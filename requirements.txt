@@ -1,7 +1,7 @@
 h5py==3.7.0
 leidenalg==0.8.10
 networkx==2.8.5
-numba==0.55.2
+numba==0.56.0
 numpy==1.22.4
 opencv-python==4.6.0.66
 openpyxl==3.0.10
