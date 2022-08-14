@@ -4,7 +4,7 @@
 
 # DANCE: A Deep Learning Library for Single-Cell Analysis
 
-DANCE is a python toolkit to support deep learning models for analyzing single-cell gene expression at scale. It includes three modules at present:
+DANCE is a Python toolkit to support deep learning models for analyzing single-cell gene expression at scale. It includes three modules at present:
 
 1. **Single-modality analysis**
 1. **Single-cell multimodal omics**
@@ -117,7 +117,7 @@ Run all tests on current environment using pytest
 pytest -v
 ```
 
-Run full test including from the ground up including environment set up using [tox](https://tox.wiki/en/latest/) on CPU
+Run full test from the ground up including environment set up using [tox](https://tox.wiki/en/latest/) on CPU
 
 ```bash
 tox -e python3.8-cpu
