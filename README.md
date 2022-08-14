@@ -14,7 +14,13 @@ Our goal is to build up a deep learning community for single cell analysis and p
 
 ## Installation
 
-### Quick install
+**Quick install**
+
+The full installation process might be a bit tedious and could involve some debugging when using CUDA enabled packages.
+Thus, we provide an `install.sh` script that simplifies the installation process, assuming the user have [conda](https://conda.io/projects/conda/en/latest/index.html) set up on their machines.
+The installation script creates a conda environment `pydance` and install the PyDANCE package along with all its dependencies with a apseicifc CUDA version.
+Currently, three options are accepted: `cpu`, `cu102`, and `cu113`.
+For example, to install the DANCE package using CUDA10.2, simply run:
 
 ```bash
 git clone git@github.com:OmicsML/dance.git
@@ -23,9 +29,11 @@ cd dance
 source install.sh cu102
 ```
 
-### Custom install
+<details>
+<summary>Custom install</summary>
+<br>
 
-#### Setup environment
+**Step1. Setup environment**
 
 First create a conda environment for pydance (optional)
 
@@ -61,21 +69,23 @@ For more information about installation or other CUDA version options, check out
 - [PyG](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html)
 - [DGL](https://www.dgl.ai/pages/start.html)
 
-#### Install PyDANCE
+**Step2. Install PyDANCE**
 
-##### Install from PyPI
+Install from PyPI
 
 ```bash
 pip install pydance
 ```
 
-##### Install the latest dev version from source
+Install the latest dev version from source
 
 ```bash
 git clone https://github.com/OmicsML/dance.git
 cd dance
 pip install -e .
 ```
+
+</details>
 
 ## Dev notes
 
