@@ -1,0 +1,10 @@
+extends: default
+
+rules:
+  line-length: disable
+  document-start: disable
+  truthy:
+    allowed-values: ['true', 'false', 'on']
+    level: error
+  braces:
+    max-spaces-inside: 1
