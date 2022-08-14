@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=42.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.yapf]
+based_on_style = "pep8"
+blank_line_before_nested_class_or_def = true
+column_limit = 120
+split_before_named_assigns = false
+
+[tool.pytest.ini_options]
+addopts = [
+    "--strict-markers",
+    "-m",
+    "not full_test",
+]
+markers = [
+    "full_test",
+    "light_test",
+]
+testpaths = [
+    "tests",
+]
+
+# Logging settings
+log_cli = true
+log_cli_level = "INFO"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+log_cli_format = "[%(asctime)s][%(levelname)s] %(message)s"
