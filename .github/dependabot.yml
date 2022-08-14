@@ -12,3 +12,8 @@ updates:
       day: "sunday"
       time: "09:00"
       timezone: "America/Detroit"
+    ignore:
+      - dependency-name: "torch"
+      - dependency-name: "torchvision"
+      - dependency-name: "numpy"
+        versions: ["1.23.x"]
