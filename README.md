@@ -87,42 +87,6 @@ pip install -e .
 
 </details>
 
-## Dev notes
-
-### Dev installation
-
-Install PyDANCE with extra dependencies for dev
-
-```bash
-pip install -e ."[dev]"
-```
-
-Make sure dependencies have specific pinned versions
-
-```bash
-pip install -r requirements.txt
-```
-
-Install pre-commit hooks for code quality checks
-
-```bash
-pre-commit install
-```
-
-### Run tests
-
-Run all tests on current environment using pytest
-
-```bash
-pytest -v
-```
-
-Run full test from the ground up including environment set up using [tox](https://tox.wiki/en/latest/) on CPU
-
-```bash
-tox -e python3.8-cpu
-```
-
 ## Implemented Algorithms
 
 **P1** not covered in the first release
@@ -300,3 +264,39 @@ Note: * Benchmark datasets were renormalied before running the original implemen
 | SpatialDecon | MSE               | .001 / .009                  | 0.09 / N/A                        | .22 / N/A                              |
 | SPOTlight    | MSE               | .016 / N/A                   | 0.13 / 0.118                      | .21 / .16                              |
 | CARD         | MSE               | 0.0012 / N/A                 | 0.0078 / 0.0062                   | 0.0076 / N/A                           |
+
+## Dev notes
+
+### Dev installation
+
+Install PyDANCE with extra dependencies for dev
+
+```bash
+pip install -e ."[dev]"
+```
+
+Make sure dependencies have specific pinned versions
+
+```bash
+pip install -r requirements.txt
+```
+
+Install pre-commit hooks for code quality checks
+
+```bash
+pre-commit install
+```
+
+### Run tests
+
+Run all tests on current environment using pytest
+
+```bash
+pytest -v
+```
+
+Run full test from the ground up including environment set up using [tox](https://tox.wiki/en/latest/) on CPU
+
+```bash
+tox -e python3.8-cpu
+```
