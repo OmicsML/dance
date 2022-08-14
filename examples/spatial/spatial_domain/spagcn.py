@@ -1,13 +1,7 @@
 # Copyright 2022 DSE lab.  All rights reserved.
-
-# TODO：start from project root directory to solve the package import error
-
 import argparse
-import sys
 
 from sklearn.metrics import adjusted_mutual_info_score
-
-sys.path.append("../../..")
 
 from dance.datasets.spatial import SpotDataset
 from dance.modules.spatial.spatial_domain.spagcn import SpaGCN, refine

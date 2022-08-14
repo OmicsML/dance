@@ -1,12 +1,7 @@
 # Copyright 2022 DSE lab.  All rights reserved.
-
-# TODO：start from project root directory to solve the package import error
-import sys
+import argparse
 
 import scanpy as sc
-
-sys.path.append("../../..")
-import argparse
 
 from dance.datasets.spatial import SpotDataset
 from dance.modules.spatial.spatial_domain.stagate import Stagate

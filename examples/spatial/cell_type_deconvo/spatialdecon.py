@@ -1,10 +1,3 @@
-import os.path as o
-import sys
-
-#use if running from dance/examples/spatial/cell_type_deconvo
-root_path = o.abspath(o.join(o.dirname(sys.modules[__name__].__file__), "../../.."))
-sys.path.append(root_path)
-
 import numpy as np
 import pandas as pd
 import torch
@@ -12,13 +5,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
 
-from dance.datasets.spatial import CellTypeDeconvoDataset
-from dance.datasets.spatial import CellTypeDeconvoDatasetLite
-
+from dance.datasets.spatial import CellTypeDeconvoDataset, CellTypeDeconvoDatasetLite
 from dance.modules.spatial.cell_type_deconvo.spatialdecon import SpatialDecon
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 # TODO: make this a property of the dataset class?
 DATASETS = ["CARD_synthetic", "GSE174746", "SPOTLight_synthetic", "toy1", "toy2"]
@@ -32,7 +22,6 @@ parser.add_argument("--max_iter", type=int, default=4000, help="Maximum optimiza
 parser.add_argument("--epsilon", type=float, default=1e-10, help="Optimization threshold.")
 args = parser.parse_args()
 pprint(vars(args))
-
 
 dataset = CellTypeDeconvoDatasetLite(data_id=args.dataset, data_dir=args.datadir)
 X = np.array(dataset.data['ref_sc_count'])

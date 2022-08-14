@@ -1,23 +1,13 @@
-import os.path as o
-import sys
-
-#use if running from dance/examples/spatial/cell_type_deconvo
-root_path = o.abspath(o.join(o.dirname(sys.modules[__name__].__file__), "../../.."))
-sys.path.append(root_path)
-
-
 import argparse
-from pprint import pprint
-
 import random
+from pprint import pprint
 
 import numpy as np
 import scanpy as sc
 import torch
 import torch.nn.functional as F
 
-from dance.datasets.spatial import CellTypeDeconvoDataset
-from dance.datasets.spatial import CellTypeDeconvoDatasetLite
+from dance.datasets.spatial import CellTypeDeconvoDataset, CellTypeDeconvoDatasetLite
 from dance.modules.spatial.cell_type_deconvo.dstg import DSTGLearner
 from dance.transforms.graph_construct import stAdjConstruct
 from dance.transforms.preprocess import preprocess_adj, pseudo_spatial_process, split
@@ -53,7 +43,6 @@ parser.add_argument("--location_free", action="store_true", help="Do not supply 
 args = parser.parse_args()
 pprint(vars(args))
 
-
 # Load dataset
 dataset = CellTypeDeconvoDatasetLite(data_id=args.dataset, data_dir=args.datadir)
 
@@ -70,23 +59,10 @@ ct_select_ix = sc_annot[sc_annot['cellType'].isin(ct_select)].index
 sc_annot = sc_annot.loc[ct_select_ix]
 sc_count = sc_count.loc[ct_select_ix]
 
-
 # Initialize and train model
-dstg = DSTGLearner(
-    sc_count=sc_count,
-    sc_annot=sc_annot,
-    scRNA=args.sc_ref,
-    mix_count=mix_count,
-    clust_vr="cellType",
-    n_hvg=args.n_hvg,
-    N_p=args.N_p,
-    k_filter=args.K_filter,
-    nhid=args.nhid,
-    device=device, 
-    bias=args.bias,
-    dropout=args.dropout
-)
-
+dstg = DSTGLearner(sc_count=sc_count, sc_annot=sc_annot, scRNA=args.sc_ref, mix_count=mix_count, clust_vr="cellType",
+                   n_hvg=args.n_hvg, N_p=args.N_p, k_filter=args.K_filter, nhid=args.nhid, device=device,
+                   bias=args.bias, dropout=args.dropout)
 
 #fit model
 dstg.fit(lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
@@ -95,10 +71,8 @@ dstg.fit(lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
 pred = dstg.predict()
 
 #score
-mse = dstg.score(pred[args.N_p:,:], torch.Tensor(true_p[ct_select].values), 'mse')
+mse = dstg.score(pred[args.N_p:, :], torch.Tensor(true_p[ct_select].values), 'mse')
 print(f"mse = {mse:7.4f}")
-
-
 """To reproduce DSTG benchmarks, please refer to command lines belows:
 
 CARD synthetic

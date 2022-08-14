@@ -1,16 +1,9 @@
 # Copyright 2022 DSE lab.  All rights reserved.
-
-# TODO：start from project root directory to solve the package import error
-import os
-import sys
-
-from sklearn.decomposition import PCA
-
-sys.path.append("../../..")
-
 import argparse
+import os
 
 import scanpy as sc
+from sklearn.decomposition import PCA
 
 from dance.datasets.spatial import SpotDataset
 from dance.modules.spatial.spatial_domain import louvain, stlearn
