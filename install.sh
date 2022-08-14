@@ -16,7 +16,7 @@ if [ -z $1 ]; then
 fi
 
 # Torch related dependency versions
-PYTORCH_VERSION=1.11
+PYTORCH_VERSION=1.11.0
 PYG_VERSION=2.0.4
 DGL_VERSION=0.9
 
@@ -48,8 +48,8 @@ conda activate pydance
 
 # Install CUDA enabled dependencies
 conda install pytorch=${PYTORCH_VERSION} torchvision ${TORCH_OPT} -c pytorch -y
-conda install pyg=${PYG_VERSION} -c pyg -y
 conda install ${DGL_OPT} -c dglteam -y
+pip install torch-geometric==${PYG_VERSION} torch-scatter torch-sparse torch-cluster -f https://data.pyg.org/whl/torch-${PYTORCH_VERSION}+${CUDA_VERSION}.html
 
 # Finally, install pydance
 pip install -e .
