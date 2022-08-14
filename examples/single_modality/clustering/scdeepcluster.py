@@ -1,6 +1,3 @@
-import warnings
-
-warnings.filterwarnings("ignore")
 import os
 import random
 from time import time

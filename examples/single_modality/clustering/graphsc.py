@@ -1,6 +1,3 @@
-import warnings
-
-warnings.filterwarnings("ignore")
 import argparse
 import random
 from argparse import Namespace

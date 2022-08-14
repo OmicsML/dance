@@ -1,6 +1,3 @@
-import warnings
-
-warnings.filterwarnings("ignore")
 import argparse
 from argparse import Namespace
 from time import time as get_time
