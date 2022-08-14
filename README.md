@@ -20,7 +20,7 @@ source activate dance-dev
 # Install PyTorch, PyG, and DGL with CUDA 10.2 via pip
 pip install torch=1.11 torchvision
 pip install torch-scatter torch-sparse torch-cluster torch-geometric -f https://data.pyg.org/whl/torch-1.11.0+cu102.html -q
-pip install dgl-cu102 dglgo -f https://data.dgl.ai/wheels/repo.html -q
+pip install dgl-cu102 -f https://data.dgl.ai/wheels/repo.html -q
 ```
 
 ### Alternative installation for PyTorch, PyG, and DGL using conda
