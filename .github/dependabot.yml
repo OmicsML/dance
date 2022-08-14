@@ -13,7 +13,6 @@ updates:
       time: "09:00"
       timezone: "America/Detroit"
     ignore:
-      - dependency-name: "torch"
+      - dependency-name: "torch" # see PyG
       - dependency-name: "torchvision"
-      - dependency-name: "numpy"
-        versions: ["1.23.x"]
+      - dependency-name: "numpy" # see numba
