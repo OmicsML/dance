@@ -1,0 +1,7 @@
+.tox
+
+__pycache__
+
+*.egg*
+
+.DS_Store
