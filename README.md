@@ -14,7 +14,7 @@ Our goal is to build up a deep learning community for single cell analysis and p
 
 ## Installation
 
-**Quick install**
+<H3>Quick install</H3>
 
 The full installation process might be a bit tedious and could involve some debugging when using CUDA enabled packages.
 Thus, we provide an `install.sh` script that simplifies the installation process, assuming the user have [conda](https://conda.io/projects/conda/en/latest/index.html) set up on their machines.
@@ -30,7 +30,7 @@ source install.sh cu102
 ```
 
 <details>
-<summary>Custom install</summary>
+<summary><H3>Custom install</H3></summary>
 <br>
 
 **Step1. Setup environment**
