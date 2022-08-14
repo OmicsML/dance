@@ -12,69 +12,102 @@ DANCE is a python toolkit to support deep learning models for analyzing single-c
 
 Our goal is to build up a deep learning community for single cell analysis and provide GNN based architecture for users for further development in single cell analysis.
 
-## Dev Environment Setup
-
-```bash
-# Create fresh dev environment (optional)
-conda create -n dance-dev python=3.8 -y && conda activate dance-dev
-
-# Activate your virtual environment
-source activate dance-dev
-
-# Install PyTorch, PyG, and DGL with CUDA 10.2 via pip
-pip install torch=1.11 torchvision
-pip install torch-scatter torch-sparse torch-cluster torch-geometric -f https://data.pyg.org/whl/torch-1.11.0+cu102.html -q
-pip install dgl-cu102 -f https://data.dgl.ai/wheels/repo.html -q
-```
-
-### Alternative installation for PyTorch, PyG, and DGL using conda
-
-```bash
-conda install pytorch=1.11 torchvision cudatoolkit=10.2 pyg dgl-cuda10.2 -c pytorch -c pyg -c dglteam -y
-
-# Uninstall torch-spline-conv if necessary: https://github.com/pyg-team/pytorch_geometric/issues/3593
-pip uninstall torch-spline-conv
-```
-
 ## Installation
 
-### Using the installation script
-
-The full installation process might be a bit tedious and could involve some debugging when using CUDA enabled packages.
-The `install.sh` script provide a simplified way to install all CUDA enabled packages required by the DANCE package.
-Currently, three options are accepted: `cpu`, `cu102`, and `cu113`.
-For example, to install the DANCE package using CUDA 10.2, simply run:
+### Quick install
 
 ```bash
+git clone git@github.com:OmicsML/dance.git
+cd dance
+
 source install.sh cu102
 ```
 
-### Install from pip
+### Custom install
 
+#### Setup environment
+
+First create a conda environment for pydance (optional)
+
+```bash
+conda create -n pydance python=3.8 -y && conda activate dance-dev
 ```
+
+Then, install CUDA enabled packages (PyTorch, PyG, DGL) with CUDA 10.2:
+
+```bash
+conda install pytorch=1.11 torchvision cudatoolkit=10.2 -c pytorch -y
+conda install pyg -c pyg -y
+conda install dgl-cu102 -c dglteam -y
+```
+
+Alternatively, install these dependencies for CPU only:
+
+```bash
+conda install pytorch=1.11 torchvision cpuonly -c pytorch -y
+conda install pyg -c pyg -y
+conda install dgl -c dglteam
+```
+
+**Note:** you may need to uninstall `torch-spline-conv` (see https://github.com/pyg-team/pytorch_geometric/issues/3593)
+
+```bash
+pip uninstall torch-spline-conv
+```
+
+For more information about installation or other CUDA version options, check out the installation pages for the corresponding packges
+
+- [PyTorch](https://pytorch.org/get-started/)
+- [PyG](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html)
+- [DGL](https://www.dgl.ai/pages/start.html)
+
+#### Install PyDANCE
+
+##### Install from PyPI
+
+```bash
 pip install pydance
 ```
 
-### Install from source
+##### Install the latest dev version from source
 
-```
+```bash
 git clone https://github.com/OmicsML/dance.git
 cd dance
 pip install -e .
-
-# Dev installation: $ pip install -e ".[dev]"
 ```
 
-Recommend: Install pre-commit hooks that helps formatting code for each commit
+## Dev notes
+
+### Dev installation
+
+Install PyDANCE with extra dependencies for dev
 
 ```bash
-pip install pre-commit
+pip install -e ."[dev]"
+```
+
+Make sure dependencies have specific pinned versions
+
+```bash
+pip install -r requirements.txt
+```
+
+Install pre-commit hooks for code quality checks
+
+```bash
 pre-commit install
 ```
 
-## Run tests
+### Run tests
 
-Test installation and run benchmarking tests (e.g., Python 3.8 on cpu) via
+Run all tests on current environment using pytest
+
+```bash
+pytest -v
+```
+
+Run full test including from the ground up including environment set up using [tox](https://tox.wiki/en/latest/) on CPU
 
 ```bash
 tox -e python3.8-cpu
@@ -253,7 +286,7 @@ Note: * Benchmark datasets were renormalied before running the original implemen
 
 | Model        | Evaluation Metric | GSE174746 (current/reported) | CARD Synthetic (current/reported) | SPOTlight Synthetic (current/reported) |
 | ------------ | ----------------- | ---------------------------- | --------------------------------- | -------------------------------------- |
-| DSTG         | MSE               | .172 / N/A                    | .0247 / N/A                        | .042 / N/A                            |
+| DSTG         | MSE               | .172 / N/A                   | .0247 / N/A                       | .042 / N/A                             |
 | SpatialDecon | MSE               | .001 / .009                  | 0.09 / N/A                        | .22 / N/A                              |
 | SPOTlight    | MSE               | .016 / N/A                   | 0.13 / 0.118                      | .21 / .16                              |
 | CARD         | MSE               | 0.0012 / N/A                 | 0.0078 / 0.0062                   | 0.0076 / N/A                           |
