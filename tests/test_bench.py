@@ -15,6 +15,9 @@ logging.info(f"{HOME_DIR=}")
 
 SKIP_LIST: List[str] = [
     "joint_embedding-dcca",  # OOM with 64GB mem and V100 GPU (succeed with 80GB mem)
+    "cell_type_deconvo-dstg",  # under construction
+    "cell_type_deconvo-spatialdecon",  # under construction
+    "cell_type_deconvo-spotlight",  # under construction
 ]
 
 light_options_dict: Dict[str, Tuple[str, str]] = {
