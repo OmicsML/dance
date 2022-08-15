@@ -1,8 +1,15 @@
+<p align="center">
+  <img
+       src="https://github.com/OmicsML/dance/blob/main/imgs/dance_logo.jpg"
+       style="width:70%; height:70%; object-fit:cover;"
+  />
+</p>
+
+---
+
 [![PyPI version](https://badge.fury.io/py/pydance.svg)](https://badge.fury.io/py/pydance)
 [![License](https://img.shields.io/badge/License-BSD_2--Clause-orange.svg)](https://opensource.org/licenses/BSD-2-Clause)
 [![Test Examples](https://github.com/OmicsML/dance/actions/workflows/test_examples.yml/badge.svg)](https://github.com/OmicsML/dance/actions/workflows/test_examples.yml)
-
-# DANCE: A Deep Learning Library for Single-Cell Analysis
 
 DANCE is a Python toolkit to support deep learning models for analyzing single-cell gene expression at scale. It includes three modules at present:
 
