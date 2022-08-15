@@ -14,9 +14,9 @@ import torch
 from torch import nn, optim
 from torch.autograd import Variable
 from torchnmf.nmf import NMF
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-def cell_topic_profile(X, groups, axis=1, method='median'):
+def cell_topic_profile(X, groups, ct_select, axis=0, method='median'):
     """cell_topic_profile.
 
     Parameters
@@ -25,6 +25,8 @@ def cell_topic_profile(X, groups, axis=1, method='median'):
         gene expression matrix, genes (rows) by sample cells (cols).
     groups : int
         cell-type labels of each sample cell in X.
+    ct_select: 
+        cell types to profile.
     method : string optional
          method for reduction of cell-types for cell profile, default median.
 
@@ -34,13 +36,11 @@ def cell_topic_profile(X, groups, axis=1, method='median'):
          cell profile matrix from scRNA-seq reference.
 
     """
-    groups = np.array(groups)
-    ids = np.unique(groups)
     if method == "median":
-        X_profile = torch.Tensor(np.array([np.median(X[:, groups == ids[i]], axis=1) for i in range(len(ids))]).T)
+        X_profile = np.array([np.median(X[[ i for i in range(len(groups)) if groups[i] == ct_select[j] ], :], axis=0) for j in range(len(ct_select))]).T
     else:
-        X_profile = torch.Tensor(np.array([np.mean(X[:, groups == ids[i]], axis=1) for i in range(len(ids))]).T)
-    return X_profile
+        X_profile = np.array([np.mean(X[[ i for i in range(len(groups)) if groups[i] == ct_select[j] ], :], axis=0) for j in range(len(ct_select))]).T
+    return torch.Tensor(X_profile)
 
 
 class NNLS(nn.Module):
@@ -142,33 +142,64 @@ class SPOTlight:
 
     Parameters
     ----------
-    rank : int
+    sc_count : pd.DataFrame
+        Reference single cell RNA-seq counts data.
+    sc_annot : pd.DataFrame
+        Reference cell-type label information.
+    mix_count : pd.DataFrame
+        Target mixed-cell RNA-seq counts data to be deconvoluted.
+    ct_varname : str, optional
+        Name of the cell-types column.
+    ct_select : str, optional
+        Selected cell-types to be considered for deconvolution.
+    rank : int optional
            rank of the matrix factorization.
+    sc_profile: numpy array optional
+        pre-constructed cell profile matrix.
     bias : boolean optional
-           set true to include bias term in the regression modules, default False.
-    profile_mtd : string optional
-           method for reduction of cell-types for cell profile, default median.
+        include bias term, default False.
+    init_bias: numpy array optional
+        initial bias term (background estimate).
     init : string optional
            initialization method for matrix factorization solver (see NMF from sklearn).
     max_iter : int optional
            maximum iterations allowed for matrix factorization solver.
 
     Returns
-        -------
+    -------
     None.
 
     """
 
-    def __init__(self, in_dim, hid_dim, out_dim, rank, bias=False, profile_mtd='median', init='random', random_state=0,
-                 max_iter=1000, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+    def __init__(self, sc_count, sc_annot, mix_count, ct_varname, ct_select, rank=2, sc_profile=None, bias=False, init_bias=None, init='random', max_iter=1000, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
         super().__init__()
         self.device = device
         self.bias = bias
-        self.profile_mtd = 'median'
-
+        self.ct_select = ct_select
+        #subset sc samples on selected cell types (mutual between sc and mix cell data)
+        ct_select_ix = sc_annot[sc_annot[ct_varname].isin(ct_select)].index
+        self.sc_annot = sc_annot.loc[ct_select_ix]
+        self.sc_count = sc_count.loc[ct_select_ix]
+        cellTypes = self.sc_annot[ct_varname].values.tolist()
+        self.cellTypes = cellTypes
+        #construct a cell profile matrix if not profided
+        if sc_profile is None:
+            self.ref_sc_profile = cell_topic_profile(self.sc_count.values, cellTypes, ct_select, method='median')
+        else:
+            self.ref_sc_profile = sc_profile
+            
+        self.mix_count = mix_count.values.T
+        self.sc_count = self.sc_count.values.T
+        
+        in_dim = self.sc_count.shape
+        hid_dim = len(ct_select)
+        out_dim = self.mix_count.shape[1]
         self.nmf_model = NMF(Vshape=in_dim, rank=rank).to(device)
+        if rank == len(ct_select):
+            #initialize basis as cell profile
+            self.nmf_model.H = nn.Parameter(torch.Tensor(self.ref_sc_profile))
         #self.nmf_model = NMF(n_components=rank, init=init,  random_state=random_state, max_iter=max_iter)
-
+            
         #self.nnls_reg1=LinearRegression(fit_intercept=bias,positive=True)
         self.nnls_reg1 = NNLS(in_dim=rank, out_dim=out_dim, bias=bias, device=device)
 
@@ -177,7 +208,7 @@ class SPOTlight:
 
         self.model = nn.Sequential(self.nmf_model, self.nnls_reg1, self.nnls_reg2)
 
-    def forward(self, x, y, cell_types):
+    def forward(self):
 
         #1. get NMF decompositons
         W = self.nmf_model.H.clone()
@@ -185,7 +216,7 @@ class SPOTlight:
 
         #2. get cell-topic and mix-topic profiles
         #a. get cell-topic profiles H_profile: cell-type group medians of coef H (topic x cells)
-        H_profile = cell_topic_profile(H.cpu().numpy(), groups=cell_types, axis=1, method=self.profile_mtd)
+        H_profile = cell_topic_profile(H.cpu().numpy().T, self.cellTypes, self.ct_select, method='median')
         H_profile = H_profile.to(self.device)
 
         #b. get mix-topic profiles B: NNLS of basis W onto mix expression Y -- y ~ W*b
@@ -197,7 +228,7 @@ class SPOTlight:
 
         return (W, H_profile, B, P)
 
-    def fit(self, x, y, cell_types):
+    def fit(self, lr, max_iter):
         """fit function for model training.
 
         Parameters
@@ -215,11 +246,11 @@ class SPOTlight:
 
         """
 
-        x = Variable(torch.FloatTensor(x), requires_grad=True).to(self.device)
-        y = Variable(torch.FloatTensor(y)).to(self.device)
+        x = Variable(torch.FloatTensor(self.sc_count), requires_grad=True).to(self.device)
+        y = Variable(torch.FloatTensor(self.mix_count)).to(self.device)
 
         #1. run NMF on scRNA X
-        self.nmf_model.fit(x)
+        self.nmf_model.fit(x, max_iter=max_iter)
         self.nmf_model.requires_grad_(False)
 
         self.W = self.nmf_model.H.clone()
@@ -227,26 +258,26 @@ class SPOTlight:
 
         #2. get cell-topic and mix-topic profiles
         #a. get cell-topic profiles H_profile: cell-type group medians of coef H (topic x cells)
-        self.H_profile = cell_topic_profile(self.H.cpu().numpy(), groups=cell_types, axis=1, method=self.profile_mtd)
+        self.H_profile = cell_topic_profile(self.H.cpu().numpy().T, self.cellTypes, self.ct_select, method='median')
         self.H_profile = self.H_profile.to(self.device)
 
         #b. get mix-topic profiles B: NNLS of basis W onto mix expression Y -- y ~ W*b
         #nnls ran for each spot
-        self.nnls_reg1.fit(self.W, y, max_iter=1000, lr=.01)
+        self.nnls_reg1.fit(self.W, y, max_iter=max_iter, lr=lr)
         self.nnls_reg1.requires_grad_(False)
         self.B = self.nnls_reg1.model.weight.clone().T
 
         #3.  get cell-type proportions P: NNLS of cell-topic profile H_profile onoto mix-topic profile B -- b ~ h_profile*p
-        self.nnls_reg2.fit(self.H_profile, self.B, max_iter=1000, lr=.01)
+        self.nnls_reg2.fit(self.H_profile, self.B, max_iter=max_iter, lr=lr)
         self.nnls_reg2.requires_grad_(False)
         self.P = self.nnls_reg2.model.weight.clone().T
 
-    def predict(self, x, y, cell_types):
+    def predict(self):
         """prediction function.
         Parameters
         ----------
-        y : torch 2-d tensor
-            mixed cell expression.
+        
+        None.
 
         Returns
         -------
@@ -254,36 +285,31 @@ class SPOTlight:
             predictions of cell-type proportions.
 
         """
+        W, H_profile, B, P = self.forward()
+        proportion_preds = P / torch.sum(P, axis=0, keepdims=True).clamp(min=1e-6)
+        return (proportion_preds)
 
-        x = torch.FloatTensor(x).to(self.device)
-        y = torch.FloatTensor(y).to(self.device)
-
-        W, H_profile, B, P = self.forward(x, y, cell_types=cell_types)
-        return (P)
-
-    def score(self, x, y, cell_types):
+    def score(self, pred, true_prop):
         """score.
 
         Parameters
         ----------
-        x : torch 2-d tensor
-            scRNA-seq reference expression.
-        y : torch 2-d tensor
-            mixed cell expression to be deconvoluted.
-        cell_types : torch tensor
-            cell type annotations for scRNA-seq reference.
+        pred :
+            predicted cell-type proportions.
+        true_prop : 
+            true cell-type proportions.
 
         Returns
         -------
-        model_score : float
-            coefficient of determination of the prediction (final non-negative linear module).
+        loss : float
+            mse loss between predicted and true cell-type proportions.
 
         """
-        x = torch.FloatTensor(x).to(self.device)
-        y = torch.FloatTensor(y).to(self.device)
-        W, H_profile, B, P = self.forward(x, y, cell_types=cell_types)
-        B_pred = self.nnls_reg2(H_profile)
+        print(pred.shape)
+        print(true_prop.shape)
+        pred = pred/torch.sum(pred, 1, keepdims=True).clamp(min=1e-6)
+        true_prop = true_prop/torch.sum(true_prop, 1, keepdims=True).clamp(min=1e-6)
+        loss = ((pred - true_prop)**2).mean()
+        
+        return loss.detach().item()
 
-        criterion = nn.MSELoss()
-        model_score = criterion(B_pred, B).item()
-        return model_score

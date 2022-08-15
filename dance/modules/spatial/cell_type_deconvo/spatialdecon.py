@@ -58,6 +58,25 @@ class MSLELoss(nn.Module):
 
 
 def cell_topic_profile(X, groups, ct_select, axis=0, method='median'):
+    """cell_topic_profile.
+
+    Parameters
+    ----------
+    X : torch 2-d tensor
+        gene expression matrix, genes (rows) by sample cells (cols).
+    groups : int
+        cell-type labels of each sample cell in X.
+    ct_select: 
+        cell types to profile.
+    method : string optional
+         method for reduction of cell-types for cell profile, default median.
+
+    Returns
+        -------
+    X_profile : torch 2-d tensor
+         cell profile matrix from scRNA-seq reference.
+
+    """
     if method == "median":
         X_profile = np.array([np.median(X[[ i for i in range(len(groups)) if groups[i] == ct_select[j] ], :], axis=0) for j in range(len(ct_select))]).T
     else:
@@ -71,12 +90,22 @@ class SpatialDecon:
 
     Parameters
     ----------
-    in_dim : int
-        input dimension.
-    out_dim : int
-        output dimension.
+    sc_count : pd.DataFrame
+        Reference single cell RNA-seq counts data.
+    sc_annot : pd.DataFrame
+        Reference cell-type label information.
+    mix_count : pd.DataFrame
+        Target mixed-cell RNA-seq counts data to be deconvoluted.
+    ct_varname : str, optional
+        Name of the cell-types column.
+    ct_select : str, optional
+        Selected cell-types to be considered for deconvolution.
+    sc_profile: numpy array optional
+        pre-constructed cell profile matrix.
     bias : boolean optional
         include bias term, default False.
+    init_bias: numpy array optional
+        initial bias term (background estimate).
 
     Returns
     -------
