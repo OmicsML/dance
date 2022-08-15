@@ -8,6 +8,7 @@ Danaher, Kim, Nelson, et al. "Advances in mixed cell deconvolution enable quanti
 Nature Communications (2022)
 
 """
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -56,6 +57,15 @@ class MSLELoss(nn.Module):
         return loss
 
 
+def cell_topic_profile(X, groups, ct_select, axis=0, method='median'):
+    if method == "median":
+        X_profile = np.array([np.median(X[[ i for i in range(len(groups)) if groups[i] == ct_select[j] ], :], axis=0) for j in range(len(ct_select))]).T
+    else:
+        X_profile = np.array([np.mean(X[[ i for i in range(len(groups)) if groups[i] == ct_select[j] ], :], axis=0) for j in range(len(ct_select))]).T
+    return X_profile
+
+
+
 class SpatialDecon:
     """SpatialDecon.
 
@@ -74,12 +84,31 @@ class SpatialDecon:
 
     """
 
-    def __init__(self, in_dim, out_dim, bias=False, init_bias=None,
+    def __init__(self, sc_count, sc_annot, mix_count, ct_varname, ct_select, sc_profile = None, bias=False, init_bias=None,
                  device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
         super().__init__()
+    
         self.device = device
+        
+        #subset sc samples on selected cell types (mutual between sc and mix cell data)
+        ct_select_ix = sc_annot[sc_annot[ct_varname].isin(ct_select)].index
+        self.sc_annot = sc_annot.loc[ct_select_ix]
+        self.sc_count = sc_count.loc[ct_select_ix]
+        cellTypes = self.sc_annot[ct_varname].values.tolist()
+        
+        #construct a cell profile matrix if not profided
+        if sc_profile is None:
+            self.ref_sc_profile = cell_topic_profile(self.sc_count.values, cellTypes, ct_select, method='median')
+        else:
+            self.ref_sc_profile = sc_profile
+            
+        self.mix_count = mix_count.values.T
+        
+        in_dim = self.ref_sc_profile.shape[1]
+        out_dim = self.mix_count.shape[1]
         self.model = nn.Linear(in_features=in_dim, out_features=out_dim, bias=bias)
-        self.model.bias = init_bias
+        if init_bias is not None:
+            self.model.bias = nn.Parameter(torch.Tensor(init_bias.values.T.copy()))
         self.model = self.model.to(device)
 
     def forward(self, x: torch.Tensor):
@@ -112,18 +141,14 @@ class SpatialDecon:
 
         """
         proportion_preds = self.model.weight.T
-        proportion_preds = proportion_preds / torch.sum(proportion_preds, axis=0)
+        proportion_preds = proportion_preds / torch.sum(proportion_preds, axis=0, keepdims=True).clamp(min=1e-6)
         return (proportion_preds)
 
-    def fit(self, ref_x, y, max_iter, lr, print_res=False, print_period=100):
+    def fit(self, lr, max_iter, print_res=False, print_period=100):
         """fit function for model training.
 
         Parameters
         ----------
-        ref_x :
-            scRNA-seq reference expression.
-        y :
-            mixed cell expression.
         max_iter : int
             maximum number of iterations for optimizat.
         lr : float
@@ -138,9 +163,8 @@ class SpatialDecon:
         None.
 
         """
-
-        ref_x = Variable(torch.FloatTensor(ref_x), requires_grad=True).to(self.device)
-        y = Variable(torch.FloatTensor(y)).to(self.device)
+        ref_sc_profile = Variable(torch.FloatTensor(self.ref_sc_profile), requires_grad=True).to(self.device)
+        mix_count = Variable(torch.FloatTensor(self.mix_count)).to(self.device)
 
         criterion = MSLELoss()
         optimizer = optim.Adam(self.model.parameters(), lr=lr)
@@ -148,10 +172,10 @@ class SpatialDecon:
         self.model.train()
         for iteration in range(max_iter):
             iteration += 1
-            y_pred = self.model(ref_x)
+            mix_pred = self.model(ref_sc_profile)
 
             # Compute and print loss
-            loss = criterion(y_pred, y)
+            loss = criterion(mix_pred, mix_count)
             self.loss = loss
             # Zero gradients, perform a backward pass,
             # and update the weights.
@@ -164,26 +188,24 @@ class SpatialDecon:
             if iteration % print_period == 0:
                 print(f"Epoch: {iteration:02}/{max_iter} Loss: {loss.item():.5e}")
 
-    def score(self, ref_x, y):
+    def score(self, pred, true_prop):
         """score.
 
         Parameters
         ----------
-        ref_x :
-            scRNA reference expression
-        y :
-            cell-mixture expression
+        pred :
+            predicted cell-type proportions.
+        true_prop : 
+            true cell-type proportions.
 
         Returns
         -------
-        model_score : float
-            MSLE loss between transformed scRNA reference expression (prediction) and cell-mixture expression.
+        loss : float
+            mse loss between predicted and true cell-type proportions.
 
         """
-        ref_x = torch.FloatTensor(ref_x).to(self.device)
-        y = torch.FloatTensor(y).to(self.device)
-        y_pred = self.model(ref_x)
-
-        criterion = MSLELoss()
-        model_score = criterion(y_pred, y).item()
-        return model_score
+        pred = pred/torch.sum(pred,1, keepdims=True).clamp(min=1e-6)
+        true_prop = true_prop/torch.sum(true_prop,1, keepdims=True).clamp(min=1e-6)
+        loss = ((pred - true_prop)**2).mean()
+        
+        return loss.detach().item()
