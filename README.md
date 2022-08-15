@@ -261,7 +261,7 @@ Note: * Benchmark datasets were renormalied before running the original implemen
 | Model        | Evaluation Metric | GSE174746 (current/reported) | CARD Synthetic (current/reported) | SPOTlight Synthetic (current/reported) |
 | ------------ | ----------------- | ---------------------------- | --------------------------------- | -------------------------------------- |
 | DSTG         | MSE               | .172 / N/A                   | .0247 / N/A                       | .042 / N/A                             |
-| SpatialDecon | MSE               | .0014 / .009                  | .007 / N/A                        | .22 / N/A                              |
+| SpatialDecon | MSE               | .0014 / .009                  | .007 / N/A                        | 0.0055 / N/A                              |
 | SPOTlight    | MSE               | .016 / N/A                   | .13 / 0.118                      | .21 / .16                              |
 | CARD         | MSE               | .0012 / N/A                 | .0078 / 0.0062                   | .0076 / N/A                           |
 
