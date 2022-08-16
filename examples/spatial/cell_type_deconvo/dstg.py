@@ -6,10 +6,6 @@ import torch
 from dance.datasets.spatial import CellTypeDeconvoDatasetLite
 from dance.modules.spatial.cell_type_deconvo.dstg import DSTGLearner
 
-# Set random seed
-torch.manual_seed(17)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 # TODO: make this a property of the dataset class?
 DATASETS = ["CARD_synthetic", "GSE174746", "SPOTLight_synthetic", "toy1", "toy2"]
 
@@ -26,8 +22,17 @@ parser.add_argument("--bias", type=bool, default=False, help="Include/Exclude bi
 parser.add_argument("--nhid", type=int, default=16, help="Number of neurons in latent layer.")
 parser.add_argument("--dropout", type=float, default=0., help="Dropout rate.")
 parser.add_argument("--epochs", type=int, default=25, help="Number of epochs to train the model.")
+parser.add_argument("--seed", type=int, default=17, help="Random seed.")
+parser.add_argument("--device", default="auto", help="Computation device.")
 args = parser.parse_args()
 pprint(vars(args))
+
+# Set torch variables
+torch.manual_seed(args.seed)
+if args.device == "auto":
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+else:
+    device = torch.device(args.device)
 
 # Load dataset
 dataset = CellTypeDeconvoDatasetLite(data_id=args.dataset, data_dir=args.datadir)

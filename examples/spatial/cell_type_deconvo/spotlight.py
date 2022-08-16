@@ -19,9 +19,17 @@ parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate.")
 parser.add_argument("--rank", type=int, default=2, help="Rank of the NMF module.")
 parser.add_argument("--bias", type=bool, default=False, help="Include/Exclude bias term.")
 parser.add_argument("--max_iter", type=int, default=4000, help="Maximum optimization iteration.")
-parser.add_argument("--epsilon", type=float, default=1e-10, help="Optimization threshold.")
+parser.add_argument("--seed", type=int, default=17, help="Random seed.")
+parser.add_argument("--device", default="auto", help="Computation device.")
 args = parser.parse_args()
 pprint(vars(args))
+
+# Set torch variables
+torch.manual_seed(args.seed)
+if args.device == "auto":
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+else:
+    device = torch.device(args.device)
 
 # Load dataset
 dataset = CellTypeDeconvoDatasetLite(data_id=args.dataset, data_dir=args.datadir)
