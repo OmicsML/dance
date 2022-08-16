@@ -66,7 +66,7 @@ def cell_topic_profile(X, groups, ct_select, axis=0, method='median'):
         gene expression matrix, genes (rows) by sample cells (cols).
     groups : int
         cell-type labels of each sample cell in X.
-    ct_select: 
+    ct_select:
         cell types to profile.
     method : string optional
          method for reduction of cell-types for cell profile, default median.
@@ -78,11 +78,16 @@ def cell_topic_profile(X, groups, ct_select, axis=0, method='median'):
 
     """
     if method == "median":
-        X_profile = np.array([np.median(X[[ i for i in range(len(groups)) if groups[i] == ct_select[j] ], :], axis=0) for j in range(len(ct_select))]).T
+        X_profile = np.array([
+            np.median(X[[i for i in range(len(groups)) if groups[i] == ct_select[j]], :], axis=0)
+            for j in range(len(ct_select))
+        ]).T
     else:
-        X_profile = np.array([np.mean(X[[ i for i in range(len(groups)) if groups[i] == ct_select[j] ], :], axis=0) for j in range(len(ct_select))]).T
+        X_profile = np.array([
+            np.mean(X[[i for i in range(len(groups)) if groups[i] == ct_select[j]], :], axis=0)
+            for j in range(len(ct_select))
+        ]).T
     return X_profile
-
 
 
 class SpatialDecon:
@@ -113,26 +118,26 @@ class SpatialDecon:
 
     """
 
-    def __init__(self, sc_count, sc_annot, mix_count, ct_varname, ct_select, sc_profile = None, bias=False, init_bias=None,
-                 device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+    def __init__(self, sc_count, sc_annot, mix_count, ct_varname, ct_select, sc_profile=None, bias=False,
+                 init_bias=None, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
         super().__init__()
-    
+
         self.device = device
-        
+
         #subset sc samples on selected cell types (mutual between sc and mix cell data)
         ct_select_ix = sc_annot[sc_annot[ct_varname].isin(ct_select)].index
         self.sc_annot = sc_annot.loc[ct_select_ix]
         self.sc_count = sc_count.loc[ct_select_ix]
         cellTypes = self.sc_annot[ct_varname].values.tolist()
-        
+
         #construct a cell profile matrix if not profided
         if sc_profile is None:
             self.ref_sc_profile = cell_topic_profile(self.sc_count.values, cellTypes, ct_select, method='median')
         else:
             self.ref_sc_profile = sc_profile
-            
+
         self.mix_count = mix_count.values.T
-        
+
         in_dim = self.ref_sc_profile.shape[1]
         out_dim = self.mix_count.shape[1]
         self.model = nn.Linear(in_features=in_dim, out_features=out_dim, bias=bias)
@@ -224,7 +229,7 @@ class SpatialDecon:
         ----------
         pred :
             predicted cell-type proportions.
-        true_prop : 
+        true_prop :
             true cell-type proportions.
 
         Returns
@@ -233,8 +238,8 @@ class SpatialDecon:
             mse loss between predicted and true cell-type proportions.
 
         """
-        pred = pred/torch.sum(pred,1, keepdims=True).clamp(min=1e-6)
-        true_prop = true_prop/torch.sum(true_prop,1, keepdims=True).clamp(min=1e-6)
+        pred = pred / torch.sum(pred, 1, keepdims=True).clamp(min=1e-6)
+        true_prop = true_prop / torch.sum(true_prop, 1, keepdims=True).clamp(min=1e-6)
         loss = ((pred - true_prop)**2).mean()
-        
+
         return loss.detach().item()

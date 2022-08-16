@@ -5,7 +5,7 @@
   />
 </p>
 
----
+______________________________________________________________________
 
 [![PyPI version](https://badge.fury.io/py/pydance.svg)](https://badge.fury.io/py/pydance)
 [![License](https://img.shields.io/badge/License-BSD_2--Clause-orange.svg)](https://opensource.org/licenses/BSD-2-Clause)
@@ -268,9 +268,9 @@ Note: * Benchmark datasets were renormalied before running the original implemen
 | Model        | Evaluation Metric | GSE174746 (current/reported) | CARD Synthetic (current/reported) | SPOTlight Synthetic (current/reported) |
 | ------------ | ----------------- | ---------------------------- | --------------------------------- | -------------------------------------- |
 | DSTG         | MSE               | .172 / N/A                   | .0247 / N/A                       | .042 / N/A                             |
-| SpatialDecon | MSE               | .0014 / .009                  | .0077 / N/A                        | .0055 / N/A                              |
-| SPOTlight    | MSE               | .0098 / N/A                   | .0246 / 0.118                      | .0109 / .16                              |
-| CARD         | MSE               | .0012 / N/A                 | .0078 / 0.0062                   | .0076 / N/A                           |
+| SpatialDecon | MSE               | .0014 / .009                 | .0077 / N/A                       | .0055 / N/A                            |
+| SPOTlight    | MSE               | .0098 / N/A                  | .0246 / 0.118                     | .0109 / .16                            |
+| CARD         | MSE               | .0012 / N/A                  | .0078 / 0.0062                    | .0076 / N/A                            |
 
 ## Dev notes
 

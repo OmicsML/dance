@@ -5,9 +5,9 @@ import sys
 root_path = o.abspath(o.join(o.dirname(sys.modules[__name__].__file__), "../../.."))
 sys.path.append(root_path)
 
-
 import argparse
 from pprint import pprint
+
 import numpy as np
 import pandas as pd
 import torch
@@ -16,7 +16,6 @@ import torch.nn.functional as F
 from torch import optim
 
 from dance.datasets.spatial import CellTypeDeconvoDatasetLite
-
 from dance.modules.spatial.cell_type_deconvo.spotlight import SPOTlight
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -36,8 +35,6 @@ parser.add_argument("--epsilon", type=float, default=1e-10, help="Optimization t
 args = parser.parse_args()
 pprint(vars(args))
 
-
-
 # Load dataset
 dataset = CellTypeDeconvoDatasetLite(data_id=args.dataset, data_dir=args.datadir)
 
@@ -54,50 +51,32 @@ true_p = dataset.data["true_p"]
 ct_select = sorted(set(sc_annot.cellType.unique().tolist()) & set(true_p.columns.tolist()))
 print('ct_select =', f'{ct_select}')
 
-true_p = torch.FloatTensor(true_p.loc[:,ct_select].values)
+true_p = torch.FloatTensor(true_p.loc[:, ct_select].values)
 if 'ref_cell_profile' in dataset.data:
     sc_profile = dataset.data["ref_cell_profile"]
-    sc_profile =  sc_profile.loc[:, ct_select].values
-
+    sc_profile = sc_profile.loc[:, ct_select].values
 
 # Initialize and train model
-spotLight = SPOTlight(
-    sc_count=sc_count,
-    sc_annot=sc_annot,
-    mix_count=mix_count,
-    ct_varname="cellType",
-    ct_select=ct_select,
-    rank = args.rank,
-    sc_profile = sc_profile,
-    bias=args.bias,
-    init_bias = init_background,
-    max_iter = args.max_iter,
-    device=device
-)
-
-
+spotLight = SPOTlight(sc_count=sc_count, sc_annot=sc_annot, mix_count=mix_count, ct_varname="cellType",
+                      ct_select=ct_select, rank=args.rank, sc_profile=sc_profile, bias=args.bias,
+                      init_bias=init_background, max_iter=args.max_iter, device=device)
 
 #fit model
 spotLight.fit(lr=args.lr, max_iter=args.max_iter)
 
-
-
 # Predict cell-type proportions and evaluate
 pred = spotLight.predict()
-
 
 #score
 mse = spotLight.score(pred.T, true_p)
 print(f"mse = {mse:7.4f}")
-
-
 """To reproduce SpatialDecon benchmarks, please refer to command lines belows:
 
 CARD_synthetic
-$ python spotlight.py --dataset CARD_synthetic --lr .1 --max_iter 100 --rank 8 --bias 0 
+$ python spotlight.py --dataset CARD_synthetic --lr .1 --max_iter 100 --rank 8 --bias 0
 
 GSE174746
-$ python spotlight.py --dataset GSE174746 --lr .1 --max_iter 15000 --rank 4 --bias 0 
+$ python spotlight.py --dataset GSE174746 --lr .1 --max_iter 15000 --rank 4 --bias 0
 
 SPOTLight synthetic
 $ python spotlight.py --dataset SPOTLight_synthetic --lr .1 --max_iter 150 --rank 10 --bias 0

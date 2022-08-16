@@ -992,17 +992,16 @@ class Classifier():
 
 
 class Celltypist():
-    """
-    Build the ACTINN model
+    r"""Build the ACTINN model.
 
-    ----------
     Parameters
-    classifier: Classification function
+    ----------
+    classifier : Classification function
         Class that wraps the celltyping and majority voting processes, as defined above
-    scaler: StandardScaler
+    scaler : StandardScaler
         The scale factor for normalization.
-    description: str
-        text description of the model, otherwise it will be set as {'date': date, 'details': details, 'url': url, 'source': source, 'version': version, 'number_celltypes': len(classifier.classes_)} in fit function
+    description : str
+        text description of the model.
 
     """
 
@@ -1138,7 +1137,7 @@ class Celltypist():
             Other keyword arguments passed to :class:`~sklearn.linear_model.LogisticRegression` (`use_SGD = False`) or :class:`~sklearn.linear_model.SGDClassifier` (`use_SGD = True`).
 
         Returns
-        ----------
+        -------
         :class:`~celltypist.models.Model`
             An instance of the :class:`~celltypist.models.Model` trained by celltypist.
 
@@ -1347,7 +1346,7 @@ class Celltypist():
             a dictionary for label conversion
 
         Returns
-        ----------
+        -------
         correct: int
             Number of correct predictions
         Accuracy: float

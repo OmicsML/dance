@@ -4,7 +4,7 @@ Adapted from https://github.com/Su-informatics-lab/DSTG
 
 Reference
 ---------
-Song, and Su. "DSTG: deconvoluting spatial transcriptomics data through graph-based artificial intelligence." 
+Song, and Su. "DSTG: deconvoluting spatial transcriptomics data through graph-based artificial intelligence."
 Briefings in Bioinformatics (2021)
 
 """
@@ -19,13 +19,16 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 from torch.nn.parameter import Parameter
+
 from dance.transforms.graph_construct import stAdjConstruct
 from dance.transforms.preprocess import preprocess_adj, pseudo_spatial_process, split
 
 
 class GraphConvolution(nn.Module):
     """Simple GCN layer, similar to https://arxiv.org/abs/1609.02907."""
-    """GraphConvolution.
+
+    def __init__(self, in_features, out_features, support, bias=False):
+        """GraphConvolution.
 
         Parameters
         ----------
@@ -43,7 +46,6 @@ class GraphConvolution(nn.Module):
         None.
 
         """
-    def __init__(self, in_features, out_features, support, bias=False):
         super().__init__()
         self.support = support
         self.in_features = in_features
@@ -104,6 +106,7 @@ class GraphConvolution(nn.Module):
 
 class GCN(nn.Module):
     """dropout + GC + activation."""
+
     def __init__(self, nfeat, nhid1, nout, bias=False, dropout=0., act=F.relu):
         super().__init__()
 
@@ -163,43 +166,47 @@ class DSTGLearner:
     None.
 
     """
-    def __init__(self, sc_count, sc_annot, scRNA, mix_count, clust_vr, mix_annot = None, n_hvg=2000, N_p=1000,  k_filter=0, nhid=32, bias=False, dropout=0., device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+
+    def __init__(self, sc_count, sc_annot, scRNA, mix_count, clust_vr, mix_annot=None, n_hvg=2000, N_p=1000, k_filter=0,
+                 nhid=32, bias=False, dropout=0., device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
         super().__init__()
         self.device = device
-        
+
         #set adata objects for sc ref and cell mixtures
         sc_adata = sc.AnnData(sc_count)
         sc_adata.obs = sc_annot
         mix_adata = sc.AnnData(mix_count)
         #mix_adata.obs = true_p
-        
+
         #pre-process: get variable genes --> normalize --> log1p --> standardize --> out
         #set scRNA to false if already using pseudo spot data with real spot data
         #set to true if the reference data is scRNA (to be used for generating pseudo spots)
-        mix_counts, mix_labels, hvgs = pseudo_spatial_process([sc_adata, mix_adata], [sc_annot, mix_annot], clust_vr, scRNA, n_hvg, N_p)
+        mix_counts, mix_labels, hvgs = pseudo_spatial_process([sc_adata, mix_adata], [sc_annot, mix_annot], clust_vr,
+                                                              scRNA, n_hvg, N_p)
         mix_labels = [lab.drop(['cell_count', 'total_umi_count', 'n_counts'], axis=1) for lab in mix_labels]
 
         # create train/val/test split
-        adj_data, features, labels_binary_train, labels_binary_val, labels_binary_test, train_mask, pred_mask, val_mask, test_mask, new_label, true_label = split(mix_counts, mix_labels, pre_process=1, split_val=.8)
-        
+        adj_data, features, labels_binary_train, labels_binary_val, labels_binary_test, train_mask, pred_mask, val_mask, test_mask, new_label, true_label = split(
+            mix_counts, mix_labels, pre_process=1, split_val=.8)
+
         self.labels_binary_train = torch.FloatTensor(labels_binary_train).to(device)
-        self.features = torch.sparse.FloatTensor(torch.LongTensor([features[0][:, 0].tolist(), features[0][:, 1].tolist()]),
-                                            torch.FloatTensor(features[1])).to(device)
+        self.features = torch.sparse.FloatTensor(
+            torch.LongTensor([features[0][:, 0].tolist(), features[0][:, 1].tolist()]),
+            torch.FloatTensor(features[1])).to(device)
         self.train_mask = torch.FloatTensor(train_mask).to(device)
-        
+
         #construct adjacency matrix
-        adj = stAdjConstruct(mix_counts, mix_labels, adj_data,  k_filter=k_filter)
+        adj = stAdjConstruct(mix_counts, mix_labels, adj_data, k_filter=k_filter)
         #preprocess adjacency matrix
         adj = preprocess_adj(adj)
 
         self.adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
-                                       torch.FloatTensor(adj.data.astype(np.int32))).to(device)
-        
+                                            torch.FloatTensor(adj.data.astype(np.int32))).to(device)
+
         nfeat = self.features.size()[1]
-        nout=self.labels_binary_train.size()[1]
+        nout = self.labels_binary_train.size()[1]
         #initialize GCN module
         self.model = GCN(nfeat, nhid, nout, bias, dropout).to(device)
-        
 
     def fit(self, lr=0.005, max_epochs=50, weight_decay=0):
         """fit function for model training.
@@ -218,26 +225,16 @@ class DSTGLearner:
         None.
 
         """
-        
-        """X :
-            node features.
-        adj :
-            adjacency matrix.
-        labels :
-            labels of pseudo spots (and real spots if provided).
-        labels_mask :
-            mask to indicate which samples to use for training.
-        """
-        X = self.features
-        adj = self.adj
-        labels = self.labels_binary_train
-        labels_mask = self.train_mask
+        X = self.features  # node features
+        adj = self.adj  # ajacency matrix
+        labels = self.labels_binary_train  # labels of pseudo spots (and real spots if provided)
+        labels_mask = self.train_mask  # mask to indicate which samples to use for training
 
         #device = self.device
         model = self.model
         model.train()
         optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-        
+
         for epoch in range(max_epochs):
             t = time.time()
 
@@ -252,13 +249,12 @@ class DSTGLearner:
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            
 
     def predict(self):
         """prediction function.
         Parameters
         ----------
-   
+
         Returns
         -------
 
@@ -272,18 +268,17 @@ class DSTGLearner:
         fX = self.model(X, adj)
         pred = F.softmax(fX, dim=1)
         return pred
-   
-    
-    def score(self, pred, true_prop, score_metric = 'ce'):
+
+    def score(self, pred, true_prop, score_metric='ce'):
         """Model performance score.
 
         Parameters
         ----------
         pred :
             predicted cell-type proportions.
-        true_prop : 
+        true_prop :
             true cell-type proportions.
-        score_metric : 
+        score_metric :
             metric used to assess prediction performance.
 
         Returns
@@ -296,7 +291,8 @@ class DSTGLearner:
         if score_metric == 'ce':
             loss = F.cross_entropy(pred, true_prop)
         elif score_metric == 'mse':
-            loss = ((pred/torch.sum(pred,1, keepdims=True) - true_prop/torch.sum(true_prop,1, keepdims=True))**2).mean()
+            loss = ((pred / torch.sum(pred, 1, keepdims=True) -
+                     true_prop / torch.sum(true_prop, 1, keepdims=True))**2).mean()
         return loss.detach().item()
 
 

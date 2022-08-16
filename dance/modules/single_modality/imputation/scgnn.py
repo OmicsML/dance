@@ -255,7 +255,8 @@ class GCNModelAE(nn.Module):
 
 
 class scGNN():
-    """ Single-cell GNN model
+    """Single-cell GNN model.
+
     Parameters
     ----------
     adata :
@@ -286,6 +287,7 @@ class scGNN():
         number of samples in minibatch
     debugMode : str
         alternative training with debug
+
     """
 
     def __init__(self, adata, genelist, celllist, params, model_type='AE', n_hidden2=32, activation=F.relu, dropout=0.1,
@@ -352,7 +354,8 @@ class scGNN():
         return ret
 
     def generateCelltypeRegu(self, listResult):
-        """
+        """generateCelltypeRegu.
+
         Parameters
         ----------
         listResult :
@@ -361,6 +364,7 @@ class scGNN():
         ----------
         celltypesample :
             matrix of cell types
+
         """
         celltypesample = np.zeros((len(listResult), len(listResult)))
         tdict = {}
@@ -384,6 +388,7 @@ class scGNN():
 
     def sample_mask(self, idx, l):
         """Create mask.
+
         Parameters
         ----------
         idx :
@@ -394,6 +399,7 @@ class scGNN():
         ----------
         mask :
             Boolean matrix for mask
+
         """
         mask = np.zeros(l)
         mask[idx] = 1
@@ -630,7 +636,8 @@ class scGNN():
         return loss
 
     def gae_loss_function(self, preds, labels, mu, logvar, n_nodes, norm, pos_weight):
-        """ Loss function for Graph AutoEncoder
+        """Loss function for Graph AutoEncoder.
+
         Parameters
         ----------
         preds :
@@ -649,9 +656,10 @@ class scGNN():
             weight of positive examples in cross entropy
 
         Returns
-        ----------
+        -------
         loss : float
             loss summation of cross entropy and KL distance
+
         """
         cost = norm * F.binary_cross_entropy_with_logits(preds, labels, pos_weight=labels * pos_weight)
 
@@ -723,13 +731,12 @@ class scGNN():
         return coords, values, shape
 
     def mask_test_edges(self, adj):
-        """ Function to build test set with 10% positive links
+        """Function to build test set with 10% positive links.
+
         Parameters
-        -------------
+        ----------
         adj :
             adjacency matrix
-        Returns
-        -------------
 
         """
         #
@@ -865,8 +872,8 @@ class scGNN():
         return roc_score, ap_score
 
     def GAEembedding(self, z, adj, params):
-        '''
-        GAE embedding for clustering
+        """GAE embedding for clustering.
+
         Parameters
         ----------
         z :
@@ -875,11 +882,13 @@ class scGNN():
             adjacency matrix of cell graph
         params :
             model parameters
+
         Returns
-        ----------
+        -------
         hidden_emb :
             Embedding from graph
-        '''
+
+        """
         # featrues from z
         # Louvain
         features = z
@@ -960,7 +969,8 @@ class scGNN():
         taskType='celltype',
         sparseImputation='nonsparse',
     ):
-        ''' Training loop
+        """Training loop.
+
         Parameters
         ----------
         model :
@@ -983,6 +993,7 @@ class scGNN():
             celltype or imputation for different model training
         sparseImputation : str
             whether input is sparse format
+
         Returns
         ----------
         recon_batch_all :
@@ -991,7 +1002,8 @@ class scGNN():
             return input data from train_loader
         z_all :
             hidden representation of data from model
-        '''
+
+        """
         model.train()
         train_loss = 0
         for batch_idx, (data, dataindex) in enumerate(train_loader):
@@ -1130,15 +1142,18 @@ class scGNN():
         return recon_batch_all, data_all, z_all
 
     def fit(self, train_data):
-        """ scGNN fit function
+        """scGNN fit function.
+
         Parameters
         ----------
         train_data :
             input gene expression features
+
         Returns
-        ----------
+        -------
         reconOri :
             Initial data reconstruction used for final imputation
+
         """
         if sp.issparse(train_data):
             train_data = train_data.toarray()
@@ -1526,14 +1541,15 @@ class scGNN():
             return reconOri
 
     def predict(self, test_data):
-        """ Predict function for imputation
+        """Predict function for imputation.
+
         Parameters
-        ------------
+        ----------
         reconOri :
             input to be imputed
 
         Returns
-        ------------
+        -------
         embedding_df :
             dataframe embedding of
         graph_df :
@@ -1542,6 +1558,7 @@ class scGNN():
             dataframe of cell types
         recon_df :
             dataframe of reconstructed input, completed imputed values
+
         """
         print("---Starts Imputation")
         test_data = torch.Tensor(test_data).to(self.device)
@@ -1565,6 +1582,7 @@ class scGNN():
     def score(self, true_expr, imputed_expr, test_idx, metric, true_labels=None, n_neighbors=None, n_pcs=None,
               clu_resolution=1, targetgenes=None):
         """Evaluate the trained model.
+
         Parameters
         ----------
         true_expr : DataFrame
@@ -1583,6 +1601,7 @@ class scGNN():
             resolution for Leiden cluster
         targetgenes: array optional
             genes to be imputed
+
         Returns
         -------
         acc : float
@@ -1593,6 +1612,7 @@ class scGNN():
             adjusted Rand index.
         mse : float
             mean squared erros
+
         """
         if sp.issparse(true_expr):
             true_expr = true_expr.toarray()

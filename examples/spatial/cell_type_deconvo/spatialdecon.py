@@ -5,9 +5,9 @@ import sys
 root_path = o.abspath(o.join(o.dirname(sys.modules[__name__].__file__), "../../.."))
 sys.path.append(root_path)
 
-
 import argparse
 from pprint import pprint
+
 import numpy as np
 import pandas as pd
 import torch
@@ -16,12 +16,10 @@ import torch.nn.functional as F
 from torch import optim
 
 from dance.datasets.spatial import CellTypeDeconvoDatasetLite
-
 from dance.modules.spatial.cell_type_deconvo.spatialdecon import SpatialDecon
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(17)
-
 
 # TODO: make this a property of the dataset class?
 DATASETS = ["CARD_synthetic", "GSE174746", "SPOTLight_synthetic"]
@@ -52,39 +50,25 @@ true_p = dataset.data["true_p"]
 ct_select = sorted(set(sc_annot.cellType.unique().tolist()) & set(true_p.columns.tolist()))
 print('ct_select =', f'{ct_select}')
 
-true_p = torch.FloatTensor(true_p.loc[:,ct_select].values)
+true_p = torch.FloatTensor(true_p.loc[:, ct_select].values)
 if 'ref_cell_profile' in dataset.data:
     sc_profile = dataset.data["ref_cell_profile"]
-    sc_profile =  sc_profile.loc[:, ct_select].values
+    sc_profile = sc_profile.loc[:, ct_select].values
 
-    
 # Initialize and train model
-spaDecon = SpatialDecon(
-    sc_count=sc_count,
-    sc_annot=sc_annot,
-    mix_count=mix_count,
-    ct_varname="cellType",
-    ct_select=ct_select,
-    sc_profile = sc_profile,
-    bias=args.bias,
-    init_bias = init_background,
-    device=device
-)
-
+spaDecon = SpatialDecon(sc_count=sc_count, sc_annot=sc_annot, mix_count=mix_count, ct_varname="cellType",
+                        ct_select=ct_select, sc_profile=sc_profile, bias=args.bias, init_bias=init_background,
+                        device=device)
 
 #fit model
 spaDecon.fit(lr=args.lr, max_iter=args.max_iter, print_period=100)
 
-
 # Predict cell-type proportions and evaluate
 pred = spaDecon.predict()
-
 
 #score
 mse = spaDecon.score(pred.T, true_p)
 print(f"mse = {mse:7.4f}")
-
-
 """To reproduce SpatialDecon benchmarks, please refer to command lines belows:
 
 CARD synthetic
