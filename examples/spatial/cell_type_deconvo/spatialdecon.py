@@ -18,7 +18,6 @@ parser.add_argument("--datadir", default="data/spatial", help="Directory to save
 parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate.")
 parser.add_argument("--bias", type=bool, default=False, help="Include/Exclude bias term.")
 parser.add_argument("--max_iter", type=int, default=10000, help="Maximum optimization iteration.")
-parser.add_argument("--epsilon", type=float, default=1e-10, help="Optimization threshold.")
 args = parser.parse_args()
 pprint(vars(args))
 

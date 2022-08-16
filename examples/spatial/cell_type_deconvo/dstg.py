@@ -16,7 +16,6 @@ DATASETS = ["CARD_synthetic", "GSE174746", "SPOTLight_synthetic", "toy1", "toy2"
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--dataset", default="CARD_synthetic", choices=DATASETS, help="Name of the dataset.")
 parser.add_argument("--datadir", default="data/spatial", help="Directory to save the data.")
-parser.add_argument("--split_val", type=float, default=.8, help="Train/Test split.")
 parser.add_argument("--sc_ref", type=bool, default=True, help="Reference scRNA (True) or cell-mixtures (False).")
 parser.add_argument("--N_p", type=int, default=500, help="Number of pseudo mixtures to generate.")
 parser.add_argument("--n_hvg", type=int, default=2000, help="Number of HVGs.")
@@ -27,9 +26,6 @@ parser.add_argument("--bias", type=bool, default=False, help="Include/Exclude bi
 parser.add_argument("--nhid", type=int, default=16, help="Number of neurons in latent layer.")
 parser.add_argument("--dropout", type=float, default=0., help="Dropout rate.")
 parser.add_argument("--epochs", type=int, default=25, help="Number of epochs to train the model.")
-parser.add_argument("--max_iter", type=int, default=100, help="Maximum optimization iteration.")
-parser.add_argument("--epsilon", type=float, default=1e-10, help="Optimization threshold.")
-parser.add_argument("--location_free", action="store_true", help="Do not supply spatial location if set.")
 args = parser.parse_args()
 pprint(vars(args))
 
