@@ -287,6 +287,7 @@ class DSTGLearner:
             loss between predicted and true labels.
 
         """
+        true_prop = true_prop.to(self.device)
         self.model.eval()
         if score_metric == 'ce':
             loss = F.cross_entropy(pred, true_prop)

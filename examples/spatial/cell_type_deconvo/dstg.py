@@ -1,3 +1,10 @@
+import os.path as o
+import sys
+
+#use if running from dance/examples/spatial/cell_type_deconvo
+root_path = o.abspath(o.join(o.dirname(sys.modules[__name__].__file__), "../../.."))
+sys.path.append(root_path)
+
 import argparse
 import random
 from pprint import pprint

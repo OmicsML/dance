@@ -238,6 +238,7 @@ class SpatialDecon:
             mse loss between predicted and true cell-type proportions.
 
         """
+        true_prop = true_prop.to(self.device)
         pred = pred / torch.sum(pred, 1, keepdims=True).clamp(min=1e-6)
         true_prop = true_prop / torch.sum(true_prop, 1, keepdims=True).clamp(min=1e-6)
         loss = ((pred - true_prop)**2).mean()
