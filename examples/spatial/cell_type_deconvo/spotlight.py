@@ -1,19 +1,7 @@
-import os.path as o
-import sys
-
-#use if running from dance/examples/spatial/cell_type_deconvo
-root_path = o.abspath(o.join(o.dirname(sys.modules[__name__].__file__), "../../.."))
-sys.path.append(root_path)
-
 import argparse
 from pprint import pprint
 
-import numpy as np
-import pandas as pd
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch import optim
 
 from dance.datasets.spatial import CellTypeDeconvoDatasetLite
 from dance.modules.spatial.cell_type_deconvo.spotlight import SPOTlight
@@ -61,13 +49,13 @@ spotLight = SPOTlight(sc_count=sc_count, sc_annot=sc_annot, mix_count=mix_count,
                       ct_select=ct_select, rank=args.rank, sc_profile=sc_profile, bias=args.bias,
                       init_bias=init_background, max_iter=args.max_iter, device=device)
 
-#fit model
+# Fit model
 spotLight.fit(lr=args.lr, max_iter=args.max_iter)
 
 # Predict cell-type proportions and evaluate
 pred = spotLight.predict()
 
-#score
+# Compute score
 mse = spotLight.score(pred.T, true_p)
 print(f"mse = {mse:7.4f}")
 """To reproduce SpatialDecon benchmarks, please refer to command lines belows:

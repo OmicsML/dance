@@ -1,19 +1,7 @@
-import os.path as o
-import sys
-
-#use if running from dance/examples/spatial/cell_type_deconvo
-root_path = o.abspath(o.join(o.dirname(sys.modules[__name__].__file__), "../../.."))
-sys.path.append(root_path)
-
 import argparse
 from pprint import pprint
 
-import numpy as np
-import pandas as pd
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch import optim
 
 from dance.datasets.spatial import CellTypeDeconvoDatasetLite
 from dance.modules.spatial.cell_type_deconvo.spatialdecon import SpatialDecon
@@ -60,13 +48,13 @@ spaDecon = SpatialDecon(sc_count=sc_count, sc_annot=sc_annot, mix_count=mix_coun
                         ct_select=ct_select, sc_profile=sc_profile, bias=args.bias, init_bias=init_background,
                         device=device)
 
-#fit model
+# Fit model
 spaDecon.fit(lr=args.lr, max_iter=args.max_iter, print_period=100)
 
 # Predict cell-type proportions and evaluate
 pred = spaDecon.predict()
 
-#score
+# Compute score
 mse = spaDecon.score(pred.T, true_p)
 print(f"mse = {mse:7.4f}")
 """To reproduce SpatialDecon benchmarks, please refer to command lines belows:

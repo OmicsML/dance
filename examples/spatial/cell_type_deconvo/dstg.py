@@ -1,31 +1,14 @@
-import os.path as o
-import sys
-
-#use if running from dance/examples/spatial/cell_type_deconvo
-root_path = o.abspath(o.join(o.dirname(sys.modules[__name__].__file__), "../../.."))
-sys.path.append(root_path)
-
 import argparse
-import random
 from pprint import pprint
 
-import numpy as np
-import scanpy as sc
 import torch
-import torch.nn.functional as F
 
-from dance.datasets.spatial import CellTypeDeconvoDataset, CellTypeDeconvoDatasetLite
+from dance.datasets.spatial import CellTypeDeconvoDatasetLite
 from dance.modules.spatial.cell_type_deconvo.dstg import DSTGLearner
-from dance.transforms.graph_construct import stAdjConstruct
-from dance.transforms.preprocess import preprocess_adj, pseudo_spatial_process, split
 
 # Set random seed
 torch.manual_seed(17)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-import warnings
-
-warnings.filterwarnings("ignore")
 
 # TODO: make this a property of the dataset class?
 DATASETS = ["CARD_synthetic", "GSE174746", "SPOTLight_synthetic", "toy1", "toy2"]
@@ -71,13 +54,13 @@ dstg = DSTGLearner(sc_count=sc_count, sc_annot=sc_annot, scRNA=args.sc_ref, mix_
                    n_hvg=args.n_hvg, N_p=args.N_p, k_filter=args.K_filter, nhid=args.nhid, device=device,
                    bias=args.bias, dropout=args.dropout)
 
-#fit model
+# Fit model
 dstg.fit(lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
 
 # Predict cell-type proportions and evaluate
 pred = dstg.predict()
 
-#score
+# Compute score
 mse = dstg.score(pred[args.N_p:, :], torch.Tensor(true_p[ct_select].values), 'mse')
 print(f"mse = {mse:7.4f}")
 """To reproduce DSTG benchmarks, please refer to command lines belows:
