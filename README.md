@@ -1,7 +1,7 @@
 <p align="center">
   <img
        src="https://github.com/OmicsML/dance/blob/main/imgs/dance_logo.jpg"
-       style="width:70%; height:70%; object-fit:cover;"
+       style="width:100%; height:100%; object-fit:cover;"
   />
 </p>
 
