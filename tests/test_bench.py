@@ -15,9 +15,6 @@ logging.info(f"{HOME_DIR=}")
 
 SKIP_LIST: List[str] = [
     "joint_embedding-dcca",  # OOM with 64GB mem and V100 GPU (succeed with 80GB mem)
-    "cell_type_deconvo-dstg",  # under construction
-    "cell_type_deconvo-spatialdecon",  # under construction
-    "cell_type_deconvo-spotlight",  # under construction
 ]
 
 light_options_dict: Dict[str, Tuple[str, str]] = {
@@ -50,9 +47,9 @@ light_options_dict: Dict[str, Tuple[str, str]] = {
     "joint_embedding-scmogcn-mp2": "--subtask openproblems_bmmc_multiome_phase2 --device cuda",
     # Spatial
     "cell_type_deconvo-card-card_synth": "--dataset CARD_synthetic --max_iter 2",
-    "cell_type_deconvo-dstg": None,
-    "cell_type_deconvo-spatialdecon": None,
-    "cell_type_deconvo-spotlight": None,
+    "cell_type_deconvo-dstg-card_synth": "--dataset CARD_synthetic --nhid 16 --lr .001 --epochs 2",
+    "cell_type_deconvo-spatialdecon-card_synth": "--dataset CARD_synthetic --lr .01 --max_iter 2 --bias 1",
+    "cell_type_deconvo-spotlight-card_synth": "--dataset CARD_synthetic --lr .1 --max_iter 2 --rank 8 --bias 0",
     "spatial_domain-louvain-151507": "--sample_number 151507 --seed 10",
     "spatial_domain-spagcn-151507": "--sample_number 151507 --lr 0.009",
     "spatial_domain-stagate-151507": "--sample_number 151507 --seed 2021",
@@ -126,10 +123,15 @@ full_options_dict: Dict[str, Tuple[str, str]] = {
     "cell_type_deconvo-card-card_synth": "--dataset CARD_synthetic",
     "cell_type_deconvo-card-gse174746": "--dataset GSE174746 --location_free",
     "cell_type_deconvo-card-spotlight_synth": "--dataset SPOTLight_synthetic --location_free",
-    "cell_type_deconvo-dstg": None,  # TODO
-    "cell_type_deconvo-dstg_mousebrain": None,  # TODO
-    "cell_type_deconvo-spatialdecon": None,  # TODO
-    "cell_type_deconvo-spotlight": None,  # TODO
+    "cell_type_deconvo-dstg-card_synth": "--dataset CARD_synthetic --nhid 16 --lr .001",
+    "cell_type_deconvo-dstg-gse174746": "--dataset GSE174746 --nhid 16 --lr .0001",
+    "cell_type_deconvo-dstg-spotlight_synth": "--dataset SPOTLight_synthetic --nhid 32 --lr .1 --epochs 25",
+    "cell_type_deconvo-spatialdecon-card_synth": "--dataset CARD_synthetic --lr .01 --max_iter 2250 --bias 1",
+    "cell_type_deconvo-spatialdecon-gse174746": "--dataset GSE174746 --lr .0001 --max_iter 20000 --bias 1",
+    "cell_type_deconvo-spatialdecon-spotlight_synth": "--dataset SPOTLight_synthetic --lr .01 --max_iter 500 --bias 1",
+    "cell_type_deconvo-spotlight-card_synth": "--dataset CARD_synthetic --lr .1 --max_iter 100 --rank 8 --bias 0",
+    "cell_type_deconvo-spotlight-gse174746": "--dataset GSE174746 --lr .1 --max_iter 15000 --rank 4 --bias 0",
+    "cell_type_deconvo-spotlight-spotlight_synth": "--dataset SPOTLight_synthetic --lr .1 --max_iter 150 --rank 10 --bias 0",
     "spatial_domain-louvain-151507": "--sample_number 151507 --seed 10",
     "spatial_domain-louvain-151673": "--sample_number 151673 --seed 5",
     "spatial_domain-louvain-151676": "--sample_number 151676 --seed 203",
