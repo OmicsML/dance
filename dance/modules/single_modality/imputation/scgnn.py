@@ -255,7 +255,7 @@ class GCNModelAE(nn.Module):
 
 
 class scGNN():
-    """ Single-cell GNN model
+    """Single-cell GNN model.
 
     Parameters
     ----------
@@ -354,7 +354,7 @@ class scGNN():
         return ret
 
     def generateCelltypeRegu(self, listResult):
-        """generateCelltypeRegu
+        """generateCelltypeRegu.
 
         Parameters
         ----------
@@ -636,7 +636,7 @@ class scGNN():
         return loss
 
     def gae_loss_function(self, preds, labels, mu, logvar, n_nodes, norm, pos_weight):
-        """ Loss function for Graph AutoEncoder.
+        """Loss function for Graph AutoEncoder.
 
         Parameters
         ----------
@@ -731,7 +731,7 @@ class scGNN():
         return coords, values, shape
 
     def mask_test_edges(self, adj):
-        """ Function to build test set with 10% positive links.
+        """Function to build test set with 10% positive links.
 
         Parameters
         ----------

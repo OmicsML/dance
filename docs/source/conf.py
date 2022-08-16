@@ -11,6 +11,7 @@
 
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath('../..'))
 
 # -- Project information -----------------------------------------------------
@@ -38,7 +39,6 @@ language = 'en'
 
 # -- Napoleon settings -------------------------------------------------------
 napoleon_include_init_with_doc = True
-
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

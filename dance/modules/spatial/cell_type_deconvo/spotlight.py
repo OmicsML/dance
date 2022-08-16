@@ -14,7 +14,9 @@ import torch
 from torch import nn, optim
 from torch.autograd import Variable
 from torchnmf.nmf import NMF
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 def cell_topic_profile(X, groups, ct_select, axis=0, method='median'):
     """cell_topic_profile.
@@ -25,7 +27,7 @@ def cell_topic_profile(X, groups, ct_select, axis=0, method='median'):
         gene expression matrix, genes (rows) by sample cells (cols).
     groups : int
         cell-type labels of each sample cell in X.
-    ct_select: 
+    ct_select:
         cell types to profile.
     method : string optional
          method for reduction of cell-types for cell profile, default median.
@@ -37,9 +39,15 @@ def cell_topic_profile(X, groups, ct_select, axis=0, method='median'):
 
     """
     if method == "median":
-        X_profile = np.array([np.median(X[[ i for i in range(len(groups)) if groups[i] == ct_select[j] ], :], axis=0) for j in range(len(ct_select))]).T
+        X_profile = np.array([
+            np.median(X[[i for i in range(len(groups)) if groups[i] == ct_select[j]], :], axis=0)
+            for j in range(len(ct_select))
+        ]).T
     else:
-        X_profile = np.array([np.mean(X[[ i for i in range(len(groups)) if groups[i] == ct_select[j] ], :], axis=0) for j in range(len(ct_select))]).T
+        X_profile = np.array([
+            np.mean(X[[i for i in range(len(groups)) if groups[i] == ct_select[j]], :], axis=0)
+            for j in range(len(ct_select))
+        ]).T
     return torch.Tensor(X_profile)
 
 
@@ -171,7 +179,9 @@ class SPOTlight:
 
     """
 
-    def __init__(self, sc_count, sc_annot, mix_count, ct_varname, ct_select, rank=2, sc_profile=None, bias=False, init_bias=None, init='random', max_iter=1000, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+    def __init__(self, sc_count, sc_annot, mix_count, ct_varname, ct_select, rank=2, sc_profile=None, bias=False,
+                 init_bias=None, init='random', max_iter=1000,
+                 device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
         super().__init__()
         self.device = device
         self.bias = bias
@@ -187,10 +197,10 @@ class SPOTlight:
             self.ref_sc_profile = cell_topic_profile(self.sc_count.values, cellTypes, ct_select, method='median')
         else:
             self.ref_sc_profile = sc_profile
-            
+
         self.mix_count = mix_count.values.T
         self.sc_count = self.sc_count.values.T
-        
+
         in_dim = self.sc_count.shape
         hid_dim = len(ct_select)
         out_dim = self.mix_count.shape[1]
@@ -199,7 +209,7 @@ class SPOTlight:
             #initialize basis as cell profile
             self.nmf_model.H = nn.Parameter(torch.Tensor(self.ref_sc_profile))
         #self.nmf_model = NMF(n_components=rank, init=init,  random_state=random_state, max_iter=max_iter)
-            
+
         #self.nnls_reg1=LinearRegression(fit_intercept=bias,positive=True)
         self.nnls_reg1 = NNLS(in_dim=rank, out_dim=out_dim, bias=bias, device=device)
 
@@ -276,7 +286,7 @@ class SPOTlight:
         """prediction function.
         Parameters
         ----------
-        
+
         None.
 
         Returns
@@ -296,7 +306,7 @@ class SPOTlight:
         ----------
         pred :
             predicted cell-type proportions.
-        true_prop : 
+        true_prop :
             true cell-type proportions.
 
         Returns
@@ -307,9 +317,8 @@ class SPOTlight:
         """
         print(pred.shape)
         print(true_prop.shape)
-        pred = pred/torch.sum(pred, 1, keepdims=True).clamp(min=1e-6)
-        true_prop = true_prop/torch.sum(true_prop, 1, keepdims=True).clamp(min=1e-6)
+        pred = pred / torch.sum(pred, 1, keepdims=True).clamp(min=1e-6)
+        true_prop = true_prop / torch.sum(true_prop, 1, keepdims=True).clamp(min=1e-6)
         loss = ((pred - true_prop)**2).mean()
-        
-        return loss.detach().item()
 
+        return loss.detach().item()
