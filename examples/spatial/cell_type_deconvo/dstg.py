@@ -31,7 +31,7 @@ warnings.filterwarnings("ignore")
 DATASETS = ["CARD_synthetic", "GSE174746", "SPOTLight_synthetic", "toy1", "toy2"]
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--dataset", default="toy1", choices=DATASETS, help="Name of the dataset.")
+parser.add_argument("--dataset", default="CARD_synthetic", choices=DATASETS, help="Name of the dataset.")
 parser.add_argument("--datadir", default="data/spatial", help="Directory to save the data.")
 parser.add_argument("--split_val", type=float, default=.8, help="Train/Test split.")
 parser.add_argument("--sc_ref", type=bool, default=True, help="Reference scRNA (True) or cell-mixtures (False).")
