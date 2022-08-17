@@ -16,8 +16,8 @@ if [ -z $1 ]; then
 fi
 
 # Torch related dependency versions
-PYTORCH_VERSION=1.11.0
-PYG_VERSION=2.0.4
+PYTORCH_VERSION=1.12.1
+PYG_VERSION=2.1.0
 DGL_VERSION=0.9
 
 # Set CUDA variable (use CPU if not set)
