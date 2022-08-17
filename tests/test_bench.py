@@ -16,6 +16,7 @@ logging.info(f"{HOME_DIR=}")
 SKIP_LIST: List[str] = [
     "joint_embedding-dcca",  # OOM with 64GB mem and V100 GPU (succeed with 80GB mem)
     "joint_embedding-jae",  # long run (~1 hr using V100 GPU)
+    "joint_embedding-scmogcn",  # long run (~1 hr using V100 GPU)
     "match_modality-scmogcn",  # long run (~30 min using V100 GPU)
 ]
 
