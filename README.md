@@ -52,20 +52,21 @@ conda create -n pydance python=3.8 -y && conda activate dance-dev
 Then, install CUDA enabled packages (PyTorch, PyG, DGL) with CUDA 10.2:
 
 ```bash
-conda install pytorch=1.11 torchvision cudatoolkit=10.2 -c pytorch -y
-conda install pyg -c pyg -y
+conda install pytorch=1.12.1 torchvision cudatoolkit=10.2 -c pytorch -y
 conda install dgl-cu102 -c dglteam -y
+pip install torch-geometric==2.1.0 torch-scatter torch-sparse torch-cluster -f https://data.pyg.org/whl/torch-1.12.1+cu102.html
 ```
 
 Alternatively, install these dependencies for CPU only:
 
 ```bash
-conda install pytorch=1.11 torchvision cpuonly -c pytorch -y
-conda install pyg -c pyg -y
+conda install pytorch=1.12.1 torchvision cpuonly -c pytorch -y
 conda install dgl -c dglteam
+pip install torch-geometric==2.1.0 torch-scatter torch-sparse torch-cluster -f https://data.pyg.org/whl/torch-1.12.1+cpu.html
 ```
 
-**Note:** you may need to uninstall `torch-spline-conv` (see https://github.com/pyg-team/pytorch_geometric/issues/3593)
+**Note:** If you installed PyG using conda and encountered an issue with `GLIBC_2.27` when importing `torch_geometric.nn`,
+then you may need to uninstall `torch-spline-conv` (see https://github.com/pyg-team/pytorch_geometric/issues/3593)
 
 ```bash
 pip uninstall torch-spline-conv
