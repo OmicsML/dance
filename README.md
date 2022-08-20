@@ -20,6 +20,41 @@ DANCE is a Python toolkit to support deep learning models for analyzing single-c
 
 Our goal is to build up a deep learning community for single cell analysis and provide GNN based architecture for users for further development in single cell analysis.
 
+## Usage
+
+### Overview
+
+In release 1.0, the main usage of the PyDANCE is to provide readily available experiment reproduction
+(see detail information about the reproduced performance [below](#implemented-algorithms)).
+Users can easily reproduce selected experiments presented in the original papers for the computational single-cell methods implemented in PyDANCE, which can be found under [`examples/`](examples).
+
+### Motivation
+
+Computational methods for single-cell analysis are quickly emerging, and the field is revolutionizing the usage of single-cell data to gain biological insights.
+A key challenge to continually developing computational single-cell methods that achieve new state-of-the-art performance is reproducing previous benchmarks.
+More specifically, different studies prepare their datasets and perform evaluation differently,
+and not to mention the compatibility of different methods, as they could be written in different languages or using incompatible library versions.
+
+PyDANCE addresses these challenges by providing a unified Python packge implementing many popular computational single-cell methods (see [Implemented Algorithms](#implemented-algorithms)),
+as well as easily reproducible experiments by providing unified tools for
+
+- Data downloading
+- Data (pre-)processing and transformation (e.g. graph construction)
+- Model training and evaluation
+
+### Example: runing cell-type annotation benchmark using scDeepSort
+
+- Step0. Install PyDANCE (see [Installation](#installation))
+- Step1. Navigate to the folder containing the corresponding example scrtip.
+  In this case, it is [`examples/single_modality/cell_type_annotation`](examples/single_modality/cell_type_annotation).
+- Step2. Obtain command line interface (CLI) options for a particular experiment to reproduce at the end of the
+  [script](examples/single_modality/cell_type_annotation/scdeepsort.py).
+  For example, the CLI options for reproducing the `Mouse Brain` experiment is
+  ```bash
+  python scdeepsort.py --data_type scdeepsort --tissue Brain --test_data 2695
+  ```
+- Step3. Wait for the experiment to finsh and check results.
+
 ## Installation
 
 <H3>Quick install</H3>
