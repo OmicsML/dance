@@ -5,7 +5,7 @@ numba==0.56.2
 numpy==1.22.4
 opencv-python==4.6.0.66
 openpyxl==3.0.10
-pandas==1.4.3
+pandas==1.4.4
 psutil==5.9.1
 pyro-ppl==1.8.1
 python-igraph==0.9.11
