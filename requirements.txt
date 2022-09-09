@@ -9,7 +9,7 @@ pandas==1.4.4
 psutil==5.9.2
 pyro-ppl==1.8.2
 python-igraph==0.9.11
-rdata==0.8
+rdata==0.9
 requests==2.28.1
 scanpy==1.9.1
 scanpy==1.9.1
