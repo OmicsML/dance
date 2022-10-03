@@ -64,8 +64,7 @@ class ScMoGCNWrapper:
                 pred = model.forward(graph)
             else:
                 pred = model.forward(graph)[idx]
-        pred = pred.to(self.args.device)
-        return pred
+        return pred.to(device)
 
     def score(self, g, idx, labels, device='gpu'):
         """Score function to get score of prediction.
