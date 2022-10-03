@@ -317,12 +317,12 @@ class ScMoGCNWrapper:
                 #                  p=feature_weight)
                 feature_sampled = torch.multinomial(feature_weight,
                                                     int(self.args.node_sampling_rate * len(g.nodes('feature'))),
-                                                    replacement=False).to(self.args.device)
+                                                    replacement=False)
                 # feature_sampled = g.nodes('feature')[feature_sampled]
                 subgraph = dgl.node_subgraph(g, {
-                    'cell': batch_idx.to(self.args.device),
-                    'feature': feature_sampled
-                })  # g.nodes('feature')})
+                    'cell': batch_idx,
+                    'feature': feature_sampled,
+                }).to(self.args.device)  # XXX: bottlenect
                 logits = self.model(subgraph)
                 output_labels = subgraph.nodes['cell'].data['label']
 
