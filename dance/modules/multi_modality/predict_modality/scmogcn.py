@@ -179,7 +179,7 @@ class ScMoGCNWrapper:
 
                 if val[-1] < minval:
                     minval = val[-1]
-                    minvep = epoch
+                    minvep = epoch // eval_interval
                     if kwargs['save_best']:
                         torch.save(self.model, f'{kwargs["model_folder"]}/{PREFIX}.best.pth')
 
@@ -214,7 +214,7 @@ class ScMoGCNWrapper:
 
         if verbose > 0 and eval:
             print('min testing', min(te), te.index(min(te)))
-            print('converged testing', minvep, te[minvep])
+            print('converged testing', minvep * eval_interval, te[minvep])
 
         return self.model
 
@@ -369,7 +369,7 @@ class ScMoGCNWrapper:
 
                 if val[-1] < minval:
                     minval = val[-1]
-                    minvep = epoch
+                    minvep = epoch // eval_interval
                     if kwargs['save_best']:
                         torch.save(self.model, f'{kwargs["model_folder"]}/{PREFIX}.best.pth')
 
@@ -406,7 +406,7 @@ class ScMoGCNWrapper:
 
         if verbose > 0 and eval:
             print('min testing', min(te), te.index(min(te)))
-            print('converged testing', minvep, te[minvep])
+            print('converged testing', minvep * eval_interval, te[minvep])
 
         return self.model
 
