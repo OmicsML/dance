@@ -319,9 +319,12 @@ class ScMoGCNWrapper:
             for i, batch_idx in enumerate(dataloader):
                 # feature_sampled = np.random.choice(g.nodes('feature'), 0.5*len(g.nodes('feature'), replace=False),
                 #                  p=feature_weight)
-                feature_sampled = torch.multinomial(feature_weight,
-                                                    int(self.args.node_sampling_rate * len(g.nodes('feature'))),
-                                                    replacement=False)
+                if self.args.node_sampling_rate < 1:
+                    feature_sampled = torch.multinomial(feature_weight,
+                                                        int(self.args.node_sampling_rate * len(g.nodes('feature'))),
+                                                        replacement=False)
+                else:
+                    feature_sampled = torch.arange(len(g.nodes('feature')))
                 # feature_sampled = g.nodes('feature')[feature_sampled]
                 subgraph = dgl.node_subgraph(g, {
                     'cell': batch_idx,
