@@ -94,7 +94,7 @@ class ScMoGCNWrapper:
 
     # TODO: need to modify the logic of validation and test to adapt Inductive learning;
     #  w. test = Transductive learning, w/o = Inductive learning
-    def fit(self, g, y, split=None, eval=True, verbose=2, y_test=None, logger=None, sampling=False):
+    def fit(self, g, y, split=None, eval=True, verbose=2, y_test=None, logger=None, sampling=False, eval_interval=1):
         """fit function for training.
 
         Parameters
@@ -128,6 +128,9 @@ class ScMoGCNWrapper:
         CELL_SIZE = kwargs['CELL_SIZE']
         TRAIN_SIZE = kwargs['TRAIN_SIZE']
 
+        g = g.to(self.args.device)
+        y = y.to(self.args.device)
+
         if verbose > 1 and logger is None:
             logger = open(f'{kwargs["log_folder"]}/{PREFIX}.log', 'w')
         if verbose > 1:
@@ -160,41 +163,42 @@ class ScMoGCNWrapper:
             torch.cuda.empty_cache()
             tr.append(math.sqrt(running_loss))
 
-            val.append(self.score(g, split['valid'], y[split['valid']]))
-            if verbose > 1:
-                logger.write(f'training loss:  {tr[-1]}\n')
-                logger.flush()
-                logger.write(f'validation loss:  {val[-1]}\n')
-                logger.flush()
-
-            if eval:
-                te.append(self.score(g, np.arange(TRAIN_SIZE, CELL_SIZE), y_test))
+            if epoch % eval_interval == 0:
+                val.append(self.score(g, split['valid'], y[split['valid']]))
                 if verbose > 1:
-                    logger.write(f'testing loss:  {te[-1]}\n')
+                    logger.write(f'training loss:  {tr[-1]}\n')
+                    logger.flush()
+                    logger.write(f'validation loss:  {val[-1]}\n')
                     logger.flush()
 
-            if val[-1] < minval:
-                minval = val[-1]
-                minvep = epoch
-                if kwargs['save_best']:
-                    torch.save(self.model, f'{kwargs["model_folder"]}/{PREFIX}.best.pth')
-
-            if epoch > 1500 and kwargs['early_stopping'] > 0 and min(val[-kwargs['early_stopping']:]) > minval:
-                if verbose > 1:
-                    logger.write('Early stopped.\n')
-                break
-
-            if epoch > 1200:
-                if epoch % 15 == 0:
-                    for p in opt.param_groups:
-                        p['lr'] *= kwargs['lr_decay']
-
-            if verbose > 0:
-                print('epoch', epoch)
-                print('training: ', tr[-1])
-                print('valid: ', val[-1])
                 if eval:
-                    print('testing: ', te[-1])
+                    te.append(self.score(g, np.arange(TRAIN_SIZE, CELL_SIZE), y_test))
+                    if verbose > 1:
+                        logger.write(f'testing loss:  {te[-1]}\n')
+                        logger.flush()
+
+                if val[-1] < minval:
+                    minval = val[-1]
+                    minvep = epoch
+                    if kwargs['save_best']:
+                        torch.save(self.model, f'{kwargs["model_folder"]}/{PREFIX}.best.pth')
+
+                if epoch > 1500 and kwargs['early_stopping'] > 0 and min(val[-kwargs['early_stopping']:]) > minval:
+                    if verbose > 1:
+                        logger.write('Early stopped.\n')
+                    break
+
+                if epoch > 1200:
+                    if epoch % 15 == 0:
+                        for p in opt.param_groups:
+                            p['lr'] *= kwargs['lr_decay']
+
+                if verbose > 0:
+                    print('epoch', epoch)
+                    print('training: ', tr[-1])
+                    print('valid: ', val[-1])
+                    if eval:
+                        print('testing: ', te[-1])
 
         if kwargs['save_final']:
             state = {'model': self.model, 'optimizer': opt.state_dict(), 'epoch': epoch - 1}
@@ -214,7 +218,7 @@ class ScMoGCNWrapper:
 
         return self.model
 
-    def fit_with_sampling(self, g, y, split=None, eval=True, verbose=2, y_test=None, logger=None):
+    def fit_with_sampling(self, g, y, split=None, eval=True, verbose=2, y_test=None, logger=None, eval_interval=1):
         """fit function for training with graph sampling.
 
         Parameters
@@ -345,42 +349,43 @@ class ScMoGCNWrapper:
                 torch.cuda.empty_cache()
             tr.append(math.sqrt(running_loss / len(dataloader)))
 
-            val.append(self.score(g_origin, split['valid'], y[split['valid']], 'cpu'))
+            if epoch % eval_interval == 0:
+                val.append(self.score(g_origin, split['valid'], y[split['valid']], 'cpu'))
 
-            if verbose > 1:
-                logger.write(f'training loss:  {tr[-1]}\n')
-                logger.flush()
-                logger.write(f'validation loss:  {val[-1]}\n')
-                logger.flush()
-
-            if eval:
-                te.append(self.score(g_origin, np.arange(TRAIN_SIZE, CELL_SIZE), y_test, 'cpu'))
                 if verbose > 1:
-                    logger.write(f'testing loss:  {te[-1]}\n')
+                    logger.write(f'training loss:  {tr[-1]}\n')
+                    logger.flush()
+                    logger.write(f'validation loss:  {val[-1]}\n')
                     logger.flush()
 
-            if val[-1] < minval:
-                minval = val[-1]
-                minvep = epoch
-                if kwargs['save_best']:
-                    torch.save(self.model, f'{kwargs["model_folder"]}/{PREFIX}.best.pth')
-
-            if epoch > 1500 and kwargs['early_stopping'] > 0 and min(val[-kwargs['early_stopping']:]) > minval:
-                if verbose > 1:
-                    logger.write('Early stopped.\n')
-                break
-
-            if epoch > 1200:
-                if epoch % 15 == 0:
-                    for p in opt.param_groups:
-                        p['lr'] *= kwargs['lr_decay']
-
-            if verbose > 0:
-                print('epoch', epoch)
-                print('training: ', tr[-1])
-                print('valid: ', val[-1])
                 if eval:
-                    print('testing: ', te[-1])
+                    te.append(self.score(g_origin, np.arange(TRAIN_SIZE, CELL_SIZE), y_test, 'cpu'))
+                    if verbose > 1:
+                        logger.write(f'testing loss:  {te[-1]}\n')
+                        logger.flush()
+
+                if val[-1] < minval:
+                    minval = val[-1]
+                    minvep = epoch
+                    if kwargs['save_best']:
+                        torch.save(self.model, f'{kwargs["model_folder"]}/{PREFIX}.best.pth')
+
+                if epoch > 1500 and kwargs['early_stopping'] > 0 and min(val[-kwargs['early_stopping']:]) > minval:
+                    if verbose > 1:
+                        logger.write('Early stopped.\n')
+                    break
+
+                if epoch > 1200:
+                    if epoch % 15 == 0:
+                        for p in opt.param_groups:
+                            p['lr'] *= kwargs['lr_decay']
+
+                if verbose > 0:
+                    print('epoch', epoch)
+                    print('training: ', tr[-1])
+                    print('valid: ', val[-1])
+                    if eval:
+                        print('testing: ', te[-1])
 
             torch.cuda.empty_cache()
 
