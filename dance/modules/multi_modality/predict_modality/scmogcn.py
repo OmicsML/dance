@@ -34,7 +34,7 @@ class ScMoGCNWrapper:
         self.args = args
         self.model = ScMoGCN(args).to(args.device)
 
-    def predict(self, graph, idx=None, device='gpu'):
+    def predict(self, graph, idx=None, device='cpu'):
         """Predict function to get latent representation of data.
 
         Parameters
@@ -66,7 +66,7 @@ class ScMoGCNWrapper:
                 pred = model.forward(graph)[idx]
         return pred.to(device)
 
-    def score(self, g, idx, labels, device='gpu'):
+    def score(self, g, idx, labels, device='cpu'):
         """Score function to get score of prediction.
 
         Parameters
@@ -164,7 +164,7 @@ class ScMoGCNWrapper:
             tr.append(math.sqrt(running_loss))
 
             if epoch % eval_interval == 0:
-                val.append(self.score(g, split['valid'], y[split['valid']]))
+                val.append(self.score(g, split['valid'], y[split['valid']], self.args.device))
                 if verbose > 1:
                     logger.write(f'training loss:  {tr[-1]}\n')
                     logger.flush()
@@ -172,7 +172,7 @@ class ScMoGCNWrapper:
                     logger.flush()
 
                 if eval:
-                    te.append(self.score(g, np.arange(TRAIN_SIZE, CELL_SIZE), y_test))
+                    te.append(self.score(g, np.arange(TRAIN_SIZE, CELL_SIZE), y_test, self.args.device))
                     if verbose > 1:
                         logger.write(f'testing loss:  {te[-1]}\n')
                         logger.flush()
