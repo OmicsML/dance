@@ -1,5 +1,5 @@
 h5py==3.7.0
-leidenalg==0.8.10
+leidenalg==0.9.0
 networkx==2.8.7
 numba==0.56.2
 numpy==1.22.4
