@@ -6,13 +6,24 @@
 # Example:
 # $ source install.sh cu102  # install pydance with CUDA 10.2
 #
-# To uninstall and remove the pydance environment:
-# $ conda remove -n pydance --all
+# To uninstall and remove the dance environment:
+# $ conda remove -n dance --all
 
-# Check input
+trap 'echo Try using source instead of sh? && exit 0' ERR
+
+# Check required version specificiation input
 if [ -z $1 ]; then
     echo "ERROR: Please provide CUDA information, available options are [cpu,cu102,cu113]"
     return 1
+fi
+
+# Check optional conda env name input
+if [ -z $2 ]; then
+    envname=dance
+    echo Conda environment name not specified, using the default option: dance
+else
+    envname=$2
+    echo Conda environment set to: ${envname}
 fi
 
 # Torch related dependency versions
@@ -43,8 +54,8 @@ case $CUDA_VERSION in
 esac
 
 # Create environment
-conda create -n pydance python=3.8 -y
-conda activate pydance
+conda create -n ${envname} python=3.8 -y
+conda activate ${envname}
 
 # Install CUDA enabled dependencies
 conda install pytorch=${PYTORCH_VERSION} torchvision ${TORCH_OPT} -c pytorch -y
@@ -54,7 +65,9 @@ pip install torch-geometric==${PYG_VERSION} torch-scatter torch-sparse torch-clu
 # Finally, install pydance
 pip install -e .
 
-printf "Successfully installed pydance, be sure to activate the pydance conda environment via:\n"
-printf "\n    \$ conda activate pydance\n"
+printf "Successfully installed pydance, be sure to activate the conda environment via:\n"
+printf "\n    \$ conda activate ${envname}\n"
 printf "\nTo uninstall and remove the pydance environment:\n"
-printf "\n    \$ conda remove -n pydance --all\n\n"
+printf "\n    \$ conda remove -n ${envname} --all\n\n"
+
+trap -

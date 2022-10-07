@@ -63,14 +63,15 @@ The full installation process might be a bit tedious and could involve some debu
 Thus, we provide an `install.sh` script that simplifies the installation process, assuming the user have [conda](https://conda.io/projects/conda/en/latest/index.html) set up on their machines.
 The installation script creates a conda environment `pydance` and install the PyDANCE package along with all its dependencies with a apseicifc CUDA version.
 Currently, three options are accepted: `cpu`, `cu102`, and `cu113`.
-For example, to install the DANCE package using CUDA10.2, simply run:
+For example, to install the DANCE package using CUDA10.2 in a `dance-env` conda environment, simply run:
 
 ```bash
-git clone git@github.com:OmicsML/dance.git
-cd dance
+git clone git@github.com:OmicsML/dance.git && cd dance
 
-source install.sh cu102
+source install.sh cu102 dance-env
 ```
+
+**Note**: the first argument for cuda version is mandatory, while the second argument for conda environment name is optional (default is `pydance`).
 
 <details>
 <summary><H3>Custom install</H3></summary>
