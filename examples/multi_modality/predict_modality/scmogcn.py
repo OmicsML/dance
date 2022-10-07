@@ -1,11 +1,12 @@
 import argparse
 import os
-import random
 from argparse import Namespace
 
-import dance.transforms.preprocess
+import numpy as np
+import torch
+
 from dance.datasets.multimodality import ModalityPredictionDataset
-from dance.modules.multi_modality.predict_modality.scmogcn import *
+from dance.modules.multi_modality.predict_modality.scmogcn import ScMoGCNWrapper
 from dance.transforms.graph_construct import construct_modality_prediction_graph, gen_batch_features
 from dance.utils import set_seed
 
@@ -62,15 +63,10 @@ def pipeline(transductive=True, verbose=2, logger=None, **kwargs):
         else:
             g.nodes['cell'].data['bf'] = batch_features
 
-    device = kwargs['device']
-    g = g.to(device)
-    if kwargs['inductive'] != 'trans':
-        gtest = gtest.to(device)
-
     # data loader
-    y = torch.from_numpy(input_train_mod2.toarray()).to(device)
+    y = torch.from_numpy(input_train_mod2.toarray())
     if transductive:
-        y_test = torch.from_numpy(true_test_mod2.toarray()).to(device)
+        y_test = torch.from_numpy(true_test_mod2.toarray())
 
     model = ScMoGCNWrapper(Namespace(**kwargs))
 
@@ -79,8 +75,8 @@ def pipeline(transductive=True, verbose=2, logger=None, **kwargs):
     else:
         model.fit(g, y, split, transductive, verbose, y_test, logger)
 
-    print(model.predict(g, np.arange(TRAIN_SIZE, CELL_SIZE)))
-    print(model.score(g, np.arange(TRAIN_SIZE, CELL_SIZE), y_test))
+    print(model.predict(g, np.arange(TRAIN_SIZE, CELL_SIZE), device="cpu"))
+    print(model.score(g, np.arange(TRAIN_SIZE, CELL_SIZE), y_test, device="cpu"))
 
 
 if __name__ == '__main__':
@@ -126,7 +122,7 @@ if __name__ == '__main__':
     parser.add_argument('-ci', '--cell_init', default='none', choices=['none', 'pca'])
     parser.add_argument('-bas', '--batch_seperation', action='store_true')
     parser.add_argument('-pwpath', '--pathway_path', default='./data/h.all.v7.4')
-    parser.add_argument('-seed', '--random_seed', type=int, default=777)  #random.randint(0, 2147483647))
+    parser.add_argument('-seed', '--random_seed', type=int, default=777)
     parser.add_argument('-ws', '--weighted_sum', action='store_true')
     parser.add_argument('-samp', '--sampling', action='store_true')
     parser.add_argument('-ns', '--node_sampling_rate', type=float, default=0.5)
@@ -136,6 +132,7 @@ if __name__ == '__main__':
 
     # For test only (low gpu memory setting; to reproduce competition result need >20G memory - v100)
     if True:
+        print("WARNING: Runing in testing mode, some cli settings maybe overwritten!")
         args.preprocessing = 'feature_selection'
         args.no_pathway = True
         args.sampling = True

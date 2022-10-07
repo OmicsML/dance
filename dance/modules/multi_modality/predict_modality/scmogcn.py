@@ -130,6 +130,7 @@ class ScMoGCNWrapper:
 
         g = g.to(self.args.device)
         y = y.to(self.args.device)
+        y_test = y_test.to(self.args.device) if y_test is not None else None
 
         if verbose > 1 and logger is None:
             logger = open(f'{kwargs["log_folder"]}/{PREFIX}.log', 'w')
@@ -325,7 +326,6 @@ class ScMoGCNWrapper:
                                                         replacement=False)
                 else:
                     feature_sampled = torch.arange(len(g.nodes('feature')))
-                # feature_sampled = g.nodes('feature')[feature_sampled]
                 subgraph = dgl.node_subgraph(g, {
                     'cell': batch_idx,
                     'feature': feature_sampled,
