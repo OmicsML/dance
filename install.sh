@@ -9,7 +9,7 @@
 # To uninstall and remove the dance environment:
 # $ conda remove -n dance --all
 
-trap 'echo Try using source instead of sh? && exit 0' ERR
+trap "echo Try using source instead of sh? && trap - ERR && return 1" ERR
 
 # Check required version specificiation input
 if [ -z $1 ]; then
@@ -70,4 +70,4 @@ printf "\n    \$ conda activate ${envname}\n"
 printf "\nTo uninstall and remove the pydance environment:\n"
 printf "\n    \$ conda remove -n ${envname} --all\n\n"
 
-trap -
+trap - ERR
