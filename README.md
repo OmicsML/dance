@@ -165,8 +165,8 @@ Note: the data split modality of DeepImpute is different from ScGNN and GraphSCI
 | BackBone                | Model         | Algorithm                                                                                                    | Year | CheckIn |
 | ----------------------- | ------------- | ------------------------------------------------------------------------------------------------------------ | ---- | ------- |
 | GNN                     | ScDeepsort    | Single-cell transcriptomics with weighted GNN                                                                | 2021 | ✅       |
-| Logistic Regression     | Celltypist    | Automated cell type annotation for scRNA-seq datasets                                                        | 2021 | ✅       |
-| Random Forest           | singleCellNet | SingleCellNet: a computational tool to classify single cell RNA-Seq data across platforms and across species | 2019 | ✅       |
+| Logistic Regression     | Celltypist    | Cross-tissue immune cell analysis reveals tissue-specific features in humans.                                | 2021 | ✅       |
+| Random Forest           | singleCellNet | SingleCellNet: a computational tool to classify single cell RNA-Seq data across platforms and across species.| 2019 | ✅       |
 | Neural Network          | ACTINN        | ACTINN: automated identification of cell types in single cell RNA sequencing.                                | 2020 | ✅       |
 | Hierarchical Clustering | SingleR       | Reference-based analysis of lung single-cell sequencing reveals a transitional profibrotic macrophage.       | 2019 | P1      |
 | SVM                     | SVM           | A comparison of automatic cell identification methods for single-cell RNA sequencing data.                   | 2018 | ✅       |
