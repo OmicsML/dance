@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'dance'
-copyright = '2022, DANCE Team'
+copyright = '(c) 2022, OmicsML'
 author = 'DANCE Team'
 release = '1.0.0'
 
