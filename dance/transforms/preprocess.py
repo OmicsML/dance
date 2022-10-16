@@ -1,4 +1,3 @@
-# Copyright 2022 DSE lab.  All rights reserved.
 import collections
 import os
 import pprint

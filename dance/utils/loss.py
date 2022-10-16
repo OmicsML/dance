@@ -1,5 +1,3 @@
-# Copyright 2022 DSE lab.  All rights reserved.
-
 import math
 from typing import *
 

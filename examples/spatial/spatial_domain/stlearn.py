@@ -1,4 +1,3 @@
-# Copyright 2022 DSE lab.  All rights reserved.
 import argparse
 import os
 
