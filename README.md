@@ -12,6 +12,9 @@ ______________________________________________________________________
 [![Documentation Status](https://readthedocs.org/projects/pydance/badge/?version=latest)](https://pydance.readthedocs.io/en/latest/?badge=latest)
 [![Test Examples](https://github.com/OmicsML/dance/actions/workflows/test_examples.yml/badge.svg)](https://github.com/OmicsML/dance/actions/workflows/test_examples.yml)
 
+[![Slack](https://img.shields.io/badge/slack-OmicsML-brightgreen)](https://omicsml.slack.com)
+![Twitter Follow](https://img.shields.io/twitter/follow/OmicsML?style=social)
+
 DANCE is a Python toolkit to support deep learning models for analyzing single-cell gene expression at scale. Our goal is to build up a deep learning community and bechmark platform for computational models in single-cell analysis. It includes three modules at present:
 
 1. **Single-modality analysis**
