@@ -15,7 +15,7 @@ scanpy==1.9.1
 scikit-learn==1.1.2
 scikit-misc==0.1.4
 scipy==1.9.1
-seaborn==0.12.0
+seaborn==0.12.1
 skorch==0.12.0
 statsmodels==0.13.2
 tables==3.7.0
