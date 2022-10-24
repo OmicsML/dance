@@ -25,7 +25,7 @@ DANCE is a Python toolkit to support deep learning models for analyzing single-c
 OmicsML Homepage: https://omicsml.ai/ \
 DANCE Open Source: https://github.com/OmicsML/dance \
 DANCE Documentation: https://pydance.readthedocs.io/en/latest/ \
-DANCE Package Paper: TBD \
+DANCE Package Paper: https://www.biorxiv.org/content/10.1101/2022.10.19.512741v2 \
 Survey Paper: TBD 
 
 Join the Community: \
