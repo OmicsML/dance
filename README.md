@@ -26,7 +26,7 @@ OmicsML Homepage: https://omicsml.ai/ \
 DANCE Open Source: https://github.com/OmicsML/dance \
 DANCE Documentation: https://pydance.readthedocs.io/en/latest/ \
 DANCE Package Paper: https://www.biorxiv.org/content/10.1101/2022.10.19.512741v2 \
-Survey Paper: TBD 
+Survey Paper: https://arxiv.org/abs/2210.12385
 
 Join the Community: \
 Slack: https://join.slack.com/t/omicsml/shared_invite/zt-1hxdz7op3-E5K~EwWF1xDvhGZFrB9AbA \
