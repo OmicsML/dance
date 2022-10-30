@@ -245,7 +245,6 @@ Note: * Benchmark datasets were renormalied before running the original implemen
 | ---------------- | ------------------------ | -------------------------------------------------------------------------------------------------- | ---- | ------- |
 | GNN              | ScMoGCN                  | Graph Neural Networks for Multimodal Single-Cell Data Integration                                  | 2022 | ✅       |
 | GNN              | ScMoLP                   | Link Prediction Variant of ScMoGCN                                                                 | 2022 | P1      |
-| GNN              | scGNN                    | scGNN is a novel graph neural network framework for single-cell RNA-Seq analyses                   | 2021 | P1      |
 | GNN              | GRAPE                    | Handling Missing Data with Graph Representation Learning                                           | 2020 | P1      |
 | Generative Model | SCMM                     | SCMM: MIXTURE-OF-EXPERTS MULTIMODAL DEEP GENERATIVE MODEL FOR SINGLE-CELL MULTIOMICS DATA ANALYSIS | 2021 | ✅       |
 | Auto-encoder     | Cross-modal autoencoders | Multi-domain translation between single-cell imaging and sequencing data using autoencoders        | 2021 | ✅       |
@@ -263,7 +262,7 @@ Note: * Benchmark datasets were renormalied before running the original implemen
 | BackBone         | Model                    | Algorithm                                                                                          | Year | CheckIn |
 | ---------------- | ------------------------ | -------------------------------------------------------------------------------------------------- | ---- | ------- |
 | GNN              | ScMoGCN                  | Graph Neural Networks for Multimodal Single-Cell Data Integration                                  | 2022 | ✅       |
-| GNN              | scGNN                    | scGNN is a novel graph neural network framework for single-cell RNA-Seq analyses                   | 2021 | P1      |
+| GNN/Auto-ecnoder | GLUE    | Multi-omics single-cell data integration and regulatory inference with graph-linked embedding         | 2021 | P1      |
 | Generative Model | SCMM                     | SCMM: MIXTURE-OF-EXPERTS MULTIMODAL DEEP GENERATIVE MODEL FOR SINGLE-CELL MULTIOMICS DATA ANALYSIS | 2021 | ✅       |
 | Auto-encoder     | Cross-modal autoencoders | Multi-domain translation between single-cell imaging and sequencing data using autoencoders        | 2021 | ✅       |
 
