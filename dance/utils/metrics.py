@@ -1,9 +1,5 @@
-import random
-
 import numpy as np
-import pylab as plt
 import scanpy as sc
-import seaborn as sns
 import torch
 from networkx.algorithms import bipartite
 from scipy import sparse

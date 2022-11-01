@@ -9,7 +9,6 @@ graph attention auto-encoder." Nature communications 13.1 (2022): 1-12.
 
 """
 
-# import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -42,7 +41,6 @@ def transfer_pytorch_data(adata, adj):
 
 
 def Stats_Spatial_Net(adata):
-    import matplotlib.pyplot as plt
     Num_edge = adata.uns['Spatial_Net']['Cell1'].shape[0]
     Mean_edge = Num_edge / adata.shape[0]
     plot_df = pd.value_counts(pd.value_counts(adata.uns['Spatial_Net']['Cell1']))
