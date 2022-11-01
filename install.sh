@@ -28,6 +28,7 @@ fi
 
 # Torch related dependency versions
 PYTORCH_VERSION=1.12.1
+TORCHVISION_VERSION=0.13.1
 PYG_VERSION=2.1.0
 DGL_VERSION=0.9
 
@@ -36,15 +37,15 @@ CUDA_VERSION=${1:-cpu}
 echo "CUDA_VERSION=${CUDA_VERSION}"
 case $CUDA_VERSION in
     cpu)
-        TORCH_OPT="cpuonly"
+        PYTORCH_CUDA_OPT="cpuonly"
         DGL_OPT="dgl"
         ;;
     cu102)
-        TORCH_OPT="cudatoolkit=10.2"
+        PYTORCH_CUDA_OPT="cudatoolkit=10.2"
         DGL_OPT="dgl-cuda10.2"
         ;;
     cu113)
-        TORCH_OPT="cudatoolkit=11.3"
+        PYTORCH_CUDA_OPT="cudatoolkit=11.3"
         DGL_OPT="dgl-cuda11.3"
         ;;
     *)
@@ -58,9 +59,9 @@ conda create -n ${envname} python=3.8 -y
 conda activate ${envname}
 
 # Install CUDA enabled dependencies
-conda install pytorch=${PYTORCH_VERSION} torchvision ${TORCH_OPT} -c pytorch -y
+conda install pytorch==${PYTORCH_VERSION} torchvision==${TORCHVISION_VERSION} ${PYTORCH_CUDA_OPT} -c pytorch -y
+conda install pyg==${PYG_VERSION} -c pyg -y
 conda install ${DGL_OPT} -c dglteam -y
-pip install torch-geometric==${PYG_VERSION} torch-scatter torch-sparse torch-cluster -f https://data.pyg.org/whl/torch-${PYTORCH_VERSION}+${CUDA_VERSION}.html
 
 # Finally, install pydance
 pip install -e .
