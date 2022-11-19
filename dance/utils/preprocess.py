@@ -7,6 +7,25 @@ from dance.typing import List, Optional, Set
 
 def cell_label_to_adata(cell_labels: List[Set[str]], idx_to_label: List[str],
                         obs: Optional[DataFrame] = None) -> AnnData:
+    """Convert cell labels into AnnData of label matrix.
+
+    Parameters
+    ----------
+    cell_labels
+        List of set of str. Each set corresponds to the relevant cell types for that cell.
+    idx_to_label
+        List of cell type names, used to define the column orders in the label matrix.
+    obs
+        Observation matrix to use. If not set, use ordered integer as cell indices.
+
+    Returns
+    -------
+    y_adata
+        An AnnData object containing the label matrix, where each row represents a cell and each column represents a
+        cell type. An entry is marked as ones if the cell is related to that particular cell type, otherwise it is set
+        to zero.
+
+    """
     num_samples = len(cell_labels)
     if obs is None:
         obs = DataFrame(index=list(range(num_samples)))

@@ -19,6 +19,14 @@ class Data:
             Cell features.
         y : AnnData
             Cell labels.
+        train_size
+            Number of cells to be used for training. If not specified, not splits will be generated.
+        val_size
+            Number of cells to be used for validation. If set to -1, use what's left from training and testing.
+        test_size
+            Number of cells to be used for testing. If set to -1, used what's left from training and validation.
+        ensure_cell_aligned
+            If set to True, then check for the consistency between the indeices of x and y.
 
         """
         self._split_idx_dict = {}
