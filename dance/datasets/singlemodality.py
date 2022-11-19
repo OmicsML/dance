@@ -363,16 +363,7 @@ class CellTypeDataset():
                     self.download_example_data()
                 assert self.is_complete()
 
-            (
-                self.svm_num_labels,
-                self.svm_train_labels,
-                self.svm_train_cell_feat,
-                self.svm_map_dict,
-                self.svm_id2label,
-                self.svm_test_label_dict,
-                self.svm_test_feat_dict,
-                self.svm_test_cell_id_dict,
-            ) = load_svm_data(self.params)
+            return load_svm_data(self.params)
 
         if self.data_type == "actinn":
             self.download_benchmark_data()
