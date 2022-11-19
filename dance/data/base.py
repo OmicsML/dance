@@ -49,7 +49,7 @@ class Data:
         # Each size must be bounded between -1 and the data size
         data_size = self.x.shape[0]
         for name, size in zip(split_names, split_sizes):
-            if not isinstance(size, int):
+            if not np.issubdtype(size, int):
                 raise TypeError(f"{name} must be of type int, got {type(size)!r}")
             elif size < -1:
                 raise ValueError(f"{name} must be integer no less than -1, got {size!r}")
@@ -64,11 +64,12 @@ class Data:
         split_sizes[split_sizes == -1] = data_size - split_sizes.clip(0).sum()
         logger.debug(f"Split sizes after conversion: {split_sizes.tolist()}")
 
-        all_idx = self.x.index.values
+        all_idx = self.x.obs.index.values
+        split_thresholds = split_sizes.cumsum()
         for i, split_name in enumerate(split_names):
-            start = size[i - 1] if i > 0 else 0
-            end = size[i]
-            if start - end > 0:  # skip empty split
+            start = split_thresholds[i - 1] if i > 0 else 0
+            end = split_thresholds[i]
+            if end - start > 0:  # skip empty split
                 self._split_idx_dict[split_name] = all_idx[start:end].tolist()
 
     def __getitem__(self, idx) -> Tuple[AnnData, AnnData]:
@@ -127,7 +128,7 @@ class Data:
             idx = self.get_split_idx(split_name)
             feat = getattr(self, feat_name)[idx]
         else:
-            raise KeyError(f"Unknown split {split_name!r}, available options are {list(split_name)}")
+            raise KeyError(f"Unknown split {split_name!r}, available options are {list(self._split_idx_dict)}")
 
         if return_type != "anndata":
             feat = feat.X

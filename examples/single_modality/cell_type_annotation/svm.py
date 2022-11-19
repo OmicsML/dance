@@ -1,8 +1,10 @@
 import argparse
 from pprint import pprint
 
+from dance.data import Data
 from dance.datasets.singlemodality import CellTypeDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
+from dance.utils.preprocess import cell_label_to_adata
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -28,7 +30,10 @@ if __name__ == "__main__":
                                  train_dir=params.train_dir, test_dir=params.test_dir, dense_dim=params.dense_dim,
                                  statistics_path=params.statistics_path, map_path=params.map_path,
                                  threshold=params.threshold, gpu=params.gpu)
-    data = dataloader.load_data()
+
+    x_adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
+    y_adata = cell_label_to_adata(cell_labels, idx_to_label, obs=x_adata.obs)
+    data = Data(x_adata, y_adata, train_size=train_size)
 
     x_train, y_train = data.get_train_data()
     y_train_converted = y_train.argmax(1)  # convert one-hot representation into label index representation
