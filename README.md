@@ -21,7 +21,6 @@ DANCE is a Python toolkit to support deep learning models for analyzing single-c
 1. **Single-cell multimodal omics**
 1. **Spatially resolved transcriptomics**
 
-
 OmicsML Homepage: https://omicsml.ai/ \
 DANCE Open Source: https://github.com/OmicsML/dance \
 DANCE Documentation: https://pydance.readthedocs.io/en/latest/ \
@@ -32,10 +31,12 @@ Join the Community: \
 Slack: https://join.slack.com/t/omicsml/shared_invite/zt-1hxdz7op3-E5K~EwWF1xDvhGZFrB9AbA \
 Twitter: https://twitter.com/OmicsML \
 Wechat Group Assistant: 736180290 \
-Email: danceteamgnn@gmail.com 
+Email: danceteamgnn@gmail.com
 
 ## Reference
+
 If our work could help your research, please cite our DANCE package paper or survey paper:
+
 ```
 @article{ding2022dance,
   title={DANCE: A Deep Learning Library and Benchmark for Single-Cell Analysis},
@@ -198,14 +199,14 @@ Note: the data split modality of DeepImpute is different from ScGNN and GraphSCI
 
 #### 2）Cell Type Annotation
 
-| BackBone                | Model         | Algorithm                                                                                                    | Year | CheckIn |
-| ----------------------- | ------------- | ------------------------------------------------------------------------------------------------------------ | ---- | ------- |
-| GNN                     | ScDeepsort    | Single-cell transcriptomics with weighted GNN                                                                | 2021 | ✅       |
-| Logistic Regression     | Celltypist    | Cross-tissue immune cell analysis reveals tissue-specific features in humans.                                | 2021 | ✅       |
-| Random Forest           | singleCellNet | SingleCellNet: a computational tool to classify single cell RNA-Seq data across platforms and across species.| 2019 | ✅       |
-| Neural Network          | ACTINN        | ACTINN: automated identification of cell types in single cell RNA sequencing.                                | 2020 | ✅       |
-| Hierarchical Clustering | SingleR       | Reference-based analysis of lung single-cell sequencing reveals a transitional profibrotic macrophage.       | 2019 | P1      |
-| SVM                     | SVM           | A comparison of automatic cell identification methods for single-cell RNA sequencing data.                   | 2018 | ✅       |
+| BackBone                | Model         | Algorithm                                                                                                     | Year | CheckIn |
+| ----------------------- | ------------- | ------------------------------------------------------------------------------------------------------------- | ---- | ------- |
+| GNN                     | ScDeepsort    | Single-cell transcriptomics with weighted GNN                                                                 | 2021 | ✅       |
+| Logistic Regression     | Celltypist    | Cross-tissue immune cell analysis reveals tissue-specific features in humans.                                 | 2021 | ✅       |
+| Random Forest           | singleCellNet | SingleCellNet: a computational tool to classify single cell RNA-Seq data across platforms and across species. | 2019 | ✅       |
+| Neural Network          | ACTINN        | ACTINN: automated identification of cell types in single cell RNA sequencing.                                 | 2020 | ✅       |
+| Hierarchical Clustering | SingleR       | Reference-based analysis of lung single-cell sequencing reveals a transitional profibrotic macrophage.        | 2019 | P1      |
+| SVM                     | SVM           | A comparison of automatic cell identification methods for single-cell RNA sequencing data.                    | 2018 | ✅       |
 
 | Model         | Evaluation Metric | Mouse Brain 2695 (current/reported) | Mouse Spleen 1759 (current/reported) | Mouse Kidney 203 (current/reported) |
 | ------------- | ----------------- | ----------------------------------- | ------------------------------------ | ----------------------------------- |
@@ -262,7 +263,7 @@ Note: * Benchmark datasets were renormalied before running the original implemen
 | BackBone         | Model                    | Algorithm                                                                                          | Year | CheckIn |
 | ---------------- | ------------------------ | -------------------------------------------------------------------------------------------------- | ---- | ------- |
 | GNN              | ScMoGCN                  | Graph Neural Networks for Multimodal Single-Cell Data Integration                                  | 2022 | ✅       |
-| GNN/Auto-ecnoder | GLUE    | Multi-omics single-cell data integration and regulatory inference with graph-linked embedding         | 2021 | P1      |
+| GNN/Auto-ecnoder | GLUE                     | Multi-omics single-cell data integration and regulatory inference with graph-linked embedding      | 2021 | P1      |
 | Generative Model | SCMM                     | SCMM: MIXTURE-OF-EXPERTS MULTIMODAL DEEP GENERATIVE MODEL FOR SINGLE-CELL MULTIOMICS DATA ANALYSIS | 2021 | ✅       |
 | Auto-encoder     | Cross-modal autoencoders | Multi-domain translation between single-cell imaging and sequencing data using autoencoders        | 2021 | ✅       |
 
