@@ -806,7 +806,7 @@ def load_svm_data(params):
     # prepare unified labels
     label2id = {label: idx for idx, label in enumerate(id2label)}
     logger.info(f"Total number of genes: {num_genes:,}")
-    logger.info(f"Training cell types (n={len(id2label)}):\n{pprint.pformat(sorted(id2label))}")
+    logger.info(f"Training cell types (n={num_labels}):\n{pprint.pformat(sorted(id2label))}")
 
     labels = []
     test_index_dict = dict()  # test-num: [begin-index, end-index]
@@ -833,13 +833,11 @@ def load_svm_data(params):
         if num in train:
             cell2type["id"] = cell2type["type"].map(label2id)
             assert not cell2type["id"].isnull().any(), "something wrong in celltype file."
-            labels.append(np.zeros((cell2type.shape[0], num_labels)))
-            labels[-1][range(cell2type.shape[0]), cell2type["id"].tolist()] = 1
+            for cell_type in cell2type["type"].tolist():
+                labels.append({cell_type})
         else:
-            labels.append(np.zeros((cell2type.shape[0], num_labels)))
-            for i, cell_type in enumerate(cell2type["type"].tolist()):
-                for mapped_cell_type in list(map_dict[num][cell_type]):
-                    labels[-1][i, label2id[mapped_cell_type]] = 1
+            for cell_type in cell2type["type"].tolist():
+                labels.append(map_dict[num][cell_type])
 
         # load data file then update graph
         df = pd.read_csv(data_path, index_col=0)  # (gene, cell)
@@ -869,10 +867,10 @@ def load_svm_data(params):
             test_index_dict[num] = list(range(train_num + test_num, train_num + test_num + len(df)))
             test_num += len(df)
         print(f"Costs {time.time() - start:.3f} s in total.")
-    labels = np.vstack(labels)
 
     # 2. create features
     sparse_feat = vstack(matrices).toarray()  # cell-wise  (cell, gene)
+    logger.info(f"Number of cells = {sparse_feat.shape[0]:,}")
     # transpose to gene-wise
     gene_pca = PCA(dense_dim, random_state=random_seed).fit(sparse_feat[:train_num].T)
     gene_feat = gene_pca.transform(sparse_feat[:train_num].T)
@@ -884,14 +882,9 @@ def load_svm_data(params):
     # use weighted gene_feat as cell_feat
     cell_feat = sparse_feat.dot(gene_feat)  # [total_cell_num, d]
 
-    x = AnnData(cell_feat, dtype=np.float32)
-    y = AnnData(X=labels, dtype=np.int32, uns={"idx_to_label": id2label, "label_map": map_dict})
+    x_adata = AnnData(cell_feat, dtype=np.float32)
 
-    data = Data(x, y)
-    data.set_split_idx("train", np.arange(train_num))
-    data.set_split_idx("test", np.arange(train_num, x.shape[0]))
-
-    return data
+    return x_adata, labels, id2label, train_num
 
 
 #######################################################

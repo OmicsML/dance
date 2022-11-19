@@ -1,13 +1,16 @@
+import numpy as np
 import torch
 from anndata import AnnData
 
+from dance import logger
 from dance.typing import FeatType, List, Optional, ReturnedFeat, Sequence, Tuple, Union
 
 
 class Data:
     """Base data object."""
 
-    def __init__(self, x: Optional[AnnData] = None, y: Optional[AnnData] = None):
+    def __init__(self, x: Optional[AnnData] = None, y: Optional[AnnData] = None, train_size: Optional[int] = None,
+                 val_size: int = 0, test_size: int = -1, ensure_cell_aligned: bool = True):
         """Initialize data object.
 
         Parameters
@@ -16,12 +19,71 @@ class Data:
             Cell features.
         y : AnnData
             Cell labels.
+        train_size
+            Number of cells to be used for training. If not specified, not splits will be generated.
+        val_size
+            Number of cells to be used for validation. If set to -1, use what's left from training and testing.
+        test_size
+            Number of cells to be used for testing. If set to -1, used what's left from training and validation.
+        ensure_cell_aligned
+            If set to True, then check for the consistency between the indeices of x and y.
 
         """
+        self._split_idx_dict = {}
+
         self._x = x or AnnData()
         self._y = y
 
-        self._split_idx_dict = {}
+        if ensure_cell_aligned and y:
+            if (x_size := x.shape[0]) != (y_size := y.shape[0]):
+                raise ValueError(f"Mismatched number of samples between x (n={x_size:,}) and y (n={y_size:,}).")
+            elif (num_diff := (x.obs.index != y.obs.index).sum()) > 0:
+                raise IndexError(f"{num_diff:,} out of {x_size:,} entries have mismached indices between x and y. ",
+                                 "Set `ensure_cell_aligned` to False if you do not wish to align x and y.")
+
+        self._setup_splits(train_size, val_size, test_size)
+
+    def _setup_splits(self, train_size: Optional[int], val_size: int, test_size: int):
+        if train_size is None:
+            return
+
+        split_names = ["train", "val", "test"]
+        split_sizes = np.array((train_size, val_size, test_size))
+
+        # Only one -1 (complementary size) is allowed
+        if (split_sizes == -1).sum() > 1:
+            raise ValueError("Only one split can be specified as -1")
+
+        # Each size must be bounded between -1 and the data size
+        data_size = self.x.shape[0]
+        for name, size in zip(split_names, split_sizes):
+            if not np.issubdtype(size, int):
+                raise TypeError(f"{name} must be of type int, got {type(size)!r}")
+            elif size < -1:
+                raise ValueError(f"{name} must be integer no less than -1, got {size!r}")
+            elif size > data_size:
+                raise ValueError(f"{name}={size:,} exceeds total number of samples {data_size:,}")
+
+        # Sum of sizes must be bounded by the data size
+        if (tot_size := split_sizes.clip(0).sum()) > data_size:
+            raise ValueError(f"Total size {tot_size:,} exceeds total number of sampels {data_size:,}")
+
+        logger.debug(f"Split sizes before conversion: {split_sizes.tolist()}")
+        split_sizes[split_sizes == -1] = data_size - split_sizes.clip(0).sum()
+        logger.debug(f"Split sizes after conversion: {split_sizes.tolist()}")
+
+        all_idx = self.x.obs.index.values
+        split_thresholds = split_sizes.cumsum()
+        for i, split_name in enumerate(split_names):
+            start = split_thresholds[i - 1] if i > 0 else 0
+            end = split_thresholds[i]
+            if end - start > 0:  # skip empty split
+                self._split_idx_dict[split_name] = all_idx[start:end].tolist()
+
+    def __getitem__(self, idx) -> Tuple[AnnData, AnnData]:
+        sliced_x = self.x[idx]
+        sliced_y = self.y[idx]
+        return sliced_x, sliced_y
 
     @property
     def x(self) -> AnnData:
@@ -74,7 +136,7 @@ class Data:
             idx = self.get_split_idx(split_name)
             feat = getattr(self, feat_name)[idx]
         else:
-            raise KeyError(f"Unknown split {split_name!r}, available options are {list(split_name)}")
+            raise KeyError(f"Unknown split {split_name!r}, available options are {list(self._split_idx_dict)}")
 
         if return_type != "anndata":
             feat = feat.X
