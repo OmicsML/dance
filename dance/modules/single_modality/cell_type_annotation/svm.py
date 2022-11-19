@@ -1,7 +1,11 @@
 import os
 
 import pandas as pd
+from sklearn.metrics import accuracy_score
 from sklearn.svm import SVC
+
+from dance.typing import Optional
+from dance.utils.deprecate import deprecated
 
 
 class SVM():
@@ -16,108 +20,66 @@ class SVM():
 
     """
 
-    def __init__(self, args, prj_path="./"):
+    def __init__(self, args, prj_path="./", random_state: Optional[int] = None):
         self.args = args
+        self.random_state = random_state
+        self._mdl = SVC(random_state=random_state, probability=True)
 
-    def fit(self, train_labels, train_cell_feat):
+    def fit(self, x, y):
         """Train the classifier.
 
         Parameters
         ----------
-        train_labels: np.array
-            Training labels.
-        train_cell_feat: np.array
+        x: np.ndarray
             Training cell features.
+        y: np.ndarray
+            Training labels.
 
         """
+        self._mdl.fit(x, y)
 
-        self.train_labels, self.train_cell_feat = train_labels, train_cell_feat
-        self.model = SVC(random_state=self.args.random_seed, probability=True)
-        self.model.fit(self.train_cell_feat, self.train_labels)
-
-    def predict(self, map_dict, id2label, test_label_dict, test_feat_dict, test_cell_id_dict):
+    def predict(self, x):
         """Predict cell labels.
 
         Parameters
         ----------
-        map_dict: dict
-            The map dictionary.
-        id2label: np.array
-            The dictionary for converting ID to label.
-        test_label_dict: dict
-            The dictionary for labels in testing set.
-        test_feat_dict: dict
-            The dictionary for features in testing set.
-        test_cell_id_dict: dict
-            The dictionary for cell ids.
+        x: np.ndarray
+            Samples to be predicted (samplex x features).
 
         Returns
         -------
-        output: dict
-            A diction of predicted celllabels.
+        y: np.ndarray
+            Predicted labels of the input samples.
 
         """
-        self.map_dict = map_dict
-        self.id2label = id2label
-        self.test_label_dict = test_label_dict
-        self.test_feat_dict = test_feat_dict
-        self.test_cell_id_dict = test_cell_id_dict
-        output = {}
-        for num in self.args.test_dataset:
-            score = self.model.predict_proba(self.test_feat_dict[num])  # [cell, class-num]
-            pred_labels = []
-            unsure_num = correct = 0
-            for pred, t_label in zip(score, self.test_label_dict[num]):
-                pred_label = self.id2label[pred.argmax().item()]
-                if pred_label in self.map_dict[num][t_label]:
-                    correct += 1
-                pred_labels.append(pred_label)
-            output[num] = pred_labels
-        return output
+        return self._mdl.predict(x)
 
-    def score(self, map_dict, id2label, test_label_dict, test_feat_dict, test_cell_id_dict):
+    def score(self, pred, true):
         """Model performance score measured by accuracy.
 
         Parameters
         ----------
-        map_dict: dict
-            The map dictionary.
-        id2label: dict
-            The dictionary for converting ID to label.
-        test_label_dict: dict
-            The dictionary for labels in testing set.
-        test_feat_dict: dict
-            The dictionary for features in testing set.
-        test_cell_id_dict: dict
-            The dictionary for cell ids.
+        pred: np.ndarray
+            Predicted labels.
+        true: np.ndarray
+            True labels. Can be either a maxtrix of size (samples x labels) with ones indicating positives, or a
+            vector of size (sameples x 1) where each element is the index of the corresponding label for the sample.
+            The first option provides flexibility to cases where a sample could be associated with multiple labels
+            at test time while the model was trained as a multi-class classifier.
 
         Returns
         -------
-        accuracy_all: dict
-            A diction of accuracy on different testing sets.
+        score: float
+            Accuracy score.
 
         """
-        self.map_dict = map_dict
-        self.id2label = id2label
-        self.test_label_dict = test_label_dict
-        self.test_feat_dict = test_feat_dict
-        self.test_cell_id_dict = test_cell_id_dict
-        accuracy_all = {}
-        for num in self.args.test_dataset:
-            score = self.model.predict_proba(self.test_feat_dict[num])  # [cell, class-num]
-            pred_labels = []
-            unsure_num = correct = 0
-            for pred, t_label in zip(score, self.test_label_dict[num]):
-                pred_label = self.id2label[pred.argmax().item()]
-                if pred_label in self.map_dict[num][t_label]:
-                    correct += 1
-                pred_labels.append(pred_label)
+        if true.max() == 1:
+            num_samples = true.shape[0]
+            return (true[range(num_samples), pred.ravel()]).sum() / num_samples
+        else:
+            return accuracy_score(pred, true)
 
-            acc = correct / score.shape[0]
-            print(f"SVM-{self.args.species}-{self.args.tissue}-{num}-ACC: {acc:.5f}")
-            accuracy_all[num] = acc
-        return accuracy_all
-
+    @deprecated
     def save(self, num, pred):
         """Save the predictions.
 

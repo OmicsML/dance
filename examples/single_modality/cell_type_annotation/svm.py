@@ -25,17 +25,20 @@ if __name__ == "__main__":
 
     dataloader = CellTypeDataset(data_type="svm", random_seed=params.random_seed, train_dataset=params.train_dataset,
                                  test_dataset=params.test_dataset, species=params.species, tissue=params.tissue,
-                                 train_dir=params.train_dir, test_dir=params.test_dir,
+                                 train_dir=params.train_dir, test_dir=params.test_dir, dense_dim=params.dense_dim,
                                  statistics_path=params.statistics_path, map_path=params.map_path,
                                  threshold=params.threshold, gpu=params.gpu)
-    dataloader = dataloader.load_data()
+    data = dataloader.load_data()
 
+    x_train, y_train = data.get_train_data()
+    y_train_converted = y_train.argmax(1)  # convert one-hot representation into label index representation
     model = SVM(params)
-    model.fit(dataloader.svm_train_labels, dataloader.svm_train_cell_feat)
-    prediction = model.predict(dataloader.svm_map_dict, dataloader.svm_id2label, dataloader.svm_test_label_dict,
-                               dataloader.svm_test_feat_dict, dataloader.svm_test_cell_id_dict)
-    accuracy = model.score(dataloader.svm_map_dict, dataloader.svm_id2label, dataloader.svm_test_label_dict,
-                           dataloader.svm_test_feat_dict, dataloader.svm_test_cell_id_dict)
+    model.fit(x_train, y_train_converted)
+
+    x_test, y_test = data.get_test_data()
+    pred = model.predict(x_test)
+    score = model.score(pred, y_test)
+    print(f"{score=}")
 """To reproduce SVM benchmarks, please refer to command lines belows:
 
 Mouse Brain

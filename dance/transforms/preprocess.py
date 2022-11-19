@@ -36,6 +36,9 @@ from sklearn.linear_model import LinearRegression, LogisticRegression, SGDClassi
 from sklearn.model_selection import train_test_split
 from statsmodels.formula.api import ols
 
+from dance import logger
+from dance.data import Data
+
 
 def set_seed(seed=1029):
     random.seed(seed)
@@ -799,13 +802,13 @@ def load_svm_data(params):
     # prepare unified genes
     gene2id = {gene: idx for idx, gene in enumerate(id2gene)}
     num_genes = len(id2gene)
-    # prepare unified labels
     num_labels = len(id2label)
+    # prepare unified labels
     label2id = {label: idx for idx, label in enumerate(id2label)}
-    print(f"totally {num_genes} genes, {num_labels} labels.")
+    logger.info(f"Total number of genes: {num_genes:,}")
+    logger.info(f"Training cell types (n={len(id2label)}):\n{pprint.pformat(sorted(id2label))}")
 
-    train_labels = []
-    test_label_dict = dict()  # test label dict
+    labels = []
     test_index_dict = dict()  # test-num: [begin-index, end-index]
     test_cell_id_dict = dict()  # test-num: ["c1", "c2"...]
     # TODO
@@ -826,13 +829,17 @@ def load_svm_data(params):
         cell2type = pd.read_csv(type_path, index_col=0)
         cell2type.columns = ["cell", "type"]
         cell2type["type"] = cell2type["type"].map(str.strip)
+
         if num in train:
             cell2type["id"] = cell2type["type"].map(label2id)
             assert not cell2type["id"].isnull().any(), "something wrong in celltype file."
-            train_labels += cell2type["id"].tolist()
+            labels.append(np.zeros((cell2type.shape[0], num_labels)))
+            labels[-1][range(cell2type.shape[0]), cell2type["id"].tolist()] = 1
         else:
-            # test_labels += cell2type["type"].tolist()
-            test_label_dict[num] = cell2type["type"].tolist()
+            labels.append(np.zeros((cell2type.shape[0], num_labels)))
+            for i, cell_type in enumerate(cell2type["type"].tolist()):
+                for mapped_cell_type in list(map_dict[num][cell_type]):
+                    labels[-1][i, label2id[mapped_cell_type]] = 1
 
         # load data file then update graph
         df = pd.read_csv(data_path, index_col=0)  # (gene, cell)
@@ -862,11 +869,10 @@ def load_svm_data(params):
             test_index_dict[num] = list(range(train_num + test_num, train_num + test_num + len(df)))
             test_num += len(df)
         print(f"Costs {time.time() - start:.3f} s in total.")
-    train_labels = np.array(list(map(int, train_labels)))
+    labels = np.vstack(labels)
 
     # 2. create features
     sparse_feat = vstack(matrices).toarray()  # cell-wise  (cell, gene)
-    test_feat_dict = dict()
     # transpose to gene-wise
     gene_pca = PCA(dense_dim, random_state=random_seed).fit(sparse_feat[:train_num].T)
     gene_feat = gene_pca.transform(sparse_feat[:train_num].T)
@@ -877,13 +883,15 @@ def load_svm_data(params):
     sparse_feat = sparse_feat / (np.sum(sparse_feat, axis=1, keepdims=True) + 1e-6)
     # use weighted gene_feat as cell_feat
     cell_feat = sparse_feat.dot(gene_feat)  # [total_cell_num, d]
-    train_cell_feat = cell_feat[:train_num]
 
-    for num in test_label_dict.keys():
-        test_feat_dict[num] = cell_feat[test_index_dict[num]]
+    x = AnnData(cell_feat, dtype=np.float32)
+    y = AnnData(X=labels, dtype=np.int32, uns={"idx_to_label": id2label, "label_map": map_dict})
 
-    return (num_labels, train_labels, train_cell_feat, map_dict, np.array(id2label, dtype=np.str), test_label_dict,
-            test_feat_dict, test_cell_id_dict)
+    data = Data(x, y)
+    data.set_split_idx("train", np.arange(train_num))
+    data.set_split_idx("test", np.arange(train_num, x.shape[0]))
+
+    return data
 
 
 #######################################################

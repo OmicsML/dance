@@ -4,6 +4,8 @@ import zipfile
 
 import tqdm
 
+from dance.data.base import Data
+
 
 # delete zip file
 def delete_file(filename):
