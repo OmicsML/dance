@@ -6,6 +6,7 @@ from torch import Tensor
 
 FeatType = Literal["anndata", "numpy", "torch"]
 NormMode = Literal["normalize", "standardize", "minmax", "l2"]
+LogLevel = Literal["NOTSET", "DEBUG", "INFO", "WARNING", "ERROR"]
 ReturnedFeat = Union[np.ndarray, Tensor, AnnData]
 
 __all__ = [
@@ -13,6 +14,7 @@ __all__ = [
     "Dict",
     "FeatType",
     "List",
+    "LogLevel",
     "NormMode",
     "Optional",
     "ReturnedFeat",

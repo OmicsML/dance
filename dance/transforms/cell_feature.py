@@ -16,7 +16,7 @@ class WeightedGenePCA(BaseTransform):
 
     """
 
-    def __init__(self, n_components: int = 400, split_name: Optional[str] = None):
+    def __init__(self, n_components: int = 400, split_name: Optional[str] = None, **kwargs):
         """Initialize WeightedGenePCA.
 
         Parameters
@@ -27,7 +27,7 @@ class WeightedGenePCA(BaseTransform):
             Which split to use to compute the gene PCA. If not set, use all data.
 
         """
-        super().__init__()
+        super().__init__(**kwargs)
 
         self.n_components = n_components
         self.split_name = split_name
@@ -36,15 +36,15 @@ class WeightedGenePCA(BaseTransform):
         feat = data.get_x(self.split_name)  # cell x genes
         gene_pca = PCA(n_components=self.n_components)
 
-        logger.info(f"Start decomposing {self.split_name} features {feat.shape}")
+        self.logger.info(f"Start decomposing {self.split_name} features {feat.shape}")
         gene_feat = gene_pca.fit_transform(feat.T)  # decompose into gene features
-        logger.info(f"Total explained variance: {gene_pca.explained_variance_ratio_.sum():.2%}")
+        self.logger.info(f"Total explained variance: {gene_pca.explained_variance_ratio_.sum():.2%}")
 
         x = data.x.X
         if hasattr(x, "toarray"):
             x = x.toarray()
 
         cell_feat = normalize(x, mode="normalize", axis=1) @ gene_feat
-        data.x.obsm[self.__class__.__name__] = cell_feat.astype(np.float32)
+        data.x.obsm[self.out_channel] = cell_feat.astype(np.float32)
 
         return data

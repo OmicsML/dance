@@ -35,8 +35,7 @@ if __name__ == "__main__":
     x_adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
     y_adata = cell_label_to_adata(cell_labels, idx_to_label, obs=x_adata.obs)
     data = Data(x_adata, y_adata, train_size=train_size)
-
-    WeightedGenePCA(n_components=params.dense_dim, split_name="train")(data)
+    WeightedGenePCA(n_components=params.dense_dim, split_name="train", log_level="INFO")(data)
 
     x_train, y_train = data.get_train_data(channel="WeightedGenePCA")
     y_train_converted = y_train.argmax(1)  # convert one-hot representation into label index representation
