@@ -779,12 +779,10 @@ def get_id_2_label_svm(cell_statistics_path, train_dir, tissue):
 
 
 def load_svm_data(params):
-    random_seed = params.random_seed
     train = params.train_dataset
     test = params.test_dataset
     tissue = params.tissue
     species = params.species
-    dense_dim = params.dense_dim
     statistics_path = Path(params.statistics_path)
     map_path = Path(params.map_path) / species
 
@@ -868,21 +866,8 @@ def load_svm_data(params):
             test_num += len(df)
         print(f"Costs {time.time() - start:.3f} s in total.")
 
-    # 2. create features
-    sparse_feat = vstack(matrices).toarray()  # cell-wise  (cell, gene)
-    logger.info(f"Number of cells = {sparse_feat.shape[0]:,}")
-    # transpose to gene-wise
-    gene_pca = PCA(dense_dim, random_state=random_seed).fit(sparse_feat[:train_num].T)
-    gene_feat = gene_pca.transform(sparse_feat[:train_num].T)
-    gene_evr = sum(gene_pca.explained_variance_ratio_) * 100
-    print(f"[PCA] Gene EVR: {gene_evr:.2f} %.")
-
-    # do normalization
-    sparse_feat = sparse_feat / (np.sum(sparse_feat, axis=1, keepdims=True) + 1e-6)
-    # use weighted gene_feat as cell_feat
-    cell_feat = sparse_feat.dot(gene_feat)  # [total_cell_num, d]
-
-    x_adata = AnnData(cell_feat, dtype=np.float32)
+    sparse_feat = sp.vstack(matrices)  # cell x gene
+    x_adata = AnnData(sparse_feat, dtype=np.float32)
 
     return x_adata, labels, id2label, train_num
 
