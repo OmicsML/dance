@@ -1,9 +1,7 @@
 import numpy as np
 import torch
 
-from dance.typing import Literal
-
-NormMode = Literal["normalize", "standardize", "minmax", "l2"]
+from dance.typing import NormMode
 
 
 def normalize(mat, *, mode: NormMode = "normalize", axis: int = 0, eps: float = -1.0):
