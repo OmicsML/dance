@@ -134,7 +134,11 @@ class Data:
         """
         return self._split_idx_dict[split_name]
 
-    def _get_feat(self, feat_name: str, split_name: Optional[str], return_type: FeatType = "numpy"):
+    def _get_feat(self, feat_name: str, split_name: Optional[str], return_type: FeatType = "numpy",
+                  layer: Optional[str] = None, channel: Optional[str] = None):
+        if (layer is not None) and (channel is not None):
+            raise ValueError(f"Cannot specify layer ({layer!r}) and channel ({channel!r}) simmultaneously.")
+
         if split_name is None:
             feat = getattr(self, feat_name)
         elif split_name in self._split_idx_dict:
@@ -143,31 +147,41 @@ class Data:
         else:
             raise KeyError(f"Unknown split {split_name!r}, available options are {list(self._split_idx_dict)}")
 
-        if return_type != "anndata":
+        # Directly return anndata view
+        if return_type == "anndata":
+            return feat
+
+        # Extract features from anndata
+        if layer is not None:
+            feat = feat.layers[layer].X
+        elif channel is not None:
+            feat = feat.obsm[channel]
+        else:
             feat = feat.X
 
-            try:  # convert sparse array to dense array
-                feat = feat.toarray()
-            except AttributeError:
-                pass
+        try:  # convert sparse array to dense array
+            feat = feat.toarray()
+        except AttributeError:
+            pass
 
-            if return_type == "torch":
-                feat = torch.from_numpy(feat)
-            elif return_type != "numpy":
-                raise ValueError(f"Unknown return_type {return_type!r}")
+        if return_type == "torch":
+            feat = torch.from_numpy(feat)
+        elif return_type != "numpy":
+            raise ValueError(f"Unknown return_type {return_type!r}")
 
         return feat
 
-    def get_x(self, split_name: Optional[str] = None, return_type: FeatType = "numpy") -> ReturnedFeat:
+    def get_x(self, split_name: Optional[str] = None, return_type: FeatType = "numpy", layer: Optional[str] = None,
+              channel: Optional[str] = None) -> ReturnedFeat:
         """Retrieve cell features from a particular split."""
-        return self._get_feat("x", split_name, return_type)
+        return self._get_feat("x", split_name, return_type, layer, channel)
 
     def get_y(self, split_name: Optional[str] = None, return_type: FeatType = "numpy") -> ReturnedFeat:
         """Retrieve cell labels from a particular split."""
         return self._get_feat("y", split_name, return_type)
 
-    def get_x_y(self, split_name: Optional[str] = None,
-                return_type: FeatType = "numpy") -> Tuple[ReturnedFeat, ReturnedFeat]:
+    def get_x_y(self, split_name: Optional[str] = None, return_type: FeatType = "numpy", layer: Optional[str] = None,
+                channel: Optional[str] = None) -> Tuple[ReturnedFeat, ReturnedFeat]:
         """Retrieve cell features and labels from a particular split.
 
         Parameters
@@ -179,18 +193,21 @@ class Data:
             tensor; **anndata**: return as an anndata object.
 
         """
-        x = self.get_x(split_name, return_type)
+        x = self.get_x(split_name, return_type, layer, channel)
         y = self.get_y(split_name, return_type)
         return x, y
 
-    def get_train_data(self, return_type: FeatType = "numpy") -> Tuple[ReturnedFeat, ReturnedFeat]:
+    def get_train_data(self, return_type: FeatType = "numpy", layer: Optional[str] = None,
+                       channel: Optional[str] = None) -> Tuple[ReturnedFeat, ReturnedFeat]:
         """Retrieve cell features and labels from the 'train' split."""
-        return self.get_x_y("train", return_type)
+        return self.get_x_y("train", return_type, layer, channel)
 
-    def get_val_data(self, return_type: FeatType = "numpy") -> Tuple[ReturnedFeat, ReturnedFeat]:
+    def get_val_data(self, return_type: FeatType = "numpy", layer: Optional[str] = None,
+                     channel: Optional[str] = None) -> Tuple[ReturnedFeat, ReturnedFeat]:
         """Retrieve cell features and labels from the 'val' split."""
-        return self.get_x_y("val", return_type)
+        return self.get_x_y("val", return_type, layer, channel)
 
-    def get_test_data(self, return_type: FeatType = "numpy") -> Tuple[ReturnedFeat, ReturnedFeat]:
+    def get_test_data(self, return_type: FeatType = "numpy", layer: Optional[str] = None,
+                      channel: Optional[str] = None) -> Tuple[ReturnedFeat, ReturnedFeat]:
         """Retrieve cell features and labels from the 'test' split."""
-        return self.get_x_y("test", return_type)
+        return self.get_x_y("test", return_type, layer, channel)
