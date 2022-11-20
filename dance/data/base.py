@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import numpy as np
 import torch
 from anndata import AnnData
@@ -104,6 +106,9 @@ class Data:
     @property
     def cells(self) -> List[str]:
         return self.x.obs.index.tolist()
+
+    def copy(self):
+        return deepcopy(self)
 
     def set_split_idx(self, split_name: str, split_idx: Sequence[Union[int, str]]):
         """Set cell indices for a particular split.
