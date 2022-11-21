@@ -5,7 +5,7 @@ import torch
 from anndata import AnnData
 
 from dance import logger
-from dance.typing import FeatType, List, Optional, ReturnedFeat, Sequence, Tuple, Union
+from dance.typing import CellIdxType, Dict, FeatType, List, Optional, ReturnedFeat, Sequence, Tuple
 
 
 class Data:
@@ -31,7 +31,7 @@ class Data:
             If set to True, then check for the consistency between the indeices of x and y.
 
         """
-        self._split_idx_dict = {}
+        self._split_idx_dict: Dict[str, Sequence[CellIdxType]] = {}
 
         self._x = x or AnnData()
         self._y = y
@@ -110,7 +110,7 @@ class Data:
     def copy(self):
         return deepcopy(self)
 
-    def set_split_idx(self, split_name: str, split_idx: Sequence[Union[int, str]]):
+    def set_split_idx(self, split_name: str, split_idx: Sequence[CellIdxType]):
         """Set cell indices for a particular split.
 
         Parameters
