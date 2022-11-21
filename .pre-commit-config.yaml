@@ -7,13 +7,13 @@ repos:
         exclude: ^docs/
 
   - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.27.1
+    rev: v1.28.0
     hooks:
       - id: yamllint
         args: [-c=.yamllint.yml]
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v2.37.2
+    rev: v3.2.2
     hooks:
       - id: pyupgrade
         args: [--py3-plus]
@@ -32,15 +32,15 @@ repos:
         name: Sort imports
         args: [--line-width, "120"]
 
-  - repo: https://github.com/myint/docformatter
-    rev: v1.4
+  - repo: https://github.com/PyCQA/docformatter
+    rev: v1.5.0
     hooks:
       - id: docformatter
         name: Format docstring
         args: [--in-place, --wrap-summaries, "88", --wrap-descriptions, "120", --blank]
 
   - repo: https://github.com/executablebooks/mdformat
-    rev: 0.7.14
+    rev: 0.7.16
     hooks:
       - id: mdformat
         name: Format markdown
