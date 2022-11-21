@@ -107,6 +107,18 @@ class Data:
     def cells(self) -> List[str]:
         return self.x.obs.index.tolist()
 
+    @property
+    def train_idx(self) -> Sequence[CellIdxType]:
+        return self.get_split_idx("train", error_on_miss=False)
+
+    @property
+    def val_idx(self) -> Sequence[CellIdxType]:
+        return self.get_split_idx("val", error_on_miss=False)
+
+    @property
+    def test_idx(self) -> Sequence[CellIdxType]:
+        return self.get_split_idx("test", error_on_miss=False)
+
     def copy(self):
         return deepcopy(self)
 
@@ -123,16 +135,23 @@ class Data:
         """
         self._split_idx_dict[split_name] = split_idx
 
-    def get_split_idx(self, split_name: str):
+    def get_split_idx(self, split_name: str, error_on_miss: bool = False):
         """Obtain cell indices for a particular split.
 
         Parameters
         ----------
         split_name : str
             Name of the split to retrieve.
+        error_on_miss
+            If set to True, raise KeyError if the queried split does not exit, otherwise return None.
 
         """
-        return self._split_idx_dict[split_name]
+        if split_name in self._split_idx_dict:
+            return self._split_idx_dict[split_name]
+        elif error_on_miss:
+            raise KeyError(f"Unknown split {split_name!r}. Please set the split inddices via set_split_idx first.")
+        else:
+            return None
 
     def _get_feat(self, feat_name: str, split_name: Optional[str], return_type: FeatType = "numpy",
                   layer: Optional[str] = None, channel: Optional[str] = None):
