@@ -210,6 +210,14 @@ class Data:
         return_type
             How should the features be returned. **numpy**: return as a numpy array; **torch**: return as a torch
             tensor; **anndata**: return as an anndata object.
+        layer
+            Return a particular layer as features.
+        channel
+            Return a particular obsm channel as features.
+
+        Notes
+        -----
+        If both `layer` and `channel` are not specified (default), then return the default layer as features.
 
         """
         x = self.get_x(split_name, return_type, layer, channel)
