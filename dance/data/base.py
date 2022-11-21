@@ -5,7 +5,7 @@ import torch
 from anndata import AnnData
 
 from dance import logger
-from dance.typing import FeatType, List, Optional, ReturnedFeat, Sequence, Tuple, Union
+from dance.typing import CellIdxType, Dict, FeatType, List, Optional, ReturnedFeat, Sequence, Tuple
 
 
 class Data:
@@ -31,7 +31,7 @@ class Data:
             If set to True, then check for the consistency between the indeices of x and y.
 
         """
-        self._split_idx_dict = {}
+        self._split_idx_dict: Dict[str, Sequence[CellIdxType]] = {}
 
         self._x = x or AnnData()
         self._y = y
@@ -48,6 +48,8 @@ class Data:
     def _setup_splits(self, train_size: Optional[int], val_size: int, test_size: int):
         if train_size is None:
             return
+        elif any(not isinstance(i, int) for i in (train_size, val_size, test_size)):
+            raise TypeError("Split sizes must be of type int")
 
         split_names = ["train", "val", "test"]
         split_sizes = np.array((train_size, val_size, test_size))
@@ -59,9 +61,7 @@ class Data:
         # Each size must be bounded between -1 and the data size
         data_size = self.x.shape[0]
         for name, size in zip(split_names, split_sizes):
-            if not np.issubdtype(size, int):
-                raise TypeError(f"{name} must be of type int, got {type(size)!r}")
-            elif size < -1:
+            if size < -1:
                 raise ValueError(f"{name} must be integer no less than -1, got {size!r}")
             elif size > data_size:
                 raise ValueError(f"{name}={size:,} exceeds total number of samples {data_size:,}")
@@ -107,10 +107,22 @@ class Data:
     def cells(self) -> List[str]:
         return self.x.obs.index.tolist()
 
+    @property
+    def train_idx(self) -> Sequence[CellIdxType]:
+        return self.get_split_idx("train", error_on_miss=False)
+
+    @property
+    def val_idx(self) -> Sequence[CellIdxType]:
+        return self.get_split_idx("val", error_on_miss=False)
+
+    @property
+    def test_idx(self) -> Sequence[CellIdxType]:
+        return self.get_split_idx("test", error_on_miss=False)
+
     def copy(self):
         return deepcopy(self)
 
-    def set_split_idx(self, split_name: str, split_idx: Sequence[Union[int, str]]):
+    def set_split_idx(self, split_name: str, split_idx: Sequence[CellIdxType]):
         """Set cell indices for a particular split.
 
         Parameters
@@ -123,16 +135,23 @@ class Data:
         """
         self._split_idx_dict[split_name] = split_idx
 
-    def get_split_idx(self, split_name: str):
+    def get_split_idx(self, split_name: str, error_on_miss: bool = False):
         """Obtain cell indices for a particular split.
 
         Parameters
         ----------
         split_name : str
             Name of the split to retrieve.
+        error_on_miss
+            If set to True, raise KeyError if the queried split does not exit, otherwise return None.
 
         """
-        return self._split_idx_dict[split_name]
+        if split_name in self._split_idx_dict:
+            return self._split_idx_dict[split_name]
+        elif error_on_miss:
+            raise KeyError(f"Unknown split {split_name!r}. Please set the split inddices via set_split_idx first.")
+        else:
+            return None
 
     def _get_feat(self, feat_name: str, split_name: Optional[str], return_type: FeatType = "numpy",
                   layer: Optional[str] = None, channel: Optional[str] = None):
@@ -191,6 +210,14 @@ class Data:
         return_type
             How should the features be returned. **numpy**: return as a numpy array; **torch**: return as a torch
             tensor; **anndata**: return as an anndata object.
+        layer
+            Return a particular layer as features.
+        channel
+            Return a particular obsm channel as features.
+
+        Notes
+        -----
+        If both `layer` and `channel` are not specified (default), then return the default layer as features.
 
         """
         x = self.get_x(split_name, return_type, layer, channel)
