@@ -48,6 +48,8 @@ class Data:
     def _setup_splits(self, train_size: Optional[int], val_size: int, test_size: int):
         if train_size is None:
             return
+        elif any(not isinstance(i, int) for i in (train_size, val_size, test_size)):
+            raise TypeError("Split sizes must be of type int")
 
         split_names = ["train", "val", "test"]
         split_sizes = np.array((train_size, val_size, test_size))
@@ -59,9 +61,7 @@ class Data:
         # Each size must be bounded between -1 and the data size
         data_size = self.x.shape[0]
         for name, size in zip(split_names, split_sizes):
-            if not np.issubdtype(size, int):
-                raise TypeError(f"{name} must be of type int, got {type(size)!r}")
-            elif size < -1:
+            if size < -1:
                 raise ValueError(f"{name} must be integer no less than -1, got {size!r}")
             elif size > data_size:
                 raise ValueError(f"{name}={size:,} exceeds total number of samples {data_size:,}")
