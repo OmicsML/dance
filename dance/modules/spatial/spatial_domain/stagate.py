@@ -53,7 +53,6 @@ def Stats_Spatial_Net(adata):
 
 
 def mclust_P(adata, num_cluster, used_obsm='STAGATE', modelNames='EEE'):
-
     from sklearn import mixture
     g = mixture.GaussianMixture(n_components=num_cluster, covariance_type='tied', warm_start=True, n_init=100,
                                 max_iter=300, reg_covar=1.4663143602030552e-04, random_state=36282,

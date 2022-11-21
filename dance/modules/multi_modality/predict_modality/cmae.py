@@ -203,7 +203,6 @@ class Classifier(nn.Module):
 
 
 def weights_init(init_type='gaussian'):
-
     def init_fun(m):
         classname = m.__class__.__name__
         if (classname.find('Conv') == 0 or classname.find('Linear') == 0) and hasattr(m, 'weight'):

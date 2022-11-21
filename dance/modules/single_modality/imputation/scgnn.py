@@ -464,9 +464,13 @@ class scGNN():
 
     def regulation_mse_loss_function(self, input, target, regulationMatrix, size_average=None, reduce=None,
                                      reduction='mean'):
-        r"""regulation_mse_loss_function(input, target, regulationMatrix, regularizer_type, size_average=None, reduce=None, reduction='mean') -> Tensor
-        Measures the element-wise mean squared error for regulation input, now only support LTMG.
+        r"""regulation_mse_loss_function(input, target, regulationMatrix,
+        regularizer_type, size_average=None, reduce=None, reduction='mean') -> Tensor
+        Measures the element-wise mean squared error for regulation input, now only
+        support LTMG.
+
         See :revised from pytorch class:`~torch.nn.MSELoss` for details.
+
         """
         if not (target.size() == input.size()):
             print("Using a target size ({}) that is different to the input size ({}). "
@@ -483,9 +487,12 @@ class scGNN():
         return ret
 
     def graph_mse_loss_function(self, input, target, graphregu, size_average=None, reduce=None, reduction='mean'):
-        r"""graph_mse_loss_function(input, target, adj, regularizer_type, size_average=None, reduce=None, reduction='mean') -> Tensor
-        Measures the element-wise mean squared error in graph regularizor.
+        r"""graph_mse_loss_function(input, target, adj, regularizer_type,
+        size_average=None, reduce=None, reduction='mean') -> Tensor Measures the
+        element-wise mean squared error in graph regularizor.
+
         See:revised from pytorch class:`~torch.nn.MSELoss` for details.
+
         """
         if not (target.size() == input.size()):
             print("Using a target size ({}) that is different to the input size ({}). "
@@ -506,9 +513,13 @@ class scGNN():
 
     def regulation01_mse_loss_function(self, input, target, regulationMatrix, size_average=None, reduce=None,
                                        reduction='mean'):
-        r"""regulation_mse_loss_function(input, target, regulationMatrix, regularizer_type, size_average=None, reduce=None, reduction='mean') -> Tensor
-        Measures the element-wise mean squared error for regulation input, now only support LTMG.
+        r"""regulation_mse_loss_function(input, target, regulationMatrix,
+        regularizer_type, size_average=None, reduce=None, reduction='mean') -> Tensor
+        Measures the element-wise mean squared error for regulation input, now only
+        support LTMG.
+
         See :revised from pytorch class:`~torch.nn.MSELoss` for details.
+
         """
         if not (target.size() == input.size()):
             print("Using a target size ({}) that is different to the input size ({}). "

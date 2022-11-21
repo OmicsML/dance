@@ -408,7 +408,6 @@ class Louvain:
 
 
 def generate_dendrogram(graph, part_init=None, weight='weight', resolution=1., randomize=None, random_state=None):
-
     if graph.is_directed():
         raise TypeError("Bad graph type, use only non directed graph")
 

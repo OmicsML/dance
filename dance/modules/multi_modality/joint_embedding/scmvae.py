@@ -43,7 +43,6 @@ def save_checkpoint(model, fileName='./saved_model/model_best.pth.tar'):
 
 
 def load_checkpoint(file_path, model, device):
-
     model.load_state_dict(torch.load(file_path))
     model.to(device)
 
@@ -116,7 +115,6 @@ def poisson_loss(y_true, y_pred):
 
 
 def adjust_learning_rate(init_lr, optimizer, iteration, max_lr, adjust_epoch):
-
     lr = max(init_lr * (0.9**(iteration // adjust_epoch)), max_lr)
     for param_group in optimizer.param_groups:
         param_group["lr"] = lr
