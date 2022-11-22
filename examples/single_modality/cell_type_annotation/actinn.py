@@ -2,12 +2,11 @@ import argparse
 import os.path as osp
 
 import numpy as np
-import pandas as pd
 
 from dance.data import Data
 from dance.datasets.singlemodality import CellTypeDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
-from dance.utils.preprocess import cell_label_to_adata
+from dance.utils.preprocess import cell_label_to_df
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -46,9 +45,10 @@ if __name__ == "__main__":
     dataloader = CellTypeDataset(data_type="actinn", train_set=train_data_paths, train_label=train_label_paths,
                                  test_set=test_data_path, test_label=test_label_path)
 
-    x_adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
-    y_adata = cell_label_to_adata(cell_labels, idx_to_label, obs=x_adata.obs)
-    data = Data(x_adata, y_adata, train_size=train_size)
+    adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
+    adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)
+    data = Data(adata, train_size=train_size)
+    data.set_config(label_channel="cell_type")
 
     model = ACTINN(input_dim=data.num_features, output_dim=len(idx_to_label), hidden_dims=args.hidden_dims,
                    lr=args.learning_rate, device=args.device, num_epochs=args.num_epochs, batch_size=args.batch_size,
