@@ -5,7 +5,7 @@ from dance.data import Data
 from dance.datasets.singlemodality import CellTypeDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
 from dance.transforms.cell_feature import WeightedGenePCA
-from dance.utils.preprocess import cell_label_to_adata
+from dance.utils.preprocess import cell_label_to_df
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -32,17 +32,19 @@ if __name__ == "__main__":
                                  statistics_path=params.statistics_path, map_path=params.map_path,
                                  threshold=params.threshold, gpu=params.gpu)
 
-    x_adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
-    y_adata = cell_label_to_adata(cell_labels, idx_to_label, obs=x_adata.obs)
-    data = Data(x_adata, y_adata, train_size=train_size)
+    adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
+    adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)
+    data = Data(adata, train_size=train_size)
     WeightedGenePCA(n_components=params.dense_dim, split_name="train", log_level="INFO")(data)
 
-    x_train, y_train = data.get_train_data(channel="WeightedGenePCA")
+    data.set_config(feature_channel="WeightedGenePCA", label_channel="cell_type")
+
+    x_train, y_train = data.get_train_data()
     y_train_converted = y_train.argmax(1)  # convert one-hot representation into label index representation
     model = SVM(params)
     model.fit(x_train, y_train_converted)
 
-    x_test, y_test = data.get_test_data(channel="WeightedGenePCA")
+    x_test, y_test = data.get_test_data()
     pred = model.predict(x_test)
     score = model.score(pred, y_test)
     print(f"{score=}")
