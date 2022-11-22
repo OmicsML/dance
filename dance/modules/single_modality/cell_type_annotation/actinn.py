@@ -145,15 +145,15 @@ class ACTINN(nn.Module):
         Parameters
         ----------
         x_train : torch.Tensor
-            training data (genes by cells).
+            training data (cells by genes).
         y_train : torch.Tensor
-            training labels (cell-types by cells).
+            training labels (cells by cell-types).
         seed : int, optional
             Random seed, if set to None, then random.
 
         """
-        x_train = x_train.T.clone().detach().float().to(self.device)  # cells by genes
-        y_train = torch.where(y_train.T)[1].to(self.device)  # cells
+        x_train = x_train.clone().detach().float().to(self.device)  # cells by genes
+        y_train = torch.where(y_train)[1].to(self.device)  # cells
 
         # Initialize weights, optimizer, and scheduler
         self.initialize_parameters(seed)
@@ -182,7 +182,7 @@ class ACTINN(nn.Module):
         Parameters
         ----------
         x : torch.Tensor
-            Gene expression input features (genes by cells).
+            Gene expression input features (cells by genes).
 
         Returns
         -------
@@ -190,27 +190,25 @@ class ACTINN(nn.Module):
             Predicted cell-label indices.
 
         """
-        x = x.T.clone().detach().to(self.device)
+        x = x.clone().detach().to(self.device)
         z = self.forward(x)
         prediction = torch.argmax(z, dim=-1)
         return prediction
 
-    def score(self, x, y):
+    def score(self, pred, true):
         """Model performance score measured by accuracy.
 
         Parameters
         ----------
-        x : torch.Tensor
-            Gene expression input features (genes by cells).
-        y : torch.Tensor
-            One-hot encoded ground truth labels (cell-types by cells).
+        pred : torch.Tensor
+            Gene expression input features (cells by genes).
+        true : torch.Tensor
+            Encoded ground truth cell type labels (cells by cell-types).
 
         Returns
         -------
         float
-            Prediction accuracy
+            Prediction accuracy.
 
         """
-        pred = self.predict(x).detach().cpu()
-        label = torch.where(y.T)[1]
-        return (pred == label).detach().float().mean().tolist()
+        return true[range(pred.shape[0]), pred.squeeze(-1)].detach().mean().item()
