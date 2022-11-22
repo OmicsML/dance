@@ -4,8 +4,10 @@ import os.path as osp
 import numpy as np
 import pandas as pd
 
+from dance.data import Data
 from dance.datasets.singlemodality import CellTypeDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
+from dance.utils.preprocess import cell_label_to_adata
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -43,33 +45,24 @@ if __name__ == "__main__":
 
     dataloader = CellTypeDataset(data_type="actinn", train_set=train_data_paths, train_label=train_label_paths,
                                  test_set=test_data_path, test_label=test_label_path)
-    dataloader = dataloader.load_data()
-    barcode = dataloader.barcode
-    train_set = dataloader.train_set
-    train_label = dataloader.train_label
-    test_set = dataloader.test_set
-    test_label = dataloader.test_label
 
-    # Initialize and train model
-    num_genes, num_train_samples = train_set.shape
-    num_cell_types = train_label.shape[0]
-    print(f"{num_train_samples=:,}, {num_genes=:,}, {num_cell_types=:,}")
-    model = ACTINN(num_genes, num_cell_types, hidden_dims=args.hidden_dims, lr=args.learning_rate, device=args.device,
-                   num_epochs=args.num_epochs, batch_size=args.batch_size, print_cost=args.print_cost, lambd=args.lambd)
+    x_adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
+    y_adata = cell_label_to_adata(cell_labels, idx_to_label, obs=x_adata.obs)
+    data = Data(x_adata, y_adata, train_size=train_size)
+
+    model = ACTINN(input_dim=data.num_features, output_dim=len(idx_to_label), hidden_dims=args.hidden_dims,
+                   lr=args.learning_rate, device=args.device, num_epochs=args.num_epochs, batch_size=args.batch_size,
+                   print_cost=args.print_cost, lambd=args.lambd)
+
+    x_train, y_train = data.get_train_data(return_type="torch")
+    x_test, y_test = data.get_test_data(return_type="torch")
 
     scores = []
     for k in range(args.runs):
-        model.fit(train_set, train_label, seed=args.seed + k)
-        test_predict = model.predict(test_set)
-
-        predicted_label = []
-        for i in range(len(test_predict)):
-            predicted_label.append(dataloader.label_to_type_dict[test_predict[i].item()])
-        predicted_label = pd.DataFrame({"cellname": barcode, "celltype": predicted_label})
-        # predicted_label.to_csv("predicted_label.txt", sep="\t", index=False)
-
-        scores.append(model.score(test_set, test_label))
-        print(f"Run {k + 1:>2d}/{args.runs:>2d}: {scores[-1]}")
+        model.fit(x_train, y_train, seed=args.seed + k)
+        pred = model.predict(x_test)
+        scores.append(score := model.score(pred, y_test))
+        print(f"{score}")
     print(f"Score: {np.mean(scores):04.3f} +/- {np.std(scores):04.3f}")
 """To reproduce ACTINN benchmarks, please refer to command lines belows:
 

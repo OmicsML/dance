@@ -976,17 +976,22 @@ def load_actinn_data(train_data_paths: List[str], train_label_paths: List[str], 
     total_test_cells = test_label.shape[0]
     indicator = test_label.iloc[:, 1].isin(type_to_label_dict_out)
     test_label = test_label[indicator]
-    barcode = test_label.iloc[:, 0].tolist()
     test_set = test_set[:, indicator]
     test_label = convert_type_to_label(test_label.iloc[:, 1], type_to_label_dict_out)
     test_label = one_hot_matrix(test_label, nt)
     logger.info(f"# Testing cells {test_label.shape[1]:,} (original number of cells = {total_test_cells:,})")
 
-    # Convert to train_set and test_set to tensor
-    train_set = torch.from_numpy(train_set)
-    test_set = torch.from_numpy(test_set)
+    x_adata = AnnData(sp.csr_matrix(np.hstack((train_set, test_set)).T), dtype=np.float32)
+    train_size = train_set.shape[1]
+    tot_size = x_adata.shape[0]
 
-    return train_set, train_label, test_set, test_label, barcode, label_to_type_dict
+    labels = [set() for _ in range(tot_size)]
+    for i, j in zip(*np.where(np.hstack((train_label, test_label)).T)):
+        labels[i].add(label_to_type_dict[j])
+
+    idx_to_label = list(map(label_to_type_dict.get, range(len(label_to_type_dict))))
+
+    return x_adata, labels, idx_to_label, train_size
 
 
 #######################################################

@@ -367,14 +367,7 @@ class CellTypeDataset():
 
         if self.data_type == "actinn":
             self.download_benchmark_data()
-            (
-                self.train_set,
-                self.train_label,
-                self.test_set,
-                self.test_label,
-                self.barcode,
-                self.label_to_type_dict,
-            ) = load_actinn_data(self.train_set, self.train_label, self.test_set, self.test_label)
+            return load_actinn_data(self.train_set, self.train_label, self.test_set, self.test_label)
 
         if self.data_type == "celltypist":
             self.download_benchmark_data(download_pretrained=False)
