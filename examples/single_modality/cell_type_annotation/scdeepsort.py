@@ -45,17 +45,23 @@ if __name__ == "__main__":
                                  gpu=params.gpu, evaluate=params.evaluate, test_dir=params.test_dir,
                                  filetype=params.filetype, threshold=params.threshold, exclude_rate=params.exclude_rate,
                                  test_rate=params.test_rate, score=True)
-    dataloader = dataloader.load_data()
-    random.seed(params.random_seed)
-    np.random.seed(params.random_seed)
-    torch.manual_seed(params.random_seed)
-    torch.cuda.manual_seed(params.random_seed)
-    trainer = ScDeepSort(params)
 
-    trainer.fit(dataloader.num_cells, dataloader.num_genes, dataloader.num_labels, dataloader.graph,
-                dataloader.train_ids, dataloader.test_ids, dataloader.labels)
-    prediction_labels = trainer.predict(dataloader.id2label_test, dataloader.test_dict)
-    evaluation_scores = trainer.score(prediction_labels, dataloader.test_label_dict)
+    # dataloader = dataloader.load_data()
+    # random.seed(params.random_seed)
+    # np.random.seed(params.random_seed)
+    # torch.manual_seed(params.random_seed)
+    # torch.cuda.manual_seed(params.random_seed)
+    # model = ScDeepSort(params)
+
+    adata, cell_labels, idx_to_label, train_size = dataloader.load_adta()
+    adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)
+    adata = Data(adata, train_size=train_size)
+
+    model = ScDeepSort(params)
+    model.fit(dataloader.num_cells, dataloader.num_genes, dataloader.num_labels, dataloader.graph, dataloader.train_ids,
+              dataloader.test_ids, dataloader.labels)
+    prediction_labels = model.predict(dataloader.id2label_test, dataloader.test_dict)
+    evaluation_scores = model.score(prediction_labels, dataloader.test_label_dict)
     pprint(evaluation_scores)
 """To reproduce the benchmarking results, please run the following commands:
 
