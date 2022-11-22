@@ -89,7 +89,6 @@ def cluster_acc(y_true, y_pred):
 
 
 def labeled_clustering_evaluate(adata, dataset, cluster=10):
-
     kmeans = KMeans(n_clusters=cluster, n_init=5, random_state=200)
 
     adata_sol = dataset.test_sol

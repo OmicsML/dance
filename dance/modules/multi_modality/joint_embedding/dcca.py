@@ -37,7 +37,6 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 def mse_loss(y_true, y_pred):
-
     mask = torch.sign(y_true)
 
     y_pred = y_pred.float()
@@ -124,7 +123,6 @@ def build_multi_layers(layers, use_batch_norm=True, dropout_rate=0.1):
 
 
 def adjust_learning_rate(init_lr, optimizer, iteration, max_lr, adjust_epoch):
-
     lr = max(init_lr * (0.9**(iteration // adjust_epoch)), max_lr)
     for param_group in optimizer.param_groups:
         param_group["lr"] = lr

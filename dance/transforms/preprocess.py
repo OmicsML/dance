@@ -1089,7 +1089,6 @@ def downsample_adata(adata: AnnData, mode: str = 'total', n_cells: Optional[int]
 
 
 def to_vector_celltypist(_vector_or_file):
-
     if isinstance(_vector_or_file, str):
         try:
             return pd.read_csv(_vector_or_file, header=None)[0].values
@@ -1100,7 +1099,6 @@ def to_vector_celltypist(_vector_or_file):
 
 
 def to_array_celltypist(_array_like):
-
     if isinstance(_array_like, pd.DataFrame):
         return _array_like.values
     elif isinstance(_array_like, spmatrix):
@@ -1114,7 +1112,6 @@ def to_array_celltypist(_array_like):
 
 
 def prepare_data_celltypist(X, labels, genes, transpose):
-
     if (X is None) or (labels is None):
         raise Exception("?? Missing training data and/or training labels. Please provide both arguments")
     if isinstance(X, AnnData) or (isinstance(X, str) and X.endswith('.h5ad')):
@@ -1954,7 +1951,6 @@ def get_pVal(counts, labels):
 
 #' select variable genes
 def select_var_genes_anova(counts, labels, clust_vr='cellType', nv=2000):
-
     # D: number of genes
     D = counts.shape[1]
 
@@ -2088,7 +2084,6 @@ def sample_mask(idx, l):
 
 
 def split(st_data, lab_label, pre_process, split_val=.9):
-
     data1 = pd.DataFrame(st_data[0].X, index=st_data[0].obs.index, columns=st_data[0].var.index)
     data2 = pd.DataFrame(st_data[1].X, index=st_data[1].obs.index, columns=st_data[1].var.index)
 

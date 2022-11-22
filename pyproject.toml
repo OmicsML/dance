@@ -8,6 +8,12 @@ blank_line_before_nested_class_or_def = true
 column_limit = 120
 split_before_named_assigns = false
 
+[tool.docformatter]
+wrap-summaries = 88
+wrap-descriptions = 88
+in-place = true
+blank = true
+
 [tool.pytest.ini_options]
 addopts = [
     "--strict-markers",

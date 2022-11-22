@@ -1017,7 +1017,6 @@ def stLinkGraphConstruct(st_scale, st_label, k_filter):
 
 
 def stAdjConstruct(st_scale, st_label, adj_data, k_filter=1):
-
     st1 = pd.DataFrame(st_scale[0].X, index=st_scale[0].obs.index, columns=st_scale[0].var.index)
     st2 = pd.DataFrame(st_scale[1].X, index=st_scale[1].obs.index, columns=st_scale[1].var.index)
 
