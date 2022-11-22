@@ -968,11 +968,10 @@ def load_actinn_data(train_data_paths: List[str], train_label_paths: List[str], 
     train_set, test_set = scale_sets([train_set, test_set], normalize=normalize)
     type_to_label_dict_out = type_to_label_dict(train_label.iloc[:, 1])
     label_to_type_dict = {v: k for k, v in type_to_label_dict_out.items()}
-    print(f"Cell Types in training set:")
-    pprint.pprint(type_to_label_dict_out)
+    logger.info("Cell Types in training set:\n%s", pprint.pformat(type_to_label_dict_out))
     train_label = convert_type_to_label(train_label.iloc[:, 1], type_to_label_dict_out)
     train_label = one_hot_matrix(train_label, nt)
-    print(f"# Trainng cells: {train_label.shape[1]:,}")
+    logger.info(f"# Trainng cells: {train_label.shape[1]:,}")
 
     total_test_cells = test_label.shape[0]
     indicator = test_label.iloc[:, 1].isin(type_to_label_dict_out)
@@ -981,7 +980,7 @@ def load_actinn_data(train_data_paths: List[str], train_label_paths: List[str], 
     test_set = test_set[:, indicator]
     test_label = convert_type_to_label(test_label.iloc[:, 1], type_to_label_dict_out)
     test_label = one_hot_matrix(test_label, nt)
-    print(f"# Testing cells {test_label.shape[1]:,} (original number of cells = {total_test_cells:,})")
+    logger.info(f"# Testing cells {test_label.shape[1]:,} (original number of cells = {total_test_cells:,})")
 
     # Convert to train_set and test_set to tensor
     train_set = torch.from_numpy(train_set)
