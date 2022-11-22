@@ -1411,6 +1411,7 @@ def removeRed(expData, genes, transID="id", geneID="symbol"):
 
 
 def cn_correctZmat_col(zmat):
+
     def myfuncInf(vector):
         mx = np.max(vector[vector < np.inf])
         mn = np.min(vector[vector > (np.inf * -1)])
@@ -1423,6 +1424,7 @@ def cn_correctZmat_col(zmat):
 
 
 def cn_correctZmat_row(zmat):
+
     def myfuncInf(vector):
         mx = np.max(vector[vector < np.inf])
         mn = np.min(vector[vector > (np.inf * -1)])
@@ -1459,6 +1461,7 @@ def sc_statTab(expDat, dThresh=0):
 
 
 def sc_compAlpha(expDat, threshold=0, pseudo=False):
+
     def singleGene(col, thresh, pseu):
         if pseudo:
             return (np.sum(col > thresh) + 1) / float(len(col) + 1)

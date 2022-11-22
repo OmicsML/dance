@@ -8,6 +8,7 @@ import torch.nn.functional as F
 
 
 def kld_loss(p, q):
+
     def kld(target, pred):
         return torch.mean(torch.sum(target * torch.log(target / (pred + 1e-6)), dim=1))
 
