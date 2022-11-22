@@ -1,18 +1,17 @@
 import numpy as np
-from anndata import AnnData
-from pandas import DataFrame
+from pandas import DataFrame, Index
 
-from dance.typing import List, Optional, Set
+from dance.typing import List, Optional, Sequence, Set, Union
 
 
-def cell_label_to_adata(cell_labels: List[Set[str]], idx_to_label: List[str],
-                        obs: Optional[DataFrame] = None) -> AnnData:
+def cell_label_to_df(cell_labels: List[Union[str, Set[str]]], idx_to_label: List[str],
+                     index: Optional[Union[Sequence[str], Index]] = None) -> DataFrame:
     """Convert cell labels into AnnData of label matrix.
 
     Parameters
     ----------
     cell_labels
-        List of set of str. Each set corresponds to the relevant cell types for that cell.
+        List of str or set of str. Each corresponds to the relevant cell type(s) for that cell.
     idx_to_label
         List of cell type names, used to define the column orders in the label matrix.
     obs
@@ -27,18 +26,12 @@ def cell_label_to_adata(cell_labels: List[Set[str]], idx_to_label: List[str],
 
     """
     num_samples = len(cell_labels)
-    if obs is None:
-        obs = DataFrame(index=list(range(num_samples)))
-    elif obs.shape[0] != num_samples:
-        raise IndexError(f"Mismatched sizes between cell_labels (n={num_samples:,}) and obs (n={obs.shape[0]:,})")
-
     num_labels = len(idx_to_label)
-    var = DataFrame(index=idx_to_label)
     label_to_idx = {j: i for i, j in enumerate(idx_to_label)}
 
-    y = np.zeros((num_samples, num_labels))
+    y = np.zeros((num_samples, num_labels), dtype=np.float32)
     for i in range(num_samples):
         for j in map(label_to_idx.get, cell_labels[i]):
             y[i, j] = 1
 
-    return AnnData(X=y, obs=obs, var=var, dtype="float32")
+    return DataFrame(y, index=index)
