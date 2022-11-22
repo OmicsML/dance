@@ -1,8 +1,7 @@
 import numpy as np
 from sklearn.decomposition import PCA
 
-from dance import logger
-from dance.data import Data
+from dance.data.base import BaseData
 from dance.transforms.base import BaseTransform
 from dance.typing import Optional
 from dance.utils.matrix import normalize
@@ -32,7 +31,7 @@ class WeightedGenePCA(BaseTransform):
         self.n_components = n_components
         self.split_name = split_name
 
-    def __call__(self, data: Data) -> Data:
+    def __call__(self, data: BaseData) -> BaseData:
         feat = data.get_x(self.split_name)  # cell x genes
         gene_pca = PCA(n_components=self.n_components)
 
@@ -40,11 +39,8 @@ class WeightedGenePCA(BaseTransform):
         gene_feat = gene_pca.fit_transform(feat.T)  # decompose into gene features
         self.logger.info(f"Total explained variance: {gene_pca.explained_variance_ratio_.sum():.2%}")
 
-        x = data.x.X
-        if hasattr(x, "toarray"):
-            x = x.toarray()
-
+        x = data.get_x()
         cell_feat = normalize(x, mode="normalize", axis=1) @ gene_feat
-        data.x.obsm[self.out_channel] = cell_feat.astype(np.float32)
+        data.data.obsm[self.out] = cell_feat.astype(np.float32)
 
         return data
