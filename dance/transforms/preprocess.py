@@ -1114,8 +1114,16 @@ def to_array_celltypist(_array_like):
 def prepare_data_celltypist(X, labels, genes, transpose):
     if (X is None) or (labels is None):
         raise Exception("?? Missing training data and/or training labels. Please provide both arguments")
-    if isinstance(X, AnnData) or (isinstance(X, str) and X.endswith('.h5ad')):
-        adata = sc.read(X) if isinstance(X, str) else X
+    if isinstance(X, (AnnData, np.ndarray, pd.DataFrame)) or (isinstance(X, str) and X.endswith('.h5ad')):
+        if isinstance(X, str):
+            adata = sc.read(X)
+        elif isinstance(X, np.ndarray):
+            adata = AnnData(pd.DataFrame(X, columns=list(map(str, range(X.shape[1])))))
+        elif isinstance(X, pd.DataFrame):
+            adata = AnnData(X)
+        else:
+            adata = X
+
         adata.var_names_make_unique()
         if adata.X.min() < 0:
             logger.info("?? Detected scaled expression in the input data, will try the .raw attribute")

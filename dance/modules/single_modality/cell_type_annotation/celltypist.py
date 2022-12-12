@@ -797,9 +797,16 @@ class Classifier():
             self.indata = self.adata.X
             self.indata_genes = self.adata.var_names
             self.indata_names = self.adata.obs_names
-        elif isinstance(filename, AnnData) or (isinstance(filename, str) and filename.endswith('.h5ad')):
-            self.adata = sc.read(filename) if isinstance(filename, str) else filename
+        elif isinstance(filename, (AnnData, np.ndarray, pd.DataFrame)) or (isinstance(filename, str)
+                                                                           and filename.endswith('.h5ad')):
+            if isinstance(filename, (np.ndarray, pd.DataFrame)):
+                self.adata = AnnData(filename)
+            elif isinstance(filename, str):
+                self.adata = sc.read(filename)
+            else:
+                self.adata = filename
             self.adata.var_names_make_unique()
+
             if self.adata.X.min() < 0:
                 logger.info(" Detected scaled expression in the input data, will try the `.raw` attribute")
                 try:
