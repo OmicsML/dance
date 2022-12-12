@@ -1,4 +1,3 @@
-import argparse
 import glob
 import os
 import os.path as osp
@@ -371,7 +370,7 @@ class CellTypeDataset():
 
         if self.data_type == "celltypist":
             self.download_benchmark_data(download_pretrained=False)
-            self.map_dict = get_map_dict(self.params.map_path, self.params.tissue)  # load map
+            map_dict = get_map_dict(self.params.map_path, self.params.tissue)  # load map
             train_data = pd.read_csv(
                 osp.join(self.params.proj_path, self.params.train_dir, self.params.species,
                          self.params.species + "_" + self.params.tissue + str(self.params.train_dataset) + "_data.csv"),
@@ -381,7 +380,6 @@ class CellTypeDataset():
                     self.params.proj_path, self.params.train_dir, self.params.species,
                     self.params.species + "_" + self.params.tissue + str(self.params.train_dataset) + "_celltype.csv"),
                 index_col=1)
-            self.train_adata = ad.AnnData(train_data.T, train_celltype)
             test_data = pd.read_csv(
                 osp.join(self.params.proj_path, self.params.test_dir, self.params.species,
                          self.params.species + "_" + self.params.tissue + str(self.params.test_dataset) + "_data.csv"),
@@ -391,7 +389,18 @@ class CellTypeDataset():
                     self.params.proj_path, self.params.test_dir, self.params.species,
                     self.params.species + "_" + self.params.tissue + str(self.params.test_dataset) + "_celltype.csv"),
                 index_col=1)
-            self.test_adata = ad.AnnData(test_data.T, test_celltype)
+
+            train_size = train_data.shape[1]
+            df = pd.concat(train_data.T.align(test_data.T, axis=1, join="left", fill_value=0))
+            adata = ad.AnnData(df, dtype=np.float32)
+            adata.obs_names_make_unique()
+
+            idx_to_label = sorted(train_celltype["Cell_type"].unique())
+            cell_labels = [{i} for i in train_celltype["Cell_type"].tolist()]
+            for i in test_celltype["Cell_type"].tolist():
+                cell_labels.append(map_dict[self.params.test_dataset][i])
+
+            return adata, cell_labels, idx_to_label, train_size
 
         if self.data_type == "singlecellnet_exp":
             if self.is_singlecellnet_complete():
