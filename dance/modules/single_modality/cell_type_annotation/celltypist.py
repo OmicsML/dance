@@ -16,6 +16,7 @@ from matplotlib import pyplot as plt
 from scipy.sparse import spmatrix
 from scipy.special import expit
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 
 from dance import logger
@@ -1321,38 +1322,27 @@ class Celltypist():
         print(predictions)
         return Classifier.majority_vote(predictions, over_clustering, min_prop=min_prop)
 
-    def score(self, input_adata, predictions, labels, map, label_conversion=False):
-        """Run the prediction and (optional) majority voting to evaluate the model
-        performance.
+    def score(self, pred, true):
+        """Model performance score measured by accuracy.
 
         Parameters
         ----------
-        input_adata: Anndata
-            Input data anndata with label ground truth
-        predictions: classifier.AnnotationResult
-            Output from prediction function.
-        labels : string
-            column name for annotated cell types in the input Anndata
-        label_conversion: boolean optional
-            whether to match predicted labels to annotated cell type labels provided in input_adata
-        map: dictionary
-            a dictionary for label conversion
+        pred: np.ndarray
+            Predicted labels.
+        true: np.ndarray
+            True labels. Can be either a maxtrix of size (samples x labels) with ones indicating positives, or a
+            vector of size (sameples x 1) where each element is the index of the corresponding label for the sample.
+            The first option provides flexibility to cases where a sample could be associated with multiple labels
+            at test time while the model was trained as a multi-class classifier.
 
         Returns
         -------
-        correct: int
-            Number of correct predictions
-        Accuracy: float
-            Prediction accuracy from the model
+        score: float
+            Accuracy score.
 
         """
-        pred_labels = np.array(predictions.predicted_labels)[:, 0]
-        if label_conversion:
-            correct = 0
-            #for i, cell in enumerate(np.array(adVal.obs.Cell_type)):
-            for i, cell in enumerate(np.array(input_adata.obs[labels])):
-                if pred_labels[i] in map[cell]:
-                    correct += 1
+        if true.max() == 1:
+            num_samples = true.shape[0]
+            return (true[range(num_samples), pred.ravel()]).sum() / num_samples
         else:
-            correct = sum(np.array(input_adata.obs[labels]) == pred_labels)
-        return (correct / len(predictions.predicted_labels))
+            return accuracy_score(pred, true)
