@@ -757,13 +757,13 @@ class Classifier():
         if isinstance(model, str):
             model = Model.load(model)
         self.model = model
-        if not filename:
-            logger.warn(f" No input file provided to the classifier")
+        if isinstance(filename, str) and filename == "":
+            logger.warn(" No input file provided to the classifier")
             return
         if isinstance(filename, str):
             self.filename = filename
             logger.info(f" Input file is '{self.filename}'")
-            logger.info(f" Loading data")
+            logger.info(" Loading data")
         if isinstance(filename, str) and filename.endswith(('.csv', '.txt', '.tsv', '.tab', '.mtx', '.mtx.gz')):
             self.adata = sc.read(self.filename)
             if transpose:
@@ -992,57 +992,21 @@ class Classifier():
         return predictions
 
 
-class Celltypist():
-    r"""Build the ACTINN model.
-
-    Parameters
-    ----------
-    classifier : Classification function
-        Class that wraps the celltyping and majority voting processes, as defined above
-    scaler : StandardScaler
-        The scale factor for normalization.
-    description : str
-        text description of the model.
-
-    """
+class Celltypist:
 
     def __init__(self, clf=None, scaler=None, description=None):
         self.classifier = clf
         self.scaler = scaler
         self.description = description
 
-    def fit(
-            self,
-            X=None,
-            labels: Optional[Union[str, list, tuple, np.ndarray, pd.Series, pd.Index]] = None,
-            genes: Optional[Union[str, list, tuple, np.ndarray, pd.Series, pd.Index]] = None,
-            transpose_input: bool = False,
-            check_expression: bool = True,
-            #LR param
-            C: float = 1.0,
-            solver: Optional[str] = None,
-            max_iter: int = 1000,
-            n_jobs: Optional[int] = None,
-            #SGD param
-            use_SGD: bool = False,
-            alpha: float = 0.0001,
-            #mini-batch
-            mini_batch: bool = False,
-            batch_number: int = 100,
-            batch_size: int = 1000,
-            epochs: int = 10,
-            balance_cell_type: bool = False,
-            #feature selection
-            feature_selection: bool = False,
-            top_genes: int = 300,
-            #description
-            date: str = '',
-            details: str = '',
-            url: str = '',
-            source: str = '',
-            version: str = '',
-            #other param
-            **kwargs):
+    def fit(self, X=None, labels: Optional[Union[str, list, tuple, np.ndarray, pd.Series,
+                                                 pd.Index]] = None, genes: Optional[Union[str, list, tuple, np.ndarray,
+                                                                                          pd.Series, pd.Index]] = None,
+            transpose_input: bool = False, check_expression: bool = True, C: float = 1.0, solver: Optional[str] = None,
+            max_iter: int = 1000, n_jobs: Optional[int] = None, use_SGD: bool = False, alpha: float = 0.0001,
+            mini_batch: bool = False, batch_number: int = 100, batch_size: int = 1000, epochs: int = 10,
+            balance_cell_type: bool = False, feature_selection: bool = False, top_genes: int = 300, date: str = '',
+            details: str = '', url: str = '', source: str = '', version: str = '', **kwargs):
         """Train a celltypist model using mini-batch (optional) logistic classifier with
         a global solver or stochastic gradient descent (SGD) learning.
 
