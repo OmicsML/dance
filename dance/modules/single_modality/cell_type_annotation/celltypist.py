@@ -18,17 +18,10 @@ from scipy.special import expit
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
+from dance import logger
 from dance.transforms.preprocess import (LRClassifier_celltypist, SGDClassifier_celltypist, downsample_adata,
                                          get_sample_csv_celltypist, get_sample_data_celltypist, prepare_data_celltypist,
                                          to_array_celltypist, to_vector_celltypist)
-
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-logger = logging.getLogger(__name__)
-set_level = logger.setLevel
-info = logger.info
-warn = logger.warning
-error = logger.error
-debug = logger.debug
 
 celltypist_path = os.getenv('CELLTYPIST_FOLDER', default=os.path.join(str(pathlib.Path.home()), '.celltypist'))
 pathlib.Path(celltypist_path).mkdir(parents=True, exist_ok=True)
