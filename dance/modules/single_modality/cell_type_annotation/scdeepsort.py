@@ -77,18 +77,18 @@ class AdaptiveSAGE(nn.Module):
 
         """
         number_of_edges = edges.src["h"].shape[0]
-        indices = np.expand_dims(np.array([self.gene_num + 1] * number_of_edges, dtype=np.int32), axis=1)
-        src_id, dst_id = edges.src["id"].cpu().numpy(), edges.dst["id"].cpu().numpy()
-        indices = np.where((src_id >= 0) & (dst_id < 0), src_id, indices)  # gene->cell
-        indices = np.where((dst_id >= 0) & (src_id < 0), dst_id, indices)  # cell->gene
-        indices = np.where((dst_id >= 0) & (src_id >= 0), self.gene_num, indices)  # gene-gene
+        src_id, dst_id = edges.src["id"], edges.dst["id"]
+        indices = (self.gene_num + 1) * torch.ones(number_of_edges, dtype=torch.long, device=src_id.device)
+        indices = torch.where((src_id >= 0) & (dst_id < 0), src_id, indices)  # gene->cell
+        indices = torch.where((dst_id >= 0) & (src_id < 0), dst_id, indices)  # cell->gene
+        indices = torch.where((dst_id >= 0) & (src_id >= 0), self.gene_num, indices)  # gene-gene
         if DEBUG:
             print(
                 f"{((src_id >= 0) & (dst_id < 0)).sum():>10,} (geen->cell), "
                 f"{((src_id < 0) & (dst_id >= 0)).sum():>10,} (cell->gene), "
                 f"{((src_id >= 0) & (dst_id >= 0)).sum():>10,} (self-gene), "
                 f"{((src_id < 0) & (dst_id < 0)).sum():>10,} (self-cell), ", )
-        h = edges.src["h"] * self.alpha[indices.squeeze()]
+        h = edges.src["h"] * self.alpha[indices]
         return {"m": h * edges.data["weight"]}
 
     def forward(self, block, h):
