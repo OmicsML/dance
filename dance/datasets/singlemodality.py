@@ -1,4 +1,3 @@
-import argparse
 import glob
 import os
 import os.path as osp
@@ -14,9 +13,8 @@ import torch
 from torch.utils.data import Dataset
 
 from dance.data import download_file, download_unzip
-from dance.transforms.preprocess import (get_map_dict, load_actinn_data, load_annotation_data_internal,
-                                         load_annotation_test_data, load_imputation_data_internal, load_svm_data,
-                                         prepare_data_celltypist, splitCommonAnnData)
+from dance.transforms.preprocess import (get_map_dict, load_actinn_data, load_annotation_data,
+                                         load_imputation_data_internal, load_svm_data, splitCommonAnnData)
 
 
 @dataclass
@@ -314,44 +312,14 @@ class CellTypeDataset():
     def load_data(self):
         # Load data from existing h5ad files, or download files and load data.
         if self.data_type == "scdeepsort" or self.data_type == "scdeepsort_exp":
-            if self.is_complete():
-                pass
-            else:
+            if not self.is_complete():
                 if self.data_type == "scdeepsort":
                     self.download_all_data()
                 if self.data_type == "scdeepsort_exp":
                     self.download_benchmark_data()
                 assert self.is_complete()
 
-            (
-                self.num_cells,
-                self.num_genes,
-                self.num_labels,
-                self.graph,
-                self.train_ids,
-                self.test_ids,
-                self.labels,
-            ) = load_annotation_data_internal(self.params)
-
-            if self.params.score:
-                (
-                    self.total_cell_test,
-                    self.num_genes_test,
-                    self.num_labels_test,
-                    self.id2label_test,
-                    self.test_dict,
-                    self.test_label_dict,
-                    self.time_used_test,
-                ) = load_annotation_test_data(self.params)
-            else:
-                (
-                    self.total_cell_test,
-                    self.num_genes_test,
-                    self.num_labels_test,
-                    self.id2label_test,
-                    self.test_dict,
-                    self.time_used_test,
-                ) = load_annotation_test_data(self.params)
+            return load_annotation_data(self.params)
 
         if self.data_type == "svm":
             if self.is_complete():
