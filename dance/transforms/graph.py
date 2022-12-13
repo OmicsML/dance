@@ -23,19 +23,24 @@ class CellGeneGraph(BaseTransform):
         num_cells, num_feats = feat.shape
 
         row, col = np.nonzero(feat)
-        edata = torch.from_numpy(np.array(feat[col, row]).ravel()[:, None])
-        size = edata.size()[0]
-        self.logger.info(f"Number of nonzero entries: {size:,}")
-        self.logger.info(f"Nonzero rate = {size / num_cells / num_feats:.1%}")
+        edata = np.array(feat[row, col])[:, None]
+        self.logger.info(f"Number of nonzero entries: {edata.size:,}")
+        self.logger.info(f"Nonzero rate = {edata.size / num_cells / num_feats:.1%}")
 
-        col = col + num_feats  # offset by feature nodes
+        row = row + num_feats  # offset by feature nodes
         col, row = np.hstack((col, row)), np.hstack((row, col))  # convert to undirected
-        edata = np.hstack((edata, edata))
+        edata = np.vstack((edata, edata))
 
+        # Convert to tensors
+        col = torch.LongTensor(col)
+        row = torch.LongTensor(row)
+        edata = torch.FloatTensor(edata)
+
+        # Initialize cell-gene graph
         g = dgl.graph((row, col))
         g.edata["weight"] = edata
-        g.ndata["id"] = torch.hstack((torch.arange(num_feats,
-                                                   dtype=torch.int32), -torch.ones(num_cells, dtype=torch.int32)))
+        g.ndata["id"] = torch.hstack((torch.arange(num_feats, dtype=torch.int32),
+                                      -torch.ones(num_cells, dtype=torch.int32)))  # yapf: disable
 
         # Normalize edges and add self-loop
         in_deg = g.in_degrees()
@@ -46,8 +51,10 @@ class CellGeneGraph(BaseTransform):
                 g.edata["weight"][eidx] = in_deg[i] * edge_w / edge_w.sum()
         g.add_edges(g.nodes(), g.nodes(), {"weight": torch.ones(g.number_of_nodes())[:, None]})
 
-        gene_feature = data.get_feature(return_type="tensor", channel=self.gene_feature_channel, mod=self.mod)
-        cell_feature = data.get_feature(return_type="tensor", channel=self.cell_feature_channel, mod=self.mod)
+        gene_feature = data.get_feature(return_type="torch", channel=self.gene_feature_channel, mod=self.mod,
+                                        channel_type="var")
+        cell_feature = data.get_feature(return_type="torch", channel=self.cell_feature_channel, mod=self.mod,
+                                        channel_type="obs")
         g.ndata["features"] = torch.vstack((gene_feature, cell_feature))
 
         data.data.uns[self.out] = g
@@ -63,6 +70,9 @@ class PCACellGeneGraph(BaseTransform):
 
         self.n_components = n_components
         self.split_name = split_name
+
+        self.layer = layer
+        self.mod = mod
 
     def __call__(self, data):
         WeightedGenePCA(self.n_components, self.split_name, log_level=self.log_level)(data)

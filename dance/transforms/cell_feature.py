@@ -42,5 +42,6 @@ class WeightedGenePCA(BaseTransform):
         x = data.get_x()
         cell_feat = normalize(x, mode="normalize", axis=1) @ gene_feat
         data.data.obsm[self.out] = cell_feat.astype(np.float32)
+        data.data.varm[self.out] = gene_feat.astype(np.float32)
 
         return data
