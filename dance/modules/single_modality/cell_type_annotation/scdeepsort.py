@@ -8,14 +8,14 @@ learning with a weighted graph neural network." Nucleic acids research 49.21 (20
 """
 import os
 import time
+from copy import deepcopy
 from pathlib import Path
 
 import dgl.function as fn
-import numpy as np
-import pandas as pd
 import torch
 import torch.nn as nn
 from dgl.dataloading import DataLoader, NeighborSampler
+from sklearn.metrics import accuracy_score
 
 DEBUG = os.environ.get("DANCE_DEBUG")
 
@@ -165,41 +165,44 @@ class GNN(nn.Module):
 
 
 class ScDeepSort:
-    """The ScDeepSort cell-type annotation model.
+    """The ScDeepSort cell-type annotation model."""
 
-    Parameters
-    ----------
-    params : argparse.Namespace
-        A Namespace contains arguments of Scdeepsort. See parser documnetation for more details.
+    def __init__(
+        self,
+        dim_in,
+        dim_out,
+        dim_hid,
+        num_layers,
+        species,
+        tissue,
+        *,
+        dropout=0,
+        batch_size=500,
+        gpu=-1,
+        save_dir="result",
+    ):  # yapf: disable
+        self.dense_dim = dim_in
+        self.hidden_dim = dim_hid
+        self.n_layers = num_layers
+        self.dropout = dropout
+        self.species = species
+        self.tissue = tissue
+        self.batch_size = batch_size
+        self.gpu = gpu
+        self.save_dir = save_dir
 
-    """
-
-    def __init__(self, params):
-        self.params = params
         self.postfix = time.strftime("%d_%m_%Y") + "_" + time.strftime("%H:%M:%S")
         self.prj_path = Path(__file__).resolve().parents[4]
-        # TODO: change the prefix from `example` to `saved_models`
-        self.save_path = (self.prj_path / "example" / "single_modality" / "cell_type_annotation" / "pretrained" /
-                          self.params.species / "models")
+        self.save_path = (self.prj_path / "saved_models" / "single_modality" / "cell_type_annotation" / "pretrained" /
+                          self.species / "models")
 
         if not self.save_path.exists():
             self.save_path.mkdir(parents=True)
-        self.device = torch.device("cpu" if self.params.gpu == -1 else f"cuda:{params.gpu}")
+        self.device = torch.device("cpu" if self.gpu == -1 else f"cuda:{gpu}")
 
-        # Define the variables during training
-        self.num_cells = None
-        self.num_genes = None
-        self.num_labels = None
-        self.graph = None
-        self.train_ids = None
-        self.test_ids = None
-        self.labels = None
+        self.num_labels = dim_out
 
-        # Define the variables during prediction
-        self.id2label = None
-        self.test_dict = None
-
-    def fit(self, num_cells, num_genes, num_labels, graph, train_ids, test_ids, labels):
+    def fit(self, graph, labels, epochs=300, lr=1e-3, weight_decay=0, val_ratio=0.2):
         """Train scDeepsort model.
 
         Parameters
@@ -220,51 +223,56 @@ class ScDeepSort:
             Node (cell, gene) labels, -1 for genes.
 
         """
-        self.num_cells = num_cells
-        self.num_genes = num_genes
-        self.num_labels = num_labels
+        gene_mask = graph.ndata["id"] != -1
+        cell_mask = graph.ndata["id"] == -1
+        num_genes = gene_mask.sum()
+        num_cells = cell_mask.sum()
 
-        self.train_ids = train_ids.to(self.device)
-        self.test_ids = test_ids.to(self.device)
-        self.labels = labels.to(self.device)
-        self.graph = graph.to(self.device)
-        self.graph.ndata["label"] = self.labels
+        perm = torch.randperm(num_cells) + num_genes
+        num_val = int(num_cells * val_ratio)
+        val_idx = perm[:num_val].to(self.device)
+        train_idx = perm[num_val:].to(self.device)
 
-        self.model = GNN(self.params.dense_dim, self.num_labels, self.params.hidden_dim, self.params.n_layers,
-                         self.num_genes, activation=nn.ReLU(), dropout=self.params.dropout).to(self.device)
+        full_labels = -torch.ones(num_genes + num_cells, dtype=torch.long)
+        full_labels[-num_cells:] = labels
+        graph = graph.to(self.device)
+        graph.ndata["label"] = full_labels.to(self.device)
+
+        self.model = GNN(self.dense_dim, self.num_labels, self.hidden_dim, self.n_layers, num_genes,
+                         activation=nn.ReLU(), dropout=self.dropout).to(self.device)
         print(self.model)
 
-        self.sampler = NeighborSampler(fanouts=[-1] * self.params.n_layers, edge_dir="in")
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.params.lr,
-                                          weight_decay=self.params.weight_decay)
+        self.sampler = NeighborSampler(fanouts=[-1] * self.n_layers, edge_dir="in")
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
         self.loss_fn = nn.CrossEntropyLoss(reduction="sum")
-        if self.params.num_neighbors == 0:
-            self.num_neighbors = self.num_cells + self.num_genes
-        else:
-            self.num_neighbors = self.params.num_neighbors
 
-        print(f"Train Number: {len(self.train_ids)}, Test Number: {len(self.test_ids)}")
-        max_test_acc, _train_acc, _epoch = 0, 0, 0
-        for epoch in range(self.params.n_epochs):
-            loss = self.cal_loss()
-            train_acc = self.evaluate(self.train_ids)[-1]
-            test_correct, test_unsure, test_acc = self.evaluate(self.test_ids)
-            if max_test_acc <= test_acc:
-                final_test_correct_num = test_correct
-                final_test_unsure_num = test_unsure
+        print(f"Train Number: {len(train_idx)}, Val Number: {len(val_idx)}")
+        max_val_acc, _train_acc, _epoch = 0, 0, 0
+        best_state_dict = None
+        for epoch in range(epochs):
+            loss = self.cal_loss(graph, train_idx)
+            train_acc = self.evaluate(graph, train_idx)[-1]
+            val_correct, val_unsure, val_acc = self.evaluate(graph, val_idx)
+            if max_val_acc <= val_acc:
+                final_val_correct_num = val_correct
+                final_val_unsure_num = val_unsure
                 _train_acc = train_acc
                 _epoch = epoch
-                max_test_acc = test_acc
+                max_val_acc = val_acc
                 self.save_model()
-            print(f">>>>Epoch {epoch:04d}: Train Acc {train_acc:.4f}, Loss {loss / len(self.train_ids):.4f}, "
-                  f"Test correct {test_correct}, Test unsure {test_unsure}, Test Acc {test_acc:.4f}")
+                best_state_dict = deepcopy(self.model.state_dict())
+            print(f">>>>Epoch {epoch:04d}: Train Acc {train_acc:.4f}, Loss {loss / len(train_idx):.4f}, "
+                  f"Val correct {val_correct}, Val unsure {val_unsure}, Val Acc {val_acc:.4f}")
 
-        print(f"---{self.params.species} {self.params.tissue} Best test result:---")
-        print(f"Epoch {_epoch:04d}, Train Acc {_train_acc:.4f}, Test Correct Num {final_test_correct_num}, "
-              f"Test Total Num {len(self.test_ids)}, Test Unsure Num {final_test_unsure_num}, "
-              f"Test Acc {final_test_correct_num / len(self.test_ids):.4f}")
+        if best_state_dict is not None:
+            self.model.load_state_dict(best_state_dict)
 
-    def cal_loss(self):
+        print(f"---{self.species} {self.tissue} Best val result:---")
+        print(f"Epoch {_epoch:04d}, Train Acc {_train_acc:.4f}, Val Correct Num {final_val_correct_num}, "
+              f"Val Total Num {len(val_idx)}, Val Unsure Num {final_val_unsure_num}, "
+              f"Val Acc {final_val_correct_num / len(val_idx):.4f}")
+
+    def cal_loss(self, graph, idx):
         """Calculate loss.
 
         Returns
@@ -276,8 +284,8 @@ class ScDeepSort:
         self.model.train()
         total_loss = 0
 
-        dataloader = DataLoader(graph=self.graph, indices=self.train_ids, graph_sampler=self.sampler,
-                                batch_size=self.params.batch_size, shuffle=True)
+        dataloader = DataLoader(graph=graph, indices=idx, graph_sampler=self.sampler, batch_size=self.batch_size,
+                                shuffle=True)
         for _, _, blocks in dataloader:
             blocks = [b.to(self.device) for b in blocks]
             input_features = blocks[0].srcdata["features"]
@@ -294,7 +302,7 @@ class ScDeepSort:
         return total_loss
 
     @torch.no_grad()
-    def evaluate(self, ids):
+    def evaluate(self, graph, ids, unsure_rate: float = 2.0):
         """Evaluate the trained scDeepsort model.
 
         Parameters
@@ -311,8 +319,8 @@ class ScDeepSort:
         self.model.eval()
         total_correct, total_unsure = 0, 0
 
-        dataloader = DataLoader(graph=self.graph, indices=ids, graph_sampler=self.sampler,
-                                batch_size=self.params.batch_size, shuffle=True)
+        dataloader = DataLoader(graph=graph, indices=ids, graph_sampler=self.sampler, batch_size=self.batch_size,
+                                shuffle=True)
         for _, _, blocks in dataloader:
             blocks = [b.to(self.device) for b in blocks]
             input_features = blocks[0].srcdata["features"]
@@ -321,7 +329,7 @@ class ScDeepSort:
 
             for pred, label in zip(output_predictions.cpu(), output_labels.cpu()):
                 max_prob = pred.max().item()
-                if max_prob < self.params.unsure_rate / self.num_labels:
+                if max_prob < unsure_rate / self.num_labels:
                     total_unsure += 1
                 elif pred.argmax().item() == label:
                     total_correct += 1
@@ -331,17 +339,17 @@ class ScDeepSort:
     def save_model(self):
         """Save the model at the save_path."""
         state = {"model": self.model.state_dict(), "optimizer": self.optimizer.state_dict()}
-        torch.save(state, self.save_path / f"{self.params.species}-{self.params.tissue}.pt")
+        torch.save(state, self.save_path / f"{self.species}-{self.tissue}.pt")
 
     def load_model(self):
         """Load the model from the model path."""
-        filename = f"{self.params.species}-{self.params.tissue}.pt"
-        model_path = self.prj_path / "pretrained" / self.params.species / "models" / filename
+        filename = f"{self.species}-{self.tissue}.pt"
+        model_path = self.prj_path / "pretrained" / self.species / "models" / filename
         state = torch.load(model_path, map_location=self.device)
         self.model.load_state_dict(state["model"])
 
     @torch.no_grad()
-    def inference(self, num):
+    def predict_proba(self, graph):
         """Perform inference on a test dataset.
 
         Parameters
@@ -357,49 +365,38 @@ class ScDeepSort:
         """
         self.model.eval()
 
-        unsure_threshold = self.params.unsure_rate / self.num_labels
+        cell_mask = graph.ndata["id"] == -1
+        idx = torch.where(cell_mask)[0].to(self.device)
+        graph = graph.to(self.device)
 
-        graph = self.test_dict["graph"][num].to(self.device)
-        test_indices = self.test_dict["nid"][num].to(self.device)
-        new_logits = torch.zeros((graph.number_of_nodes(), self.num_labels))
-
-        dataloader = DataLoader(graph=graph, indices=test_indices, graph_sampler=self.sampler,
-                                batch_size=self.params.batch_size, shuffle=True)
+        logits = torch.zeros(graph.number_of_nodes(), self.num_labels)
+        dataloader = DataLoader(graph=graph, indices=idx, graph_sampler=self.sampler, batch_size=self.batch_size)
         for _, output_nodes, blocks in dataloader:
-            blocks = [b.to(torch.device(self.device)) for b in blocks]
+            blocks = [b.to(self.device) for b in blocks]
             input_features = blocks[0].srcdata["features"]
-            new_logits[output_nodes] = self.model(blocks, input_features).detach().cpu()
+            logits[output_nodes] = self.model(blocks, input_features).detach().cpu()
 
-        new_logits = new_logits[self.test_dict["mask"][num]]
-        new_logits = nn.functional.softmax(new_logits, dim=1).numpy()
-        predict_label = []
-        for pred in new_logits:
-            pred_label = self.id2label[pred.argmax().item()]
-            predict_label.append("unsure" if pred.max().item() < unsure_threshold else pred_label)
-        return predict_label
+        pred_prob = nn.functional.softmax(logits[cell_mask], dim=-1).numpy()
+        return pred_prob
 
-    def predict(self, id2label, test_dict):
+    def predict(self, graph, unsure_rate: float = 2.0):
         """Perform prediction on all test datasets.
 
         Parameters
         ----------
-        id2label : np.ndarray
-            Id to label diction.
-        test_dict : dict
-            The test dictionary.
 
         Returns
         -------
-        dict
-            A dictionary where the keys are the test dataset IDs and the values are the corresponding predictions.
 
         """
-        self.id2label = id2label
-        self.test_dict = test_dict
-        return {num: self.inference(num) for num in self.params.test_dataset}
+        pred_prob = self.predict_proba(graph)
 
-    @torch.no_grad()
-    def score(self, predicted_labels, true_labels):
+        pred = pred_prob.argmax(1)
+        unsure = pred_prob.max(1) < unsure_rate / self.num_labels
+
+        return pred, unsure
+
+    def score(self, pred, true):
         """Compute model performance on test datasets based on accuracy.
 
         Parameters
@@ -417,60 +414,8 @@ class ScDeepSort:
             A diction of correct prediction numbers, total samples, unsured prediction numbers, and accuracy.
 
         """
-        output_score = {}
-        for num in set(predicted_labels) & set(true_labels):
-            total_num = len(predicted_labels[num])
-            unsure_num = correct = 0
-            for pred, true in zip(predicted_labels[num], true_labels[num]):
-                if pred == "unsure":
-                    unsure_num += 1
-                elif pred == true or pred in true:  # either a single mapping or multiple mappings
-                    correct += 1
-
-            output_score[num] = {
-                "Total number of predictions": total_num,
-                "Number of correct predictions": correct,
-                "Number of unsure predictions": unsure_num,
-                "Accuracy": correct / total_num,
-            }
-
-        return output_score
-
-    def save_pred(self, num, pred):
-        """Save predictions for a particular test dataset.
-
-        Parameters
-        ----------
-        num : int
-            Test file number.
-        pred : list np.array or dataframe
-            Predicted labels.
-
-        """
-        label_map = pd.read_excel("./map/celltype2subtype.xlsx", sheet_name=self.params.species, header=0,
-                                  names=["species", "old_type", "new_type", "new_subtype"])
-        label_map = label_map.fillna("N/A", inplace=False)
-        oldtype2newtype = {}
-        oldtype2newsubtype = {}
-        for _, old_type, new_type, new_subtype in label_map.itertuples(index=False):
-            oldtype2newtype[old_type] = new_type
-            oldtype2newsubtype[old_type] = new_subtype
-
-        save_path = self.prj_path / self.params.save_dir
-        if not save_path.exists():
-            save_path.mkdir()
-        if self.params.score:
-            df = pd.DataFrame({
-                "index": self.test_dict["origin_id"][num],
-                "original label": self.test_dict["label"][num],
-                "cell_type": [oldtype2newtype.get(p, p) for p in pred],
-                "cell_subtype": [oldtype2newsubtype.get(p, p) for p in pred]
-            })
+        if true.max() == 1:
+            num_samples = true.shape[0]
+            return (true[range(num_samples), pred.ravel()]).sum() / num_samples
         else:
-            df = pd.DataFrame({
-                "index": self.test_dict["origin_id"][num],
-                "cell_type": [oldtype2newtype.get(p, p) for p in pred],
-                "cell_subtype": [oldtype2newsubtype.get(p, p) for p in pred]
-            })
-        df.to_csv(save_path / (self.params.species + f"_{self.params.tissue}_{num}.csv"), index=False)
-        print(f"output has been stored in {self.params.species}_{self.params.tissue}_{num}.csv")
+            return accuracy_score(pred, true)
