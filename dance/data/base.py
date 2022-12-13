@@ -5,7 +5,7 @@ import numpy as np
 import torch
 
 from dance import logger
-from dance.typing import Any, Dict, FeatType, List, Optional, Sequence, Tuple
+from dance.typing import Any, Dict, FeatType, List, Literal, Optional, Sequence, Tuple
 
 
 class BaseData(ABC):
@@ -122,6 +122,9 @@ class BaseData(ABC):
     def test_idx(self) -> Sequence[int]:
         return self.get_split_idx("test", error_on_miss=False)
 
+    def shape(self) -> Tuple[int, int]:
+        return self.data.shape
+
     def copy(self):
         return deepcopy(self)
 
@@ -155,6 +158,53 @@ class BaseData(ABC):
             raise KeyError(f"Unknown split {split_name!r}. Please set the split inddices via set_split_idx first.")
         else:
             return None
+
+    def get_feature(self, *, return_type: FeatType = "numpy", channel: Optional[str] = None,
+                    channel_type: Literal["obs", "var"] = "obs", layer: Optional[str] = None,
+                    mod: Optional[str] = None):  # yapf: disable
+        # Pick modality
+        if mod is None:
+            data = self.data
+        elif not hasattr(self.data, "mod"):
+            raise AttributeError("`mod` option is only available when using multimodality data.")
+        elif mod not in self.mod:
+            raise KeyError(f"Unknown modality {mod!r}, available options are {sorted(self.mod)}")
+        else:
+            data = self.data.mod[mod]
+
+        # Pick channels - obsm or varm
+        if channel_type == "obs":
+            channels = data.obsm
+        elif channel_type == "var":
+            channels = data.varm
+        else:
+            raise ValueError(f"Unknown channel type {channel_type!r}")
+
+        # Pick specific channl
+        if (channel is not None) and (layer is not None):
+            raise ValueError(f"Cannot specify feature layer ({layer!r}) and channel ({channel!r}) simmultaneously.")
+        elif channel is not None:
+            feature = channels[channel]
+        elif layer is not None:
+            feature = data.layers[layer].X
+        else:
+            feature = data.X
+
+        if return_type == "default":
+            return feature
+
+        # Transform features to other data types
+        if hasattr(feature, "toarray"):  # convert sparse array to dense numpy array
+            feature = feature.toarray()
+        elif hasattr(feature, "to_numpy"):  # convert dataframe to numpy array
+            feature = feature.to_numpy()
+
+        if return_type == "torch":
+            feature = torch.from_numpy(feature)
+        elif return_type != "numpy":
+            raise ValueError(f"Unknown return_type {return_type!r}")
+
+        return feature
 
     def _get_data(self, name: str, split_name: Optional[str], return_type: FeatType = "numpy", **kwargs):
         out = getattr(self, name)
