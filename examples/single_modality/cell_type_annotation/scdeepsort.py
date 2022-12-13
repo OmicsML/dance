@@ -1,12 +1,13 @@
 import argparse
-import random
 from pprint import pprint
 
-import numpy as np
 import torch
 
+from dance.data import Data
 from dance.datasets.singlemodality import CellTypeDataset
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
+from dance.transforms.graph import PCACellGeneGraph
+from dance.utils.preprocess import cell_label_to_df
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -46,23 +47,33 @@ if __name__ == "__main__":
                                  filetype=params.filetype, threshold=params.threshold, exclude_rate=params.exclude_rate,
                                  test_rate=params.test_rate, score=True)
 
-    # dataloader = dataloader.load_data()
-    # random.seed(params.random_seed)
-    # np.random.seed(params.random_seed)
-    # torch.manual_seed(params.random_seed)
-    # torch.cuda.manual_seed(params.random_seed)
-    # model = ScDeepSort(params)
-
-    adata, cell_labels, idx_to_label, train_size = dataloader.load_adta()
+    adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
     adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)
-    adata = Data(adata, train_size=train_size)
+    data = Data(adata, train_size=train_size)
+    PCACellGeneGraph(n_components=params.dense_dim, split_name="train", log_level="INFO")(data)
+    data.set_config(label_channel="cell_type")
 
-    model = ScDeepSort(params)
-    model.fit(dataloader.num_cells, dataloader.num_genes, dataloader.num_labels, dataloader.graph, dataloader.train_ids,
-              dataloader.test_ids, dataloader.labels)
-    prediction_labels = model.predict(dataloader.id2label_test, dataloader.test_dict)
-    evaluation_scores = model.score(prediction_labels, dataloader.test_label_dict)
-    pprint(evaluation_scores)
+    y_train = data.get_y(split_name="train", return_type="torch").argmax(1)
+    y_test = data.get_y(split_name="test", return_type="torch")
+    num_labels = y_test.shape[1]
+
+    # TODO: make api for the following blcok?
+    g = data.data.uns["CellGeneGraph"]
+    num_genes = data.num_features
+    gene_ids = torch.arange(num_genes)
+    train_cell_ids = torch.LongTensor(data.train_idx) + num_genes
+    test_cell_ids = torch.LongTensor(data.test_idx) + num_genes
+    g_train = g.subgraph(torch.concat((gene_ids, train_cell_ids)))
+    g_test = g.subgraph(torch.concat((gene_ids, test_cell_ids)))
+
+    model = ScDeepSort(params.dense_dim, num_labels, params.hidden_dim, params.n_layers, params.species, params.tissue,
+                       dropout=params.dropout, batch_size=params.batch_size, gpu=params.gpu, save_dir=params.save_dir)
+    model.fit(g_train, y_train, epochs=params.n_epochs, lr=params.lr, weight_decay=params.weight_decay,
+              val_ratio=params.test_rate)
+
+    pred, unsure = model.predict(g_test)
+    score = model.score(pred, y_test)
+    print(f"{score=}")
 """To reproduce the benchmarking results, please run the following commands:
 
 python scdeepsort.py --data_type scdeepsort --tissue Brain --test_data 2695
