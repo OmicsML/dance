@@ -167,20 +167,32 @@ class GNN(nn.Module):
 class ScDeepSort:
     """The ScDeepSort cell-type annotation model."""
 
-    def __init__(
-        self,
-        dim_in,
-        dim_out,
-        dim_hid,
-        num_layers,
-        species,
-        tissue,
-        *,
-        dropout=0,
-        batch_size=500,
-        gpu=-1,
-        save_dir="result",
-    ):  # yapf: disable
+    def __init__(self, dim_in: int, dim_out: int, dim_hid: int, num_layers: int, species: str, tissue: str, *,
+                 dropout: int = 0, batch_size: int = 500, device: str = "cpu"):
+        """Initialize the scDeepSort object.
+
+        Parameters
+        ----------
+        dim_in
+            Input dimension, i.e., the number of PCA used for cell and gene features.
+        dim_out
+            Output dimension, i.e., the number of possible cell-types.
+        dim_hid
+            Hidden dimension.
+        num_layers
+            Number of convolution layers.
+        species
+            Species name (only used for determining the read/write path).
+        tissue
+            Tissue name (only used for determining the read/write path).
+        dropout
+            Drop-out rate.
+        batch_size
+            Batch size.
+        device
+            Computation device, e.g., 'cpu', 'cuda'.
+
+        """
         self.dense_dim = dim_in
         self.hidden_dim = dim_hid
         self.n_layers = num_layers
@@ -188,8 +200,7 @@ class ScDeepSort:
         self.species = species
         self.tissue = tissue
         self.batch_size = batch_size
-        self.gpu = gpu
-        self.save_dir = save_dir
+        self.device = device
 
         self.postfix = time.strftime("%d_%m_%Y") + "_" + time.strftime("%H:%M:%S")
         self.prj_path = Path(__file__).resolve().parents[4]
@@ -198,7 +209,6 @@ class ScDeepSort:
 
         if not self.save_path.exists():
             self.save_path.mkdir(parents=True)
-        self.device = torch.device("cpu" if self.gpu == -1 else f"cuda:{gpu}")
 
         self.num_labels = dim_out
 
@@ -275,14 +285,21 @@ class ScDeepSort:
     def cal_loss(self, graph, idx):
         """Calculate loss.
 
+        Parameters
+        ----------
+        graph
+            Input cell-gene graph object.
+        idx
+            1-D tensor containing the indexes of the cell nodes to calculate the loss.
+
         Returns
         -------
         float
-            Loss function value.
+            Averaged loss over all batches.
 
         """
         self.model.train()
-        total_loss = 0
+        total_loss = total_size = 0
 
         dataloader = DataLoader(graph=graph, indices=idx, graph_sampler=self.sampler, batch_size=self.batch_size,
                                 shuffle=True)
@@ -297,18 +314,19 @@ class ScDeepSort:
             loss.backward()
             self.optimizer.step()
 
-            total_loss += loss.item()
+            total_size += (size := blocks[-1].num_dst_nodes())
+            total_loss += loss.item() * size
 
-        return total_loss
+        return total_loss / total_size
 
     @torch.no_grad()
-    def evaluate(self, graph, ids, unsure_rate: float = 2.0):
-        """Evaluate the trained scDeepsort model.
+    def evaluate(self, graph, idx, unsure_rate: float = 2.0):
+        """Evaluate the model on certain cell nodes.
 
         Parameters
         ----------
-        ids : Tensor
-            A 1-D tensor containing node IDs to be evaluated on.
+        idx
+            1-D tensor containing the indexes of the cell nodes to be evaluated.
 
         Returns
         -------
@@ -317,9 +335,9 @@ class ScDeepSort:
 
         """
         self.model.eval()
-        total_correct, total_unsure = 0, 0
+        total_correct = total_unsure = 0
 
-        dataloader = DataLoader(graph=graph, indices=ids, graph_sampler=self.sampler, batch_size=self.batch_size,
+        dataloader = DataLoader(graph=graph, indices=idx, graph_sampler=self.sampler, batch_size=self.batch_size,
                                 shuffle=True)
         for _, _, blocks in dataloader:
             blocks = [b.to(self.device) for b in blocks]
@@ -334,7 +352,7 @@ class ScDeepSort:
                 elif pred.argmax().item() == label:
                     total_correct += 1
 
-        return total_correct, total_unsure, total_correct / len(ids)
+        return total_correct, total_unsure, total_correct / len(idx)
 
     def save_model(self):
         """Save the model at the save_path."""
@@ -354,13 +372,13 @@ class ScDeepSort:
 
         Parameters
         ----------
-        num : int
-            Test dataset number.
+        graph
+            Input cell-gene graph to be predicted.
 
         Returns
         -------
-        list
-            Predicted labels.
+        np.ndarray
+            2-D array of predicted probabilities of the cell-types, where rows are cells and columns are cell-types.
 
         """
         self.model.eval()
@@ -384,6 +402,11 @@ class ScDeepSort:
 
         Parameters
         ----------
+        graph
+            Input cell-gene grahp to be predicted.
+        unsure_rate
+            Determine the threshold of the maximum predicted probability under which the predictions are considered
+            uncertain.
 
         Returns
         -------
@@ -401,17 +424,15 @@ class ScDeepSort:
 
         Parameters
         ----------
-        predicted_labels : dict
-            A dictionary where the keys are test dataset IDs and the values are the predicted labels.
-        true_labels : dict
-            A dictionary where the keys are test dataset IDs and the values are the true labels of the cells. Each
-            element, i.e., the label, can be either a specific value (e.g., string or intger) or a set of values,
-            allowing multiple mappings.
+        pred
+            Predicted cell-labels as a 1-d numpy array.
+        true
+            True cell-labels (could contain multiple cell-type per cell).
 
         Returns
         -------
-        dict
-            A diction of correct prediction numbers, total samples, unsured prediction numbers, and accuracy.
+        float
+            Accuracy score of the prediction
 
         """
         if true.max() == 1:

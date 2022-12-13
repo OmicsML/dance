@@ -14,7 +14,7 @@ if __name__ == "__main__":
     parser.add_argument("--random_seed", type=int, default=10)
     parser.add_argument("--data_type", type=str, default="scdeepsort_exp")
     parser.add_argument("--dropout", type=float, default=0.1, help="dropout probability")
-    parser.add_argument("--gpu", type=int, default=-1, help="GPU id, -1 for cpu")
+    parser.add_argument("--device", type=str, default="cpu", help="Computation device")
     parser.add_argument("--filetype", default="csv", type=str, choices=["csv", "gz"], help="data file type, csv or gz")
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
     parser.add_argument("--weight_decay", type=float, default=5e-4, help="Weight for L2 loss")
@@ -35,7 +35,6 @@ if __name__ == "__main__":
     parser.add_argument("--test", dest="evaluate", action="store_false")
     parser.set_defaults(evaluate=True)
     parser.add_argument("--test_dir", default="test", type=str, help="test directory")
-    parser.add_argument("--save_dir", default="result", type=str, help="save directory")
     parser.add_argument("--test_rate", type=float, default=0.2)
     parser.add_argument("--test_dataset", nargs="+", type=int, default=[1759], help="Testing dataset IDs")
     params = parser.parse_args()
@@ -43,8 +42,8 @@ if __name__ == "__main__":
 
     dataloader = CellTypeDataset(data_type="scdeepsort_exp", random_seed=params.random_seed, dense_dim=params.dense_dim,
                                  test_dataset=params.test_dataset, species=params.species, tissue=params.tissue,
-                                 gpu=params.gpu, evaluate=params.evaluate, test_dir=params.test_dir,
-                                 filetype=params.filetype, threshold=params.threshold, exclude_rate=params.exclude_rate,
+                                 evaluate=params.evaluate, test_dir=params.test_dir, filetype=params.filetype,
+                                 threshold=params.threshold, exclude_rate=params.exclude_rate,
                                  test_rate=params.test_rate, score=True)
 
     adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
@@ -67,7 +66,7 @@ if __name__ == "__main__":
     g_test = g.subgraph(torch.concat((gene_ids, test_cell_ids)))
 
     model = ScDeepSort(params.dense_dim, num_labels, params.hidden_dim, params.n_layers, params.species, params.tissue,
-                       dropout=params.dropout, batch_size=params.batch_size, gpu=params.gpu, save_dir=params.save_dir)
+                       dropout=params.dropout, batch_size=params.batch_size, device=params.device)
     model.fit(g_train, y_train, epochs=params.n_epochs, lr=params.lr, weight_decay=params.weight_decay,
               val_ratio=params.test_rate)
 
