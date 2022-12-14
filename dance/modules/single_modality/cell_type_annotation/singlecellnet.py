@@ -4,10 +4,10 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import scanpy as sc
-from scipy import sparse
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
 
-from dance.transforms.preprocess import *
+from dance.transforms.preprocess import findClassyGenes, ptGetTop, query_transform
 
 
 class SingleCellNet():
@@ -59,7 +59,8 @@ class SingleCellNet():
         expDat: Union[AnnData, ndarray, spmatrix]
             Data to be shuffled
         total: float optional
-            If None, after normalization, each cell has a total count equal to the median of the counts_per_cell before normalization.
+            If None, after normalization, each cell has a total count equal to the median of the counts_per_cell before
+            normalization.
 
         Return
         ----------
@@ -100,7 +101,6 @@ class SingleCellNet():
         randDat = self.randomize(expTrain, num=nRand)
         expT = pd.concat([expTrain, randDat])
         allgenes = expT.columns.values
-        missingGenes = np.setdiff1d(np.unique(genes), allgenes)
         ggenes = np.intersect1d(np.unique(genes), allgenes)
         if not stratify:
             clf = RandomForestClassifier(n_estimators=ntrees, random_state=100)
@@ -131,7 +131,8 @@ class SingleCellNet():
         stratify: bool optional
             whether we select balanced class weight in the random forest model
         counts_per_cell_after: float optional
-            If None, after normalization, each cell has a total count equal to the median of the counts_per_cell before normalization.
+            If None, after normalization, each cell has a total count equal to the median of the counts_per_cell before
+            normalization.
         scaleMax: int optional
             Maximum scaling for data normalization
         limitToHVG: bool optional
@@ -143,10 +144,9 @@ class SingleCellNet():
 
         """
         warnings.filterwarnings('ignore')
-        stTrain = aTrain.obs
 
         expRaw = pd.DataFrame(data=aTrain.X, index=aTrain.obs.index.values, columns=aTrain.var.index.values)
-        expRaw = expRaw.loc[stTrain.index.values]
+        expRaw = expRaw.loc[aTrain.obs_names]
 
         adNorm = aTrain.copy()
         sc.pp.normalize_per_cell(adNorm, counts_per_cell_after=counts_per_cell_after)
@@ -159,15 +159,11 @@ class SingleCellNet():
 
         sc.pp.scale(adNorm, max_value=scaleMax)
         expTnorm = pd.DataFrame(data=adNorm.X, index=adNorm.obs.index.values, columns=adNorm.var.index.values)
-        expTnorm = expTnorm.loc[stTrain.index.values]
+        expTnorm = expTnorm.loc[aTrain.obs_names]
 
-        ### expTnorm= pd.DataFrame(data=aTrain.X,  index= aTrain.obs.index.values, columns= aTrain.var.index.values)
-        ### expTnorm=expTnorm.loc[stTrain.index.values]
         print("Matrix normalized")
-        ### cgenesA, grps, cgenes_list =findClassyGenes(expTnorm,stTrain, dLevel = dLevel, topX = nTopGenes)
-        cgenesA, grps, cgenes_list = findClassyGenes(expTnorm, stTrain, dLevel=dLevel, topX=nTopGenes)
+        cgenesA, grps, cgenes_list = findClassyGenes(expTnorm, aTrain.obsm[dLevel], topX=nTopGenes)
         print("There are ", len(cgenesA), " classification genes\n")
-        ### xpairs= ptGetTop(expTnorm.loc[:,cgenesA], grps, cgenes_list, topX=nTopGenePairs, sliceSize=5000)
         xpairs = ptGetTop(expTnorm.loc[:, cgenesA], grps, cgenes_list, topX=nTopGenePairs, sliceSize=5000)
 
         print("There are", len(xpairs), "top gene pairs\n")
@@ -180,122 +176,63 @@ class SingleCellNet():
         self.xpairs = xpairs
         self.tspRF = tspRF
 
-    def predict(self, adata):
+    def predict_proba(self, adata):
         """Do prediction with singlecellnet model.
 
         Parameters
         ----------
         adata: Union[AnnData, ndarray, spmatrix]
-            test data
+            Input data to be predicted.
 
         Returns
         ----------
-        output:
-            a certain adata class from scanpy with an extra column names SCN_class as prediction
+        np.ndarray
+            Cell-type probability matrix where each row is a cell and each column is a cell-type. The values in the
+            matrix indicate the predicted probability that the cell is a particular cell-type. The last column
+            corresponds to the probability that the model could not confidently identify the cell type of the cell.
 
         """
-
         cgenes = self.cgenesA
         xpairs = self.xpairs
         rf_tsp = self.tspRF
-        classRes = self.scn_predict(cgenes, xpairs, rf_tsp, adata, nrand=0)
-        categories = classRes.columns.values
-        adNew = ad.AnnData(classRes, obs=adata.obs, var=pd.DataFrame(index=categories))
-        adNew.obs['SCN_class'] = classRes.idxmax(axis=1)
-        return adNew
+        pred_prob = self.scn_predict(cgenes, xpairs, rf_tsp, adata, nrand=0).values
+        return pred_prob
 
-    def score_exp(self, adNew, dtype):
-        """singlecellnet model evaluation.
+    def predict(self, adata):
+        """Predict cell type label.
 
         Parameters
         ----------
-        adNew: AnnData
-            a certain adata class from scanpy
-        dtype: str
-            column name in of the label groundtruth
-
-        Returns
-        ----------
-        correct: int
-            total number of correct prediction
-        acc: float
-            prediction accuracy
+        adata: Union[AnnData, ndarray, spmatrix]
+            Input data to be predicted.
 
         """
-        correct = sum(np.array(adNew.obs[dtype]) == np.array(adNew.obs['SCN_class']))
-        acc = correct / len(adNew.obs)
-        return correct, acc
+        pred_prob = self.predict_proba(adata)
+        pred = pred_prob.argmax(1)
+        return pred
 
-    def score(self, adNew, test_dataset, map, dtype):
-        """singlecellnet model evaluation.
+    def score(self, pred, true):
+        """Compute model performance on test datasets based on accuracy.
 
         Parameters
         ----------
-        adNew: AnnData
-            a certain adata class from scanpy
-        test_dataset: AnnData
-            test data
-        map: dictionary
-            dictionary for label conversion
-        dtype: string
-            column name in of the label groundtruth
+        pred
+            Predicted cell-labels as a 1-d numpy array.
+        true
+            True cell-labels (could contain multiple cell-type per cell).
 
         Returns
-        ----------
-        correct: int
-            total number of correct prediction
-        acc: float
-            prediction accuracy
+        -------
+        float
+            Accuracy score of the prediction
 
         """
-        correct = 0
-        for i, cell in enumerate(np.array(adNew.obs[dtype])):
-            if np.array(adNew.obs.SCN_class)[i] in map[cell]:
-                correct += 1
-
-        return (correct / len(np.array(adNew.obs.SCN_class)))
-
-    def add_classRes(self, adata: AnnData, adClassRes, copy=False) -> AnnData:
-        """add adClassRes to adata.obs.
-
-        Parameters
-        ----------
-        adata: AnnData object
-            Original Anndata
-        adClassRes: AnnData object
-            Adding another dataset into adata
-        copy: bool optional
-            whether to return modified adata
-
-        Returns
-        ----------
-        adata: AnnData optional
-            modified
-
-        """
-        cNames = adClassRes.var_names
-        for cname in cNames:
-            adata.obs[cname] = adClassRes[:, cname].X
-        # adata.obs['category'] = adClassRes.obs['category']
-        adata.obs['SCN_class'] = adClassRes.obs['SCN_class']
-        return adata if copy else None
-
-    def check_adX(self, adata: AnnData) -> AnnData:
-        """convert the feature matrix within adata class to sparse csr matrix.
-
-        Parameters
-        ----------
-        adata: Anndata
-            a certain adata class from scanpy
-
-        Returns
-        ----------
-        No return
-
-        """
-
-        if (isinstance(adata.X, np.ndarray)):
-            adata.X = sparse.csr_matrix(adata.X)
+        if true.max() == 1:
+            num_samples, num_classes = true.shape
+            mask = pred < num_classes  # last column for unsure cells
+            return true[mask, pred[mask]].sum() / num_samples
+        else:
+            return accuracy_score(pred, true)
 
     def scn_predict(self, cgenes, xpairs, rf_tsp, aDat, nrand=2):
         """Prediction with random forest.
@@ -323,7 +260,6 @@ class SingleCellNet():
             # in the case of aDat.X is a numpy array
             aDat.X = ad._core.views.ArrayView(aDat.X)
 
-    ###    expDat= pd.DataFrame(data=aDat.X, index= aDat.obs.index.values, columns= aDat.var.index.values)
         expDat = pd.DataFrame(data=aDat.X.toarray(), index=aDat.obs.index.values, columns=aDat.var.index.values)
         expValTrans = query_transform(expDat.reindex(labels=cgenes, axis='columns', fill_value=0), xpairs)
         classRes_val = self.rf_classPredict(rf_tsp, expValTrans, numRand=nrand)

@@ -184,45 +184,6 @@ class CellTypeDataset():
         os.system("unzip actinn_data.zip?dl=0")
         os.system("rm actinn_data.zip?dl=0")
 
-    def download_singlecellnet_data(self):
-        """Download pretrained model and label maps."""
-        print("Downloading Training Data from Bladder...")
-        os.system("wget https://cnobjects.s3.amazonaws.com/singleCellNet/pySCN/training/adBladder_TabSen_101320.h5ad")
-        print("Downloading Training Data from Fat...")
-        os.system("wget https://cnobjects.s3.amazonaws.com/singleCellNet/pySCN/training/adFat_TabSen_101320.h5ad")
-        print("Downloading Training Data from Heart...")
-        os.system("wget https://cnobjects.s3.amazonaws.com/singleCellNet/pySCN/training/adHeart_TabSen_101320.h5ad")
-        print("Downloading Training Data from Kidney...")
-        os.system("wget https://cnobjects.s3.amazonaws.com/singleCellNet/pySCN/training/adKidney_TabSen_101320.h5ad")
-        print("Downloading Training Data from Large Intestine...")
-        os.system(
-            "wget https://cnobjects.s3.amazonaws.com/singleCellNet/pySCN/training/adL_Intestine_TabSen_101320.h5ad")
-        print("Downloading Training Data from Lung...")
-        os.system("wget https://cnobjects.s3.amazonaws.com/singleCellNet/pySCN/training/adLung_TabSen_100920.h5ad")
-        print("Downloading Training Data from Mammary Gland...")
-        os.system(
-            "wget https://cnobjects.s3.amazonaws.com/singleCellNet/pySCN/training/adMammary_Gland_TabSen_101320.h5ad")
-        print("Downloading Training Data from Marrow...")
-        os.system("wget https://cnobjects.s3.amazonaws.com/singleCellNet/pySCN/training/adMarrow_TabSen_101320.h5ad")
-        print("Downloading Training Data from Pancreas...")
-        os.system("wget https://cnobjects.s3.amazonaws.com/singleCellNet/pySCN/training/adPancreas_TabSen_101320.h5ad")
-        print("Downloading Training Data from Skeletal Muscle...")
-        os.system(
-            "wget https://cnobjects.s3.amazonaws.com/singleCellNet/pySCN/training/adSkel_Muscle_TabSen_101320.h5ad")
-        print("Downloading Training Data from Skin...")
-        os.system("wget https://cnobjects.s3.amazonaws.com/singleCellNet/pySCN/training/adSkin_TabSen_101320.h5ad")
-        print("Downloading Training Data from Trachea...")
-        os.system("wget https://cnobjects.s3.amazonaws.com/singleCellNet/pySCN/training/adTrachea_TabSen_101320.h5ad")
-
-    def download_singlecellnet_lung_example_data(self):
-        print("Downloading lung example data...")
-        os.system(
-            "wget https://cnobjects.s3.amazonaws.com/singleCellNet/pySCN/query/GSE124872_raw_counts_single_cell.mtx.gz")
-        os.system("gzip -d  GSE124872_raw_counts_single_cell.mtx.gz")
-        os.system(
-            "wget https://cnobjects.s3.amazonaws.com/singleCellNet/pySCN/query/GSE124872_Angelidis_2018_metadata.csv")
-        os.system("wget https://cnobjects.s3.amazonaws.com/singleCellNet/pySCN/query/genes.csv")
-
     def is_complete(self):
         """Check if data is complete."""
         check = [
@@ -337,7 +298,7 @@ class CellTypeDataset():
             self.download_benchmark_data()
             return load_actinn_data(self.train_set, self.train_label, self.test_set, self.test_label)
 
-        if self.data_type == "celltypist":
+        if self.data_type in ["celltypist", "singlecellnet"]:
             self.download_benchmark_data(download_pretrained=False)
             map_dict = get_map_dict(self.params.map_path, self.params.tissue)  # load map
             train_data = pd.read_csv(
@@ -370,85 +331,6 @@ class CellTypeDataset():
                 cell_labels.append(map_dict[self.params.test_dataset][i])
 
             return adata, cell_labels, idx_to_label, train_size
-
-        if self.data_type == "singlecellnet_exp":
-            if self.is_singlecellnet_complete():
-                pass
-            else:
-                self.download_singlecellnet_data()
-                self.download_singlecellnet_lung_example_data()
-
-            if self.singlecellnet_type == "Lung":
-                file_i = "adLung_TabSen_100920.h5ad"
-            else:
-                file_i = "ad" + self.singlecellnet_type + "_TabSen_101320.h5ad"
-            adTrain = sc.read(file_i)
-            qDatT = sc.read_mtx("GSE124872_raw_counts_single_cell.mtx")
-            qDat = qDatT.T
-            genes = pd.read_csv("genes.csv")
-            qDat.var_names = genes.x
-            qMeta = pd.read_csv("GSE124872_Angelidis_2018_metadata.csv")
-            qMeta.columns.values[0] = "cellid"
-            qMeta.index = qMeta["cellid"]
-            qDat.obs = qMeta.copy()
-            genesTrain = adTrain.var_names
-            genesQuery = qDat.var_names
-            cgenes = genesTrain.intersection(genesQuery)
-            adTrain1 = adTrain[:, cgenes]
-            adQuery = qDat[:, cgenes].copy()
-            adQuery = adQuery[adQuery.obs["nGene"] >= 500, :].copy()
-            self.expTrain, self.expVal = splitCommonAnnData(adTrain1, ncells=200, dLevel="cell_ontology_class")
-
-        if self.data_type == "singlecellnet":
-            self.download_benchmark_data(download_pretrained=False)
-            self.map_dict = get_map_dict(self.params.map_path, self.params.tissue)  # load map
-            train_data = pd.read_csv(
-                osp.join(self.params.proj_path, self.params.train_dir, self.params.species,
-                         self.params.species + "_" + self.params.tissue + str(self.params.train_dataset) + "_data.csv"),
-                index_col=0)
-            train_celltype = pd.read_csv(
-                osp.join(
-                    self.params.proj_path, self.params.train_dir, self.params.species,
-                    self.params.species + "_" + self.params.tissue + str(self.params.train_dataset) + "_celltype.csv"),
-                index_col=1)
-            self.train_adata = ad.AnnData(train_data.T, train_celltype)
-            test_data = pd.read_csv(
-                osp.join(self.params.proj_path, self.params.test_dir, self.params.species,
-                         self.params.species + "_" + self.params.tissue + str(self.params.test_dataset) + "_data.csv"),
-                index_col=0)
-            test_celltype = pd.read_csv(
-                osp.join(
-                    self.params.proj_path, self.params.test_dir, self.params.species,
-                    self.params.species + "_" + self.params.tissue + str(self.params.test_dataset) + "_celltype.csv"),
-                index_col=1)
-            self.test_adata = ad.AnnData(test_data.T, test_celltype)
-
-            if self.is_singlecellnet_complete():
-                pass
-            else:
-                self.download_singlecellnet_data()
-                self.download_singlecellnet_lung_example_data()
-
-            if self.singlecellnet_type == "Lung":
-                file_i = "adLung_TabSen_100920.h5ad"
-            else:
-                file_i = "ad" + self.singlecellnet_type + "_TabSen_101320.h5ad"
-            adTrain = sc.read(file_i)
-            qDatT = sc.read_mtx("GSE124872_raw_counts_single_cell.mtx")
-            qDat = qDatT.T
-            genes = pd.read_csv("genes.csv")
-            qDat.var_names = genes.x
-            qMeta = pd.read_csv("GSE124872_Angelidis_2018_metadata.csv")
-            qMeta.columns.values[0] = "cellid"
-            qMeta.index = qMeta["cellid"]
-            qDat.obs = qMeta.copy()
-            genesTrain = adTrain.var_names
-            genesQuery = qDat.var_names
-            cgenes = genesTrain.intersection(genesQuery)
-            adTrain1 = adTrain[:, cgenes]
-            adQuery = qDat[:, cgenes].copy()
-            adQuery = adQuery[adQuery.obs["nGene"] >= 500, :].copy()
-            self.expTrain, self.expVal = splitCommonAnnData(adTrain1, ncells=200, dLevel="cell_ontology_class")
 
         return self
 

@@ -1664,10 +1664,10 @@ def ptGetTop(expDat, cell_labels, cgenes_list=None, topX=50, sliceSize=5000, qui
         return np.unique(np.array(res).flatten())
 
 
-def findClassyGenes(expDat, sampTab, dLevel, topX=25, dThresh=0, alpha1=0.05, alpha2=.001, mu=2):
+def findClassyGenes(expDat, sampTab, topX=25, dThresh=0, alpha1=0.05, alpha2=.001, mu=2):
     gsTrain = sc_statTab(expDat, dThresh=dThresh)
     ggenes = sc_filterGenes(gsTrain, alpha1=alpha1, alpha2=alpha2, mu=mu)
-    grps = sampTab[dLevel]
+    grps = sampTab.columns.values[sampTab.values.argmax(1)]
     xdiff = gnrAll(expDat.loc[:, ggenes], grps)
     groups = np.unique(grps)
     res = []

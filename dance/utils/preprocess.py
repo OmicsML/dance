@@ -34,4 +34,4 @@ def cell_label_to_df(cell_labels: List[Union[str, Set[str]]], idx_to_label: List
         for j in map(label_to_idx.get, cell_labels[i]):
             y[i, j] = 1
 
-    return DataFrame(y, index=index)
+    return DataFrame(y, index=index, columns=idx_to_label)
