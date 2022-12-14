@@ -7,7 +7,7 @@ import scanpy as sc
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 
-from dance.transforms.preprocess import *
+from dance.transforms.preprocess import findClassyGenes, ptGetTop, query_transform
 
 
 class SingleCellNet():
@@ -59,7 +59,8 @@ class SingleCellNet():
         expDat: Union[AnnData, ndarray, spmatrix]
             Data to be shuffled
         total: float optional
-            If None, after normalization, each cell has a total count equal to the median of the counts_per_cell before normalization.
+            If None, after normalization, each cell has a total count equal to the median of the counts_per_cell before
+            normalization.
 
         Return
         ----------
@@ -130,7 +131,8 @@ class SingleCellNet():
         stratify: bool optional
             whether we select balanced class weight in the random forest model
         counts_per_cell_after: float optional
-            If None, after normalization, each cell has a total count equal to the median of the counts_per_cell before normalization.
+            If None, after normalization, each cell has a total count equal to the median of the counts_per_cell before
+            normalization.
         scaleMax: int optional
             Maximum scaling for data normalization
         limitToHVG: bool optional
