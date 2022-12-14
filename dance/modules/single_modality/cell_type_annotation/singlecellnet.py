@@ -182,12 +182,14 @@ class SingleCellNet():
         Parameters
         ----------
         adata: Union[AnnData, ndarray, spmatrix]
-            test data
+            Input data to be predicted.
 
         Returns
         ----------
-        output:
-            a certain adata class from scanpy with an extra column names SCN_class as prediction
+        np.ndarray
+            Cell-type probability matrix where each row is a cell and each column is a cell-type. The values in the
+            matrix indicate the predicted probability that the cell is a particular cell-type. The last column
+            corresponds to the probability that the model could not confidently identify the cell type of the cell.
 
         """
         cgenes = self.cgenesA
@@ -197,6 +199,14 @@ class SingleCellNet():
         return pred_prob
 
     def predict(self, adata):
+        """Predict cell type label.
+
+        Parameters
+        ----------
+        adata: Union[AnnData, ndarray, spmatrix]
+            Input data to be predicted.
+
+        """
         pred_prob = self.predict_proba(adata)
         pred = pred_prob.argmax(1)
         return pred
