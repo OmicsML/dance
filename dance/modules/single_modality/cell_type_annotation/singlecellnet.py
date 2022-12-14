@@ -143,10 +143,9 @@ class SingleCellNet():
 
         """
         warnings.filterwarnings('ignore')
-        stTrain = aTrain.obs
 
         expRaw = pd.DataFrame(data=aTrain.X, index=aTrain.obs.index.values, columns=aTrain.var.index.values)
-        expRaw = expRaw.loc[stTrain.index.values]
+        expRaw = expRaw.loc[aTrain.obs_names]
 
         adNorm = aTrain.copy()
         sc.pp.normalize_per_cell(adNorm, counts_per_cell_after=counts_per_cell_after)
@@ -159,15 +158,11 @@ class SingleCellNet():
 
         sc.pp.scale(adNorm, max_value=scaleMax)
         expTnorm = pd.DataFrame(data=adNorm.X, index=adNorm.obs.index.values, columns=adNorm.var.index.values)
-        expTnorm = expTnorm.loc[stTrain.index.values]
+        expTnorm = expTnorm.loc[aTrain.obs_names]
 
-        ### expTnorm= pd.DataFrame(data=aTrain.X,  index= aTrain.obs.index.values, columns= aTrain.var.index.values)
-        ### expTnorm=expTnorm.loc[stTrain.index.values]
         print("Matrix normalized")
-        ### cgenesA, grps, cgenes_list =findClassyGenes(expTnorm,stTrain, dLevel = dLevel, topX = nTopGenes)
-        cgenesA, grps, cgenes_list = findClassyGenes(expTnorm, stTrain, dLevel=dLevel, topX=nTopGenes)
+        cgenesA, grps, cgenes_list = findClassyGenes(expTnorm, aTrain.obsm[dLevel], topX=nTopGenes)
         print("There are ", len(cgenesA), " classification genes\n")
-        ### xpairs= ptGetTop(expTnorm.loc[:,cgenesA], grps, cgenes_list, topX=nTopGenePairs, sliceSize=5000)
         xpairs = ptGetTop(expTnorm.loc[:, cgenesA], grps, cgenes_list, topX=nTopGenePairs, sliceSize=5000)
 
         print("There are", len(xpairs), "top gene pairs\n")
