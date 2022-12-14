@@ -22,6 +22,7 @@ class BaseTransform(ABC):
 
         self.logger = logger.getChild(self.name)
         self.logger.setLevel(log_level)
+        self.log_level = log_level
 
     @abstractmethod
     def __call__(self, data: Any) -> Any:
