@@ -16,19 +16,13 @@ from matplotlib import pyplot as plt
 from scipy.sparse import spmatrix
 from scipy.special import expit
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 
+from dance import logger
 from dance.transforms.preprocess import (LRClassifier_celltypist, SGDClassifier_celltypist, downsample_adata,
                                          get_sample_csv_celltypist, get_sample_data_celltypist, prepare_data_celltypist,
                                          to_array_celltypist, to_vector_celltypist)
-
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-logger = logging.getLogger(__name__)
-set_level = logger.setLevel
-info = logger.info
-warn = logger.warning
-error = logger.error
-debug = logger.debug
 
 celltypist_path = os.getenv('CELLTYPIST_FOLDER', default=os.path.join(str(pathlib.Path.home()), '.celltypist'))
 pathlib.Path(celltypist_path).mkdir(parents=True, exist_ok=True)
@@ -763,13 +757,13 @@ class Classifier():
         if isinstance(model, str):
             model = Model.load(model)
         self.model = model
-        if not filename:
-            logger.warn(f" No input file provided to the classifier")
+        if isinstance(filename, str) and filename == "":
+            logger.warn(" No input file provided to the classifier")
             return
         if isinstance(filename, str):
             self.filename = filename
             logger.info(f" Input file is '{self.filename}'")
-            logger.info(f" Loading data")
+            logger.info(" Loading data")
         if isinstance(filename, str) and filename.endswith(('.csv', '.txt', '.tsv', '.tab', '.mtx', '.mtx.gz')):
             self.adata = sc.read(self.filename)
             if transpose:
@@ -803,9 +797,16 @@ class Classifier():
             self.indata = self.adata.X
             self.indata_genes = self.adata.var_names
             self.indata_names = self.adata.obs_names
-        elif isinstance(filename, AnnData) or (isinstance(filename, str) and filename.endswith('.h5ad')):
-            self.adata = sc.read(filename) if isinstance(filename, str) else filename
+        elif isinstance(filename, (AnnData, np.ndarray, pd.DataFrame)) or (isinstance(filename, str)
+                                                                           and filename.endswith('.h5ad')):
+            if isinstance(filename, (np.ndarray, pd.DataFrame)):
+                self.adata = AnnData(filename)
+            elif isinstance(filename, str):
+                self.adata = sc.read(filename)
+            else:
+                self.adata = filename
             self.adata.var_names_make_unique()
+
             if self.adata.X.min() < 0:
                 logger.info(" Detected scaled expression in the input data, will try the `.raw` attribute")
                 try:
@@ -991,57 +992,21 @@ class Classifier():
         return predictions
 
 
-class Celltypist():
-    r"""Build the ACTINN model.
-
-    Parameters
-    ----------
-    classifier : Classification function
-        Class that wraps the celltyping and majority voting processes, as defined above
-    scaler : StandardScaler
-        The scale factor for normalization.
-    description : str
-        text description of the model.
-
-    """
+class Celltypist:
 
     def __init__(self, clf=None, scaler=None, description=None):
         self.classifier = clf
         self.scaler = scaler
         self.description = description
 
-    def fit(
-            self,
-            X=None,
-            labels: Optional[Union[str, list, tuple, np.ndarray, pd.Series, pd.Index]] = None,
-            genes: Optional[Union[str, list, tuple, np.ndarray, pd.Series, pd.Index]] = None,
-            transpose_input: bool = False,
-            check_expression: bool = True,
-            #LR param
-            C: float = 1.0,
-            solver: Optional[str] = None,
-            max_iter: int = 1000,
-            n_jobs: Optional[int] = None,
-            #SGD param
-            use_SGD: bool = False,
-            alpha: float = 0.0001,
-            #mini-batch
-            mini_batch: bool = False,
-            batch_number: int = 100,
-            batch_size: int = 1000,
-            epochs: int = 10,
-            balance_cell_type: bool = False,
-            #feature selection
-            feature_selection: bool = False,
-            top_genes: int = 300,
-            #description
-            date: str = '',
-            details: str = '',
-            url: str = '',
-            source: str = '',
-            version: str = '',
-            #other param
-            **kwargs):
+    def fit(self, X=None, labels: Optional[Union[str, list, tuple, np.ndarray, pd.Series,
+                                                 pd.Index]] = None, genes: Optional[Union[str, list, tuple, np.ndarray,
+                                                                                          pd.Series, pd.Index]] = None,
+            transpose_input: bool = False, check_expression: bool = True, C: float = 1.0, solver: Optional[str] = None,
+            max_iter: int = 1000, n_jobs: Optional[int] = None, use_SGD: bool = False, alpha: float = 0.0001,
+            mini_batch: bool = False, batch_number: int = 100, batch_size: int = 1000, epochs: int = 10,
+            balance_cell_type: bool = False, feature_selection: bool = False, top_genes: int = 300, date: str = '',
+            details: str = '', url: str = '', source: str = '', version: str = '', **kwargs):
         """Train a celltypist model using mini-batch (optional) logistic classifier with
         a global solver or stochastic gradient descent (SGD) learning.
 
@@ -1328,38 +1293,27 @@ class Celltypist():
         print(predictions)
         return Classifier.majority_vote(predictions, over_clustering, min_prop=min_prop)
 
-    def score(self, input_adata, predictions, labels, map, label_conversion=False):
-        """Run the prediction and (optional) majority voting to evaluate the model
-        performance.
+    def score(self, pred, true):
+        """Model performance score measured by accuracy.
 
         Parameters
         ----------
-        input_adata: Anndata
-            Input data anndata with label ground truth
-        predictions: classifier.AnnotationResult
-            Output from prediction function.
-        labels : string
-            column name for annotated cell types in the input Anndata
-        label_conversion: boolean optional
-            whether to match predicted labels to annotated cell type labels provided in input_adata
-        map: dictionary
-            a dictionary for label conversion
+        pred: np.ndarray
+            Predicted labels.
+        true: np.ndarray
+            True labels. Can be either a maxtrix of size (samples x labels) with ones indicating positives, or a
+            vector of size (sameples x 1) where each element is the index of the corresponding label for the sample.
+            The first option provides flexibility to cases where a sample could be associated with multiple labels
+            at test time while the model was trained as a multi-class classifier.
 
         Returns
         -------
-        correct: int
-            Number of correct predictions
-        Accuracy: float
-            Prediction accuracy from the model
+        score: float
+            Accuracy score.
 
         """
-        pred_labels = np.array(predictions.predicted_labels)[:, 0]
-        if label_conversion:
-            correct = 0
-            #for i, cell in enumerate(np.array(adVal.obs.Cell_type)):
-            for i, cell in enumerate(np.array(input_adata.obs[labels])):
-                if pred_labels[i] in map[cell]:
-                    correct += 1
+        if true.max() == 1:
+            num_samples = true.shape[0]
+            return (true[range(num_samples), pred.ravel()]).sum() / num_samples
         else:
-            correct = sum(np.array(input_adata.obs[labels]) == pred_labels)
-        return (correct / len(predictions.predicted_labels))
+            return accuracy_score(pred, true)
