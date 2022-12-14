@@ -9,7 +9,6 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--data_type", type=str, default="singlecellnet")
-    parser.add_argument("--example", type=bool, default=False, help="Whether this is a example based on Anndata")
     parser.add_argument("--random_seed", type=int, default=10)
     parser.add_argument("--train_dataset", default=4682, type=int, help="train id")
     parser.add_argument("--test_dataset", default=203, type=int, help="test id")
@@ -25,8 +24,6 @@ if __name__ == "__main__":
     parser.add_argument("--nTopGenePairs", type=int, default=250)
     parser.add_argument("--dLevel", type=str, default="cell_type",
                         help="name for the cell type information for training data")
-    parser.add_argument("--dtype", type=str, default="cell_type",
-                        help="name for the cell type information for test data")
     parser.add_argument("--limitToHVG", type=bool, default=True)
     parser.add_argument("--stratify", type=bool, default=True)
     args = parser.parse_args()
