@@ -4,7 +4,6 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import scanpy as sc
-from scipy import sparse
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 
@@ -101,7 +100,6 @@ class SingleCellNet():
         randDat = self.randomize(expTrain, num=nRand)
         expT = pd.concat([expTrain, randDat])
         allgenes = expT.columns.values
-        missingGenes = np.setdiff1d(np.unique(genes), allgenes)
         ggenes = np.intersect1d(np.unique(genes), allgenes)
         if not stratify:
             clf = RandomForestClassifier(n_estimators=ntrees, random_state=100)
@@ -201,28 +199,6 @@ class SingleCellNet():
         pred = pred_prob.argmax(1)
         return pred
 
-    def score_exp(self, adNew, dtype):
-        """singlecellnet model evaluation.
-
-        Parameters
-        ----------
-        adNew: AnnData
-            a certain adata class from scanpy
-        dtype: str
-            column name in of the label groundtruth
-
-        Returns
-        ----------
-        correct: int
-            total number of correct prediction
-        acc: float
-            prediction accuracy
-
-        """
-        correct = sum(np.array(adNew.obs[dtype]) == np.array(adNew.obs['SCN_class']))
-        acc = correct / len(adNew.obs)
-        return correct, acc
-
     def score(self, pred, true):
         """Compute model performance on test datasets based on accuracy.
 
@@ -245,48 +221,6 @@ class SingleCellNet():
             return true[mask, pred[mask]].sum() / num_samples
         else:
             return accuracy_score(pred, true)
-
-    def add_classRes(self, adata: AnnData, adClassRes, copy=False) -> AnnData:
-        """add adClassRes to adata.obs.
-
-        Parameters
-        ----------
-        adata: AnnData object
-            Original Anndata
-        adClassRes: AnnData object
-            Adding another dataset into adata
-        copy: bool optional
-            whether to return modified adata
-
-        Returns
-        ----------
-        adata: AnnData optional
-            modified
-
-        """
-        cNames = adClassRes.var_names
-        for cname in cNames:
-            adata.obs[cname] = adClassRes[:, cname].X
-        # adata.obs['category'] = adClassRes.obs['category']
-        adata.obs['SCN_class'] = adClassRes.obs['SCN_class']
-        return adata if copy else None
-
-    def check_adX(self, adata: AnnData) -> AnnData:
-        """convert the feature matrix within adata class to sparse csr matrix.
-
-        Parameters
-        ----------
-        adata: Anndata
-            a certain adata class from scanpy
-
-        Returns
-        ----------
-        No return
-
-        """
-
-        if (isinstance(adata.X, np.ndarray)):
-            adata.X = sparse.csr_matrix(adata.X)
 
     def scn_predict(self, cgenes, xpairs, rf_tsp, aDat, nrand=2):
         """Prediction with random forest.
@@ -314,7 +248,6 @@ class SingleCellNet():
             # in the case of aDat.X is a numpy array
             aDat.X = ad._core.views.ArrayView(aDat.X)
 
-    ###    expDat= pd.DataFrame(data=aDat.X, index= aDat.obs.index.values, columns= aDat.var.index.values)
         expDat = pd.DataFrame(data=aDat.X.toarray(), index=aDat.obs.index.values, columns=aDat.var.index.values)
         expValTrans = query_transform(expDat.reindex(labels=cgenes, axis='columns', fill_value=0), xpairs)
         classRes_val = self.rf_classPredict(rf_tsp, expValTrans, numRand=nrand)
