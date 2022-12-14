@@ -6,6 +6,7 @@ import pandas as pd
 import scanpy as sc
 from scipy import sparse
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
 
 from dance.transforms.preprocess import *
 
@@ -175,7 +176,7 @@ class SingleCellNet():
         self.xpairs = xpairs
         self.tspRF = tspRF
 
-    def predict(self, adata):
+    def predict_proba(self, adata):
         """Do prediction with singlecellnet model.
 
         Parameters
@@ -189,15 +190,16 @@ class SingleCellNet():
             a certain adata class from scanpy with an extra column names SCN_class as prediction
 
         """
-
         cgenes = self.cgenesA
         xpairs = self.xpairs
         rf_tsp = self.tspRF
-        classRes = self.scn_predict(cgenes, xpairs, rf_tsp, adata, nrand=0)
-        categories = classRes.columns.values
-        adNew = ad.AnnData(classRes, obs=adata.obs, var=pd.DataFrame(index=categories))
-        adNew.obs['SCN_class'] = classRes.idxmax(axis=1)
-        return adNew
+        pred_prob = self.scn_predict(cgenes, xpairs, rf_tsp, adata, nrand=0).values
+        return pred_prob
+
+    def predict(self, adata):
+        pred_prob = self.predict_proba(adata)
+        pred = pred_prob.argmax(1)
+        return pred
 
     def score_exp(self, adNew, dtype):
         """singlecellnet model evaluation.
@@ -221,34 +223,28 @@ class SingleCellNet():
         acc = correct / len(adNew.obs)
         return correct, acc
 
-    def score(self, adNew, test_dataset, map, dtype):
-        """singlecellnet model evaluation.
+    def score(self, pred, true):
+        """Compute model performance on test datasets based on accuracy.
 
         Parameters
         ----------
-        adNew: AnnData
-            a certain adata class from scanpy
-        test_dataset: AnnData
-            test data
-        map: dictionary
-            dictionary for label conversion
-        dtype: string
-            column name in of the label groundtruth
+        pred
+            Predicted cell-labels as a 1-d numpy array.
+        true
+            True cell-labels (could contain multiple cell-type per cell).
 
         Returns
-        ----------
-        correct: int
-            total number of correct prediction
-        acc: float
-            prediction accuracy
+        -------
+        float
+            Accuracy score of the prediction
 
         """
-        correct = 0
-        for i, cell in enumerate(np.array(adNew.obs[dtype])):
-            if np.array(adNew.obs.SCN_class)[i] in map[cell]:
-                correct += 1
-
-        return (correct / len(np.array(adNew.obs.SCN_class)))
+        if true.max() == 1:
+            num_samples, num_classes = true.shape
+            mask = pred < num_classes  # last column for unsure cells
+            return true[mask, pred[mask]].sum() / num_samples
+        else:
+            return accuracy_score(pred, true)
 
     def add_classRes(self, adata: AnnData, adClassRes, copy=False) -> AnnData:
         """add adClassRes to adata.obs.
