@@ -10,7 +10,6 @@ Y = np.array([[0], [1], [2]])
 
 def test_data_basic_properties(subtests):
     adata = AnnData(X=X)
-    adata.obsm["label"] = Y
 
     with subtests.test("No training splits"):
         data = Data(adata)
@@ -45,3 +44,23 @@ def test_data_basic_properties(subtests):
             Data(adata, train_size=5)
         with pytest.raises(ValueError):  # sum of sizes exceeds data size
             Data(adata, train_size=2, test_size=2)
+
+
+def test_get_data(subtests):
+    adata = AnnData(X=X)
+    adata.obsm["label"] = Y
+
+    with subtests.test("Single feature"):
+        data = Data(adata, train_size=2)
+        data.set_config(label_channel="label")
+
+        x_train, y_train = data.get_train_data()
+        assert x_train.tolist() == [[0, 1], [1, 2]]
+        assert y_train.tolist() == [[0], [1]]
+
+        x_test, y_test = data.get_test_data()
+        assert x_test.tolist() == [[2, 3]]
+        assert y_test.tolist() == [[2]]
+
+        # Validation set not set
+        pytest.raises(KeyError, data.get_val_data)
