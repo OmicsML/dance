@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Dict, Iterator, List, Literal, Optional, Sequence, Set, Tuple, Union
 
 import numpy as np
 from anndata import AnnData
@@ -15,6 +15,7 @@ __all__ = [
     "CellIdxType",
     "Dict",
     "FeatType",
+    "Iterator",
     "List",
     "LogLevel",
     "NormMode",
