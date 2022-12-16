@@ -1,17 +1,45 @@
+import itertools
 from abc import ABC, abstractmethod
 from copy import deepcopy
 
 import numpy as np
 import torch
+from anndata import AnnData
+from mudata import MuData
 
 from dance import logger
-from dance.typing import Any, Dict, FeatType, List, Literal, Optional, Sequence, Tuple
+from dance.typing import Any, Dict, FeatType, Iterator, List, Literal, Optional, Sequence, Tuple, Union
+
+
+def _ensure_iter(val: Optional[Union[List[str], str]]) -> Iterator[Optional[str]]:
+    if val is None:
+        val = itertools.repeat(None)
+    elif isinstance(val, str):
+        val = [val]
+    elif not isinstance(val, list):
+        raise TypeError(f"Input to _ensure_iter must be list, str, or None. Got {type(val)}.")
+    return val
+
+
+def _check_types_and_sizes(types, sizes):
+    if len(types) == 0:
+        return
+    elif len(types) > 1:
+        raise TypeError(f"Found mixed types: {types}. Input configs must be either all str or all lists.")
+    elif ((type_ := types.pop()) == list) and (len(sizes) > 1):
+        raise ValueError(f"Found mixed sizes lists: {sizes}. Input configs must be of same length.")
+    elif type_ not in (list, str):
+        raise TypeError(f"Unknownn type {type_} found in config.")
 
 
 class BaseData(ABC):
     """Base data object."""
 
-    def __init__(self, data: Any, train_size: Optional[int] = None, val_size: int = 0, test_size: int = -1):
+    FEATURE_CONFIGS: List[str] = ["feature_layer", "feature_channel", "channel_type"]
+    LABEL_CONFIGS: List[str] = ["label_channel"]
+
+    def __init__(self, data: Union[AnnData, MuData], train_size: Optional[int] = None, val_size: int = 0,
+                 test_size: int = -1):
         """Initialize data object.
 
         Parameters
@@ -95,7 +123,21 @@ class BaseData(ABC):
         return self._data.uns["dance_config"]
 
     def set_config(self, **kwargs):
-        # TODO: need to have some control about validity of configs
+        # Check config key validity
+        all_configs = set(self.FEATURE_CONFIGS + self.LABEL_CONFIGS)
+        if (unknown_options := set(kwargs).difference(all_configs)):
+            raise KeyError(f"Unknown config option(s): {unknown_options}, available options are: {all_configs}")
+
+        feature_configs = [j for i, j in kwargs.items() if i in self.FEATURE_CONFIGS]
+        label_configs = [j for i, j in kwargs.items() if i in self.LABEL_CONFIGS]
+
+        # Check type and length consistencies for feature and label configs
+        for i in (feature_configs, label_configs):
+            types = set(map(type, i))
+            sizes = set(map(len, i))
+            _check_types_and_sizes(types, sizes)
+
+        # Finally, update the configs
         self.config.update(kwargs)
 
     @property
@@ -159,9 +201,9 @@ class BaseData(ABC):
         else:
             return None
 
-    def get_feature(self, *, return_type: FeatType = "numpy", channel: Optional[str] = None,
-                    channel_type: Literal["obs", "var"] = "obs", layer: Optional[str] = None,
-                    mod: Optional[str] = None):  # yapf: disable
+    def get_feature(self, *, split_name: Optional[str] = None, return_type: FeatType = "numpy",
+                    channel: Optional[str] = None, channel_type: Optional[Literal["obs", "var"]] = "obs",
+                    layer: Optional[str] = None, mod: Optional[str] = None):  # yapf: disable
         # Pick modality
         if mod is None:
             data = self.data
@@ -173,12 +215,10 @@ class BaseData(ABC):
             data = self.data.mod[mod]
 
         # Pick channels - obsm or varm
-        if channel_type == "obs":
-            channels = data.obsm
-        elif channel_type == "var":
-            channels = data.varm
-        else:
+        channel_type = channel_type or "obs"
+        if channel_type not in ["obs", "var"]:
             raise ValueError(f"Unknown channel type {channel_type!r}")
+        channels = data.obsm if channel_type == "obs" else data.varm
 
         # Pick specific channl
         if (channel is not None) and (layer is not None):
@@ -191,14 +231,21 @@ class BaseData(ABC):
             feature = data.X
 
         if return_type == "default":
+            if split_name is not None:
+                raise ValueError(f"split_name is not supported when return_type is 'default', got {split_name!r}")
             return feature
 
-        # Transform features to other data types
+        # Transform features to numpy array
         if hasattr(feature, "toarray"):  # convert sparse array to dense numpy array
             feature = feature.toarray()
         elif hasattr(feature, "to_numpy"):  # convert dataframe to numpy array
             feature = feature.to_numpy()
 
+        # Extract specific split
+        if split_name is not None:
+            feature = feature[self.get_split_idx(split_name, error_on_miss=True)]
+
+        # Convert to other data types if needed
         if return_type == "torch":
             feature = torch.from_numpy(feature)
         elif return_type != "numpy":
@@ -206,34 +253,41 @@ class BaseData(ABC):
 
         return feature
 
-    def _get_data(self, name: str, split_name: Optional[str], return_type: FeatType = "numpy", **kwargs):
-        out = getattr(self, name)
 
-        if hasattr(out, "toarray"):  # convert sparse array to dense numpy array
-            out = out.toarray()
-        elif hasattr(out, "to_numpy"):  # convert dataframe to numpy array
-            out = out.to_numpy()
+class Data(BaseData):
 
-        if split_name in self._split_idx_dict:
-            idx = self.get_split_idx(split_name)
-            out = out[idx]
-        elif split_name is not None:
-            raise KeyError(f"Unknown split {split_name!r}, available options are {list(self._split_idx_dict)}")
+    @property
+    def x(self):
+        return self.get_x(return_type="default")
 
-        if return_type == "torch":
-            out = torch.from_numpy(out)
-        elif return_type != "numpy":
-            raise ValueError(f"Unknown return_type {return_type!r}")
-
-        return out
+    @property
+    def y(self):
+        return self.get_y(return_type="default")
 
     def get_x(self, split_name: Optional[str] = None, return_type: FeatType = "numpy", **kwargs) -> Any:
         """Retrieve cell features from a particular split."""
-        return self._get_data("x", split_name, return_type, **kwargs)
+        info = list(map(self.config.get, ["feature_layer", "feature_channel", "channel_type", "mod"]))
+        if all(i is None for i in info):
+            layers = channels = channel_types = mods = [None]
+        else:
+            layers, channels, channel_types, mods = map(_ensure_iter, info)
+
+        xs = []
+        for ly, c, ct, m in zip(layers, channels, channel_types, mods):
+            x = self.get_feature(split_name=split_name, return_type=return_type, layer=ly, channel=c, channel_type=ct,
+                                 mod=m, **kwargs)
+            xs.append(x)
+
+        if len(xs) == 1:
+            xs = xs[0]
+
+        return xs
 
     def get_y(self, split_name: Optional[str] = None, return_type: FeatType = "numpy", **kwargs) -> Any:
         """Retrieve cell labels from a particular split."""
-        return self._get_data("y", split_name, return_type, **kwargs)
+        if (channel := self.config.get("label_channel")) is None:
+            raise ValueError("Label channel has not been specified yet.")
+        return self.get_feature(split_name=split_name, return_type=return_type, channel=channel, **kwargs)
 
     def get_x_y(
         self, split_name: Optional[str] = None, return_type: FeatType = "numpy", x_kwargs: Dict[str, Any] = dict(),
@@ -279,30 +333,3 @@ class BaseData(ABC):
     ) -> Tuple[Any, Any]:
         """Retrieve cell features and labels from the 'test' split."""
         return self.get_x_y("test", return_type, x_kwargs, y_kwargs)
-
-    def concat(self, data, merge_splits: bool = True):
-        raise NotImplementedError
-
-
-class Data(BaseData):
-
-    @property
-    def x(self):
-        # TODO: check validity when setting up
-        channel = self.config.get("feature_channel")
-        layer = self.config.get("feature_layer")
-        if (channel is not None) and (layer is not None):
-            raise ValueError(f"Cannot specify feature layer ({layer!r}) and channel ({channel!r}) simmultaneously.")
-        elif channel is not None:
-            return self.data.obsm[channel]
-        elif layer is not None:
-            return self.data.layers[layer].X
-        else:
-            return self.data.X
-
-    @property
-    def y(self):
-        if (channel := self.config.get("label_channel")) is None:
-            raise ValueError("Label channel has not been specified yet.")
-        else:
-            return self.data.obsm[channel]
