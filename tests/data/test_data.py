@@ -48,6 +48,8 @@ def test_data_basic_properties(subtests):
 
 def test_get_data(subtests):
     adata = AnnData(X=X)
+    adata.obsm["feature1"] = X + 10
+    adata.obsm["feature2"] = X + 20
     adata.obsm["label"] = Y
 
     with subtests.test("Single feature"):
@@ -64,3 +66,12 @@ def test_get_data(subtests):
 
         # Validation set not set
         pytest.raises(KeyError, data.get_val_data)
+
+    with subtests.test("Multi feature"):
+        data = Data(adata, train_size=2)
+        data.set_config(feature_channel=[None, "feature1", "feature2"], label_channel="label")
+
+        (x1_train, x2_train, x3_train), y_train = data.get_train_data()
+        assert x2_train.tolist() == [[10, 11], [11, 12]]
+        assert x3_train.tolist() == [[20, 21], [21, 22]]
+        assert y_train.tolist() == [[0], [1]]
