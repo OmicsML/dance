@@ -93,7 +93,7 @@ def test_get_data(subtests):
 
         (x_obsm, x_obsp, x_varm, x_varp), y = data.get_train_data()
         assert x_obsm.tolist() == [[0, 1], [1, 2]]
-        assert x_obsp.tolist() == [[1, 2, 3], [2, 5, 8]]
+        assert x_obsp.tolist() == [[1, 2], [2, 5]]
         assert x_varm.tolist() == [[0, 1, 2], [1, 2, 3]]
         assert x_varp.tolist() == [[5, 8], [8, 14]]
         assert y.tolist() == [[0], [1]]
