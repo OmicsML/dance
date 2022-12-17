@@ -37,6 +37,7 @@ class BaseData(ABC):
 
     FEATURE_CONFIGS: List[str] = ["feature_layer", "feature_channel", "channel_type"]
     LABEL_CONFIGS: List[str] = ["label_channel"]
+    DATA_CHANNELS: List[str] = ["obsm", "varm", "obsp", "varp"]
 
     def __init__(self, data: Union[AnnData, MuData], train_size: Optional[int] = None, val_size: int = 0,
                  test_size: int = -1):
@@ -205,7 +206,7 @@ class BaseData(ABC):
             return None
 
     def get_feature(self, *, split_name: Optional[str] = None, return_type: FeatType = "numpy",
-                    channel: Optional[str] = None, channel_type: Optional[Literal["obs", "var"]] = "obs",
+                    channel: Optional[str] = None, channel_type: Optional[Literal["obs", "var"]] = "obsm",
                     layer: Optional[str] = None, mod: Optional[str] = None):  # yapf: disable
         # Pick modality
         if mod is None:
@@ -218,10 +219,10 @@ class BaseData(ABC):
             data = self.data.mod[mod]
 
         # Pick channels - obsm or varm
-        channel_type = channel_type or "obs"
-        if channel_type not in ["obs", "var"]:
-            raise ValueError(f"Unknown channel type {channel_type!r}")
-        channels = data.obsm if channel_type == "obs" else data.varm
+        channel_type = channel_type or "obsm"  # default to obsm
+        if channel_type not in self.DATA_CHANNELS:
+            raise ValueError(f"Unknown channel type {channel_type!r}. Available options are {self.DATA_CHANNELS}")
+        channels = getattr(data, channel_type)
 
         # Pick specific channl
         if (channel is not None) and (layer is not None):
@@ -245,8 +246,10 @@ class BaseData(ABC):
             feature = feature.to_numpy()
 
         # Extract specific split
-        if split_name is not None:
+        if channel_type.startswith("obs") and (split_name is not None):
             feature = feature[self.get_split_idx(split_name, error_on_miss=True)]
+        elif channel_type.startswith("var"):
+            logger.warning(f"Indexing option for {channel_type} not implemented yet.")
 
         # Convert to other data types if needed
         if return_type == "torch":
