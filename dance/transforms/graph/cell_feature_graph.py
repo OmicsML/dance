@@ -3,11 +3,11 @@ import numpy as np
 import torch
 
 from dance.transforms.base import BaseTransform
-from dance.transforms.cell_feature import WeightedGenePCA
+from dance.transforms.cell_feature import WeightedFeaturePCA
 from dance.typing import LogLevel, Optional
 
 
-class CellGeneGraph(BaseTransform):
+class CellFeatureGraph(BaseTransform):
 
     def __init__(self, cell_feature_channel: str, gene_feature_channel: Optional[str] = None, *,
                  layer: Optional[str] = None, mod: Optional[str] = None, **kwargs):
@@ -52,9 +52,9 @@ class CellGeneGraph(BaseTransform):
         g.add_edges(g.nodes(), g.nodes(), {"weight": torch.ones(g.number_of_nodes())[:, None]})
 
         gene_feature = data.get_feature(return_type="torch", channel=self.gene_feature_channel, mod=self.mod,
-                                        channel_type="var")
+                                        channel_type="varm")
         cell_feature = data.get_feature(return_type="torch", channel=self.cell_feature_channel, mod=self.mod,
-                                        channel_type="obs")
+                                        channel_type="obsm")
         g.ndata["features"] = torch.vstack((gene_feature, cell_feature))
 
         data.data.uns[self.out] = g
@@ -62,7 +62,7 @@ class CellGeneGraph(BaseTransform):
         return data
 
 
-class PCACellGeneGraph(BaseTransform):
+class PCACellFeatureGraph(BaseTransform):
 
     def __init__(self, n_components: int = 400, split_name: Optional[str] = None, *, layer: Optional[str] = None,
                  mod: Optional[str] = None, log_level: LogLevel = "WARNING"):
@@ -75,7 +75,7 @@ class PCACellGeneGraph(BaseTransform):
         self.mod = mod
 
     def __call__(self, data):
-        WeightedGenePCA(self.n_components, self.split_name, log_level=self.log_level)(data)
-        CellGeneGraph(cell_feature_channel="WeightedGenePCA", layer=self.layer, mod=self.mod,
-                      log_level=self.log_level)(data)
+        WeightedFeaturePCA(self.n_components, self.split_name, log_level=self.log_level)(data)
+        CellFeatureGraph(cell_feature_channel="WeightedFeaturePCA", layer=self.layer, mod=self.mod,
+                         log_level=self.log_level)(data)
         return data

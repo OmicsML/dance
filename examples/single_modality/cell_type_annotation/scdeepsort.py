@@ -6,7 +6,7 @@ import torch
 from dance.data import Data
 from dance.datasets.singlemodality import CellTypeDataset
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
-from dance.transforms.graph import PCACellGeneGraph
+from dance.transforms.graph import PCACellFeatureGraph
 from dance.utils.preprocess import cell_label_to_df
 
 if __name__ == "__main__":
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
     adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)
     data = Data(adata, train_size=train_size)
-    PCACellGeneGraph(n_components=params.dense_dim, split_name="train", log_level="INFO")(data)
+    PCACellFeatureGraph(n_components=params.dense_dim, split_name="train", log_level="INFO")(data)
     data.set_config(label_channel="cell_type")
 
     y_train = data.get_y(split_name="train", return_type="torch").argmax(1)
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     num_labels = y_test.shape[1]
 
     # TODO: make api for the following blcok?
-    g = data.data.uns["CellGeneGraph"]
+    g = data.data.uns["CellFeatureGraph"]
     num_genes = data.num_features
     gene_ids = torch.arange(num_genes)
     train_cell_ids = torch.LongTensor(data.train_idx) + num_genes
