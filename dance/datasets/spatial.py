@@ -81,7 +81,7 @@ class SpotDataset:
         self.data_id = data_id
         self.data_dir = data_dir + "/{}".format(data_id)
         self.data_url = dataset[data_id]
-        self.load_data()
+        self._load_data()
         self.adj = None
 
     def get_all_data(self):
@@ -115,7 +115,7 @@ class SpotDataset:
                 return False
         return True
 
-    def load_data(self):
+    def _load_data(self):
         if self.is_complete():
             pass
         else:
@@ -142,6 +142,14 @@ class SpotDataset:
         self.data.obs["label"] = list(map(lambda x: classes[x], label["ground_truth"].tolist()))
         self.data.obs["ground_truth"] = label["ground_truth"].tolist()
         return self
+
+    def load_data(self):
+        adata = self.data
+        spatial = adata.obs[["x", "y"]]
+        spatial_pixel = adata.obs[["x_pixel", "y_pixel"]]
+        image = self.img
+        label = adata.obs[["label"]]
+        return image, adata, spatial, spatial_pixel, label
 
 
 class CellTypeDeconvoDataset:

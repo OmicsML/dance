@@ -37,7 +37,7 @@ class BaseData(ABC):
 
     FEATURE_CONFIGS: List[str] = ["feature_layer", "feature_channel", "channel_type"]
     LABEL_CONFIGS: List[str] = ["label_channel"]
-    DATA_CHANNELS: List[str] = ["obsm", "varm", "obsp", "varp"]
+    DATA_CHANNELS: List[str] = ["obsm", "varm", "obsp", "varp", "uns"]
 
     def __init__(self, data: Union[AnnData, MuData], train_size: Optional[int] = None, val_size: int = 0,
                  test_size: int = -1):
