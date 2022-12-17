@@ -1,3 +1,4 @@
+import numba
 import numpy as np
 import torch
 
@@ -64,3 +65,26 @@ def normalize(mat, *, mode: NormMode = "normalize", axis: int = 0, eps: float = 
     norm_mat = (mat + shift) / denom
 
     return norm_mat
+
+
+@numba.njit("f4(f4[:], f4[:])")
+def euclidean_distance(t1, t2):
+    sum = 0
+    for i in range(t1.shape[0]):
+        sum += (t1[i] - t2[i])**2
+    return np.sqrt(sum)
+
+
+@numba.njit("f4[:,:](f4[:,:], u4)", parallel=True, nogil=True)
+def pairwise_distance(x, dist_func_id=0):
+    if dist_func_id == 0:  # Euclidean distance
+        dist = euclidean_distance
+    else:
+        raise ValueError("Unknown distance function ID")
+
+    n = x.shape[0]
+    mat = np.empty((n, n), dtype=np.float32)
+    for i in numba.prange(n):
+        for j in numba.prange(n):
+            mat[i][j] = dist(x[i], x[j])
+    return mat

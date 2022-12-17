@@ -8,7 +8,6 @@ from typing import List, Union
 import anndata as ad
 import dgl
 import networkx as nx
-import numba
 import numpy as np
 import pandas as pd
 import scanpy as sc
@@ -26,24 +25,6 @@ from torch.nn import functional as F
 
 import dance.transforms.preprocess
 from dance import logger
-
-
-@numba.njit("f4(f4[:], f4[:])")
-def euclid_dist(t1, t2):
-    sum = 0
-    for i in range(t1.shape[0]):
-        sum += (t1[i] - t2[i])**2
-    return np.sqrt(sum)
-
-
-@numba.njit("f4[:,:](f4[:,:])", parallel=True, nogil=True)
-def pairwise_distance(X):
-    n = X.shape[0]
-    adj = np.empty((n, n), dtype=np.float32)
-    for i in numba.prange(n):
-        for j in numba.prange(n):
-            adj[i][j] = euclid_dist(X[i], X[j])
-    return adj
 
 
 def csr_cosine_similarity(input_csr_matrix):
