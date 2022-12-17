@@ -65,9 +65,12 @@ class BaseData(ABC):
         if "dance_config" not in self._data.uns:
             self._data.uns["dance_config"] = dict()
 
-    def _setup_splits(self, train_size: Optional[int], val_size: int, test_size: int):
+    def _setup_splits(self, train_size: Optional[Union[int, str]], val_size: int, test_size: int):
         if train_size is None:
             return
+        elif isinstance(train_size, str) and train_size.lower() == "all":
+            train_size = -1
+            val_size = test_size = 0
         elif any(not isinstance(i, int) for i in (train_size, val_size, test_size)):
             raise TypeError("Split sizes must be of type int")
 

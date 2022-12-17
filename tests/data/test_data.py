@@ -18,6 +18,12 @@ def test_data_basic_properties(subtests):
         assert data.cells == ["0", "1", "2"]
         assert data.train_idx is data.val_idx is data.test_idx is None
 
+    with subtests.test("All training"):
+        data = Data(adata, train_size="all")
+        assert data.train_idx == [0, 1, 2]
+        assert data.val_idx is None
+        assert data.test_idx is None
+
     with subtests.test("Training and testing splits"):
         data = Data(adata, train_size=2)
         assert data.train_idx == [0, 1]
