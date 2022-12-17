@@ -246,10 +246,12 @@ class BaseData(ABC):
             feature = feature.to_numpy()
 
         # Extract specific split
-        if channel_type.startswith("obs") and (split_name is not None):
-            feature = feature[self.get_split_idx(split_name, error_on_miss=True)]
-        elif channel_type.startswith("var"):
-            logger.warning(f"Indexing option for {channel_type} not implemented yet.")
+        if split_name is not None:
+            if channel_type.startswith("obs"):
+                idx = self.get_split_idx(split_name, error_on_miss=True)
+                feature = feature[idx] if channel_type == "obsm" else feature[idx][:, idx]
+            elif channel_type.startswith("var"):
+                logger.warning(f"Indexing option for {channel_type} not implemented yet.")
 
         # Convert to other data types if needed
         if return_type == "torch":
