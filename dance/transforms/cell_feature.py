@@ -7,7 +7,7 @@ from dance.typing import Optional
 from dance.utils.matrix import normalize
 
 
-class WeightedGenePCA(BaseTransform):
+class WeightedFeaturePCA(BaseTransform):
     """Compute the weighted gene PCA as cell features.
 
     Given a gene expression matrix of dimension (cell x gene), the gene PCA is first compured. Then, the representation
@@ -16,7 +16,7 @@ class WeightedGenePCA(BaseTransform):
     """
 
     def __init__(self, n_components: int = 400, split_name: Optional[str] = None, **kwargs):
-        """Initialize WeightedGenePCA.
+        """Initialize WeightedFeaturePCA.
 
         Parameters
         ----------

@@ -4,7 +4,7 @@ from pprint import pprint
 from dance.data import Data
 from dance.datasets.singlemodality import CellTypeDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
-from dance.transforms.cell_feature import WeightedGenePCA
+from dance.transforms.cell_feature import WeightedFeaturePCA
 from dance.utils.preprocess import cell_label_to_df
 
 if __name__ == "__main__":
@@ -35,9 +35,9 @@ if __name__ == "__main__":
     adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
     adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)
     data = Data(adata, train_size=train_size)
-    WeightedGenePCA(n_components=params.dense_dim, split_name="train", log_level="INFO")(data)
+    WeightedFeaturePCA(n_components=params.dense_dim, split_name="train", log_level="INFO")(data)
 
-    data.set_config(feature_channel="WeightedGenePCA", label_channel="cell_type")
+    data.set_config(feature_channel="WeightedFeaturePCA", label_channel="cell_type")
 
     x_train, y_train = data.get_train_data()
     y_train_converted = y_train.argmax(1)  # convert one-hot representation into label index representation
