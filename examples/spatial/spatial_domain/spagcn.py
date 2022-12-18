@@ -55,8 +55,8 @@ if __name__ == "__main__":
     SpaGCNGraph(alpha=args.alpha, beta=args.beta, log_level="INFO")(data)
     SpaGCNGraph2D(log_level="INFO")(data)
     CellPCA(n_components=50, log_level="INFO")(data)
-    data.set_config(feature_channel=["CellPCA", "SpaGCNGraph", "SpaGCNGraph2D"], channel_type=["obsm", "obsp", "obsp"],
-                    label_channel="label")
+    data.set_config(feature_channel=["CellPCA", "SpaGCNGraph", "SpaGCNGraph2D"],
+                    feature_channel_type=["obsm", "obsp", "obsp"], label_channel="label")
     (x, adj, adj_2d), y = data.get_train_data()
 
     # model and pipeline

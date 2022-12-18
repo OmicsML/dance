@@ -10,16 +10,15 @@ from dance.typing import LogLevel, Optional
 class CellFeatureGraph(BaseTransform):
 
     def __init__(self, cell_feature_channel: str, gene_feature_channel: Optional[str] = None, *,
-                 layer: Optional[str] = None, mod: Optional[str] = None, **kwargs):
+                 mod: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
 
         self.cell_feature_channel = cell_feature_channel
         self.gene_feature_channel = gene_feature_channel or cell_feature_channel
-        self.layer = layer
         self.mod = mod
 
     def __call__(self, data):
-        feat = data.get_feature(return_type="default", layer=self.layer, mod=self.mod)
+        feat = data.get_feature(return_type="default", mod=self.mod)
         num_cells, num_feats = feat.shape
 
         row, col = np.nonzero(feat)
@@ -64,18 +63,16 @@ class CellFeatureGraph(BaseTransform):
 
 class PCACellFeatureGraph(BaseTransform):
 
-    def __init__(self, n_components: int = 400, split_name: Optional[str] = None, *, layer: Optional[str] = None,
-                 mod: Optional[str] = None, log_level: LogLevel = "WARNING"):
+    def __init__(self, n_components: int = 400, split_name: Optional[str] = None, *, mod: Optional[str] = None,
+                 log_level: LogLevel = "WARNING"):
         super().__init__(log_level=log_level)
 
         self.n_components = n_components
         self.split_name = split_name
 
-        self.layer = layer
         self.mod = mod
 
     def __call__(self, data):
         WeightedFeaturePCA(self.n_components, self.split_name, log_level=self.log_level)(data)
-        CellFeatureGraph(cell_feature_channel="WeightedFeaturePCA", layer=self.layer, mod=self.mod,
-                         log_level=self.log_level)(data)
+        CellFeatureGraph(cell_feature_channel="WeightedFeaturePCA", mod=self.mod, log_level=self.log_level)(data)
         return data
