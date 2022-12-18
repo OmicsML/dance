@@ -1,28 +1,15 @@
-import csv
 import glob
 import os
 import os.path as osp
-import pickle as pkl
-import random
-import re
-import time as tm
 import warnings
-from collections import defaultdict
-from operator import itemgetter
 
 import anndata
 import cv2
-import networkx as nx
-import numpy as np
 import pandas as pd
 import rdata
 import scanpy as sc
-import scipy.sparse
-from anndata import AnnData
-from scipy.stats import uniform
 
 from dance.data import download_file, download_unzip, unzip_file
-from dance.transforms import preprocess
 
 IGNORED_FILES = ["readme.txt"]
 
@@ -181,7 +168,6 @@ class CellTypeDeconvoDataset:
         check = [self.data_dir + "/mix_count.*", self.data_dir + "/ref_sc_count.*"]
 
         for i in check:
-            #if not os.path.exists(i):
             if not glob.glob(i):
                 print("lack {}".format(i))
                 return False
@@ -195,8 +181,6 @@ class CellTypeDeconvoDataset:
 
         self.data = {}
         files = os.listdir(self.data_dir + "/")
-        filenames = [f.split(".")[0] for f in files]
-        extensions = [f.split(".")[1] for f in files]
         for f in files:
             DataPath = self.data_dir + "/" + f
             filename = f.split(".")[0]
