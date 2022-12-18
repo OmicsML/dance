@@ -8,7 +8,7 @@ from anndata import AnnData
 from mudata import MuData
 
 from dance import logger
-from dance.typing import Any, Dict, FeatType, Iterator, List, Literal, Optional, Sequence, Tuple, Union
+from dance.typing import Any, Dict, FeatType, Iterator, List, Optional, Sequence, Tuple, Union
 
 
 def _ensure_iter(val: Optional[Union[List[str], str]]) -> Iterator[Optional[str]]:
@@ -35,9 +35,9 @@ def _check_types_and_sizes(types, sizes):
 class BaseData(ABC):
     """Base data object."""
 
-    FEATURE_CONFIGS: List[str] = ["feature_layer", "feature_channel", "channel_type"]
-    LABEL_CONFIGS: List[str] = ["label_channel"]
-    DATA_CHANNELS: List[str] = ["obsm", "varm", "obsp", "varp", "uns"]
+    FEATURE_CONFIGS: List[str] = ["feature_mod", "feature_channel", "feature_channel_type"]
+    LABEL_CONFIGS: List[str] = ["label_mod", "label_channel", "label_channel_type"]
+    DATA_CHANNELS: List[str] = ["obsm", "varm", "obsp", "varp", "layers", "uns"]
 
     def __init__(self, data: Union[AnnData, MuData], train_size: Optional[int] = None, val_size: int = 0,
                  test_size: int = -1):
@@ -206,12 +206,12 @@ class BaseData(ABC):
             return None
 
     def get_feature(self, *, split_name: Optional[str] = None, return_type: FeatType = "numpy",
-                    channel: Optional[str] = None, channel_type: Optional[Literal["obs", "var"]] = "obsm",
-                    layer: Optional[str] = None, mod: Optional[str] = None):  # yapf: disable
+                    channel: Optional[str] = None, channel_type: Optional[str] = "obsm",
+                    mod: Optional[str] = None):  # yapf: disable
         # Pick modality
         if mod is None:
             data = self.data
-        elif not hasattr(self.data, "mod"):
+        elif not isinstance(self.data, MuData):
             raise AttributeError("`mod` option is only available when using multimodality data.")
         elif mod not in self.mod:
             raise KeyError(f"Unknown modality {mod!r}, available options are {sorted(self.mod)}")
@@ -224,19 +224,12 @@ class BaseData(ABC):
             raise ValueError(f"Unknown channel type {channel_type!r}. Available options are {self.DATA_CHANNELS}")
         channels = getattr(data, channel_type)
 
-        # Pick specific channl
-        if (channel is not None) and (layer is not None):
-            raise ValueError(f"Cannot specify feature layer ({layer!r}) and channel ({channel!r}) simmultaneously.")
-        elif channel is not None:
-            feature = channels[channel]
-        elif layer is not None:
-            feature = data.layers[layer].X
-        else:
-            feature = data.X
+        # Pick feature from a specific channel
+        feature = data.X if channel is None else channels[channel]
 
         if return_type == "default":
             if split_name is not None:
-                raise ValueError(f"split_name is not supported when return_type is 'default', got {split_name!r}")
+                raise ValueError(f"split_name is not supported when return_type is 'default', got {split_name=!r}")
             return feature
 
         # Transform features to numpy array
@@ -247,7 +240,7 @@ class BaseData(ABC):
 
         # Extract specific split
         if split_name is not None:
-            if channel_type.startswith("obs"):
+            if channel_type.startswith("obs") or channel_type == "layers":
                 idx = self.get_split_idx(split_name, error_on_miss=True)
                 feature = feature[idx] if channel_type == "obsm" else feature[idx][:, idx]
             elif channel_type.startswith("var"):
@@ -272,32 +265,32 @@ class Data(BaseData):
     def y(self):
         return self.get_y(return_type="default")
 
+    def _get(self, config_keys: List[str], *, split_name: Optional[str] = None, return_type: FeatType = "numpy",
+             **kwargs) -> Any:
+        info = list(map(self.config.get, config_keys))
+        if all(i is None for i in info):
+            mods = channels = channel_types = [None]
+        else:
+            mods, channels, channel_types = map(_ensure_iter, info)
+
+        out = []
+        for mod, channel, channel_type in zip(mods, channels, channel_types):
+            x = self.get_feature(split_name=split_name, return_type=return_type, mod=mod, channel=channel,
+                                 channel_type=channel_type, **kwargs)
+            out.append(x)
+        out = out[0] if len(out) == 1 else out
+
+        return out
+
     def get_x(self, split_name: Optional[str] = None, return_type: FeatType = "numpy", **kwargs) -> Any:
         """Retrieve cell features from a particular split."""
-        info = list(map(self.config.get, ["feature_layer", "feature_channel", "channel_type", "mod"]))
-        if all(i is None for i in info):
-            layers = channels = channel_types = mods = [None]
-        else:
-            layers, channels, channel_types, mods = map(_ensure_iter, info)
-
-        xs = []
-        for ly, c, ct, m in zip(layers, channels, channel_types, mods):
-            x = self.get_feature(split_name=split_name, return_type=return_type, layer=ly, channel=c, channel_type=ct,
-                                 mod=m, **kwargs)
-            xs.append(x)
-
-        if len(xs) == 1:
-            xs = xs[0]
-
-        return xs
+        return self._get(self.FEATURE_CONFIGS, split_name=split_name, return_type=return_type, **kwargs)
 
     def get_y(self, split_name: Optional[str] = None, return_type: FeatType = "numpy", **kwargs) -> Any:
         """Retrieve cell labels from a particular split."""
-        if (channel := self.config.get("label_channel")) is None:
-            raise ValueError("Label channel has not been specified yet.")
-        return self.get_feature(split_name=split_name, return_type=return_type, channel=channel, **kwargs)
+        return self._get(self.LABEL_CONFIGS, split_name=split_name, return_type=return_type, **kwargs)
 
-    def get_x_y(
+    def get_data(
         self, split_name: Optional[str] = None, return_type: FeatType = "numpy", x_kwargs: Dict[str, Any] = dict(),
         y_kwargs: Dict[str, Any] = dict()
     ) -> Tuple[Any, Any]:
@@ -328,16 +321,16 @@ class Data(BaseData):
         self, return_type: FeatType = "numpy", x_kwargs: Dict[str, Any] = dict(), y_kwargs: Dict[str, Any] = dict()
     ) -> Tuple[Any, Any]:
         """Retrieve cell features and labels from the 'train' split."""
-        return self.get_x_y("train", return_type, x_kwargs, y_kwargs)
+        return self.get_data("train", return_type, x_kwargs, y_kwargs)
 
     def get_val_data(
         self, return_type: FeatType = "numpy", x_kwargs: Dict[str, Any] = dict(), y_kwargs: Dict[str, Any] = dict()
     ) -> Tuple[Any, Any]:
         """Retrieve cell features and labels from the 'val' split."""
-        return self.get_x_y("val", return_type, x_kwargs, y_kwargs)
+        return self.get_data("val", return_type, x_kwargs, y_kwargs)
 
     def get_test_data(
         self, return_type: FeatType = "numpy", x_kwargs: Dict[str, Any] = dict(), y_kwargs: Dict[str, Any] = dict()
     ) -> Tuple[Any, Any]:
         """Retrieve cell features and labels from the 'test' split."""
-        return self.get_x_y("test", return_type, x_kwargs, y_kwargs)
+        return self.get_data("test", return_type, x_kwargs, y_kwargs)

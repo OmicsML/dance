@@ -56,6 +56,7 @@ def test_get_data(subtests):
     adata = AnnData(X=X)
     adata.obsm["feature1"] = X + 10
     adata.obsm["feature2"] = X + 20
+    adata.layers["layer_feature"] = X + 30
     adata.obsm["obsm_feature"] = X
     adata.obsp["obsp_feature"] = X @ X.T
     adata.varm["varm_feature"] = X.T
@@ -88,12 +89,14 @@ def test_get_data(subtests):
 
     with subtests.test("Multi type feature"):
         data = Data(adata, train_size=2)
-        data.set_config(feature_channel=["obsm_feature", "obsp_feature", "varm_feature", "varp_feature"],
-                        channel_type=["obsm", "obsp", "varm", "varp"], label_channel="label")
+        data.set_config(
+            feature_channel=["obsm_feature", "obsp_feature", "varm_feature", "varp_feature", "layer_feature"],
+            feature_channel_type=["obsm", "obsp", "varm", "varp", "layers"], label_channel="label")
 
-        (x_obsm, x_obsp, x_varm, x_varp), y = data.get_train_data()
+        (x_obsm, x_obsp, x_varm, x_varp, x_layer), y = data.get_train_data()
         assert x_obsm.tolist() == [[0, 1], [1, 2]]
         assert x_obsp.tolist() == [[1, 2], [2, 5]]
         assert x_varm.tolist() == [[0, 1, 2], [1, 2, 3]]
         assert x_varp.tolist() == [[5, 8], [8, 14]]
+        assert x_layer.tolist() == [[30, 31], [31, 32]]
         assert y.tolist() == [[0], [1]]
