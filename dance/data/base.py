@@ -35,9 +35,9 @@ def _check_types_and_sizes(types, sizes):
 class BaseData(ABC):
     """Base data object."""
 
-    FEATURE_CONFIGS: List[str] = ["feature_mod", "feature_channel", "feature_channel_type"]
-    LABEL_CONFIGS: List[str] = ["label_mod", "label_channel", "label_channel_type"]
-    DATA_CHANNELS: List[str] = ["obsm", "varm", "obsp", "varp", "layers", "uns"]
+    _FEATURE_CONFIGS: List[str] = ["feature_mod", "feature_channel", "feature_channel_type"]
+    _LABEL_CONFIGS: List[str] = ["label_mod", "label_channel", "label_channel_type"]
+    _DATA_CHANNELS: List[str] = ["obsm", "varm", "obsp", "varp", "layers", "uns"]
 
     def __init__(self, data: Union[AnnData, MuData], train_size: Optional[int] = None, val_size: int = 0,
                  test_size: int = -1):
@@ -128,12 +128,12 @@ class BaseData(ABC):
 
     def set_config(self, **kwargs):
         # Check config key validity
-        all_configs = set(self.FEATURE_CONFIGS + self.LABEL_CONFIGS)
+        all_configs = set(self._FEATURE_CONFIGS + self._LABEL_CONFIGS)
         if (unknown_options := set(kwargs).difference(all_configs)):
             raise KeyError(f"Unknown config option(s): {unknown_options}, available options are: {all_configs}")
 
-        feature_configs = [j for i, j in kwargs.items() if i in self.FEATURE_CONFIGS]
-        label_configs = [j for i, j in kwargs.items() if i in self.LABEL_CONFIGS]
+        feature_configs = [j for i, j in kwargs.items() if i in self._FEATURE_CONFIGS]
+        label_configs = [j for i, j in kwargs.items() if i in self._LABEL_CONFIGS]
 
         # Check type and length consistencies for feature and label configs
         for i in (feature_configs, label_configs):
@@ -220,8 +220,8 @@ class BaseData(ABC):
 
         # Pick channels - obsm or varm
         channel_type = channel_type or "obsm"  # default to obsm
-        if channel_type not in self.DATA_CHANNELS:
-            raise ValueError(f"Unknown channel type {channel_type!r}. Available options are {self.DATA_CHANNELS}")
+        if channel_type not in self._DATA_CHANNELS:
+            raise ValueError(f"Unknown channel type {channel_type!r}. Available options are {self._DATA_CHANNELS}")
         channels = getattr(data, channel_type)
 
         # Pick feature from a specific channel
@@ -284,11 +284,11 @@ class Data(BaseData):
 
     def get_x(self, split_name: Optional[str] = None, return_type: FeatType = "numpy", **kwargs) -> Any:
         """Retrieve cell features from a particular split."""
-        return self._get(self.FEATURE_CONFIGS, split_name=split_name, return_type=return_type, **kwargs)
+        return self._get(self._FEATURE_CONFIGS, split_name=split_name, return_type=return_type, **kwargs)
 
     def get_y(self, split_name: Optional[str] = None, return_type: FeatType = "numpy", **kwargs) -> Any:
         """Retrieve cell labels from a particular split."""
-        return self._get(self.LABEL_CONFIGS, split_name=split_name, return_type=return_type, **kwargs)
+        return self._get(self._LABEL_CONFIGS, split_name=split_name, return_type=return_type, **kwargs)
 
     def get_data(
         self, split_name: Optional[str] = None, return_type: FeatType = "numpy", x_kwargs: Dict[str, Any] = dict(),
