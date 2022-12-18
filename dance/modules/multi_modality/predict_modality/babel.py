@@ -4,18 +4,17 @@ Extended from https://github.com/wukevin/babel
 
 Reference
 ---------
-Wu, Kevin E., Kathryn E. Yost, Howard Y. Chang, and James Zou. "BABEL enables cross-modality translation between multiomic profiles at single-cell resolution." Proceedings of the National Academy of Sciences 118, no. 15 (2021).
+Wu, Kevin E., Kathryn E. Yost, Howard Y. Chang, and James Zou. "BABEL enables cross-modality translation between
+multiomic profiles at single-cell resolution." Proceedings of the National Academy of Sciences 118, no. 15 (2021).
 
 """
 import logging
 import math
 from typing import Callable, List, Tuple, Union
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from scipy import sparse
 from torch.utils.data import DataLoader
 
 import dance.utils.loss as loss_functions
@@ -794,7 +793,7 @@ class BabelWrapper:
                 pred = self.model.decoder2(emb)[0]
             return pred
 
-    def fit(self, x_train, y_train, x_val, y_val, max_epochs=500, val_ratio=0.15):
+    def fit(self, x_train, y_train, max_epochs=500, val_ratio=0.15):
         """fit function for training.
 
         Parameters
@@ -803,25 +802,26 @@ class BabelWrapper:
             Training input modality.
         y_train : torch.Tensor
             Training output modality.
-        x_val : torch.Tensor
-            Validation input modality.
-        y_val : torch.Tensor
-            Validation output modality.
         max_epochs : int optional
             Maximum number of training epochs, by default to be 500.
-
-        Returns
-        -------
-        None.
+        val_ratio : int
+            Validation ratio.
 
         """
         criterion = loss_functions.QuadLoss(loss1=loss_functions.RMSELoss, loss2=loss_functions.RMSELoss,
                                             loss2_weight=self.args.lossweight)
         device = self.args.device
 
+        total_size = x_train.shape[0]
+        val_size = int(total_size * val_ratio)
+        rand_idx = torch.randperm(total_size)
+        train_idx = rand_idx[:-val_size]
+        val_idx = rand_idx[-val_size:]
+
+        train_loader = DataLoader(torch.hstack((x_train[train_idx], y_train[train_idx])), shuffle=True,
+                                  batch_size=self.args.batchsize)
+        val_loader = DataLoader(torch.hstack((x_train[val_idx], y_train[val_idx])), batch_size=self.args.batchsize)
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.args.lr)
-        train_loader = DataLoader(torch.hstack((x_train, y_train)), batch_size=self.args.batchsize, shuffle=True)
-        val_loader = DataLoader(torch.hstack((x_val, y_val)), batch_size=self.args.batchsize)
 
         val = []
         for i in range(max_epochs):
