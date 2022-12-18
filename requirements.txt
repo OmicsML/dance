@@ -1,5 +1,5 @@
 h5py==3.7.0
-leidenalg==0.9.0
+leidenalg==0.9.1
 mudata==0.2.1
 networkx==2.8.8
 numba==0.56.2
