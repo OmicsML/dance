@@ -45,3 +45,29 @@ class WeightedFeaturePCA(BaseTransform):
         data.data.varm[self.out] = gene_feat.astype(np.float32)
 
         return data
+
+
+class CellPCA(BaseTransform):
+
+    def __init__(self, n_components: int = 400, *, layer: Optional[str] = None, channel: Optional[str] = None,
+                 mod: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+
+        self.n_components = n_components
+        self.layer = layer
+        self.channel = channel
+        self.mod = mod
+
+    def __call__(self, data: BaseData) -> BaseData:
+        feat = data.get_feature(return_type="numpy", layer=self.layer, channel=self.channel, mod=self.mod)
+        pca = PCA(n_components=self.n_components)
+
+        self.logger.info(f"Start generating cell PCA features {feat.shape}")
+        cell_feat = pca.fit_transform(feat)
+        evr = pca.explained_variance_ratio_
+        self.logger.info(f"Top 10 explained variances: {evr[:10]}")
+        self.logger.info(f"Total explained variance: {evr.sum():.2%}")
+
+        data.data.obsm[self.out] = cell_feat
+
+        return data

@@ -605,7 +605,7 @@ class SpaGCN:
 
     def fit(
             self,
-            adata,
+            embed,
             adj,
             num_pcs=50,
             lr=0.005,
@@ -622,7 +622,7 @@ class SpaGCN:
 
         Parameters
         ----------
-        adata :
+        embed :
             input data.
         adj :
             adjacent matrix.
@@ -666,19 +666,10 @@ class SpaGCN:
         self.n_clusters = n_clusters
         self.res = res
         self.tol = tol
-        assert adata.shape[0] == adj.shape[0] == adj.shape[1]
-        pca = PCA(n_components=self.num_pcs)
-        if issparse(adata.X):
-            pca.fit(adata.X.A)
-            embed = pca.transform(adata.X.A)
-        else:
-            pca.fit(adata.X)
-            embed = pca.transform(adata.X)
-        ###------------------------------------------###
         if self.l is None:
             raise ValueError('l should be set before fitting the model!')
         adj_exp = np.exp(-1 * (adj**2) / (2 * (self.l**2)))
-        #----------Train model----------
+
         self.model = SimpleGCDEC(embed.shape[1], embed.shape[1])
         self.model.fit(embed, adj_exp, lr=self.lr, max_epochs=self.max_epochs, weight_decay=self.weight_decay,
                        opt=self.opt, init_spa=self.init_spa, init=self.init, n_neighbors=self.n_neighbors,

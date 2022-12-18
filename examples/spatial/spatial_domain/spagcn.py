@@ -2,13 +2,14 @@ import argparse
 
 from sklearn.metrics import adjusted_mutual_info_score
 
+from dance.data import Data
 from dance.datasets.spatial import SpotDataset
 from dance.modules.spatial.spatial_domain.spagcn import SpaGCN, refine
-from dance.transforms.graph_construct import construct_graph
-from dance.transforms.preprocess import (log1p, normalize, prefilter_cells, prefilter_genes, prefilter_specialgenes,
-                                         set_seed)
+from dance.transforms.cell_feature import CellPCA
+from dance.transforms.graph import SpaGCNGraph, SpaGCNGraph2D
+from dance.transforms.preprocess import log1p, normalize, prefilter_specialgenes
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--sample_number", type=str, default="151673",
@@ -34,40 +35,45 @@ if __name__ == '__main__':
 
     # get data
     dataset = SpotDataset(args.sample_number, data_dir="../../../data/spot")
-    ## dataset.data has repeat name , be careful
 
-    # build graph
-    dataset.adj = construct_graph(dataset.data.obs['x'], dataset.data.obs['y'], dataset.data.obs['x_pixel'],
-                                  dataset.data.obs['y_pixel'], dataset.img, beta=args.beta, alpha=args.alpha,
-                                  histology=True)
+    # dataset.data has repeat name , be careful
+    image, adata, spatial, spatial_pixel, label = dataset.load_data()
+    adata.var_names_make_unique()
+    adata.obsm["spatial"] = spatial
+    adata.obsm["spatial_pixel"] = spatial_pixel
+    adata.uns["image"] = image
+    adata.obsm["label"] = label
 
-    # preprocess data
-    dataset.data.var_names_make_unique()
+    # prefilter_cells(adata)  # this operation will change the data shape
+    prefilter_specialgenes(adata)
+    normalize(adata)
+    log1p(adata)
 
-    # prefilter_cells(dataset.data) # this operation will change the data shape
-    prefilter_specialgenes(dataset.data)
-    normalize(dataset.data)
-    log1p(dataset.data)
+    data = Data(adata, train_size="all")
+
+    # Construct cell feature and spot graphs
+    SpaGCNGraph(alpha=args.alpha, beta=args.beta, log_level="INFO")(data)
+    SpaGCNGraph2D(log_level="INFO")(data)
+    CellPCA(n_components=50, log_level="INFO")(data)
+    data.set_config(feature_channel=["CellPCA", "SpaGCNGraph", "SpaGCNGraph2D"], channel_type=["obsm", "obsp", "obsp"],
+                    label_channel="label")
+    (x, adj, adj_2d), y = data.get_train_data()
 
     # model and pipeline
     model = SpaGCN()
 
-    p = args.p
-    l = 0.5
-    l = model.search_l(p, dataset.adj, start=args.start, end=args.end, tol=args.tol, max_run=args.max_run)
+    l = model.search_l(args.p, adj, start=args.start, end=args.end, tol=args.tol, max_run=args.max_run)
     model.set_l(l)
     n_clusters = args.n_clusters
-    res = model.search_set_res(dataset.data, dataset.adj, l=l, target_num=n_clusters, start=0.4, step=args.step,
-                               tol=args.tol, lr=args.lr, max_epochs=args.max_epochs, r_seed=args.r_seed,
-                               t_seed=args.t_seed, n_seed=args.n_seed, max_run=args.max_run)
-    model.fit(dataset.data, dataset.adj, init_spa=True, init="louvain", tol=args.tol, lr=args.lr,
-              max_epochs=args.max_epochs, res=res)
+    res = model.search_set_res(x, adj, l=l, target_num=n_clusters, start=0.4, step=args.step, tol=args.tol, lr=args.lr,
+                               max_epochs=args.max_epochs, r_seed=args.r_seed, t_seed=args.t_seed, n_seed=args.n_seed,
+                               max_run=args.max_run)
+    model.fit(x, adj, init_spa=True, init="louvain", tol=args.tol, lr=args.lr, max_epochs=args.max_epochs, res=res)
     predict = model.predict()
-    adj_2d = construct_graph(x=dataset.data.obs['x_pixel'], y=dataset.data.obs['y_pixel'], histology=False)
-    refined_pred = refine(sample_id=dataset.data.obs.index.tolist(), pred=predict[0].tolist(), dis=adj_2d,
-                          shape='hexagon')
-    print(model.score(dataset.data.obs['label'].values))
-    print(adjusted_mutual_info_score(dataset.data.obs['label'].values, refined_pred))
+
+    refined_pred = refine(sample_id=data.data.obs_names.tolist(), pred=predict[0].tolist(), dis=adj_2d, shape="hexagon")
+    print(model.score(y.ravel()))
+    print(adjusted_mutual_info_score(y.ravel(), refined_pred))
 """ To reproduce SpaGCN on other samples, please refer to command lines belows:
 
 human dorsolateral prefrontal cortex sample 151673:
