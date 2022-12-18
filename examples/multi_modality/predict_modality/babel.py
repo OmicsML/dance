@@ -68,11 +68,8 @@ if __name__ == '__main__':
     test_mod1 = torch.from_numpy(dataset.numpy_features(2)).float()
     test_mod2 = torch.from_numpy(dataset.numpy_features(3)).float()
 
-    sc_dual_train_dataset = PairedDataset(train_mod1, train_mod2)
-    sc_dual_valid_dataset = PairedDataset(valid_mod1, valid_mod2)
-
-    model = BabelWrapper(args, dataset)
-    model.fit(sc_dual_train_dataset, sc_dual_valid_dataset, args.max_epochs)
+    model = BabelWrapper(args, train_mod1.shape[1], train_mod2.shape[1])
+    model.fit(train_mod1, train_mod2, valid_mod1, valid_mod2, args.max_epochs)
     print(model.predict(test_mod1))
     print(model.score(test_mod1, test_mod2))
 """ To reproduce BABEL on other samples, please refer to command lines belows:

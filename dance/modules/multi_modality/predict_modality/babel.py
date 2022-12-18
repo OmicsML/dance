@@ -834,19 +834,22 @@ class BabelWrapper:
     Parameters
     ----------
     args : argparse.Namespace
-        A Namespace object that contains arguments of Babel. For details of parameters in parser args, please refer to link (parser help document).
-    dataset : dance.datasets.multimodality.ModalityPredictionDataset
-        Modality prediction dataset.
+        A Namespace object that contains arguments of Babel. For details of parameters in parser args, please refer to
+        link (parser help document).
+    dim_in : int
+        Input dimension.
+    dim_out: int
+        Output dimension.
 
     """
 
-    def __init__(self, args, dataset):
+    def __init__(self, args, dim_in, dim_out):
         self.args = args
         model_class = (NaiveSplicedAutoEncoder if args.naive else AssymSplicedAutoEncoder)
         self.model = model_class(
             hidden_dim=args.hidden,
-            input_dim1=dataset.modalities[0].shape[1],
-            input_dim2=[dataset.modalities[1].shape[1]],
+            input_dim1=dim_in,
+            input_dim2=[dim_out],
             final_activations1=nn.ReLU(),
             final_activations2=nn.ReLU(),
             flat_mode=True,
@@ -918,15 +921,19 @@ class BabelWrapper:
                 pred = self.model.decoder2(emb)[0]
             return pred
 
-    def fit(self, train_dual, valid_dual, max_epochs=500):
+    def fit(self, x_train, y_train, x_val, y_val, max_epochs=500, val_ratio=0.15):
         """fit function for training.
 
         Parameters
         ----------
-        train_dual : dance.utils.PairedDataset
-            Training dataset.
-        valid_dual : dance.utils.PairedDataset
-            Validation dataset.
+        x_train : torch.Tensor
+            Training input modality.
+        y_train : torch.Tensor
+            Training output modality.
+        x_val : torch.Tensor
+            Validation input modality.
+        y_val : torch.Tensor
+            Validation output modality.
         max_epochs : int optional
             Maximum number of training epochs, by default to be 500.
 
@@ -935,39 +942,21 @@ class BabelWrapper:
         None.
 
         """
-
-        #TODO: add callbacks
-        # callbacks = [
-        #                 skorch.callbacks.EarlyStopping(patience=self.args.earlystop),
-        #                 skorch.callbacks.GradientNormClipping(gradient_clip_value=5),
-        #             ],
-        # train_dual = sc_dual_train_dataset
-        # valid_dual = sc_dual_valid_dataset
         criterion = loss_functions.QuadLoss(loss1=loss_functions.RMSELoss, loss2=loss_functions.RMSELoss,
                                             loss2_weight=self.args.lossweight)
         device = self.args.device
 
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.args.lr)
-        train_loader = DataLoader(
-            dataset=train_dual,
-            batch_size=self.args.batchsize,
-            shuffle=True,
-            num_workers=1,
-        )
-        valid_loader = DataLoader(
-            dataset=valid_dual,
-            batch_size=len(valid_dual),
-            shuffle=False,
-            num_workers=1,
-        )
+        train_loader = DataLoader(torch.hstack((x_train, y_train)), batch_size=self.args.batchsize, shuffle=True)
+        val_loader = DataLoader(torch.hstack((x_val, y_val)), batch_size=self.args.batchsize)
 
         val = []
         for i in range(max_epochs):
             self.model.train()
             total_loss = 0
-            for idx, data in enumerate(train_loader):
-                logits = self.model(data[0].to(device))
-                loss = criterion(logits, data[1].to(device))
+            for train_batch in train_loader:
+                logits = self.model(train_batch.to(device))
+                loss = criterion(logits, train_batch.to(device))
                 total_loss += loss.item()
 
                 optimizer.zero_grad()
@@ -981,10 +970,10 @@ class BabelWrapper:
 
             with torch.no_grad():
                 loss = 0
-                for _, data in enumerate(valid_loader):
-                    logits = self.model(data[0].to(device))
-                    loss += mse(logits[1][0], data[1][:, -logits[1][0].shape[1]:].to(device)).item()
-            val.append(math.sqrt(loss / len(valid_loader)))
+                for val_batch in val_loader:
+                    logits = self.model(val_batch.to(device))
+                    loss += mse(logits[1][0], val_batch[:, -logits[1][0].shape[1]:].to(device)).item()
+            val.append(math.sqrt(loss / len(val_loader)))
             print('epoch: ', i + 1)
             print('training (sum of 4 losses):', total_loss / len(train_loader))
             print('validation (prediction loss):', val[-1])

@@ -1,4 +1,3 @@
-import math
 import os
 import random
 
@@ -19,32 +18,6 @@ class SimpleIndexDataset(Dataset):
     def __getitem__(self, index):
         x = self.data[index]
         return x
-
-
-class PairedDataset(Dataset):
-    """Combines two datasets into one, where input is now (x1, x2) and output is (y1,
-    y2).
-
-    A Paired dataset simply combines x and y by returning the x input and y input as a tuple, and the x output and y
-    output as a tuple, and does not "cross" between the datasets
-
-    """
-
-    # Inherits the init from SplicedDataset since we're doing the same thing - recording
-    # the two different datasets
-    def __init__(self, dataset_x, dataset_y):
-        self.dataset_x = dataset_x
-        self.dataset_y = dataset_y
-
-    def __len__(self):
-        return len(self.dataset_x)
-
-    def __getitem__(self, i):
-        x1 = self.dataset_x[i]
-        x2 = self.dataset_y[i]
-        x_pair = (x1, x2)
-        y_pair = (x1, x2)
-        return torch.cat(x_pair), torch.cat(y_pair)
 
 
 def set_seed(rndseed, cuda=True, extreme_mode=False):
