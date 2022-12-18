@@ -7,16 +7,11 @@ Reference
 Wu, Kevin E., Kathryn E. Yost, Howard Y. Chang, and James Zou. "BABEL enables cross-modality translation between multiomic profiles at single-cell resolution." Proceedings of the National Academy of Sciences 118, no. 15 (2021).
 
 """
-import functools
 import logging
 import math
-import os
-import sys
 from typing import Callable, List, Tuple, Union
 
 import numpy as np
-import skorch
-import skorch.utils
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -706,128 +701,6 @@ class AssymSplicedAutoEncoder(SplicedAutoEncoder):
         return (a, torch.split(b, self.input_dim2, dim=-1))
 
 
-class PairedAutoEncoderSkorchNet(skorch.NeuralNet):
-
-    def forward_iter(self, X, training=False, device="cpu"):
-        """Subclassed to work with tuples."""
-        dataset = self.get_dataset(X)
-        iterator = self.get_iterator(dataset, training=training)
-        for i, data in enumerate(iterator):
-            Xi = skorch.dataset.unpack_data(data)[0]
-            with torch.set_grad_enabled(training):
-                self.module_.train(training)
-                yp = self.infer(Xi)
-
-            if isinstance(yp, tuple):
-                yield recursive_to_device(yp)  # <- modification here
-            else:
-                yield yp.to(device)
-
-    def predict_proba(self, x):
-        """Subclassed so calling predict produces a tuple of outputs."""
-        y_probas1, y_probas2 = [], []
-        for yp in self.forward_iter(x, training=False):
-            assert isinstance(yp, tuple)
-            yp1 = yp[0][0]
-            yp2 = yp[1][0]
-            y_probas1.append(skorch.utils.to_numpy(yp1))
-            y_probas2.append(skorch.utils.to_numpy(yp2))
-        y_proba1 = np.concatenate(y_probas1, 0)
-        y_proba2 = np.concatenate(y_probas2, 0)
-        return y_proba1, y_proba2
-
-    def get_encoded_layer(self, x):
-        """Get the encoded representation as a TUPLE of two elements."""
-        encoded1, encoded2 = [], []
-        for out1, out2, *_other in self.forward_iter(x, training=False):
-            encoded1.append(out1[-1])
-            encoded2.append(out2[-1])
-        return np.concatenate(encoded1, axis=0), np.concatenate(encoded2, axis=0)
-
-    def translate_1_to_2(self, x):
-        enc1, enc2 = self.get_encoded_layer(x)
-        device = next(self.module_.parameters()).device
-        enc1_torch = torch.from_numpy(enc1).to(device)
-        return self.module_.translate_1_to_2(enc1_torch)[0].detach().cpu().numpy()
-
-    def translate_2_to_1(self, x):
-        enc1, enc2 = self.get_encoded_layer(x)
-        device = next(self.module_.parameters()).device
-        enc2_torch = torch.from_numpy(enc2).to(device)
-        return self.module_.translate_2_to_1(enc2_torch)[0].detach().cpu().numpy()
-
-
-class SplicedAutoEncoderSkorchNet(PairedAutoEncoderSkorchNet):
-    """Skorch wrapper for the SplicedAutoEncoder above.
-
-    Mostly here to take care of how we calculate loss
-
-    """
-
-    def predict_proba(self, x):
-        """Subclassed so that calling predict produces a tuple of 4 outputs."""
-        y_probas1, y_probas2, y_probas3, y_probas4 = [], [], [], []
-        for yp in self.forward_iter(x, training=False):
-            assert isinstance(yp, tuple)
-            yp1 = yp[0][0]
-            yp2 = yp[1][0]
-            yp3 = yp[2][0]
-            yp4 = yp[3][0]
-            y_probas1.append(skorch.utils.to_numpy(yp1))
-            y_probas2.append(skorch.utils.to_numpy(yp2))
-            y_probas3.append(skorch.utils.to_numpy(yp3))
-            y_probas4.append(skorch.utils.to_numpy(yp4))
-        y_proba1 = np.concatenate(y_probas1)
-        y_proba2 = np.concatenate(y_probas2)
-        y_proba3 = np.concatenate(y_probas3)
-        y_proba4 = np.concatenate(y_probas4)
-        # Order: 1to1, 1to2, 2to1, 2to2
-        return y_proba1, y_proba2, y_proba3, y_proba4
-
-    def get_encoded_layer(self, x):
-        """Get the encoded representation as a TUPLE of two elements."""
-        encoded1, encoded2 = [], []
-        for out11, out12, out21, out22 in self.forward_iter(x, training=False):
-            encoded1.append(out11[-1])
-            encoded2.append(out22[-1])
-        return np.concatenate(encoded1, axis=0), np.concatenate(encoded2, axis=0)
-
-    def translate_1_to_1(self, x) -> sparse.csr_matrix:
-        retval = [sparse.csr_matrix(skorch.utils.to_numpy(yp[0][0])) for yp in self.forward_iter(x, training=False)]
-        return sparse.vstack(retval)
-
-    def translate_1_to_2(self, x) -> sparse.csr_matrix:
-        retval = [sparse.csr_matrix(skorch.utils.to_numpy(yp[1][0])) for yp in self.forward_iter(x, training=False)]
-        return sparse.vstack(retval)
-
-    def translate_2_to_1(self, x) -> sparse.csr_matrix:
-        retval = [sparse.csr_matrix(skorch.utils.to_numpy(yp[2][0])) for yp in self.forward_iter(x, training=False)]
-        return sparse.vstack(retval)
-
-    def translate_2_to_2(self, x) -> sparse.csr_matrix:
-        retval = [sparse.csr_matrix(skorch.utils.to_numpy(yp[3][0])) for yp in self.forward_iter(x, training=False)]
-        return sparse.vstack(retval)
-
-    def score(self, true, pred):
-        return self.get_loss(pred, true)
-
-
-class PairedInvertibleAutoEncoderSkorchNet(PairedAutoEncoderSkorchNet):
-
-    def translate_1_to_2(self, x):
-        enc1, enc2 = self.get_encoded_layer(x)
-        device = next(self.module_.parameters()).device
-        enc1_torch = torch.from_numpy(enc1).to(device)
-        return self.module_.translate_1_to_2(enc1_torch)[0].detach().cpu().numpy()
-
-    def translate_2_to_1(self, x):
-        enc1, enc2 = self.get_encoded_layer(x)
-        device = next(self.module_.parameters()).device
-        enc2_torch = torch.from_numpy(enc2).to(device)
-        return self.module_.translate_2_to_1(enc2_torch)[0].detach().cpu().numpy()
-
-
-# BabelWrapper = SplicedAutoEncoderSkorchNet
 class BabelWrapper:
     """Babel class.
 
