@@ -209,9 +209,9 @@ class CellTypeDeconvoDatasetLite:
         self.data_id = data_id
         self.data_dir = osp.join(data_dir, data_id)
         self.data_url = cellDeconvo_dataset[data_id]
-        self.load_data()
+        self._load_data()
 
-    def load_data(self):
+    def _load_data(self):
         if not osp.exists(self.data_dir):
             download_unzip(self.data_url, self.data_dir)
 
@@ -227,6 +227,15 @@ class CellTypeDeconvoDatasetLite:
                 self.data[filename] = sc.read_h5ad(filepath).to_df()
             else:
                 warnings.warn(f"Unsupported file type {ext!r}. Use csv or h5ad file types.")
+
+    def load_data(self):
+        ref_count = self.data["ref_sc_count"]
+        ref_annot = self.data["ref_sc_annot"]
+        count_matrix = self.data["mix_count"]
+        cell_type_portion = self.data["true_p"]
+        if (spatial := self.data.get("spatial_location")) is None:
+            spatial = pd.DataFrame(0, index=count_matrix.index, columns=["x", "y"])
+        return ref_count, ref_annot, count_matrix, cell_type_portion, spatial
 
 
 class CARDSimulationRDataset:
