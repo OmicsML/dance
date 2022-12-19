@@ -339,6 +339,10 @@ class Card:
         prop_pred = optim_res["V"] / optim_res["V"].sum(axis=1, keepdims=True)
         return prop_pred
 
+    def fit_and_predict(self, x, spatial, max_iter=100, epsilon=1e-4):
+        self.fit(x, spatial, max_iter=max_iter, epsilon=epsilon)
+        return self.predict()
+
     @staticmethod
     def score(x, y):
         """Model performance score measured by mean square error.
