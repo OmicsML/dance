@@ -213,7 +213,7 @@ class BaseData(ABC):
             data = self.data
         elif not isinstance(self.data, MuData):
             raise AttributeError("`mod` option is only available when using multimodality data.")
-        elif mod not in self.mod:
+        elif mod not in self.data.mod:
             raise KeyError(f"Unknown modality {mod!r}, available options are {sorted(self.mod)}")
         else:
             data = self.data.mod[mod]

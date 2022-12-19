@@ -1,25 +1,18 @@
 import argparse
 import logging
-import math
 import os
 import random
 
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import scanpy as sc
-import scipy.spatial
-import skorch.helper
+import anndata
+import mudata
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
-import dance.utils.loss as loss_functions
+from dance.data import Data
 from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.babel import BabelWrapper
-from dance.utils import PairedDataset, set_seed
+from dance.utils import set_seed
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     OPTIMIZER_DICT = {
@@ -28,28 +21,18 @@ if __name__ == '__main__':
     }
     rndseed = random.randint(0, 2147483647)
     parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--subtask', default='openproblems_bmmc_cite_phase2_rna')
-    parser.add_argument('-device', '--device', default='cuda')
-    parser.add_argument('-cpu', '--cpus', default=1, type=int)
-    parser.add_argument('-seed', '--rnd_seed', default=rndseed, type=int)
-    parser.add_argument('-m', '--model_folder', default='./models')
-    parser.add_argument("--outdir", "-o", default='./logs', help="Directory to output to")
-    parser.add_argument(
-        "--lossweight",
-        type=float,
-        default=1.,
-        help="Relative loss weight",
-    )
+    parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
+    parser.add_argument("-device", "--device", default="cuda")
+    parser.add_argument("-cpu", "--cpus", default=1, type=int)
+    parser.add_argument("-seed", "--rnd_seed", default=rndseed, type=int)
+    parser.add_argument("-m", "--model_folder", default="./models")
+    parser.add_argument("--outdir", "-o", default="./logs", help="Directory to output to")
+    parser.add_argument("--lossweight", type=float, default=1., help="Relative loss weight")
     parser.add_argument("--lr", "-l", type=float, default=0.01, help="Learning rate")
     parser.add_argument("--batchsize", "-b", type=int, default=64, help="Batch size")
     parser.add_argument("--hidden", type=int, default=64, help="Hidden dimensions")
     parser.add_argument("--earlystop", type=int, default=20, help="Early stopping after N epochs")
-    parser.add_argument(
-        "--naive",
-        "-n",
-        action="store_true",
-        help="Use a naive model instead of lego model",
-    )
+    parser.add_argument("--naive", "-n", action="store_true", help="Use a naive model instead of lego model")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--max_epochs", type=int, default=500)
     args = parser.parse_args()
@@ -58,7 +41,7 @@ if __name__ == '__main__':
     torch.set_num_threads(args.cpus)
     rndseed = args.rnd_seed
     set_seed(rndseed)
-    dataset = ModalityPredictionDataset(args.subtask).load_data().preprocess('feature_selection')
+    dataset = ModalityPredictionDataset(args.subtask).load_data().preprocess("feature_selection")
     device = args.device
     os.makedirs(args.model_folder, exist_ok=True)
     os.makedirs(args.outdir, exist_ok=True)
@@ -77,23 +60,26 @@ if __name__ == '__main__':
     for arg in vars(args):
         logging.info(f"Parameter {arg}: {getattr(args, arg)}")
 
-    idx = np.random.permutation(dataset.modalities[0].shape[0])
-    train_idx = idx[:int(idx.shape[0] * 0.85)]
-    val_idx = idx[int(idx.shape[0] * 0.85):]
-    train_mod1 = torch.from_numpy(dataset.numpy_features(0)[train_idx]).float()
-    train_mod2 = torch.from_numpy(dataset.numpy_features(1)[train_idx]).float()
-    valid_mod1 = torch.from_numpy(dataset.numpy_features(0)[val_idx]).float()
-    valid_mod2 = torch.from_numpy(dataset.numpy_features(1)[val_idx]).float()
-    test_mod1 = torch.from_numpy(dataset.numpy_features(2)).float()
-    test_mod2 = torch.from_numpy(dataset.numpy_features(3)).float()
+    # Construct data object
+    mod1 = anndata.concat((dataset.modalities[0], dataset.modalities[2]))
+    mod2 = anndata.concat((dataset.modalities[1], dataset.modalities[3]))
+    mod1.var_names_make_unique()
+    mod2.var_names_make_unique()
+    mdata = mudata.MuData({"mod1": mod1, "mod2": mod2})
+    mdata.var_names_make_unique()
+    train_size = dataset.modalities[0].shape[0]
+    data = Data(mdata, train_size=train_size)
+    data.set_config(feature_mod="mod1", label_mod="mod2")
 
-    sc_dual_train_dataset = PairedDataset(train_mod1, train_mod2)
-    sc_dual_valid_dataset = PairedDataset(valid_mod1, valid_mod2)
+    # Obtain training and testing data
+    x_train, y_train = data.get_train_data(return_type="torch")
+    x_test, y_test = data.get_test_data(return_type="torch")
 
-    model = BabelWrapper(args, dataset)
-    model.fit(sc_dual_train_dataset, sc_dual_valid_dataset, args.max_epochs)
-    print(model.predict(test_mod1))
-    print(model.score(test_mod1, test_mod2))
+    # Train and evaluate the model
+    model = BabelWrapper(args, dim_in=x_train.shape[1], dim_out=y_train.shape[1])
+    model.fit(x_train, y_train, val_ratio=0.15)
+    print(model.predict(x_test))
+    print(model.score(x_test, y_test))
 """ To reproduce BABEL on other samples, please refer to command lines belows:
 GEX to ADT:
 python babel.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda

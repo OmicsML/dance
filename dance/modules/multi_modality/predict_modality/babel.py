@@ -4,23 +4,17 @@ Extended from https://github.com/wukevin/babel
 
 Reference
 ---------
-Wu, Kevin E., Kathryn E. Yost, Howard Y. Chang, and James Zou. "BABEL enables cross-modality translation between multiomic profiles at single-cell resolution." Proceedings of the National Academy of Sciences 118, no. 15 (2021).
+Wu, Kevin E., Kathryn E. Yost, Howard Y. Chang, and James Zou. "BABEL enables cross-modality translation between
+multiomic profiles at single-cell resolution." Proceedings of the National Academy of Sciences 118, no. 15 (2021).
 
 """
-import functools
 import logging
 import math
-import os
-import sys
 from typing import Callable, List, Tuple, Union
 
-import numpy as np
-import skorch
-import skorch.utils
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from scipy import sparse
 from torch.utils.data import DataLoader
 
 import dance.utils.loss as loss_functions
@@ -706,147 +700,28 @@ class AssymSplicedAutoEncoder(SplicedAutoEncoder):
         return (a, torch.split(b, self.input_dim2, dim=-1))
 
 
-class PairedAutoEncoderSkorchNet(skorch.NeuralNet):
-
-    def forward_iter(self, X, training=False, device="cpu"):
-        """Subclassed to work with tuples."""
-        dataset = self.get_dataset(X)
-        iterator = self.get_iterator(dataset, training=training)
-        for i, data in enumerate(iterator):
-            Xi = skorch.dataset.unpack_data(data)[0]
-            with torch.set_grad_enabled(training):
-                self.module_.train(training)
-                yp = self.infer(Xi)
-
-            if isinstance(yp, tuple):
-                yield recursive_to_device(yp)  # <- modification here
-            else:
-                yield yp.to(device)
-
-    def predict_proba(self, x):
-        """Subclassed so calling predict produces a tuple of outputs."""
-        y_probas1, y_probas2 = [], []
-        for yp in self.forward_iter(x, training=False):
-            assert isinstance(yp, tuple)
-            yp1 = yp[0][0]
-            yp2 = yp[1][0]
-            y_probas1.append(skorch.utils.to_numpy(yp1))
-            y_probas2.append(skorch.utils.to_numpy(yp2))
-        y_proba1 = np.concatenate(y_probas1, 0)
-        y_proba2 = np.concatenate(y_probas2, 0)
-        return y_proba1, y_proba2
-
-    def get_encoded_layer(self, x):
-        """Get the encoded representation as a TUPLE of two elements."""
-        encoded1, encoded2 = [], []
-        for out1, out2, *_other in self.forward_iter(x, training=False):
-            encoded1.append(out1[-1])
-            encoded2.append(out2[-1])
-        return np.concatenate(encoded1, axis=0), np.concatenate(encoded2, axis=0)
-
-    def translate_1_to_2(self, x):
-        enc1, enc2 = self.get_encoded_layer(x)
-        device = next(self.module_.parameters()).device
-        enc1_torch = torch.from_numpy(enc1).to(device)
-        return self.module_.translate_1_to_2(enc1_torch)[0].detach().cpu().numpy()
-
-    def translate_2_to_1(self, x):
-        enc1, enc2 = self.get_encoded_layer(x)
-        device = next(self.module_.parameters()).device
-        enc2_torch = torch.from_numpy(enc2).to(device)
-        return self.module_.translate_2_to_1(enc2_torch)[0].detach().cpu().numpy()
-
-
-class SplicedAutoEncoderSkorchNet(PairedAutoEncoderSkorchNet):
-    """Skorch wrapper for the SplicedAutoEncoder above.
-
-    Mostly here to take care of how we calculate loss
-
-    """
-
-    def predict_proba(self, x):
-        """Subclassed so that calling predict produces a tuple of 4 outputs."""
-        y_probas1, y_probas2, y_probas3, y_probas4 = [], [], [], []
-        for yp in self.forward_iter(x, training=False):
-            assert isinstance(yp, tuple)
-            yp1 = yp[0][0]
-            yp2 = yp[1][0]
-            yp3 = yp[2][0]
-            yp4 = yp[3][0]
-            y_probas1.append(skorch.utils.to_numpy(yp1))
-            y_probas2.append(skorch.utils.to_numpy(yp2))
-            y_probas3.append(skorch.utils.to_numpy(yp3))
-            y_probas4.append(skorch.utils.to_numpy(yp4))
-        y_proba1 = np.concatenate(y_probas1)
-        y_proba2 = np.concatenate(y_probas2)
-        y_proba3 = np.concatenate(y_probas3)
-        y_proba4 = np.concatenate(y_probas4)
-        # Order: 1to1, 1to2, 2to1, 2to2
-        return y_proba1, y_proba2, y_proba3, y_proba4
-
-    def get_encoded_layer(self, x):
-        """Get the encoded representation as a TUPLE of two elements."""
-        encoded1, encoded2 = [], []
-        for out11, out12, out21, out22 in self.forward_iter(x, training=False):
-            encoded1.append(out11[-1])
-            encoded2.append(out22[-1])
-        return np.concatenate(encoded1, axis=0), np.concatenate(encoded2, axis=0)
-
-    def translate_1_to_1(self, x) -> sparse.csr_matrix:
-        retval = [sparse.csr_matrix(skorch.utils.to_numpy(yp[0][0])) for yp in self.forward_iter(x, training=False)]
-        return sparse.vstack(retval)
-
-    def translate_1_to_2(self, x) -> sparse.csr_matrix:
-        retval = [sparse.csr_matrix(skorch.utils.to_numpy(yp[1][0])) for yp in self.forward_iter(x, training=False)]
-        return sparse.vstack(retval)
-
-    def translate_2_to_1(self, x) -> sparse.csr_matrix:
-        retval = [sparse.csr_matrix(skorch.utils.to_numpy(yp[2][0])) for yp in self.forward_iter(x, training=False)]
-        return sparse.vstack(retval)
-
-    def translate_2_to_2(self, x) -> sparse.csr_matrix:
-        retval = [sparse.csr_matrix(skorch.utils.to_numpy(yp[3][0])) for yp in self.forward_iter(x, training=False)]
-        return sparse.vstack(retval)
-
-    def score(self, true, pred):
-        return self.get_loss(pred, true)
-
-
-class PairedInvertibleAutoEncoderSkorchNet(PairedAutoEncoderSkorchNet):
-
-    def translate_1_to_2(self, x):
-        enc1, enc2 = self.get_encoded_layer(x)
-        device = next(self.module_.parameters()).device
-        enc1_torch = torch.from_numpy(enc1).to(device)
-        return self.module_.translate_1_to_2(enc1_torch)[0].detach().cpu().numpy()
-
-    def translate_2_to_1(self, x):
-        enc1, enc2 = self.get_encoded_layer(x)
-        device = next(self.module_.parameters()).device
-        enc2_torch = torch.from_numpy(enc2).to(device)
-        return self.module_.translate_2_to_1(enc2_torch)[0].detach().cpu().numpy()
-
-
-# BabelWrapper = SplicedAutoEncoderSkorchNet
 class BabelWrapper:
     """Babel class.
 
     Parameters
     ----------
     args : argparse.Namespace
-        A Namespace object that contains arguments of Babel. For details of parameters in parser args, please refer to link (parser help document).
-    dataset : dance.datasets.multimodality.ModalityPredictionDataset
-        Modality prediction dataset.
+        A Namespace object that contains arguments of Babel. For details of parameters in parser args, please refer to
+        link (parser help document).
+    dim_in : int
+        Input dimension.
+    dim_out: int
+        Output dimension.
 
     """
 
-    def __init__(self, args, dataset):
+    def __init__(self, args, dim_in, dim_out):
         self.args = args
         model_class = (NaiveSplicedAutoEncoder if args.naive else AssymSplicedAutoEncoder)
         self.model = model_class(
             hidden_dim=args.hidden,
-            input_dim1=dataset.modalities[0].shape[1],
-            input_dim2=[dataset.modalities[1].shape[1]],
+            input_dim1=dim_in,
+            input_dim2=[dim_out],
             final_activations1=nn.ReLU(),
             final_activations2=nn.ReLU(),
             flat_mode=True,
@@ -918,56 +793,43 @@ class BabelWrapper:
                 pred = self.model.decoder2(emb)[0]
             return pred
 
-    def fit(self, train_dual, valid_dual, max_epochs=500):
+    def fit(self, x_train, y_train, max_epochs=500, val_ratio=0.15):
         """fit function for training.
 
         Parameters
         ----------
-        train_dual : dance.utils.PairedDataset
-            Training dataset.
-        valid_dual : dance.utils.PairedDataset
-            Validation dataset.
+        x_train : torch.Tensor
+            Training input modality.
+        y_train : torch.Tensor
+            Training output modality.
         max_epochs : int optional
             Maximum number of training epochs, by default to be 500.
-
-        Returns
-        -------
-        None.
+        val_ratio : int
+            Validation ratio.
 
         """
-
-        #TODO: add callbacks
-        # callbacks = [
-        #                 skorch.callbacks.EarlyStopping(patience=self.args.earlystop),
-        #                 skorch.callbacks.GradientNormClipping(gradient_clip_value=5),
-        #             ],
-        # train_dual = sc_dual_train_dataset
-        # valid_dual = sc_dual_valid_dataset
         criterion = loss_functions.QuadLoss(loss1=loss_functions.RMSELoss, loss2=loss_functions.RMSELoss,
                                             loss2_weight=self.args.lossweight)
         device = self.args.device
 
+        total_size = x_train.shape[0]
+        val_size = int(total_size * val_ratio)
+        rand_idx = torch.randperm(total_size)
+        train_idx = rand_idx[:-val_size]
+        val_idx = rand_idx[-val_size:]
+
+        train_loader = DataLoader(torch.hstack((x_train[train_idx], y_train[train_idx])), shuffle=True,
+                                  batch_size=self.args.batchsize)
+        val_loader = DataLoader(torch.hstack((x_train[val_idx], y_train[val_idx])), batch_size=self.args.batchsize)
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.args.lr)
-        train_loader = DataLoader(
-            dataset=train_dual,
-            batch_size=self.args.batchsize,
-            shuffle=True,
-            num_workers=1,
-        )
-        valid_loader = DataLoader(
-            dataset=valid_dual,
-            batch_size=len(valid_dual),
-            shuffle=False,
-            num_workers=1,
-        )
 
         val = []
         for i in range(max_epochs):
             self.model.train()
             total_loss = 0
-            for idx, data in enumerate(train_loader):
-                logits = self.model(data[0].to(device))
-                loss = criterion(logits, data[1].to(device))
+            for train_batch in train_loader:
+                logits = self.model(train_batch.to(device))
+                loss = criterion(logits, train_batch.to(device))
                 total_loss += loss.item()
 
                 optimizer.zero_grad()
@@ -981,10 +843,10 @@ class BabelWrapper:
 
             with torch.no_grad():
                 loss = 0
-                for _, data in enumerate(valid_loader):
-                    logits = self.model(data[0].to(device))
-                    loss += mse(logits[1][0], data[1][:, -logits[1][0].shape[1]:].to(device)).item()
-            val.append(math.sqrt(loss / len(valid_loader)))
+                for val_batch in val_loader:
+                    logits = self.model(val_batch.to(device))
+                    loss += mse(logits[1][0], val_batch[:, -logits[1][0].shape[1]:].to(device)).item()
+            val.append(math.sqrt(loss / len(val_loader)))
             print('epoch: ', i + 1)
             print('training (sum of 4 losses):', total_loss / len(train_loader))
             print('validation (prediction loss):', val[-1])
