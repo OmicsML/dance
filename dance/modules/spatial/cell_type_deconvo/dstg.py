@@ -31,17 +31,13 @@ class GraphConvolution(nn.Module):
         Parameters
         ----------
         in_features : int
-            input dimension.
+            Input dimension.
         out_features : int
-            output dimension.
+            Output dimension.
         support :
-            support for graph convolution.
+            Support for graph convolution.
         bias : boolean optional
-            include bias term, default False.
-
-        Returns
-        -------
-        None.
+            Include bias term, default False.
 
         """
         super().__init__()
@@ -65,19 +61,19 @@ class GraphConvolution(nn.Module):
             self.bias.data.uniform_(-stdv, stdv)
 
     def forward(self, input, adj):
-        """forward function.
+        """Forward function.
 
         Parameters
         ----------
-        input :
-            node features.
-        adj :
-            adjacency matrix.
+        input
+            Node features.
+        adj
+            Adjacency matrix.
 
         Returns
         -------
         output : float
-            output of graph convolution layer.
+            Output of graph convolution layer.
 
         """
         # Convolution
@@ -114,15 +110,15 @@ class GCN(nn.Module):
 
         Parameters
         ----------
-        x :
-            node features.
-        adj :
-            adjacency matrix.
+        x
+            Node features.
+        adj
+            Adjacency matrix.
 
         Returns
         -------
         output : float
-            output of graph convolution network.
+            Output of graph convolution network.
 
         """
         # Dropout + convolution
@@ -141,21 +137,17 @@ class DSTGLearner:
     Parameters
     ----------
     nfeat : int
-        input dimension.
+        Input dimension.
     nhid1 : int
-        number of units in the hidden layer (graph convolution).
+        Number of units in the hidden layer (graph convolution).
     nout : int
-        output dimension.
+        Output dimension.
     bias : boolean optional
-        include bias term, default False.
+        Include bias term, default False.
     dropout : float optional
-        dropout rate, default 0.
+        Dropout rate, default 0.
     act : optional
-        activation function, default torch functional relu.
-
-    Returns
-    -------
-    None.
+        Activation function, default torch functional relu.
 
     """
 
@@ -199,20 +191,16 @@ class DSTGLearner:
         self.model = GCN(nfeat, nhid, nout, bias, dropout).to(device)
 
     def fit(self, lr=0.005, max_epochs=50, weight_decay=0):
-        """fit function for model training.
+        """Fit function for model training.
 
         Parameters
         ----------
         lr : float optional
-            learning rate.
+            Learning rate.
         max_epochs : int optional
-            maximum number of epochs to train.
+            Maximum number of epochs to train.
         weight_decay : float optional
-            weight decay parameter for optimization (Adam).
-
-        Returns
-        -------
-        None.
+            Weight decay parameter for optimization (Adam).
 
         """
         X = self.features  # node features
@@ -239,15 +227,12 @@ class DSTGLearner:
             optimizer.step()
 
     def predict(self):
-        """prediction function.
-        Parameters
-        ----------
+        """Prediction function.
 
         Returns
         -------
-
         pred : torch tensor
-            predictions of cell-type proportions.
+            Predictions of cell-type proportions.
 
         """
         self.model.eval()
@@ -262,17 +247,17 @@ class DSTGLearner:
 
         Parameters
         ----------
-        pred :
-            predicted cell-type proportions.
-        true_prop :
-            true cell-type proportions.
-        score_metric :
-            metric used to assess prediction performance.
+        pred
+            Predicted cell-type proportions.
+        true_prop
+            True cell-type proportions.
+        score_metric
+            Metric used to assess prediction performance.
 
         Returns
         -------
         loss : float
-            loss between predicted and true labels.
+            Loss between predicted and true labels.
 
         """
         true_prop = true_prop.to(self.device)
@@ -286,10 +271,11 @@ class DSTGLearner:
 
 
 def dropout_layer(x, dropout):
-    """dropout_layer.
+    """Dropout layer.
+
     Parameters
     ----------
-    x:
+    x
         input to dropout layer.
     dropout : float
         dropout rate (between 0 and 1).
@@ -298,6 +284,7 @@ def dropout_layer(x, dropout):
     -------
     out : torch tensor
         dropout output.
+
     """
     if x.is_sparse:  # sparse input features
         out = sparse_dropout(x, dropout)
@@ -308,18 +295,15 @@ def dropout_layer(x, dropout):
 
 
 def sparse_dropout(x, dropout):
-    """sparse_dropout.
+    """Sparse dropout.
+
     Parameters
     ----------
-    x:
-        input to dropout layer.
+    x
+        Input to dropout layer.
     dropout : float
-        dropout rate (between 0 and 1).
+        Dropout rate (between 0 and 1).
 
-    Returns
-    -------
-    out * (1. / (1-dropout)) : torch tensor
-        dropout output.
     """
 
     noise_shape = x._nnz()
@@ -335,24 +319,23 @@ def sparse_dropout(x, dropout):
     return out * (1. / (1 - dropout))
 
 
-"""Softmax cross-entropy loss with masking."""
-
-
 def masked_softmax_cross_entropy(preds, labels, mask):
-    """masked_softmax_cross_entropy.
+    """Softmax cross-entropy loss with masking.
+
     Parameters
     ----------
     preds:
-        cell-type proportion predictions from dstg model.
+        Cell-type proportion predictions from dstg model.
     labels :
-        true cell-type proportion labels.
+        True cell-type proportion labels.
     mask :
-        mask to indicate which samples to use in computing loss.
+        Mask to indicate which samples to use in computing loss.
 
     Returns
     -------
     loss : float
-        cross entropy loss between true and predicted cell-type proportions (mean reduced).
+        Cross entropy loss between true and predicted cell-type proportions (mean reduced).
+
     """
     if (mask is None):
         loss = F.cross_entropy(preds, labels, reduction="mean")
