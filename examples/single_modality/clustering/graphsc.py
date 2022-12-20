@@ -6,42 +6,34 @@ import dgl
 import numpy as np
 import torch
 
+from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.graphsc import *
-from dance.transforms.graph_construct import make_graph
+from dance.transforms.graph_construct import cell_gene_graph
 from dance.transforms.preprocess import filter_data
+from dance.utils import set_seed
 
 
 def pipeline(**args):
-    data = ClusteringDataset(args['data_dir'], args['dataset']).load_data()
-    X = data.X
-    Y = data.Y
+    adata, labels = ClusteringDataset(args['data_dir'], args['dataset']).load_data()
+    adata.obsm["labels"] = labels
+    data = Data(adata, train_size="all")
+
+    filter_data(data, highly_genes=args['nb_genes'])
+    cell_gene_graph(data, dense_dim=args['in_feats'], node_features=args['node_features'],
+                    normalize_weights=args['normalize_weights'], same_edge_values=args['same_edge_values'],
+                    edge_norm=args['edge_norm'])
+    data.set_config(feature_channel="graph", feature_channel_type="uns", label_channel="labels")
+    graph, Y = data.get_train_data()
     n_clusters = len(np.unique(Y))
-
-    genes_idx, cells_idx = filter_data(X, highly_genes=args['nb_genes'])
-    X = X[cells_idx][:, genes_idx]
-    Y = Y[cells_idx]
-
-    t0 = time.time()
-    graph = make_graph(X, Y, dense_dim=args['in_feats'], node_features=args['node_features'],
-                       normalize_weights=args['normalize_weights'], same_edge_values=args['same_edge_values'],
-                       edge_norm=args['edge_norm'])
-
     labels = graph.ndata["label"]
     train_ids = np.where(labels != -1)[0]
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(args['n_layers'])
     dataloader = dgl.dataloading.NodeDataLoader(graph, train_ids, sampler, batch_size=args['batch_size'], shuffle=True,
                                                 drop_last=False, num_workers=args['num_workers'])
 
-    t1 = time.time()
-
     for run in range(args['num_run']):
-        t_start = time.time()
-        torch.manual_seed(run)
-        torch.cuda.manual_seed_all(run)
-        np.random.seed(run)
-        random.seed(run)
-
+        set_seed(run)
         model = GraphSC(Namespace(**args))
         model.fit(args['epochs'], dataloader, n_clusters, args['learning_rate'], cluster=["KMeans", "Leiden"])
         pred = model.predict(n_clusters, cluster=["KMeans", "Leiden"])

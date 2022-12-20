@@ -2039,38 +2039,15 @@ def selectTopGenes(Loadings, dims, DimGenes, maxGenes):
     return (selgene)
 
 
-def filter_data(X, highly_genes=500):
-    """Remove less variable genes.
-
-    Parameters
-    ----------
-    X :
-        cell-gene data.
-    highly_genes : int optional
-        number of chosen genes.
-
-    Returns
-    -------
-    genes_idx :
-        index of chosen genes
-    cells_idx :
-        index of chosen cells
-
-    """
-
-    X = np.ceil(X).astype(int)
-    adata = sc.AnnData(X, dtype=np.float32)
-
+def filter_data(data, highly_genes=500):
+    adata = data.data.copy()
     sc.pp.filter_genes(adata, min_counts=3)
     sc.pp.filter_cells(adata, min_counts=1)
     sc.pp.normalize_per_cell(adata)
     sc.pp.log1p(adata)
     sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=4, flavor='cell_ranger', min_disp=0.5,
                                 n_top_genes=highly_genes, subset=True)
-    genes_idx = np.array(adata.var_names.tolist()).astype(int)
-    cells_idx = np.array(adata.obs_names.tolist()).astype(int)
-
-    return genes_idx, cells_idx
+    data._data = data.data[adata.obs_names, adata.var_names]
 
 
 def generate_random_pair(y, label_cell_indx, num, error_rate=0):
@@ -2121,9 +2098,8 @@ def generate_random_pair(y, label_cell_indx, num, error_rate=0):
     return ml_ind1, ml_ind2, cl_ind1, cl_ind2, error_num
 
 
-def geneSelection(data, threshold=0, atleast=10, yoffset=.02, xoffset=5, decay=1.5, n=None, plot=True, markers=None,
-                  genes=None, figsize=(6, 3.5), markeroffsets=None, labelsize=10, alpha=1, verbose=1):
-    if sparse.issparse(data):
+def geneSelection(data, threshold=0, atleast=10, yoffset=.02, xoffset=5, decay=1.5, n=None, verbose=1):
+    if sp.issparse(data):
         zeroRate = 1 - np.squeeze(np.array((data > threshold).mean(axis=0)))
         A = data.multiply(data > threshold)
         A.data = np.log2(A.data)
@@ -2164,50 +2140,6 @@ def geneSelection(data, threshold=0, atleast=10, yoffset=.02, xoffset=5, decay=1
         nonan = ~np.isnan(zeroRate)
         selected = np.zeros_like(zeroRate).astype(bool)
         selected[nonan] = zeroRate[nonan] > np.exp(-decay * (meanExpr[nonan] - xoffset)) + yoffset
-
-    if plot:
-        if figsize is not None:
-            plt.figure(figsize=figsize)
-        plt.ylim([0, 1])
-        if threshold > 0:
-            plt.xlim([np.log2(threshold), np.ceil(np.nanmax(meanExpr))])
-        else:
-            plt.xlim([0, np.ceil(np.nanmax(meanExpr))])
-        x = np.arange(plt.xlim()[0], plt.xlim()[1] + .1, .1)
-        y = np.exp(-decay * (x - xoffset)) + yoffset
-        if decay == 1:
-            plt.text(.4, 0.2, '{} genes selected\ny = exp(-x+{:.2f})+{:.2f}'.format(np.sum(selected), xoffset, yoffset),
-                     color='k', fontsize=labelsize, transform=plt.gca().transAxes)
-        else:
-            plt.text(
-                .4, 0.2,
-                '{} genes selected\ny = exp(-{:.1f}*(x-{:.2f}))+{:.2f}'.format(np.sum(selected), decay, xoffset,
-                                                                               yoffset), color='k', fontsize=labelsize,
-                transform=plt.gca().transAxes)
-
-        plt.plot(x, y, color=sns.color_palette()[1], linewidth=2)
-        xy = np.concatenate((np.concatenate((x[:, None], y[:, None]), axis=1), np.array([[plt.xlim()[1], 1]])))
-        t = plt.matplotlib.patches.Polygon(xy, color=sns.color_palette()[1], alpha=.4)
-        plt.gca().add_patch(t)
-
-        plt.scatter(meanExpr, zeroRate, s=1, alpha=alpha, rasterized=True)
-        if threshold == 0:
-            plt.xlabel('Mean log2 nonzero expression')
-            plt.ylabel('Frequency of zero expression')
-        else:
-            plt.xlabel('Mean log2 nonzero expression')
-            plt.ylabel('Frequency of near-zero expression')
-        plt.tight_layout()
-
-        if markers is not None and genes is not None:
-            if markeroffsets is None:
-                markeroffsets = [(0, 0) for g in markers]
-            for num, g in enumerate(markers):
-                i = np.where(genes == g)[0]
-                plt.scatter(meanExpr[i], zeroRate[i], s=10, color='k')
-                dx, dy = markeroffsets[num]
-                plt.text(meanExpr[i] + dx + .1, zeroRate[i] + dy, g, color='k', fontsize=labelsize)
-
     return selected
 
 
@@ -2229,29 +2161,27 @@ def load_graph(path, data):
     return adj
 
 
-def normalize_adata(adata, filter_min_counts=True, size_factors=True, normalize_input=True, logtrans_input=True):
+def normalize_adata(data, filter_min_counts=True, size_factors=True, normalize_input=True, logtrans_input=True):
     if filter_min_counts:
-        sc.pp.filter_genes(adata, min_counts=1)
-        sc.pp.filter_cells(adata, min_counts=1)
+        sc.pp.filter_genes(data.data, min_counts=1)
+        sc.pp.filter_cells(data.data, min_counts=1)
 
     if size_factors or normalize_input or logtrans_input:
-        adata.raw = adata.copy()
+        data.data.raw = data.data.copy()
     else:
-        adata.raw = adata
+        data.data.raw = data.data
 
     if size_factors:
-        sc.pp.normalize_per_cell(adata)
-        adata.obs['size_factors'] = adata.obs.n_counts / np.median(adata.obs.n_counts)
+        sc.pp.normalize_per_cell(data.data)
+        data.data.obs['size_factors'] = data.data.obs.n_counts / np.median(data.data.obs.n_counts)
     else:
-        adata.obs['size_factors'] = 1.0
+        data.data.obs['size_factors'] = 1.0
 
     if logtrans_input:
-        sc.pp.log1p(adata)
+        sc.pp.log1p(data.data)
 
     if normalize_input:
-        sc.pp.scale(adata)
-
-    return adata
+        sc.pp.scale(data.data)
 
 
 def row_normalize(mx):

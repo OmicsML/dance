@@ -6,15 +6,14 @@ import numpy as np
 import scanpy as sc
 import torch
 
+from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdeepcluster import ScDeepCluster
 from dance.transforms.preprocess import geneSelection, normalize_adata
+from dance.utils import set_seed
 
 # for repeatability
-random.seed(42)
-np.random.seed(42)
-torch.manual_seed(42)
-torch.cuda.manual_seed(42)
+set_seed(42)
 
 if __name__ == "__main__":
 
@@ -50,29 +49,22 @@ if __name__ == "__main__":
     args = parser.parse_args()
     args.ae_weight_file = f'scdeepcluster_{args.data_file}_{args.ae_weight_file}'
 
-    data = ClusteringDataset(args.data_dir, args.data_file).load_data()
-    x = data.X
-    y = data.Y
+    adata, labels = ClusteringDataset(args.data_dir, args.data_file).load_data()
+    adata.obsm["Group"] = labels
+    data = Data(adata, train_size="all")
+    data.set_config(label_channel="Group")
+
+    # preprocessing scRNA-seq counts matrix
+    normalize_adata(data, size_factors=True, normalize_input=True, logtrans_input=True)
+    adata = data.data
+    y = data.get_y("train")
+    input_size = adata.n_vars
+    y = adata.obsm['Group']
     n_clusters = len(np.unique(y))
 
-    if args.select_genes > 0:
-        importantGenes = geneSelection(x, n=args.select_genes, plot=False)
-        x = x[:, importantGenes]
-
-    # preprocessing scRNA-seq read counts matrix
-    adata = sc.AnnData(x, dtype=np.float32)
-    adata.obs['Group'] = y
-    adata = adata.copy()
-    adata.obs['DCA_split'] = 'train'
-    adata.obs['DCA_split'] = adata.obs['DCA_split'].astype('category')
-
-    adata = normalize_adata(adata, size_factors=True, normalize_input=True, logtrans_input=True)
-
-    input_size = adata.n_vars
-
+    # model pretraining
     model = ScDeepCluster(input_dim=adata.n_vars, z_dim=32, encodeLayer=[256, 64], decodeLayer=[64, 256],
                           sigma=args.sigma, gamma=args.gamma, device=args.device)
-
     t0 = time()
     if args.ae_weights is None:
         model.pretrain_autoencoder(X=adata.X, X_raw=adata.raw.X, size_factor=adata.obs.size_factors,
@@ -86,12 +78,11 @@ if __name__ == "__main__":
         else:
             print("==> no checkpoint found at '{}'".format(args.ae_weights))
             raise ValueError
-
     print('Pretraining time: %d seconds.' % int(time() - t0))
 
+    # model training
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
-
     model.fit(X=adata.X, X_raw=adata.raw.X, size_factor=adata.obs.size_factors, n_clusters=n_clusters,
               init_centroid=None, y_pred_init=None, y=y, lr=args.lr, batch_size=args.batch_size,
               num_epochs=args.maxiter, update_interval=args.update_interval, tol=args.tol, save_dir=args.save_dir)

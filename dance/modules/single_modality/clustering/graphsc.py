@@ -42,7 +42,8 @@ class GraphSC:
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.model = GCNAE(args).to(get_device(args.use_cpu))
+        self.device = get_device(args.use_cpu)
+        self.model = GCNAE(args).to(self.device)
 
     def fit(self, n_epochs, dataloader, n_clusters, lr, cluster=["KMeans"]):
         """Train graph-sc.
@@ -88,7 +89,7 @@ class GraphSC:
                     y.extend(blocks[-1].dstdata["label"].cpu().numpy())
                 order.extend(blocks[-1].dstdata["order"].cpu().numpy())
 
-                adj = g.adjacency_matrix().to_dense()
+                adj = g.adjacency_matrix().to_dense().to(device)
                 adj = adj[g.dstnodes()]
                 pos_weight = torch.Tensor([float(adj.shape[0] * adj.shape[0] - adj.sum()) / adj.sum()])
                 factor = float((adj.shape[0] * adj.shape[0] - adj.sum()) * 2)

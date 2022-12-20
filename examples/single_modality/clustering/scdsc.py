@@ -7,9 +7,10 @@ import pandas as pd
 import scanpy as sc
 import scipy as sp
 
+from dance.data import Data
 from dance.datasets.singlemodality import *
 from dance.modules.single_modality.clustering.scdsc import *
-from dance.transforms.graph_construct import construct_graph_sc
+from dance.transforms.graph_construct import construct_graph_scdsc
 from dance.transforms.preprocess import filter_data, normalize_adata
 from dance.utils import set_seed
 
@@ -69,34 +70,24 @@ if __name__ == "__main__":
     ]
     args.graph_path = File[1]
     args.pretrain_path = File[3]
-
     if not os.path.exists("./graph/"):
         os.makedirs("./graph/")
-
     if not os.path.exists("./model/"):
         os.makedirs("./model/")
 
-    data = ClusteringDataset('./data', args.name).load_data()
-    X = data.X
-    Y = data.Y
-    genes_idx, cells_idx = filter_data(X, highly_genes=args.nb_genes)
-    X = X[cells_idx][:, genes_idx]
-    Y = Y[cells_idx]
+    adata, labels = ClusteringDataset('./data', args.name).load_data()
+    adata.obsm["Group"] = labels
+    data = Data(adata, train_size="all")
+    data.set_config(label_channel="Group")
 
-    adata = sc.AnnData(X, dtype=np.float32)
-    adata.obs['Group'] = Y
-    adata = adata.copy()
-    adata.obs['DCA_split'] = 'train'
-    adata.obs['DCA_split'] = adata.obs['DCA_split'].astype('category')
+    filter_data(data, highly_genes=args.nb_genes)
+    normalize_adata(data, size_factors=True, normalize_input=True, logtrans_input=True)
+    construct_graph_scdsc(File[1], data, args.method, args.topk)
+    X, Y = data.get_train_data()
+    adata = data.data
 
-    adata = normalize_adata(adata, size_factors=True, normalize_input=True, logtrans_input=True)
-    X = adata.X
-    Y = adata.obs['Group']
-    args.n_clusters = len(np.unique(Y))
-    construct_graph_sc(File[1], X, Y, args.method, args.topk)
-
-    model = SCDSCWrapper(Namespace(**vars(args)))
     # pretrain AE
+    model = SCDSCWrapper(Namespace(**vars(args)))
     if not os.path.exists(args.pretrain_path):
         print('Pretrain:')
         dataset_pre = PretrainDataset(X)
@@ -107,14 +98,12 @@ if __name__ == "__main__":
     dataset = TrainingDataset(X, Y)
     X_raw = adata.raw.X
     sf = adata.obs.size_factors
-
     model.fit(dataset, X_raw, sf, args.graph_path, lr=args.lr, n_epochs=args.n_epochs,
               bcl=args.binary_crossentropy_loss, cl=args.ce_loss, rl=args.re_loss, zl=args.zinb_loss)
     print("Running Time：%d seconds", get_time() - time_start)
 
     y_pred = model.predict()
     #    print(f'Prediction: {y_pred}')
-
     acc, nmi, ari = model.score(Y)
     print("ACC: {:.4f}, NMI: {:.4f}, ARI: {:.4f}".format(acc, nmi, ari))
 """Reproduction information

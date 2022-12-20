@@ -7,6 +7,7 @@ import pandas as pd
 import scanpy as sc
 import torch
 
+from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.sctag import SCTAG
 from dance.transforms.graph_construct import get_adj
@@ -50,28 +51,20 @@ if __name__ == "__main__":
 
     args.pretrain_file = "./sctag_" + args.data_file + "_pre.pkl"
     # Load data
-    data = ClusteringDataset(args.data_dir, args.data_file).load_data()
-    x = data.X
-    y = data.Y
+    adata, labels = ClusteringDataset(args.data_dir, args.data_file).load_data()
+    adata.obsm["Group"] = labels
+    data = Data(adata, train_size="all")
 
-    genes_idx, cells_idx = filter_data(x, highly_genes=args.highly_genes)
-    x = x[cells_idx][:, genes_idx]
-    y = y[cells_idx]
-    n_clusters = len(np.unique(y))
-
-    adata = sc.AnnData(x, dtype=np.float32)
-    adata.obs['Group'] = y
-    adata = adata.copy()
-    adata.obs['DCA_split'] = 'train'
-    adata.obs['DCA_split'] = adata.obs['DCA_split'].astype('category')
-
-    adata = normalize_adata(adata, size_factors=True, normalize_input=True, logtrans_input=True)
+    filter_data(data, highly_genes=args.highly_genes)
+    normalize_adata(data, size_factors=True, normalize_input=True, logtrans_input=True)
+    get_adj(data, k=args.k_neighbor, pca_dim=args.pca_dim)
+    data.set_config(feature_channel=["adj", "adj_n"], feature_channel_type=["obsp", "obsp"], label_channel="Group")
+    (adj, adj_n), y = data.get_train_data()
+    adata = data.data
     x = adata.X
     x_raw = adata.raw.X
-    y = adata.obs['Group']
     scale_factor = adata.obs.size_factors
-
-    adj, adj_n = get_adj(x, k=args.k_neighbor, pca_dim=args.pca_dim)
+    n_clusters = len(np.unique(y))
 
     # Build model & training
     model = SCTAG(x, adj=adj, adj_n=adj_n, n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim,

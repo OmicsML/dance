@@ -570,39 +570,10 @@ def construct_modality_prediction_graph(dataset, **kwargs):
         return g
 
 
-def make_graph(X, Y=None, threshold=0, dense_dim=100, gene_data={}, normalize_weights="log_per_cell", nb_edges=1,
-               node_features="scale", same_edge_values=False, edge_norm=True):
-    """Create DGL graph for graph-sc.
+def cell_gene_graph(data, threshold=0, dense_dim=100, gene_data={}, normalize_weights="log_per_cell", nb_edges=1,
+                    node_features="scale", same_edge_values=False, edge_norm=True):
 
-    Parameters
-    ----------
-    X :
-        input cell-gene features.
-    Y : list optional
-        true labels.
-    threshold : int optional
-        minimum value of selected feature.
-    dense_dim : int optional
-        dense dimension for PCA.
-    gene_data : dict optional
-        external gene data.
-    normalize_weights : str optional
-        weights normalization method.
-    nb_edges : float, optional
-        proportion of edges selected.
-    node_features : str optional
-        type of node features.
-    same_edge_values : bool optional
-        set identical edge value or not.
-    edge_norm : bool optional
-        perform edge normalization or not.
-
-    Returns
-    -------
-    graph :
-        constructed dgl graph.
-
-    """
+    X = data.get_x()
     num_genes = X.shape[1]
 
     graph = dgl.DGLGraph()
@@ -660,11 +631,7 @@ def make_graph(X, Y=None, threshold=0, dense_dim=100, gene_data={}, normalize_we
 
     graph.ndata['order'] = torch.tensor([-1] * num_genes + list(np.arange(len(X))),
                                         dtype=torch.long)  # [gene_num+train_num]
-    if Y is not None:
-        graph.ndata['label'] = torch.tensor([-1] * num_genes + list(np.array(Y).astype(int)),
-                                            dtype=torch.long)  # [gene_num+train_num]
-    else:
-        graph.ndata['label'] = torch.tensor([-1] * num_genes + [np.nan] * len(X))
+    graph.ndata['label'] = torch.tensor([-1] * num_genes + [np.nan] * len(X))
     nb_edges = graph.num_edges()
 
     if len(gene_data) != 0 and len(gene_data['gene1']) > 0:
@@ -681,7 +648,7 @@ def make_graph(X, Y=None, threshold=0, dense_dim=100, gene_data={}, normalize_we
 
     graph.add_edges(graph.nodes(), graph.nodes(),
                     {'weight': torch.ones(graph.number_of_nodes(), dtype=torch.float).unsqueeze(1)})
-    return graph
+    data.data.uns["graph"] = graph
 
 
 def external_data_connections(graph, gene_data, X, gene_idx, cell_idx):
@@ -752,26 +719,9 @@ def external_data_connections(graph, gene_data, X, gene_idx, cell_idx):
     return graph
 
 
-def get_adj(count, k=15, pca_dim=50, mode="connectivity"):
-    """Conctruct adjacency matrix for scTAG.
-
-    Parameters
-    ----------
-    count :
-        input cell-gene features.
-    k : int optional
-        number of neighbors for each sample in k-neighbors graph.
-    pca_dim : int optional
-        number of components in PCA.
-    mode : str optional
-        type of returned adjacency matrix.
-
-    Returns
-    -------
-    pred : list
-        prediction of leiden.
-
-    """
+def get_adj(data, k=15, pca_dim=50, mode="connectivity"):
+    """Conctruct adjacency matrix for scTAG."""
+    count = data.get_x()
     if pca_dim:
         countp = PCA(n_components=pca_dim).fit_transform(count)
     else:
@@ -780,8 +730,8 @@ def get_adj(count, k=15, pca_dim=50, mode="connectivity"):
     adj = A.toarray()
     normalized_D = degree_power(adj, -0.5)
     adj_n = normalized_D.dot(adj).dot(normalized_D)
-
-    return adj, adj_n
+    data.data.obsp["adj"] = adj
+    data.data.obsp["adj_n"] = adj_n
 
 
 def degree_power(A, k):
@@ -990,7 +940,7 @@ def stAdjConstruct(st_scale, st_label, adj_data, k_filter=1):
 ############################
 #          scDSC           #
 ############################
-def construct_graph_sc(fname, features, label, method, topk):
+def construct_graph_scdsc(fname, data, method, topk):
     """Graph construction function for scDSC.
 
     Parameters
@@ -1011,6 +961,7 @@ def construct_graph_sc(fname, features, label, method, topk):
     None.
 
     """
+    features, label = data.get_train_data()
     num = len(label)
     if topk == None:
         topk = 0
