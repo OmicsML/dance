@@ -208,6 +208,6 @@ class SpatialDecon:
         """
         true = torch.FloatTensor(true).to(self.device)
         pred = torch.FloatTensor(pred).to(self.device)
-        loss = ((pred - true)**2).mean()
+        loss = nn.MSELoss()(pred, true)
 
-        return loss.detach().item()
+        return loss.item()
