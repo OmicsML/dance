@@ -20,11 +20,11 @@ def pipeline(**args):
     adata = adata[:100, :]
     data = Data(adata, train_size=adata.n_obs)
     data.set_config(label_channel="labels")
-    
+
     filter_data(data, highly_genes=args['nb_genes'])
     cell_gene_graph(data, dense_dim=args['in_feats'], node_features=args['node_features'],
-        normalize_weights=args['normalize_weights'], same_edge_values=args['same_edge_values'],
-        edge_norm=args['edge_norm'])
+                    normalize_weights=args['normalize_weights'], same_edge_values=args['same_edge_values'],
+                    edge_norm=args['edge_norm'])
     data.set_config(feature_channel="graph", feature_channel_type="uns")
     graph, Y = data.get_train_data()
     n_clusters = len(np.unique(Y))

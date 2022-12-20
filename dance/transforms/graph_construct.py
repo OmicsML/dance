@@ -633,7 +633,7 @@ def construct_modality_prediction_graph(dataset, **kwargs):
 
 
 def cell_gene_graph(data, threshold=0, dense_dim=100, gene_data={}, normalize_weights="log_per_cell", nb_edges=1,
-               node_features="scale", same_edge_values=False, edge_norm=True):
+                    node_features="scale", same_edge_values=False, edge_norm=True):
     """Create DGL cell-gene graph for graph-sc.
 
     Parameters
@@ -846,6 +846,7 @@ def get_adj(data, k=15, pca_dim=50, mode="connectivity"):
     adj_n = normalized_D.dot(adj).dot(normalized_D)
     data.data.obsp["adj"] = adj
     data.data.obsp["adj_n"] = adj_n
+
 
 def degree_power(A, k):
     degrees = np.power(np.array(A.sum(1)), k).flatten()

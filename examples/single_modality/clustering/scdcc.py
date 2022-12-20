@@ -72,7 +72,7 @@ if __name__ == "__main__":
         print("Number of error pairs: %d" % error_num)
     else:
         ml_ind1, ml_ind2, cl_ind1, cl_ind2 = np.array([]), np.array([]), np.array([]), np.array([])
-    
+
     # Construct moodel
     sigma = 2.75
     use_cuda = torch.cuda.is_available()
@@ -82,7 +82,7 @@ if __name__ == "__main__":
         device = 'cpu'
     model = ScDCC(input_dim=adata.n_vars, z_dim=32, n_clusters=n_clusters, encodeLayer=[256, 64], decodeLayer=[64, 256],
                   sigma=args.sigma, gamma=args.gamma, ml_weight=args.ml_weight, cl_weight=args.ml_weight).to(device)
-    
+
     # Pretrain model
     t0 = time()
     if args.ae_weights is None:
