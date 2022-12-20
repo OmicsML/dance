@@ -1,8 +1,11 @@
 import argparse
 from pprint import pprint
 
+import numpy as np
 import torch
+from anndata import AnnData
 
+from dance.data import Data
 from dance.datasets.spatial import CellTypeDeconvoDatasetLite
 from dance.modules.spatial.cell_type_deconvo.spatialdecon import SpatialDecon
 
@@ -30,37 +33,22 @@ else:
 # Load dataset
 dataset = CellTypeDeconvoDatasetLite(data_id=args.dataset, data_dir=args.datadir)
 
-sc_count = dataset.data["ref_sc_count"]
-sc_profile = None
-sc_annot = dataset.data["ref_sc_annot"]
-init_background = None
-if 'init_background' in dataset.data:
-    init_background = dataset.data['init_background']
+ref_count, ref_annot, count_matrix, cell_type_portion, spatial = dataset.load_data()
+adata = AnnData(X=count_matrix, obsm={"spatial": spatial, "cell_type_portion": cell_type_portion}, dtype=np.float32)
 
-mix_count = dataset.data["mix_count"]
-true_p = dataset.data["true_p"]
+ct_select = sorted(set(ref_annot.cellType.unique().tolist()) & set(cell_type_portion.columns.tolist()))
+print(f"{ct_select=}")
 
-ct_select = sorted(set(sc_annot.cellType.unique().tolist()) & set(true_p.columns.tolist()))
-print('ct_select =', f'{ct_select}')
-
-true_p = torch.FloatTensor(true_p.loc[:, ct_select].values)
-if 'ref_cell_profile' in dataset.data:
-    sc_profile = dataset.data["ref_cell_profile"]
-    sc_profile = sc_profile.loc[:, ct_select].values
+data = Data(adata)
+data.set_config(label_channel="cell_type_portion")
+x, y = data.get_data(return_type="default")
 
 # Initialize and train model
-spaDecon = SpatialDecon(sc_count=sc_count, sc_annot=sc_annot, mix_count=mix_count, ct_varname="cellType",
-                        ct_select=ct_select, sc_profile=sc_profile, bias=args.bias, init_bias=init_background,
-                        device=device)
-
-# Fit model
-spaDecon.fit(lr=args.lr, max_iter=args.max_iter, print_period=100)
-
-# Predict cell-type proportions and evaluate
-pred = spaDecon.predict()
+spaDecon = SpatialDecon(ref_count, ref_annot, ct_varname="cellType", ct_select=ct_select, bias=args.bias, device=device)
+pred = spaDecon.fit_and_predict(x, lr=args.lr, max_iter=args.max_iter, print_period=100)
 
 # Compute score
-mse = spaDecon.score(pred.T, true_p)
+mse = spaDecon.score(pred, y[ct_select].values)  # TODO: align cell type first
 print(f"mse = {mse:7.4f}")
 """To reproduce SpatialDecon benchmarks, please refer to command lines belows:
 
