@@ -26,14 +26,14 @@ repos:
         additional_dependencies: [toml]
 
   - repo: https://github.com/pycqa/isort
-    rev: 5.10.1
+    rev: v5.11.3
     hooks:
       - id: isort
         name: Sort imports
         args: [--line-width, "120"]
 
   - repo: https://github.com/PyCQA/docformatter
-    rev: v1.5.0
+    rev: v1.5.1
     hooks:
       - id: docformatter
         name: Format docstring
