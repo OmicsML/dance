@@ -632,9 +632,9 @@ def construct_modality_prediction_graph(dataset, **kwargs):
         return g
 
 
-def make_graph(X, Y=None, threshold=0, dense_dim=100, gene_data={}, normalize_weights="log_per_cell", nb_edges=1,
+def cell_gene_graph(data, threshold=0, dense_dim=100, gene_data={}, normalize_weights="log_per_cell", nb_edges=1,
                node_features="scale", same_edge_values=False, edge_norm=True):
-    """Create DGL graph for graph-sc.
+    """Create DGL cell-gene graph for graph-sc.
 
     Parameters
     ----------
@@ -665,6 +665,7 @@ def make_graph(X, Y=None, threshold=0, dense_dim=100, gene_data={}, normalize_we
         constructed dgl graph.
 
     """
+    X, Y = data.get_x_y()
     num_genes = X.shape[1]
 
     graph = dgl.DGLGraph()
@@ -743,7 +744,7 @@ def make_graph(X, Y=None, threshold=0, dense_dim=100, gene_data={}, normalize_we
 
     graph.add_edges(graph.nodes(), graph.nodes(),
                     {'weight': torch.ones(graph.number_of_nodes(), dtype=torch.float).unsqueeze(1)})
-    return graph
+    data.data.uns["graph"] = graph
 
 
 def external_data_connections(graph, gene_data, X, gene_idx, cell_idx):
@@ -814,7 +815,7 @@ def external_data_connections(graph, gene_data, X, gene_idx, cell_idx):
     return graph
 
 
-def get_adj(count, k=15, pca_dim=50, mode="connectivity"):
+def get_adj(data, k=15, pca_dim=50, mode="connectivity"):
     """Conctruct adjacency matrix for scTAG.
 
     Parameters
@@ -834,6 +835,7 @@ def get_adj(count, k=15, pca_dim=50, mode="connectivity"):
         prediction of leiden.
 
     """
+    count = data.get_x()
     if pca_dim:
         countp = PCA(n_components=pca_dim).fit_transform(count)
     else:
@@ -842,9 +844,8 @@ def get_adj(count, k=15, pca_dim=50, mode="connectivity"):
     adj = A.toarray()
     normalized_D = degree_power(adj, -0.5)
     adj_n = normalized_D.dot(adj).dot(normalized_D)
-
-    return adj, adj_n
-
+    data.data.obsp["adj"] = adj
+    data.data.obsp["adj_n"] = adj_n
 
 def degree_power(A, k):
     degrees = np.power(np.array(A.sum(1)), k).flatten()
@@ -1052,7 +1053,7 @@ def stAdjConstruct(st_scale, st_label, adj_data, k_filter=1):
 ############################
 #          scDSC           #
 ############################
-def construct_graph_sc(fname, features, label, method, topk):
+def construct_graph_scdsc(fname, data, method, topk):
     """Graph construction function for scDSC.
 
     Parameters
@@ -1073,6 +1074,7 @@ def construct_graph_sc(fname, features, label, method, topk):
     None.
 
     """
+    features, label = data.get_train_data()
     num = len(label)
     if topk == None:
         topk = 0

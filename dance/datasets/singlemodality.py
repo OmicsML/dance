@@ -494,9 +494,10 @@ class ClusteringDataset():
             assert self.is_complete()
 
         data_mat = h5py.File(f"{self.data_dir}/{self.dataset}.h5", "r")
-        self.X = np.array(data_mat["X"])
-        self.Y = np.array(data_mat["Y"])
-        return self
+        X = np.array(data_mat["X"])
+        adata = ad.AnnData(X, dtype=np.float32)
+        Y = np.array(data_mat["Y"])
+        return adata, Y
 
 
 class PretrainDataset(Dataset):

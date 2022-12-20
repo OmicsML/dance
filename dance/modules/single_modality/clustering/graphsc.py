@@ -88,7 +88,7 @@ class GraphSC:
                     y.extend(blocks[-1].dstdata["label"].cpu().numpy())
                 order.extend(blocks[-1].dstdata["order"].cpu().numpy())
 
-                adj = g.adjacency_matrix().to_dense()
+                adj = g.adjacency_matrix().to_dense().to(device)
                 adj = adj[g.dstnodes()]
                 pos_weight = torch.Tensor([float(adj.shape[0] * adj.shape[0] - adj.sum()) / adj.sum()])
                 factor = float((adj.shape[0] * adj.shape[0] - adj.sum()) * 2)
