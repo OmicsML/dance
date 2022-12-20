@@ -197,11 +197,11 @@ class Card:
         S = S_JK.mean(axis=0).to_frame().unstack().droplevel(0)
         S = S[sc_meta[ct_varname].unique()]
         countMat["ct_sample_id"] = ct_sample_id
-        Theta_S_colMean = countMat.groupby(ct_sample_id).agg("mean")
+        Theta_S_colMean = countMat.groupby(ct_sample_id).mean(numeric_only=True)
         tbl_sample = countMat.groupby([ct_sample_id]).size()
         tbl_sample = tbl_sample.reindex_like(Theta_S_colMean)
         tbl_sample = tbl_sample.reindex(Theta_S_colMean.index)
-        Theta_S_colSums = countMat.groupby(ct_sample_id).agg("sum")
+        Theta_S_colSums = countMat.groupby(ct_sample_id).sum(numeric_only=True)
         Theta_S = Theta_S_colSums.copy()
         Theta_S["sum"] = Theta_S_colSums.sum(axis=1)
         Theta_S = Theta_S[list(Theta_S.columns)[:-1]].div(Theta_S["sum"], axis=0)
@@ -209,7 +209,7 @@ class Card:
         for ind in Theta_S.index:
             grp.append(ind.split("$*$")[0])
         Theta_S["grp"] = grp
-        Theta = Theta_S.groupby(grp).agg("mean")
+        Theta = Theta_S.groupby(grp).mean(numeric_only=True)
         Theta = Theta.reindex(sc_meta[ct_varname].unique())
         S = S[Theta.index]
         Theta["S"] = S.iloc[0]
