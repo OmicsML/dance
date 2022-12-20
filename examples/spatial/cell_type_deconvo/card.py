@@ -1,6 +1,10 @@
 import argparse
 from pprint import pprint
 
+import numpy as np
+from anndata import AnnData
+
+from dance.data import Data
 from dance.datasets.spatial import CellTypeDeconvoDatasetLite
 from dance.modules.spatial.cell_type_deconvo.card import Card
 
@@ -18,33 +22,30 @@ pprint(vars(args))
 
 # Load dataset
 dataset = CellTypeDeconvoDatasetLite(data_id=args.dataset, data_dir=args.datadir)
-sc_count = dataset.data["ref_sc_count"]
-sc_meta = dataset.data["ref_sc_annot"]
-spatial_count = dataset.data["mix_count"]
-true_p = dataset.data["true_p"]
-spatial_location = None if args.location_free else dataset.data["spatial_location"]
-ct_select = sorted(set(sc_meta.cellType.unique().tolist()) & set(true_p.columns.tolist()))
+
+ref_count, ref_annot, count_matrix, cell_type_portion, spatial = dataset.load_data()
+
+# TODO: add ref index (or more flexible indexing option at init, e.g., as dict?) and combine with data
+ref_adata = AnnData(X=ref_count, obsm={"annot": ref_annot}, dtype=np.float32)
+adata = AnnData(X=count_matrix, obsm={"spatial": spatial, "cell_type_portion": cell_type_portion}, dtype=np.float32)
+
+# TODO: deprecate the need for ct_select by doing this in a preprocessing step -> convert ct into one-hot matrix
+ct_select = sorted(set(ref_annot.cellType.unique().tolist()) & set(cell_type_portion.columns.tolist()))
 print(f"{ct_select=}")
 
-# Initialize and train moel
-crd = Card(
-    sc_count=sc_count,
-    sc_meta=sc_meta,
-    spatial_count=spatial_count,
-    spatial_location=spatial_location,
-    ct_varname="cellType",
-    ct_select=ct_select,
-    cell_varname=None,
-    sample_varname=None,
-)
-crd.fit(max_iter=args.max_iter, epsilon=args.epsilon)
+data = Data(adata)
+data.set_config(feature_channel=[None, "spatial"], feature_channel_type=[None, "obsm"],
+                label_channel="cell_type_portion")
 
-# Evaluate
-pred = crd.predict()
-mse = crd.score(pred, true_p[ct_select].values)
+# TODO: after removing ct_select, return as numpy
+(x_count, x_spatial), y = data.get_data(return_type="default")
+
+model = Card(ref_count, ref_annot, ct_varname="cellType", ct_select=ct_select)
+pred = model.fit_and_predict(x_count, x_spatial.values, max_iter=args.max_iter, epsilon=args.epsilon)
+mse = model.score(pred, y[ct_select].values)
 
 print(f"Predicted cell-type proportions of  sample 1: {pred[0].round(3)}")
-print(f"True cell-type proportions of  sample 1: {true_p[ct_select].iloc[0].tolist()}")
+print(f"True cell-type proportions of  sample 1: {y.iloc[0].tolist()}")
 print(f"mse = {mse:7.4f}")
 """To reproduce CARD benchmarks, please refer to command lines belows:
 

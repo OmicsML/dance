@@ -1,28 +1,15 @@
-import csv
 import glob
 import os
 import os.path as osp
-import pickle as pkl
-import random
-import re
-import time as tm
 import warnings
-from collections import defaultdict
-from operator import itemgetter
 
 import anndata
 import cv2
-import networkx as nx
-import numpy as np
 import pandas as pd
 import rdata
 import scanpy as sc
-import scipy.sparse
-from anndata import AnnData
-from scipy.stats import uniform
 
 from dance.data import download_file, download_unzip, unzip_file
-from dance.transforms import preprocess
 
 IGNORED_FILES = ["readme.txt"]
 
@@ -181,7 +168,6 @@ class CellTypeDeconvoDataset:
         check = [self.data_dir + "/mix_count.*", self.data_dir + "/ref_sc_count.*"]
 
         for i in check:
-            #if not os.path.exists(i):
             if not glob.glob(i):
                 print("lack {}".format(i))
                 return False
@@ -195,8 +181,6 @@ class CellTypeDeconvoDataset:
 
         self.data = {}
         files = os.listdir(self.data_dir + "/")
-        filenames = [f.split(".")[0] for f in files]
-        extensions = [f.split(".")[1] for f in files]
         for f in files:
             DataPath = self.data_dir + "/" + f
             filename = f.split(".")[0]
@@ -225,9 +209,9 @@ class CellTypeDeconvoDatasetLite:
         self.data_id = data_id
         self.data_dir = osp.join(data_dir, data_id)
         self.data_url = cellDeconvo_dataset[data_id]
-        self.load_data()
+        self._load_data()
 
-    def load_data(self):
+    def _load_data(self):
         if not osp.exists(self.data_dir):
             download_unzip(self.data_url, self.data_dir)
 
@@ -243,6 +227,15 @@ class CellTypeDeconvoDatasetLite:
                 self.data[filename] = sc.read_h5ad(filepath).to_df()
             else:
                 warnings.warn(f"Unsupported file type {ext!r}. Use csv or h5ad file types.")
+
+    def load_data(self):
+        ref_count = self.data["ref_sc_count"]
+        ref_annot = self.data["ref_sc_annot"]
+        count_matrix = self.data["mix_count"]
+        cell_type_portion = self.data["true_p"]
+        if (spatial := self.data.get("spatial_location")) is None:
+            spatial = pd.DataFrame(0, index=count_matrix.index, columns=["x", "y"])
+        return ref_count, ref_annot, count_matrix, cell_type_portion, spatial
 
 
 class CARDSimulationRDataset:
