@@ -52,7 +52,7 @@ class GraphConvolution(nn.Module):
         if bias:
             self.bias = Parameter(torch.FloatTensor(out_features))
         else:
-            self.register_parameter('bias', None)
+            self.register_parameter("bias", None)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -174,7 +174,7 @@ class DSTGLearner:
         # set to true if the reference data is scRNA (to be used for generating pseudo spots)
         mix_counts, mix_labels, hvgs = pseudo_spatial_process([sc_adata, mix_adata], [sc_annot, mix_annot], clust_vr,
                                                               scRNA, n_hvg, N_p)
-        mix_labels = [lab.drop(['cell_count', 'total_umi_count', 'n_counts'], axis=1) for lab in mix_labels]
+        mix_labels = [lab.drop(["cell_count", "total_umi_count", "n_counts"], axis=1) for lab in mix_labels]
 
         # create train/val/test split
         (adj_data, features, labels_binary_train, labels_binary_val, labels_binary_test, train_mask, pred_mask,
@@ -231,7 +231,7 @@ class DSTGLearner:
             loss = masked_softmax_cross_entropy(y_hat, labels, labels_mask)
 
             if (epoch + 1) % 5 == 0:
-                print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(loss), "time=",
+                print("Epoch:", "%04d" % (epoch + 1), "train_loss=", "{:.5f}".format(loss), "time=",
                       "{:.5f}".format(time.time() - t))
 
             optimizer.zero_grad()
@@ -257,7 +257,7 @@ class DSTGLearner:
         pred = F.softmax(fX, dim=1)
         return pred
 
-    def score(self, pred, true_prop, score_metric='ce'):
+    def score(self, pred, true_prop, score_metric="ce"):
         """Model performance score.
 
         Parameters
@@ -277,9 +277,9 @@ class DSTGLearner:
         """
         true_prop = true_prop.to(self.device)
         self.model.eval()
-        if score_metric == 'ce':
+        if score_metric == "ce":
             loss = F.cross_entropy(pred, true_prop)
-        elif score_metric == 'mse':
+        elif score_metric == "mse":
             loss = ((pred / torch.sum(pred, 1, keepdims=True) -
                      true_prop / torch.sum(true_prop, 1, keepdims=True))**2).mean()
         return loss.detach().item()
@@ -355,10 +355,10 @@ def masked_softmax_cross_entropy(preds, labels, mask):
         cross entropy loss between true and predicted cell-type proportions (mean reduced).
     """
     if (mask is None):
-        loss = F.cross_entropy(preds, labels, reduction='mean')
+        loss = F.cross_entropy(preds, labels, reduction="mean")
         return loss
     else:
-        loss = F.cross_entropy(preds, labels, reduction='none')
+        loss = F.cross_entropy(preds, labels, reduction="none")
         mask = mask.type(torch.float32)
         mask /= torch.mean(mask)
         loss *= mask

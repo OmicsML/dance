@@ -44,9 +44,9 @@ mix_count = dataset.data["mix_count"]
 true_p = dataset.data["true_p"]
 
 ct_select = sorted(set(sc_annot.cellType.unique().tolist()) & set(true_p.columns.tolist()))
-print('ct_select =', f'{ct_select}')
+print(f"{ct_select=}")
 
-ct_select_ix = sc_annot[sc_annot['cellType'].isin(ct_select)].index
+ct_select_ix = sc_annot[sc_annot["cellType"].isin(ct_select)].index
 sc_annot = sc_annot.loc[ct_select_ix]
 sc_count = sc_count.loc[ct_select_ix]
 
@@ -62,7 +62,7 @@ dstg.fit(lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
 pred = dstg.predict()
 
 # Compute score
-mse = dstg.score(pred[args.N_p:, :], torch.Tensor(true_p[ct_select].values), 'mse')
+mse = dstg.score(pred[args.N_p:, :], torch.Tensor(true_p[ct_select].values), "mse")
 print(f"mse = {mse:7.4f}")
 """To reproduce DSTG benchmarks, please refer to command lines belows:
 
