@@ -4,16 +4,16 @@ Adapted from https: https://github.com/Nanostring-Biostats/SpatialDecon
 
 Reference
 ---------
-Danaher, Kim, Nelson, et al. "Advances in mixed cell deconvolution enable quantification of cell types in spatial transcriptomic data."
-Nature Communications (2022)
+Danaher, Kim, Nelson, et al. "Advances in mixed cell deconvolution enable quantification of cell types in spatial
+transcriptomic data." Nature Communications (2022)
 
 """
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch import optim
-from torch.autograd import Variable
+
+from dance.utils.matrix import normalize
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -118,29 +118,25 @@ class SpatialDecon:
 
     """
 
-    def __init__(self, sc_count, sc_annot, mix_count, ct_varname, ct_select, sc_profile=None, bias=False,
+    def __init__(self, dim_in, dim_out, sc_count, sc_annot, ct_varname, ct_select, sc_profile=None, bias=False,
                  init_bias=None, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
         super().__init__()
 
         self.device = device
 
-        #subset sc samples on selected cell types (mutual between sc and mix cell data)
+        # Subset sc samples on selected cell types (mutual between sc and mix cell data)
         ct_select_ix = sc_annot[sc_annot[ct_varname].isin(ct_select)].index
         self.sc_annot = sc_annot.loc[ct_select_ix]
         self.sc_count = sc_count.loc[ct_select_ix]
         cellTypes = self.sc_annot[ct_varname].values.tolist()
 
-        #construct a cell profile matrix if not profided
+        # Construct a cell profile matrix if not profided
         if sc_profile is None:
             self.ref_sc_profile = cell_topic_profile(self.sc_count.values, cellTypes, ct_select, method='median')
         else:
             self.ref_sc_profile = sc_profile
 
-        self.mix_count = mix_count.values.T
-
-        in_dim = self.ref_sc_profile.shape[1]
-        out_dim = self.mix_count.shape[1]
-        self.model = nn.Linear(in_features=in_dim, out_features=out_dim, bias=bias)
+        self.model = nn.Linear(in_features=dim_in, out_features=dim_out, bias=bias)
         if init_bias is not None:
             self.model.bias = nn.Parameter(torch.Tensor(init_bias.values.T.copy()))
         self.model = self.model.to(device)
@@ -174,11 +170,11 @@ class SpatialDecon:
             predictions of cell-type proportions.
 
         """
-        proportion_preds = self.model.weight.T
-        proportion_preds = proportion_preds / torch.sum(proportion_preds, axis=0, keepdims=True).clamp(min=1e-6)
-        return (proportion_preds)
+        weights = self.model.weight.clone().detach().cpu()
+        proportion_preds = normalize(weights, mode="normalize", axis=1)
+        return proportion_preds
 
-    def fit(self, lr, max_iter, print_res=False, print_period=100):
+    def fit(self, x, lr=1e-4, max_iter=500, print_res=False, print_period=100):
         """fit function for model training.
 
         Parameters
@@ -197,8 +193,8 @@ class SpatialDecon:
         None.
 
         """
-        ref_sc_profile = Variable(torch.FloatTensor(self.ref_sc_profile), requires_grad=True).to(self.device)
-        mix_count = Variable(torch.FloatTensor(self.mix_count)).to(self.device)
+        ref_sc_profile = torch.FloatTensor(self.ref_sc_profile).to(self.device)
+        mix_count = torch.FloatTensor(x.T).to(self.device)
 
         criterion = MSLELoss()
         optimizer = optim.Adam(self.model.parameters(), lr=lr)
@@ -208,11 +204,9 @@ class SpatialDecon:
             iteration += 1
             mix_pred = self.model(ref_sc_profile)
 
-            # Compute and print loss
             loss = criterion(mix_pred, mix_count)
             self.loss = loss
-            # Zero gradients, perform a backward pass,
-            # and update the weights.
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -222,25 +216,29 @@ class SpatialDecon:
             if iteration % print_period == 0:
                 print(f"Epoch: {iteration:02}/{max_iter} Loss: {loss.item():.5e}")
 
-    def score(self, pred, true_prop):
+    def fit_and_predict(self, x, lr=1e-4, max_iter=500, print_res=False, print_period=100):
+        self.fit(x, lr=lr, max_iter=max_iter, print_res=print_res, print_period=print_period)
+        pred = self.predict()
+        return pred
+
+    def score(self, pred, true):
         """score.
 
         Parameters
         ----------
         pred :
-            predicted cell-type proportions.
-        true_prop :
-            true cell-type proportions.
+            Predicted cell-type proportions.
+        true :
+            True cell-type proportions.
 
         Returns
         -------
         loss : float
-            mse loss between predicted and true cell-type proportions.
+            MSE loss between predicted and true cell-type proportions.
 
         """
-        true_prop = true_prop.to(self.device)
-        pred = pred / torch.sum(pred, 1, keepdims=True).clamp(min=1e-6)
-        true_prop = true_prop / torch.sum(true_prop, 1, keepdims=True).clamp(min=1e-6)
-        loss = ((pred - true_prop)**2).mean()
+        true = torch.FloatTensor(true).to(self.device)
+        pred = torch.FloatTensor(pred).to(self.device)
+        loss = ((pred - true)**2).mean()
 
         return loss.detach().item()
