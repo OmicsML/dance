@@ -1810,7 +1810,7 @@ def gen_pseudo_spots(sc_counts, labels, clust_vr='cellType', nc_min=2, nc_max=10
         mix_counts, obs = gen_mix(tmp_sc_cnt, clust_vr=clust_vr, umi_cutoff=25000, downsample_counts=20000)
         #append this mix to sample of pseudo mixtures
         mix_X = np.append(mix_X, mix_counts, axis=0)
-        mix_obs = mix_obs.append(obs)
+        mix_obs = pd.concat((mix_obs, obs))
 
     mix_obs.index = pd.Index(['ps_mix_' + str(i + 1) for i in range(N_p)])
     #create AnnData object with sample of pseudo mixtures (obs)

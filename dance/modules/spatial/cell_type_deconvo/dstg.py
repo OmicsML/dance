@@ -8,7 +8,6 @@ Song, and Su. "DSTG: deconvoluting spatial transcriptomics data through graph-ba
 Briefings in Bioinformatics (2021)
 
 """
-import math
 import time
 
 import numpy as np
@@ -17,7 +16,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.autograd import Variable
 from torch.nn.parameter import Parameter
 
 from dance.transforms.graph_construct import stAdjConstruct
@@ -58,12 +56,11 @@ class GraphConvolution(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        #glorot
+        # glorot
         init_range = np.sqrt(6.0 / (self.in_features + self.out_features))
         self.weight.data.uniform_(-init_range, init_range)
         # similar to kaiming normal/uniform
-        stdv = 1. / math.sqrt(self.weight.size(1))
-        #self.weight.data.uniform_(-stdv, stdv)
+        stdv = 1. / np.sqrt(self.weight.size(1))
         if self.bias is not None:
             self.bias.data.uniform_(-stdv, stdv)
 
@@ -83,15 +80,14 @@ class GraphConvolution(nn.Module):
             output of graph convolution layer.
 
         """
-        #convolution
-        if input.is_sparse:
-            #sparse input features
+        # Convolution
+        if input.is_sparse:  # Sparse input features
             support = torch.spmm(input, self.weight)
         else:
             support = torch.mm(input, self.weight)
 
-        #adj should always be sparse
-        #### add a ReLU or other activation!!
+        # Adj should always be sparse
+        # Add a ReLU or other activation!!
         output = torch.spmm(adj, support)
         if self.bias is not None:
             return output + self.bias
@@ -99,9 +95,7 @@ class GraphConvolution(nn.Module):
             return output
 
     def __repr__(self):
-        return self.__class__.__name__ + ' (' \
-               + str(self.in_features) + ' -> ' \
-               + str(self.out_features) + ')'
+        return f"{self.__class__.__name__}({self.in_features} -> {self.out_features})"
 
 
 class GCN(nn.Module):
@@ -131,9 +125,7 @@ class GCN(nn.Module):
             output of graph convolution network.
 
         """
-        #self.nnz = x._nnz() if sparse_inputs else None
-
-        #dropout + convolution
+        # Dropout + convolution
         x = dropout_layer(x, self.dropout)
         x = self.gc1(x, adj)
         x = self.act(x)
@@ -172,22 +164,21 @@ class DSTGLearner:
         super().__init__()
         self.device = device
 
-        #set adata objects for sc ref and cell mixtures
+        # Set adata objects for sc ref and cell mixtures
         sc_adata = sc.AnnData(sc_count)
         sc_adata.obs = sc_annot
         mix_adata = sc.AnnData(mix_count)
-        #mix_adata.obs = true_p
 
-        #pre-process: get variable genes --> normalize --> log1p --> standardize --> out
-        #set scRNA to false if already using pseudo spot data with real spot data
-        #set to true if the reference data is scRNA (to be used for generating pseudo spots)
+        # pre-process: get variable genes --> normalize --> log1p --> standardize --> out
+        # set scRNA to false if already using pseudo spot data with real spot data
+        # set to true if the reference data is scRNA (to be used for generating pseudo spots)
         mix_counts, mix_labels, hvgs = pseudo_spatial_process([sc_adata, mix_adata], [sc_annot, mix_annot], clust_vr,
                                                               scRNA, n_hvg, N_p)
         mix_labels = [lab.drop(['cell_count', 'total_umi_count', 'n_counts'], axis=1) for lab in mix_labels]
 
         # create train/val/test split
-        adj_data, features, labels_binary_train, labels_binary_val, labels_binary_test, train_mask, pred_mask, val_mask, test_mask, new_label, true_label = split(
-            mix_counts, mix_labels, pre_process=1, split_val=.8)
+        (adj_data, features, labels_binary_train, labels_binary_val, labels_binary_test, train_mask, pred_mask,
+         val_mask, test_mask, new_label, true_label) = split(mix_counts, mix_labels, pre_process=1, split_val=.8)
 
         self.labels_binary_train = torch.FloatTensor(labels_binary_train).to(device)
         self.features = torch.sparse.FloatTensor(
@@ -195,17 +186,16 @@ class DSTGLearner:
             torch.FloatTensor(features[1])).to(device)
         self.train_mask = torch.FloatTensor(train_mask).to(device)
 
-        #construct adjacency matrix
+        # Construct and process adjacency matrix
         adj = stAdjConstruct(mix_counts, mix_labels, adj_data, k_filter=k_filter)
-        #preprocess adjacency matrix
         adj = preprocess_adj(adj)
 
         self.adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
                                             torch.FloatTensor(adj.data.astype(np.int32))).to(device)
 
+        # Initialize GCN module
         nfeat = self.features.size()[1]
         nout = self.labels_binary_train.size()[1]
-        #initialize GCN module
         self.model = GCN(nfeat, nhid, nout, bias, dropout).to(device)
 
     def fit(self, lr=0.005, max_epochs=50, weight_decay=0):
@@ -230,7 +220,6 @@ class DSTGLearner:
         labels = self.labels_binary_train  # labels of pseudo spots (and real spots if provided)
         labels_mask = self.train_mask  # mask to indicate which samples to use for training
 
-        #device = self.device
         model = self.model
         model.train()
         optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -244,7 +233,6 @@ class DSTGLearner:
             if (epoch + 1) % 5 == 0:
                 print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(loss), "time=",
                       "{:.5f}".format(time.time() - t))
-            #    _ = model(X, adj)
 
             optimizer.zero_grad()
             loss.backward()
@@ -311,8 +299,7 @@ def dropout_layer(x, dropout):
     out : torch tensor
         dropout output.
     """
-    if x.is_sparse:
-        #sparse input features
+    if x.is_sparse:  # sparse input features
         out = sparse_dropout(x, dropout)
         return out
     else:
