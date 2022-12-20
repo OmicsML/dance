@@ -19,17 +19,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class MSLELoss(nn.Module):
-    """MSLELoss.
-
-    Parameters
-    ----------
-    None
-
-    Returns
-    -------
-    None.
-
-    """
+    """MSLELoss."""
 
     def __init__(self):
         super().__init__()
@@ -41,14 +31,14 @@ class MSLELoss(nn.Module):
         Parameters
         ----------
         pred : torch tensor
-            linear transformation of cell profile (reference basis) matrix.
+            Linear transformation of cell profile (reference basis) matrix.
         actual : torch tensor
-            mixture expression matrix.
+            Mixture expression matrix.
 
         Returns
         -------
         loss : float
-            mean squared log error loss.
+            Mean squared log error loss.
 
         """
         pred_clamp = pred.clamp(min=0)
@@ -58,23 +48,23 @@ class MSLELoss(nn.Module):
 
 
 def cell_topic_profile(X, groups, ct_select, axis=0, method='median'):
-    """cell_topic_profile.
+    """Compute cell topic profile matrix.
 
     Parameters
     ----------
     X : torch 2-d tensor
-        gene expression matrix, genes (rows) by sample cells (cols).
+        Gene expression matrix (gene x cell).
     groups : int
-        cell-type labels of each sample cell in X.
+        Cell-type labels of each sample cell in X.
     ct_select:
-        cell types to profile.
+        Cell types to profile.
     method : string optional
-         method for reduction of cell-types for cell profile, default median.
+        Method for reduction of cell-types for cell profile, default median.
 
     Returns
-        -------
+    -------
     X_profile : torch 2-d tensor
-         cell profile matrix from scRNA-seq reference.
+         Cell profile matrix from scRNA-seq reference (gene x cell-type).
 
     """
     if method == "median":
@@ -106,15 +96,11 @@ class SpatialDecon:
     ct_select : str, optional
         Selected cell-types to be considered for deconvolution.
     sc_profile: numpy array optional
-        pre-constructed cell profile matrix.
+        Pre-constructed cell profile matrix.
     bias : boolean optional
-        include bias term, default False.
+        Include bias term, default False.
     init_bias: numpy array optional
-        initial bias term (background estimate).
-
-    Returns
-    -------
-    None.
+        Initial bias term (background estimate).
 
     """
 
@@ -142,32 +128,16 @@ class SpatialDecon:
         self.model = self.model.to(device)
 
     def forward(self, x: torch.Tensor):
-        """forward function.
-
-        Parameters
-        ----------
-        x : torch tensor
-            input features.
-
-        Returns
-        -------
-        output : torch tensor
-            linear projection of input.
-
-        """
         out = self.model(x)
         return (out)
 
     def predict(self):
-        """prediction function.
-        Parameters
-        ----------
+        """Return fiited parameters as cell-type portion predictions.
 
         Returns
         -------
-
-        proportion_preds : torch tensor
-            predictions of cell-type proportions.
+        proportion_preds : torch.Tensor
+            Predictions of cell-type proportions (cell x cell-type).
 
         """
         weights = self.model.weight.clone().detach().cpu()
@@ -179,18 +149,16 @@ class SpatialDecon:
 
         Parameters
         ----------
+        x
+            Input expression matrix (cell x gene).
         max_iter : int
-            maximum number of iterations for optimizat.
+            Maximum number of iterations for optimizat.
         lr : float
-            learning rate.
+            Learning rate.
         print_res : bool optional
-            indicates to print live training results, default False.
+            Indicates to print live training results, default False.
         print_period : int optional
-            indicates number of iterations until training results print.
-
-        Returns
-        -------
-        None.
+            Indicates number of iterations until training results print.
 
         """
         ref_sc_profile = torch.FloatTensor(self.ref_sc_profile).to(self.device)
@@ -217,12 +185,13 @@ class SpatialDecon:
                 print(f"Epoch: {iteration:02}/{max_iter} Loss: {loss.item():.5e}")
 
     def fit_and_predict(self, x, lr=1e-4, max_iter=500, print_res=False, print_period=100):
+        """Fit parameters and return cell-type portion predictions."""
         self.fit(x, lr=lr, max_iter=max_iter, print_res=print_res, print_period=print_period)
         pred = self.predict()
         return pred
 
     def score(self, pred, true):
-        """score.
+        """Evaluate predictions.
 
         Parameters
         ----------
