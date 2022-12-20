@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
     adata, labels = ClusteringDataset(args.data_dir, args.data_file).load_data()
     adata.obsm["Group"] = labels
-    data = Data(adata, train_size=adata.n_obs)
+    data = Data(adata, train_size="all")
     data.set_config(label_channel="Group")
 
     # Preprocess scRNA-seq counts matrix

@@ -77,7 +77,7 @@ if __name__ == "__main__":
 
     adata, labels = ClusteringDataset('./data', args.name).load_data()
     adata.obsm["Group"] = labels
-    data = Data(adata, train_size=adata.n_obs)
+    data = Data(adata, train_size="all")
     data.set_config(label_channel="Group")
 
     filter_data(data, highly_genes=args.nb_genes)

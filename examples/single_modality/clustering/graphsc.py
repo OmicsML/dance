@@ -17,15 +17,13 @@ from dance.utils import set_seed
 def pipeline(**args):
     adata, labels = ClusteringDataset(args['data_dir'], args['dataset']).load_data()
     adata.obsm["labels"] = labels
-    adata = adata[:100, :]
-    data = Data(adata, train_size=adata.n_obs)
-    data.set_config(label_channel="labels")
+    data = Data(adata, train_size="all")
 
     filter_data(data, highly_genes=args['nb_genes'])
     cell_gene_graph(data, dense_dim=args['in_feats'], node_features=args['node_features'],
                     normalize_weights=args['normalize_weights'], same_edge_values=args['same_edge_values'],
                     edge_norm=args['edge_norm'])
-    data.set_config(feature_channel="graph", feature_channel_type="uns")
+    data.set_config(feature_channel="graph", feature_channel_type="uns", label_channel="labels")
     graph, Y = data.get_train_data()
     n_clusters = len(np.unique(Y))
     labels = graph.ndata["label"]

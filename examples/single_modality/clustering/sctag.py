@@ -53,13 +53,12 @@ if __name__ == "__main__":
     # Load data
     adata, labels = ClusteringDataset(args.data_dir, args.data_file).load_data()
     adata.obsm["Group"] = labels
-    data = Data(adata)
-    data.set_config(label_channel="Group")
+    data = Data(adata, train_size="all")
 
     filter_data(data, highly_genes=args.highly_genes)
     normalize_adata(data, size_factors=True, normalize_input=True, logtrans_input=True)
     get_adj(data, k=args.k_neighbor, pca_dim=args.pca_dim)
-    data.set_config(feature_channel=["adj", "adj_n"], feature_channel_type=["obsp", "obsp"])
+    data.set_config(feature_channel=["adj", "adj_n"], feature_channel_type=["obsp", "obsp"], label_channel="Group")
     (adj, adj_n), y = data.get_train_data()
     adata = data.data
     x = adata.X

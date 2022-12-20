@@ -42,7 +42,8 @@ class GraphSC:
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.model = GCNAE(args).to(get_device(args.use_cpu))
+        self.device = get_device(args.use_cpu)
+        self.model = GCNAE(args).to(self.device)
 
     def fit(self, n_epochs, dataloader, n_clusters, lr, cluster=["KMeans"]):
         """Train graph-sc.
