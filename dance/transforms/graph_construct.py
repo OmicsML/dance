@@ -634,7 +634,7 @@ def construct_modality_prediction_graph(dataset, **kwargs):
 
 def cell_gene_graph(data, threshold=0, dense_dim=100, gene_data={}, normalize_weights="log_per_cell", nb_edges=1,
                     node_features="scale", same_edge_values=False, edge_norm=True):
-    
+
     X = data.get_x()
     num_genes = X.shape[1]
 
