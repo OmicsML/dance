@@ -100,8 +100,8 @@ class SpatialDecon:
 
     """
 
-    def __init__(self, dim_in, dim_out, sc_count, sc_annot, ct_varname, ct_select, sc_profile=None, bias=False,
-                 init_bias=None, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+    def __init__(self, sc_count, sc_annot, ct_varname, ct_select, sc_profile=None, bias=False, init_bias=None,
+                 device="cpu"):
         super().__init__()
 
         self.device = device
@@ -118,10 +118,16 @@ class SpatialDecon:
         else:
             self.ref_sc_profile = sc_profile
 
-        self.model = nn.Linear(in_features=dim_in, out_features=dim_out, bias=bias)
-        if init_bias is not None:
-            self.model.bias = nn.Parameter(torch.Tensor(init_bias.values.T.copy()))
-        self.model = self.model.to(device)
+        self.bias = bias
+        self.init_bias = init_bias
+        self.model = None
+
+    def _init_model(self, num_cells: int, bias: bool = True):
+        num_cell_types = self.ref_sc_profile.shape[1]
+        model = nn.Linear(in_features=num_cell_types, out_features=num_cells, bias=self.bias)
+        if self.init_bias is not None:
+            model.bias = nn.Parameter(torch.Tensor(self.init_bias.values.T.copy()))
+        self.model = model.to(self.device)
 
     def forward(self, x: torch.Tensor):
         out = self.model(x)
@@ -157,6 +163,7 @@ class SpatialDecon:
             Indicates number of iterations until training results print.
 
         """
+        self._init_model(x.shape[0])
         ref_sc_profile = torch.FloatTensor(self.ref_sc_profile).to(self.device)
         mix_count = torch.FloatTensor(x.T).to(self.device)
 

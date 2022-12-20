@@ -44,10 +44,7 @@ data.set_config(label_channel="cell_type_portion")
 x, y = data.get_data(return_type="default")
 
 # Initialize and train model
-dim_in = len(ct_select)  # number of cell-types
-dim_out = x.shape[0]  # number of cells/spots
-spaDecon = SpatialDecon(dim_in, dim_out, ref_count, ref_annot, ct_varname="cellType", ct_select=ct_select,
-                        bias=args.bias, device=device)
+spaDecon = SpatialDecon(ref_count, ref_annot, ct_varname="cellType", ct_select=ct_select, bias=args.bias, device=device)
 pred = spaDecon.fit_and_predict(x, lr=args.lr, max_iter=args.max_iter, print_period=100)
 
 # Compute score
