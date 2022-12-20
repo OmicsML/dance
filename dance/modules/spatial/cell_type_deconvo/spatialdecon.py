@@ -15,24 +15,22 @@ from torch import optim
 
 from dance.utils.matrix import normalize
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 class MSLELoss(nn.Module):
-    """MSLELoss."""
+    """Mean squared log error loss."""
 
     def __init__(self):
         super().__init__()
         self.mse = nn.MSELoss()
 
-    def forward(self, pred, actual):
-        """forward function.
+    def forward(self, pred, true):
+        """Forward function.
 
         Parameters
         ----------
-        pred : torch tensor
+        pred : torch.Tensor
             Linear transformation of cell profile (reference basis) matrix.
-        actual : torch tensor
+        true : torch.Tensor
             Mixture expression matrix.
 
         Returns
@@ -41,9 +39,7 @@ class MSLELoss(nn.Module):
             Mean squared log error loss.
 
         """
-        pred_clamp = pred.clamp(min=0)
-        actual_clamp = actual.clamp(min=0)
-        loss = self.mse(torch.log1p(pred_clamp), torch.log1p(actual_clamp))
+        loss = self.mse(pred.clip(0).log1p(), true.clip(0).log1p())
         return loss
 
 
@@ -209,5 +205,4 @@ class SpatialDecon:
         true = torch.FloatTensor(true).to(self.device)
         pred = torch.FloatTensor(pred).to(self.device)
         loss = nn.MSELoss()(pred, true)
-
         return loss.item()
