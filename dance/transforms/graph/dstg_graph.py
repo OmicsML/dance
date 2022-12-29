@@ -49,6 +49,7 @@ def stLinkGraphConstruct(st_scale, st_label, k_filter):
         combine = pd.Series(itertools.combinations(range(n), 2))
 
     link = stLinkGraph(scale_list=st_scale, combine=combine, k_filter=k_filter)
+    assert len(link) == 1, "Default DSTG graph construct only uses the firs two expression matrices."
     graph = link[0].iloc[:, :2].reset_index(drop=True)
 
     return graph
