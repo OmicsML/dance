@@ -1,5 +1,4 @@
 import itertools
-from collections import defaultdict
 
 import networkx as nx
 import numpy as np
@@ -21,22 +20,23 @@ def compute_dstg_adj(st_scale, st_label, adj_data, k_filter=1):
 
     data_train1, data_val1, data_test1, labels, lab_data2 = adj_data
 
-    fake1 = np.array([-1] * len(lab_data2.index))
-    index1 = np.concatenate((data_train1.index, fake1, data_val1.index, data_test1.index)).flatten()
-    fake2 = np.array([-1] * len(data_train1))
-    fake3 = np.array([-1] * (len(data_val1) + len(data_test1)))
-    find1 = np.concatenate((fake2, np.array(lab_data2.index), fake3)).flatten()
+    num_inf = len(lab_data2)
+    num_train = len(data_train1)
+    num_valtest = len(data_val1) + len(data_test1)
 
-    row1 = [np.where(find1 == graph.iloc[i, 1])[0][0] for i in range(len(graph))]
-    col1 = [np.where(index1 == graph.iloc[i, 0])[0][0] for i in range(len(graph))]
-    adj = defaultdict(list)  # default value of int is 0
-    for i in range(len(labels)):
-        adj[i].append(i)
-    for i in range(len(row1)):
-        adj[row1[i]].append(col1[i])
-        adj[col1[i]].append(row1[i])
+    # Combine the spot index for pseudo (find) and real (index) into the graph node index
+    index = np.concatenate((data_train1.index, -np.ones(num_inf), data_val1.index, data_test1.index))
+    find = np.concatenate((-np.ones(num_train), lab_data2.index, -np.ones(num_valtest)))
+    index_map = {j: i for i, j in enumerate(index) if j >= 0}
+    find_map = {j: i for i, j in enumerate(find) if j >= 0}
 
-    adj = nx.adjacency_matrix(nx.from_dict_of_lists(adj))
+    edge_sets_dict = {i: {i} for i in range(len(labels))}  # initialize graph with self-loops
+    for _, (i, j) in graph.iterrows():
+        col, row = index_map[i], find_map[j]
+        edge_sets_dict[row].add(col)
+        edge_sets_dict[col].add(row)
+
+    adj = nx.adjacency_matrix(nx.from_dict_of_lists(edge_sets_dict))
     adj_normalized = preprocess_adj(adj)
 
     return adj_normalized
@@ -94,6 +94,7 @@ def filter_edge(edges, neighbors, mats, features, k_filter):
 def preprocess_adj(adj):
     """Preprocessing of adjacency matrix for scGCN model and conversion to tuple
     representation."""
+    # Question: isn't this addition of self-loop redundant with the initialization?
     adj_normalized = normalize_adj(adj + sp.eye(adj.shape[0]))
     return adj_normalized
 
