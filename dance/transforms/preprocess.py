@@ -1969,7 +1969,7 @@ def split(st_data, lab_label, pre_process, split_val=.9):
     labels_binary_val[val_mask, :] = new_label[val_mask, :]
     labels_binary_test[test_mask, :] = new_label[test_mask, :]
 
-    adj_data = [data_train1, data_val1, data_test1, labels, lab_data2]
+    adj_data = [data_train1, data_val1, data_test1]
 
     return adj_data, features, labels_binary_train, labels_binary_val, labels_binary_test, train_mask, pred_mask, val_mask, test_mask, new_label, true_label
 

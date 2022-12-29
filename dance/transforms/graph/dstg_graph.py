@@ -18,19 +18,20 @@ def compute_dstg_adj(st_scale, adj_data, k_filter=1):
     st_scale_dfs = [adata.to_df().T for adata in st_scale]
     graph = construct_link_graph(st_scale_dfs, k_filter)
 
-    data_train1, data_val1, data_test1, labels, lab_data2 = adj_data
+    data_train1, data_val1, data_test1 = adj_data
 
-    num_inf = len(lab_data2)
+    num_inf = len(st_scale[1])
     num_train = len(data_train1)
     num_valtest = len(data_val1) + len(data_test1)
+    num_tot = num_inf + num_train + num_valtest
 
     # Combine the spot index for pseudo (find) and real (index) into the graph node index
     index = np.concatenate((data_train1.index, -np.ones(num_inf), data_val1.index, data_test1.index))
-    find = np.concatenate((-np.ones(num_train), lab_data2.index, -np.ones(num_valtest)))
+    find = np.concatenate((-np.ones(num_train), np.arange(num_inf), -np.ones(num_valtest)))
     index_map = {j: i for i, j in enumerate(index) if j >= 0}
     find_map = {j: i for i, j in enumerate(find) if j >= 0}
 
-    edge_sets_dict = {i: {i} for i in range(len(labels))}  # initialize graph with self-loops
+    edge_sets_dict = {i: {i} for i in range(num_tot)}  # initialize graph with self-loops
     for _, (i, j) in graph.iterrows():
         col, row = index_map[i], find_map[j]
         edge_sets_dict[row].add(col)
@@ -87,8 +88,8 @@ def filter_edge(edges, neighbors, mats, features, k_filter):
         np.where(edges.loc[:, "spot2"][x] == nn[1][edges.loc[:, "spot1"][x], ])[0] for x in range(edges.shape[0])
     ]
     nps = np.concatenate(position, axis=0)
-    fedge = edges.iloc[nps, ]
-    return (fedge)
+    filtered_edges = edges.iloc[nps].copy()
+    return filtered_edges
 
 
 def preprocess_adj(adj):
