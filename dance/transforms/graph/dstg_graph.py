@@ -14,9 +14,9 @@ class DSTGraph(BaseTransform):
     pass
 
 
-def compute_dstg_adj(st_scale, st_label, adj_data, k_filter=1):
+def compute_dstg_adj(st_scale, adj_data, k_filter=1):
     st_scale_dfs = [adata.to_df().T for adata in st_scale]
-    graph = construct_link_graph(st_scale_dfs, st_label, k_filter)
+    graph = construct_link_graph(st_scale_dfs, k_filter)
 
     data_train1, data_val1, data_test1, labels, lab_data2 = adj_data
 
@@ -42,7 +42,7 @@ def compute_dstg_adj(st_scale, st_label, adj_data, k_filter=1):
     return adj_normalized
 
 
-def construct_link_graph(st_scale, st_label, k_filter):
+def construct_link_graph(st_scale, k_filter):
     if (n := len(st_scale)) == 1:
         combine = pd.Series([(0, 0)])
     else:
