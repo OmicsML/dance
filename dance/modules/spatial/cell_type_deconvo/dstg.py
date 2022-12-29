@@ -18,8 +18,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn.parameter import Parameter
 
-from dance.transforms.graph_construct import stAdjConstruct
-from dance.transforms.preprocess import preprocess_adj, pseudo_spatial_process, split
+from dance.transforms.graph.dstg_graph import stAdjConstruct
+from dance.transforms.preprocess import pseudo_spatial_process, split
 
 
 class GraphConvolution(nn.Module):
@@ -180,8 +180,6 @@ class DSTGLearner:
 
         # Construct and process adjacency matrix
         adj = stAdjConstruct(mix_counts, mix_labels, adj_data, k_filter=k_filter)
-        adj = preprocess_adj(adj)
-
         self.adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
                                             torch.FloatTensor(adj.data.astype(np.int32))).to(device)
 
