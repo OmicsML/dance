@@ -15,9 +15,9 @@ class DSTGraph(BaseTransform):
     pass
 
 
-def stAdjConstruct(st_scale, st_label, adj_data, k_filter=1):
+def compute_dstg_adj(st_scale, st_label, adj_data, k_filter=1):
     st_scale_dfs = [adata.to_df().T for adata in st_scale]
-    graph = stLinkGraphConstruct(st_scale_dfs, st_label, k_filter)
+    graph = construct_link_graph(st_scale_dfs, st_label, k_filter)
 
     data_train1, data_val1, data_test1, labels, lab_data2 = adj_data
 
@@ -42,20 +42,20 @@ def stAdjConstruct(st_scale, st_label, adj_data, k_filter=1):
     return adj_normalized
 
 
-def stLinkGraphConstruct(st_scale, st_label, k_filter):
+def construct_link_graph(st_scale, st_label, k_filter):
     if (n := len(st_scale)) == 1:
         combine = pd.Series([(0, 0)])
     else:
         combine = pd.Series(itertools.combinations(range(n), 2))
 
-    link = stLinkGraph(scale_list=st_scale, combine=combine, k_filter=k_filter)
+    link = link_graph(scale_list=st_scale, combine=combine, k_filter=k_filter)
     assert len(link) == 1, "Default DSTG graph construct only uses the firs two expression matrices."
     graph = link[0].iloc[:, :2].reset_index(drop=True)
 
     return graph
 
 
-def stLinkGraph(scale_list, combine, k_filter=200, num_cc=30):
+def link_graph(scale_list, combine, k_filter=200, num_cc=30):
     all_edges = []
     for i, j in combine:
         scale_data1 = scale_list[i]
@@ -65,24 +65,24 @@ def stLinkGraph(scale_list, combine, k_filter=200, num_cc=30):
         norm_embedding = dance.transforms.preprocess.l2norm(mat=cell_embedding[0])
         spots1 = scale_data1.columns
         spots2 = scale_data2.columns
-        neighbor = KNN(cell_embedding=norm_embedding, spots1=spots1, spots2=spots2, k=30)
-        mnn_edges = MNN(neighbors=neighbor, colnames=cell_embedding[0].index, num=5)
+        neighbor = knn(cell_embedding=norm_embedding, spots1=spots1, spots2=spots2, k=30)
+        mnn_edges = mnn(neighbors=neighbor, colnames=cell_embedding[0].index, num=5)
         select_genes = dance.transforms.preprocess.selectTopGenes(Loadings=loading, dims=range(num_cc), DimGenes=100,
                                                                   maxGenes=200)
         Mat = pd.concat([scale_data1, scale_data2], axis=1)
-        edges = filterEdge(edges=mnn_edges, neighbors=neighbor, mats=Mat, features=select_genes, k_filter=k_filter)
+        edges = filter_edge(edges=mnn_edges, neighbors=neighbor, mats=Mat, features=select_genes, k_filter=k_filter)
         edges[["Dataset1", "Dataset2"]] = i, j
         all_edges.append(edges)
     return all_edges
 
 
-def filterEdge(edges, neighbors, mats, features, k_filter):
+def filter_edge(edges, neighbors, mats, features, k_filter):
     nn_spots1, nn_spots2 = neighbors[4:6]
     mat1 = mats.loc[features, nn_spots1].T
     mat2 = mats.loc[features, nn_spots2].T
     cn_data1 = dance.transforms.preprocess.l2norm(mat1)
     cn_data2 = dance.transforms.preprocess.l2norm(mat2)
-    nn = kNN(data=cn_data2.loc[nn_spots2, ], query=cn_data1.loc[nn_spots1, ], k=k_filter)
+    nn = query_knn(data=cn_data2.loc[nn_spots2, ], query=cn_data1.loc[nn_spots1, ], k=k_filter)
     position = [
         np.where(edges.loc[:, "spot2"][x] == nn[1][edges.loc[:, "spot1"][x], ])[0] for x in range(edges.shape[0])
     ]
@@ -95,7 +95,7 @@ def preprocess_adj(adj):
     """Preprocessing of adjacency matrix for scGCN model and conversion to tuple
     representation."""
     adj_normalized = normalize_adj(adj + sp.eye(adj.shape[0]))
-    return adj_normalized  # sparse_to_tuple(adj_normalized)
+    return adj_normalized
 
 
 def normalize_adj(adj):
@@ -108,23 +108,23 @@ def normalize_adj(adj):
     return adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo()
 
 
-def kNN(data, k, query=None):
+def query_knn(data, k, query=None):
     tree = KDTree(data)
     dist, ind = tree.query(data if query is None else query, k)
     return dist, ind
 
 
-def KNN(cell_embedding, spots1, spots2, k):
+def knn(cell_embedding, spots1, spots2, k):
     embedding_spots1 = cell_embedding.loc[spots1, ]
     embedding_spots2 = cell_embedding.loc[spots2, ]
-    nnaa = kNN(embedding_spots1, k=k + 1)
-    nnbb = kNN(embedding_spots2, k=k + 1)
-    nnab = kNN(data=embedding_spots2, k=k, query=embedding_spots1)
-    nnba = kNN(data=embedding_spots1, k=k, query=embedding_spots2)
+    nnaa = query_knn(embedding_spots1, k=k + 1)
+    nnbb = query_knn(embedding_spots2, k=k + 1)
+    nnab = query_knn(data=embedding_spots2, k=k, query=embedding_spots1)
+    nnba = query_knn(data=embedding_spots1, k=k, query=embedding_spots2)
     return nnaa, nnab, nnba, nnbb, spots1, spots2
 
 
-def MNN(neighbors, colnames, num):
+def mnn(neighbors, colnames, num):
     max_nn = np.array([neighbors[1][1].shape[1], neighbors[2][1].shape[1]])
     if ((num > max_nn).any()):
         num = np.min(max_nn)
