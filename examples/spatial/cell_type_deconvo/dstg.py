@@ -17,7 +17,7 @@ parser.add_argument("--N_p", type=int, default=500, help="Number of pseudo mixtu
 parser.add_argument("--n_hvg", type=int, default=2000, help="Number of HVGs.")
 parser.add_argument("--lr", type=float, default=1e-2, help="Learning rate.")
 parser.add_argument("--wd", type=float, default=1e-4, help="Weight decay.")
-parser.add_argument("--K_filter", type=int, default=0, help="Graph node filter.")
+parser.add_argument("--K_filter", type=int, default=200, help="Graph node filter.")
 parser.add_argument("--bias", type=bool, default=False, help="Include/Exclude bias term.")
 parser.add_argument("--nhid", type=int, default=16, help="Number of neurons in latent layer.")
 parser.add_argument("--dropout", type=float, default=0., help="Dropout rate.")
