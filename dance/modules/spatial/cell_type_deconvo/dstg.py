@@ -169,7 +169,7 @@ class DSTGLearner:
         mix_labels = [lab.drop(["cell_count", "total_umi_count", "n_counts"], axis=1) for lab in mix_labels]
 
         # create train/val/test split
-        (adj_data, features, labels_binary_train, labels_binary_val, labels_binary_test, train_mask, pred_mask,
+        (split_indexs, features, labels_binary_train, labels_binary_val, labels_binary_test, train_mask, pred_mask,
          val_mask, test_mask, new_label, true_label) = split(mix_counts, mix_labels, pre_process=1, split_val=.8)
 
         self.labels_binary_train = torch.FloatTensor(labels_binary_train).to(device)
@@ -179,7 +179,7 @@ class DSTGLearner:
         self.train_mask = torch.FloatTensor(train_mask).to(device)
 
         # Construct and process adjacency matrix
-        adj = compute_dstg_adj(mix_counts, adj_data, k_filter=k_filter)
+        adj = compute_dstg_adj(mix_counts, split_indexs, k_filter=k_filter)
         self.adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
                                             torch.FloatTensor(adj.data.astype(np.int32))).to(device)
 

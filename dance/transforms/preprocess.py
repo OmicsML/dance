@@ -1885,7 +1885,7 @@ def sample_mask(idx, l):
     return np.array(mask, dtype=np.bool)
 
 
-def split(st_data, lab_label, pre_process, split_val=.9):
+def split(st_data, lab_label, pre_process, split_val=.9, random_state=1):
     data1 = pd.DataFrame(st_data[0].X, index=st_data[0].obs.index, columns=st_data[0].var.index)
     data2 = pd.DataFrame(st_data[1].X, index=st_data[1].obs.index, columns=st_data[1].var.index)
 
@@ -1895,12 +1895,13 @@ def split(st_data, lab_label, pre_process, split_val=.9):
     lab_data1 = data1.reset_index(drop=True)  #.transpose()
     lab_data2 = data2.reset_index(drop=True)  #.transpose()
 
-    random.seed(123)
     p_data = lab_data1
     p_label = lab_label1
 
-    temd_train, temD_val, teml_train, temL_val = train_test_split(p_data, p_label, test_size=0.2, random_state=1)
-    temd_val, temd_test, teml_val, teml_test = train_test_split(temD_val, temL_val, test_size=0.5, random_state=1)
+    temd_train, temD_val, teml_train, temL_val = train_test_split(p_data, p_label, test_size=0.2,
+                                                                  random_state=random_state)
+    temd_val, temd_test, teml_val, teml_test = train_test_split(temD_val, temL_val, test_size=0.5,
+                                                                random_state=random_state)
 
     print((temd_train.index == teml_train.index).all())
     print((temd_test.index == teml_test.index).all())
@@ -1969,9 +1970,9 @@ def split(st_data, lab_label, pre_process, split_val=.9):
     labels_binary_val[val_mask, :] = new_label[val_mask, :]
     labels_binary_test[test_mask, :] = new_label[test_mask, :]
 
-    adj_data = [data_train1, data_val1, data_test1]
+    split_indexs = [data_train1.index.values, data_val1.index.values, data_test1.index.values]
 
-    return adj_data, features, labels_binary_train, labels_binary_val, labels_binary_test, train_mask, pred_mask, val_mask, test_mask, new_label, true_label
+    return split_indexs, features, labels_binary_train, labels_binary_val, labels_binary_test, train_mask, pred_mask, val_mask, test_mask, new_label, true_label
 
 
 def l2norm(mat):
