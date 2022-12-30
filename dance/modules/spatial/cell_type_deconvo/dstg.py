@@ -336,13 +336,9 @@ def masked_softmax_cross_entropy(preds, labels, mask):
         Cross entropy loss between true and predicted cell-type proportions (mean reduced).
 
     """
-    if (mask is None):
-        loss = F.cross_entropy(preds, labels, reduction="mean")
-        return loss
+    loss = F.cross_entropy(preds, labels, reduction="none")
+    if mask is None:
+        loss = loss.mean()
     else:
-        loss = F.cross_entropy(preds, labels, reduction="none")
-        mask = mask.type(torch.float32)
-        mask /= torch.mean(mask)
-        loss *= mask
-        loss = torch.mean(loss)
-        return loss
+        loss = (loss * mask.float()).sum() / mask.sum()
+    return loss
