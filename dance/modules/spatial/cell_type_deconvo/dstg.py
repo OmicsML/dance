@@ -132,68 +132,47 @@ class GCN(nn.Module):
         return x
 
 
-class DSTGLearner:
-    """DSTGLearner.
+class DSTG:
+    """DSTG cell-type deconvolution model."""
 
-    Parameters
-    ----------
-    nfeat : int
-        Input dimension.
-    nhid1 : int
-        Number of units in the hidden layer (graph convolution).
-    nout : int
-        Output dimension.
-    bias : boolean optional
-        Include bias term, default False.
-    dropout : float optional
-        Dropout rate, default 0.
-    act : optional
-        Activation function, default torch functional relu.
+    def __init__(self, nhid=32, bias=False, dropout=0, device="cpu"):
+        """Initialize the DSTG model.
 
-    """
+        Parameters
+        ----------
+        nhid : int
+            Number of units in the hidden layer (graph convolution).
+        bias : boolean optional
+            Include bias term, default False.
+        dropout : float optional
+            Dropout rate, default 0.
+        device : str
+            Computation device.
 
-    def __init__(self, sc_count, sc_annot, scRNA, mix_count, clust_vr, mix_annot=None, n_hvg=2000, N_p=1000, k_filter=0,
-                 nhid=32, bias=False, dropout=0., device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+        """
         super().__init__()
+        self.nhid = nhid
+        self.bias = bias
+        self.dropout = dropout
         self.device = device
 
-        # Set adata objects for sc ref and cell mixtures
-        sc_adata = sc.AnnData(sc_count, obs=sc_annot, dtype=np.float32)
-        mix_adata = sc.AnnData(mix_count, dtype=np.float32)
+    def _init_model(self, dim_in, dim_out):
+        """Initialize GCN model."""
+        self.model = GCN(dim_in, self.nhid, dim_out, self.bias, self.dropout).to(self.device)
 
-        # pre-process: get variable genes --> normalize --> log1p --> standardize --> out
-        # set scRNA to false if already using pseudo spot data with real spot data
-        # set to true if the reference data is scRNA (to be used for generating pseudo spots)
-        mix_counts, mix_labels, hvgs = pseudo_spatial_process([sc_adata, mix_adata], [sc_annot, mix_annot], clust_vr,
-                                                              scRNA, n_hvg, N_p)
-        mix_labels = [lab.drop(["cell_count", "total_umi_count", "n_counts"], axis=1) for lab in mix_labels]
-
-        features = np.vstack((mix_counts[0].X, mix_counts[1].X)).astype(np.float32)
-        normalized_features = normalize(features, axis=1, mode="normalize")
-        labels = np.vstack(mix_labels).astype(np.float32)
-        train_mask = np.zeros(len(labels), dtype=np.bool)
-        train_mask[:len(mix_counts[0])] = True
-
-        self.labels_binary_train = torch.from_numpy(labels).to(device)
-        self.features = torch.from_numpy(normalized_features).to(device)
-        self.train_mask = torch.from_numpy(train_mask).to(device)
-
-        # Construct and process adjacency matrix
-        pseudo_mix_counts, real_mix_counts = mix_counts
-        adj = compute_dstg_adj(pseudo_mix_counts, real_mix_counts, k_filter=k_filter)
-        self.adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
-                                            torch.FloatTensor(adj.data.astype(np.int32))).to(device)
-
-        # Initialize GCN module
-        nfeat = self.features.size()[1]
-        nout = self.labels_binary_train.size()[1]
-        self.model = GCN(nfeat, nhid, nout, bias, dropout).to(device)
-
-    def fit(self, lr=0.005, max_epochs=50, weight_decay=0):
+    def fit(self, x, adj, y, train_mask, lr=0.005, max_epochs=50, weight_decay=0):
         """Fit function for model training.
 
         Parameters
         ----------
+        x : torch.Tensor
+            Gene expression feature (spot x gene).
+        adj : torch.Tensor
+            Spot similarity graph.
+        y : torch.Tensor
+            Cell-type portions (spot x cell-type).
+        train_mask : torch.Tensor
+            Mask indicating which spots (rows) should be used for training.
         lr : float optional
             Learning rate.
         max_epochs : int optional
@@ -202,10 +181,11 @@ class DSTGLearner:
             Weight decay parameter for optimization (Adam).
 
         """
-        X = self.features  # node features
-        adj = self.adj  # ajacency matrix
-        labels = self.labels_binary_train  # labels of pseudo spots (and real spots if provided)
-        labels_mask = self.train_mask  # mask to indicate which samples to use for training
+        x = x.to(self.device)
+        adj = adj.to(self.device)
+        y = y.to(self.device)
+        train_mask = train_mask.to(self.device)
+        self._init_model(x.shape[1], y.shape[1])
 
         model = self.model
         model.train()
@@ -214,16 +194,18 @@ class DSTGLearner:
         for epoch in range(max_epochs):
             t = time.time()
 
-            y_hat = model(X, adj)
-            loss = masked_softmax_cross_entropy(y_hat, labels, labels_mask)
+            y_pred = model(x, adj)
+            loss = masked_softmax_cross_entropy(y_pred, y, train_mask)
 
             if (epoch + 1) % 5 == 0:
-                print("Epoch:", "%04d" % (epoch + 1), "train_loss=", "{:.5f}".format(loss), "time=",
-                      "{:.5f}".format(time.time() - t))
+                print(f"Epoch: {epoch + 1:04d}, train_loss={loss:.5f}, time={time.time() - t:.5f}")
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+
+        model.eval()
+        self.pred = F.softmax(self.model(x, adj), dim=-1)
 
     def predict(self):
         """Prediction function.
@@ -234,12 +216,7 @@ class DSTGLearner:
             Predictions of cell-type proportions.
 
         """
-        self.model.eval()
-        X = self.features
-        adj = self.adj
-        fX = self.model(X, adj)
-        pred = F.softmax(fX, dim=1)
-        return pred
+        return self.pred
 
     def score(self, pred, true_prop, score_metric="ce"):
         """Model performance score.

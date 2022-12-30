@@ -1,10 +1,15 @@
 import argparse
 from pprint import pprint
 
+import numpy as np
 import torch
+from anndata import AnnData
 
 from dance.datasets.spatial import CellTypeDeconvoDatasetLite
-from dance.modules.spatial.cell_type_deconvo.dstg import DSTGLearner
+from dance.modules.spatial.cell_type_deconvo.dstg import DSTG
+from dance.transforms.graph.dstg_graph import compute_dstg_adj
+from dance.transforms.preprocess import pseudo_spatial_process
+from dance.utils.matrix import normalize
 
 # TODO: make this a property of the dataset class?
 DATASETS = ["CARD_synthetic", "GSE174746", "SPOTLight_synthetic", "toy1", "toy2"]
@@ -13,11 +18,11 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 parser.add_argument("--dataset", default="CARD_synthetic", choices=DATASETS, help="Name of the dataset.")
 parser.add_argument("--datadir", default="data/spatial", help="Directory to save the data.")
 parser.add_argument("--sc_ref", type=bool, default=True, help="Reference scRNA (True) or cell-mixtures (False).")
-parser.add_argument("--N_p", type=int, default=500, help="Number of pseudo mixtures to generate.")
+parser.add_argument("--num_pseudo", type=int, default=500, help="Number of pseudo mixtures to generate.")
 parser.add_argument("--n_hvg", type=int, default=2000, help="Number of HVGs.")
 parser.add_argument("--lr", type=float, default=1e-2, help="Learning rate.")
 parser.add_argument("--wd", type=float, default=1e-4, help="Weight decay.")
-parser.add_argument("--K_filter", type=int, default=200, help="Graph node filter.")
+parser.add_argument("--k_filter", type=int, default=200, help="Graph node filter.")
 parser.add_argument("--bias", type=bool, default=False, help="Include/Exclude bias term.")
 parser.add_argument("--nhid", type=int, default=16, help="Number of neurons in latent layer.")
 parser.add_argument("--dropout", type=float, default=0., help="Dropout rate.")
@@ -50,19 +55,40 @@ ct_select_ix = sc_annot[sc_annot["cellType"].isin(ct_select)].index
 sc_annot = sc_annot.loc[ct_select_ix]
 sc_count = sc_count.loc[ct_select_ix]
 
+# Set adata objects for sc ref and cell mixtures
+sc_adata = AnnData(sc_count, obs=sc_annot, dtype=np.float32)
+mix_adata = AnnData(mix_count, dtype=np.float32)
+
+# pre-process: get variable genes --> normalize --> log1p --> standardize --> out
+# set scRNA to false if already using pseudo spot data with real spot data
+# set to true if the reference data is scRNA (to be used for generating pseudo spots)
+mix_counts, mix_labels, hvgs = pseudo_spatial_process([sc_adata, mix_adata], [sc_annot, None], "cellType", args.sc_ref,
+                                                      args.n_hvg, args.num_pseudo)
+mix_labels = [lab.drop(["cell_count", "total_umi_count", "n_counts"], axis=1) for lab in mix_labels]
+
+features = np.vstack((mix_counts[0].X, mix_counts[1].X)).astype(np.float32)
+x = normalize(torch.from_numpy(features), axis=1, mode="normalize")
+y = torch.from_numpy(np.vstack(mix_labels).astype(np.float32))
+train_mask = torch.zeros(y.shape[0], dtype=torch.bool)
+train_mask[:len(mix_counts[0])] = True
+
+# Construct and process adjacency matrix
+pseudo_mix_counts, real_mix_counts = mix_counts
+adj = compute_dstg_adj(pseudo_mix_counts, real_mix_counts, k_filter=args.k_filter)
+adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
+                               torch.FloatTensor(adj.data.astype(np.int32)))
+
 # Initialize and train model
-dstg = DSTGLearner(sc_count=sc_count, sc_annot=sc_annot, scRNA=args.sc_ref, mix_count=mix_count, clust_vr="cellType",
-                   n_hvg=args.n_hvg, N_p=args.N_p, k_filter=args.K_filter, nhid=args.nhid, device=device,
-                   bias=args.bias, dropout=args.dropout)
+dstg = DSTG(nhid=args.nhid, bias=args.bias, dropout=args.dropout, device=device)
 
 # Fit model
-dstg.fit(lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
+dstg.fit(x, adj, y, train_mask, lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
 
 # Predict cell-type proportions and evaluate
 pred = dstg.predict()
 
 # Compute score
-mse = dstg.score(pred[args.N_p:, :], torch.Tensor(true_p[ct_select].values), "mse")
+mse = dstg.score(pred[args.num_pseudo:, :], torch.Tensor(true_p[ct_select].values), "mse")
 print(f"mse = {mse:7.4f}")
 """To reproduce DSTG benchmarks, please refer to command lines belows:
 

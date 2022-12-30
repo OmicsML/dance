@@ -1,5 +1,5 @@
 from .card import Card
-from .dstg import DSTGLearner
+from .dstg import DSTG
 from .spatialdecon import SpatialDecon
 from .spotlight import SPOTlight
 
