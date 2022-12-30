@@ -93,10 +93,10 @@ print(f"mse = {mse:7.4f}")
 """To reproduce DSTG benchmarks, please refer to command lines belows:
 
 CARD synthetic
-$ python dstg.py --dataset CARD_synthetic --nhid 16 --lr .001
+$ python dstg.py --dataset CARD_synthetic --nhid 16 --lr .001 --k_filter 50
 
 GSE174746
-$ python dstg.py --dataset GSE174746 --nhid 16 --lr .0001
+$ python dstg.py --dataset GSE174746 --nhid 16 --lr .0001 --k_filter 50
 
 SPOTLight synthetic
 $ python dstg.py --dataset SPOTLight_synthetic --nhid 32 --lr .1 --epochs 25
