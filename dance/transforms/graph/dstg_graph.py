@@ -14,20 +14,18 @@ class DSTGraph(BaseTransform):
         pass
 
 
-def compute_dstg_adj(pseudo_st_scale, real_st_scale, split_indexs, k_filter=1):
+def compute_dstg_adj(pseudo_st_scale, real_st_scale, k_filter=1):
     pseudo_st_df = pseudo_st_scale.to_df().T
     real_st_df = real_st_scale.to_df().T
     graph = construct_link_graph(pseudo_st_df, real_st_df, k_filter)
 
-    data_train1, data_val1, data_test1 = (pseudo_st_df.iloc[i] for i in split_indexs)
+    num_ref = len(pseudo_st_scale)
     num_inf = len(real_st_scale)
-    num_train = len(data_train1)
-    num_valtest = len(data_val1) + len(data_test1)
-    num_tot = num_inf + num_train + num_valtest
+    num_tot = num_ref + num_inf
 
     # Combine the spot index for pseudo (find) and real (index) into the graph node index
-    index = np.concatenate((split_indexs[0], -np.ones(num_inf), split_indexs[1], split_indexs[2]))
-    find = np.concatenate((-np.ones(num_train), np.arange(num_inf), -np.ones(num_valtest)))
+    index = np.concatenate((np.arange(num_ref), -np.ones(num_inf)))
+    find = np.concatenate((-np.ones(num_ref), np.arange(num_inf)))
     index_map = {j: i for i, j in enumerate(index) if j >= 0}
     find_map = {j: i for i, j in enumerate(find) if j >= 0}
 

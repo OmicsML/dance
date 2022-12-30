@@ -19,7 +19,8 @@ import torch.optim as optim
 from torch.nn.parameter import Parameter
 
 from dance.transforms.graph.dstg_graph import compute_dstg_adj
-from dance.transforms.preprocess import pseudo_spatial_process, split
+from dance.transforms.preprocess import pseudo_spatial_process
+from dance.utils.matrix import normalize
 
 
 class GraphConvolution(nn.Module):
@@ -157,9 +158,8 @@ class DSTGLearner:
         self.device = device
 
         # Set adata objects for sc ref and cell mixtures
-        sc_adata = sc.AnnData(sc_count)
-        sc_adata.obs = sc_annot
-        mix_adata = sc.AnnData(mix_count)
+        sc_adata = sc.AnnData(sc_count, obs=sc_annot, dtype=np.float32)
+        mix_adata = sc.AnnData(mix_count, dtype=np.float32)
 
         # pre-process: get variable genes --> normalize --> log1p --> standardize --> out
         # set scRNA to false if already using pseudo spot data with real spot data
@@ -168,19 +168,19 @@ class DSTGLearner:
                                                               scRNA, n_hvg, N_p)
         mix_labels = [lab.drop(["cell_count", "total_umi_count", "n_counts"], axis=1) for lab in mix_labels]
 
-        # create train/val/test split
-        (split_indexs, features, labels_binary_train, labels_binary_val, labels_binary_test, train_mask, pred_mask,
-         val_mask, test_mask, new_label, true_label) = split(mix_counts, mix_labels, pre_process=1, split_val=.8)
+        features = np.vstack((mix_counts[0].X, mix_counts[1].X)).astype(np.float32)
+        normalized_features = normalize(features, axis=1, mode="normalize")
+        labels = np.vstack(mix_labels).astype(np.float32)
+        train_mask = np.zeros(len(labels), dtype=np.bool)
+        train_mask[:len(mix_counts[0])] = True
 
-        self.labels_binary_train = torch.FloatTensor(labels_binary_train).to(device)
-        self.features = torch.sparse.FloatTensor(
-            torch.LongTensor([features[0][:, 0].tolist(), features[0][:, 1].tolist()]),
-            torch.FloatTensor(features[1])).to(device)
-        self.train_mask = torch.FloatTensor(train_mask).to(device)
+        self.labels_binary_train = torch.from_numpy(labels).to(device)
+        self.features = torch.from_numpy(normalized_features).to(device)
+        self.train_mask = torch.from_numpy(train_mask).to(device)
 
         # Construct and process adjacency matrix
         pseudo_mix_counts, real_mix_counts = mix_counts
-        adj = compute_dstg_adj(pseudo_mix_counts, real_mix_counts, split_indexs, k_filter=k_filter)
+        adj = compute_dstg_adj(pseudo_mix_counts, real_mix_counts, k_filter=k_filter)
         self.adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
                                             torch.FloatTensor(adj.data.astype(np.int32))).to(device)
 
