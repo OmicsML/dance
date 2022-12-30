@@ -64,12 +64,9 @@ def filter_edge(edges, neighbors, mats, features, k_filter):
     mat2 = mats.loc[features, nn_spots2].T
     cn_data1 = dance.transforms.preprocess.l2norm(mat1)
     cn_data2 = dance.transforms.preprocess.l2norm(mat2)
-    nn = query_knn(data=cn_data2.loc[nn_spots2, ], query=cn_data1.loc[nn_spots1, ], k=k_filter)
-    position = [
-        np.where(edges.loc[:, "spot2"][x] == nn[1][edges.loc[:, "spot1"][x], ])[0] for x in range(edges.shape[0])
-    ]
-    nps = np.concatenate(position, axis=0)
-    filtered_edges = edges.iloc[nps].copy().reset_index(drop=True)
+    nn = query_knn(data=cn_data2.loc[nn_spots2], query=cn_data1.loc[nn_spots1], k=k_filter)
+    ind = [j in nn[1][i] for _, (i, j) in edges.iterrows()]
+    filtered_edges = edges[ind].copy().reset_index(drop=True)
     return filtered_edges
 
 
