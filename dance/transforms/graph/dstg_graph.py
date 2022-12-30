@@ -1,5 +1,3 @@
-import itertools
-
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -11,16 +9,18 @@ from dance.transforms.base import BaseTransform
 
 
 class DSTGraph(BaseTransform):
-    pass
+
+    def __init__(self, k_filter, **kwargs):
+        pass
 
 
-def compute_dstg_adj(st_scale, split_indexs, k_filter=1):
-    st_scale_dfs = [adata.to_df().T for adata in st_scale]
-    graph = construct_link_graph(st_scale_dfs, k_filter)
+def compute_dstg_adj(pseudo_st_scale, real_st_scale, split_indexs, k_filter=1):
+    pseudo_st_df = pseudo_st_scale.to_df().T
+    real_st_df = real_st_scale.to_df().T
+    graph = construct_link_graph(pseudo_st_df, real_st_df, k_filter)
 
-    data_train1, data_val1, data_test1 = (st_scale_dfs[0].iloc[i] for i in split_indexs)
-
-    num_inf = len(st_scale[1])
+    data_train1, data_val1, data_test1 = (pseudo_st_df.iloc[i] for i in split_indexs)
+    num_inf = len(real_st_scale)
     num_train = len(data_train1)
     num_valtest = len(data_val1) + len(data_test1)
     num_tot = num_inf + num_train + num_valtest
@@ -43,38 +43,19 @@ def compute_dstg_adj(st_scale, split_indexs, k_filter=1):
     return adj_normalized
 
 
-def construct_link_graph(st_scale, k_filter):
-    if (n := len(st_scale)) == 1:
-        combine = pd.Series([(0, 0)])
-    else:
-        combine = pd.Series(itertools.combinations(range(n), 2))
-
-    link = link_graph(scale_list=st_scale, combine=combine, k_filter=k_filter)
-    assert len(link) == 1, "Default DSTG graph construct only uses the firs two expression matrices."
-    graph = link[0].iloc[:, :2].reset_index(drop=True)
+def construct_link_graph(pseudo_st_df, real_st_df, k_filter=200, num_cc=30):
+    cell_embedding, loading = dance.transforms.preprocess.ccaEmbed(pseudo_st_df, real_st_df, num_cc=num_cc)
+    norm_embedding = dance.transforms.preprocess.l2norm(mat=cell_embedding[0])
+    spots1 = pseudo_st_df.columns
+    spots2 = real_st_df.columns
+    neighbor = knn(cell_embedding=norm_embedding, spots1=spots1, spots2=spots2, k=30)
+    mnn_edges = mnn(neighbors=neighbor, colnames=cell_embedding[0].index, num=5)
+    select_genes = dance.transforms.preprocess.selectTopGenes(Loadings=loading, dims=range(num_cc), DimGenes=100,
+                                                              maxGenes=200)
+    Mat = pd.concat((pseudo_st_df, real_st_df), axis=1)
+    graph = filter_edge(edges=mnn_edges, neighbors=neighbor, mats=Mat, features=select_genes, k_filter=k_filter)
 
     return graph
-
-
-def link_graph(scale_list, combine, k_filter=200, num_cc=30):
-    all_edges = []
-    for i, j in combine:
-        scale_data1 = scale_list[i]
-        scale_data2 = scale_list[j]
-
-        cell_embedding, loading = dance.transforms.preprocess.ccaEmbed(scale_data1, scale_data2, num_cc=num_cc)
-        norm_embedding = dance.transforms.preprocess.l2norm(mat=cell_embedding[0])
-        spots1 = scale_data1.columns
-        spots2 = scale_data2.columns
-        neighbor = knn(cell_embedding=norm_embedding, spots1=spots1, spots2=spots2, k=30)
-        mnn_edges = mnn(neighbors=neighbor, colnames=cell_embedding[0].index, num=5)
-        select_genes = dance.transforms.preprocess.selectTopGenes(Loadings=loading, dims=range(num_cc), DimGenes=100,
-                                                                  maxGenes=200)
-        Mat = pd.concat([scale_data1, scale_data2], axis=1)
-        edges = filter_edge(edges=mnn_edges, neighbors=neighbor, mats=Mat, features=select_genes, k_filter=k_filter)
-        edges[["Dataset1", "Dataset2"]] = i, j
-        all_edges.append(edges)
-    return all_edges
 
 
 def filter_edge(edges, neighbors, mats, features, k_filter):
@@ -88,7 +69,7 @@ def filter_edge(edges, neighbors, mats, features, k_filter):
         np.where(edges.loc[:, "spot2"][x] == nn[1][edges.loc[:, "spot1"][x], ])[0] for x in range(edges.shape[0])
     ]
     nps = np.concatenate(position, axis=0)
-    filtered_edges = edges.iloc[nps].copy()
+    filtered_edges = edges.iloc[nps].copy().reset_index(drop=True)
     return filtered_edges
 
 

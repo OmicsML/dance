@@ -179,7 +179,8 @@ class DSTGLearner:
         self.train_mask = torch.FloatTensor(train_mask).to(device)
 
         # Construct and process adjacency matrix
-        adj = compute_dstg_adj(mix_counts, split_indexs, k_filter=k_filter)
+        pseudo_mix_counts, real_mix_counts = mix_counts
+        adj = compute_dstg_adj(pseudo_mix_counts, real_mix_counts, split_indexs, k_filter=k_filter)
         self.adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
                                             torch.FloatTensor(adj.data.astype(np.int32))).to(device)
 
