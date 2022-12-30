@@ -60,12 +60,12 @@ class GraphConvolution(nn.Module):
         if self.bias is not None:
             self.bias.data.uniform_(-stdv, stdv)
 
-    def forward(self, input, adj):
+    def forward(self, x, adj):
         """Forward function.
 
         Parameters
         ----------
-        input
+        x
             Node features.
         adj
             Adjacency matrix.
@@ -77,10 +77,10 @@ class GraphConvolution(nn.Module):
 
         """
         # Convolution
-        if input.is_sparse:  # Sparse input features
-            support = torch.spmm(input, self.weight)
+        if x.is_sparse:  # Sparse x features
+            support = torch.spmm(x, self.weight)
         else:
-            support = torch.mm(input, self.weight)
+            support = torch.mm(x, self.weight)
 
         # Adj should always be sparse
         # Add a ReLU or other activation!!
