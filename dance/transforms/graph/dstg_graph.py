@@ -83,21 +83,12 @@ def filter_edge(edges, neighbors, mats, features, k_filter):
 
 
 def preprocess_adj(adj):
-    """Preprocessing of adjacency matrix for scGCN model and conversion to tuple
-    representation."""
+    """Symmetrically normalize the adjacency matrix with an addition of identity."""
     # Question: isn't this addition of self-loop redundant with the initialization?
-    adj_normalized = normalize_adj(adj + sp.eye(adj.shape[0]))
+    adj = sp.csr_matrix(adj + sp.eye(adj.shape[0]))
+    d_inv_sqrt = sp.diags(1 / np.sqrt(adj.sum(1).A.ravel()))
+    adj_normalized = d_inv_sqrt.dot(adj).dot(d_inv_sqrt).tocoo()
     return adj_normalized
-
-
-def normalize_adj(adj):
-    """Symmetrically normalize adjacency matrix."""
-    adj = sp.coo_matrix(adj)
-    rowsum = np.array(adj.sum(1))
-    d_inv_sqrt = np.power(rowsum, -0.5).flatten()
-    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.
-    d_mat_inv_sqrt = sp.diags(d_inv_sqrt)
-    return adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo()
 
 
 def query_knn(data, k, query=None):
