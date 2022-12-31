@@ -168,6 +168,7 @@ class BaseData(ABC):
     def test_idx(self) -> Sequence[int]:
         return self.get_split_idx("test", error_on_miss=False)
 
+    @property
     def shape(self) -> Tuple[int, int]:
         return self.data.shape
 
@@ -204,6 +205,27 @@ class BaseData(ABC):
             raise KeyError(f"Unknown split {split_name!r}. Please set the split inddices via set_split_idx first.")
         else:
             return None
+
+    def get_split_mask(self, split_name: str, return_type: FeatType = "numpy") -> Union[np.ndarray, torch.Tensor]:
+        """Obtain mask representation of a particualr split.
+
+        Parameters
+        ----------
+        split_name : str
+            Name of the split to retrieve.
+        return_type : str
+            Return numpy array if set to 'numpy', or torch Tensor if set to 'torch'.
+
+        """
+        split_idx = self.get_split_idx(split_name, error_on_miss=True)
+        if return_type == "numpy":
+            mask = np.zeros(self.shape[0], dtype=bool)
+        elif return_type == "torch":
+            mask = torch.zeros(self.shape[0], dtype=torch.bool)
+        else:
+            raise ValueError(f"Unsupported return_type {return_type!r}. Available options are 'numpy' and 'torch'.")
+        mask[split_idx] = True
+        return mask
 
     def get_feature(self, *, split_name: Optional[str] = None, return_type: FeatType = "numpy",
                     channel: Optional[str] = None, channel_type: Optional[str] = "obsm",

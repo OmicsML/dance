@@ -8,7 +8,6 @@ Song, and Su. "DSTG: deconvoluting spatial transcriptomics data through graph-ba
 Briefings in Bioinformatics (2021)
 
 """
-import math
 import time
 
 import numpy as np
@@ -17,11 +16,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.autograd import Variable
 from torch.nn.parameter import Parameter
 
-from dance.transforms.graph_construct import stAdjConstruct
-from dance.transforms.preprocess import preprocess_adj, pseudo_spatial_process, split
+from dance.transforms.graph.dstg_graph import compute_dstg_adj
+from dance.transforms.preprocess import pseudo_spatial_process
+from dance.utils.matrix import normalize
 
 
 class GraphConvolution(nn.Module):
@@ -33,17 +32,13 @@ class GraphConvolution(nn.Module):
         Parameters
         ----------
         in_features : int
-            input dimension.
+            Input dimension.
         out_features : int
-            output dimension.
+            Output dimension.
         support :
-            support for graph convolution.
+            Support for graph convolution.
         bias : boolean optional
-            include bias term, default False.
-
-        Returns
-        -------
-        None.
+            Include bias term, default False.
 
         """
         super().__init__()
@@ -54,44 +49,42 @@ class GraphConvolution(nn.Module):
         if bias:
             self.bias = Parameter(torch.FloatTensor(out_features))
         else:
-            self.register_parameter('bias', None)
+            self.register_parameter("bias", None)
         self.reset_parameters()
 
     def reset_parameters(self):
-        #glorot
+        # glorot
         init_range = np.sqrt(6.0 / (self.in_features + self.out_features))
         self.weight.data.uniform_(-init_range, init_range)
         # similar to kaiming normal/uniform
-        stdv = 1. / math.sqrt(self.weight.size(1))
-        #self.weight.data.uniform_(-stdv, stdv)
+        stdv = 1. / np.sqrt(self.weight.size(1))
         if self.bias is not None:
             self.bias.data.uniform_(-stdv, stdv)
 
-    def forward(self, input, adj):
-        """forward function.
+    def forward(self, x, adj):
+        """Forward function.
 
         Parameters
         ----------
-        input :
-            node features.
-        adj :
-            adjacency matrix.
+        x
+            Node features.
+        adj
+            Adjacency matrix.
 
         Returns
         -------
         output : float
-            output of graph convolution layer.
+            Output of graph convolution layer.
 
         """
-        #convolution
-        if input.is_sparse:
-            #sparse input features
-            support = torch.spmm(input, self.weight)
+        # Convolution
+        if x.is_sparse:  # Sparse x features
+            support = torch.spmm(x, self.weight)
         else:
-            support = torch.mm(input, self.weight)
+            support = torch.mm(x, self.weight)
 
-        #adj should always be sparse
-        #### add a ReLU or other activation!!
+        # Adj should always be sparse
+        # Add a ReLU or other activation!!
         output = torch.spmm(adj, support)
         if self.bias is not None:
             return output + self.bias
@@ -99,9 +92,7 @@ class GraphConvolution(nn.Module):
             return output
 
     def __repr__(self):
-        return self.__class__.__name__ + ' (' \
-               + str(self.in_features) + ' -> ' \
-               + str(self.out_features) + ')'
+        return f"{self.__class__.__name__}({self.in_features} -> {self.out_features})"
 
 
 class GCN(nn.Module):
@@ -120,20 +111,18 @@ class GCN(nn.Module):
 
         Parameters
         ----------
-        x :
-            node features.
-        adj :
-            adjacency matrix.
+        x
+            Node features.
+        adj
+            Adjacency matrix.
 
         Returns
         -------
         output : float
-            output of graph convolution network.
+            Output of graph convolution network.
 
         """
-        #self.nnz = x._nnz() if sparse_inputs else None
-
-        #dropout + convolution
+        # Dropout + convolution
         x = dropout_layer(x, self.dropout)
         x = self.gc1(x, adj)
         x = self.act(x)
@@ -143,94 +132,61 @@ class GCN(nn.Module):
         return x
 
 
-class DSTGLearner:
-    """DSTGLearner.
+class DSTG:
+    """DSTG cell-type deconvolution model."""
 
-    Parameters
-    ----------
-    nfeat : int
-        input dimension.
-    nhid1 : int
-        number of units in the hidden layer (graph convolution).
-    nout : int
-        output dimension.
-    bias : boolean optional
-        include bias term, default False.
-    dropout : float optional
-        dropout rate, default 0.
-    act : optional
-        activation function, default torch functional relu.
-
-    Returns
-    -------
-    None.
-
-    """
-
-    def __init__(self, sc_count, sc_annot, scRNA, mix_count, clust_vr, mix_annot=None, n_hvg=2000, N_p=1000, k_filter=0,
-                 nhid=32, bias=False, dropout=0., device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
-        super().__init__()
-        self.device = device
-
-        #set adata objects for sc ref and cell mixtures
-        sc_adata = sc.AnnData(sc_count)
-        sc_adata.obs = sc_annot
-        mix_adata = sc.AnnData(mix_count)
-        #mix_adata.obs = true_p
-
-        #pre-process: get variable genes --> normalize --> log1p --> standardize --> out
-        #set scRNA to false if already using pseudo spot data with real spot data
-        #set to true if the reference data is scRNA (to be used for generating pseudo spots)
-        mix_counts, mix_labels, hvgs = pseudo_spatial_process([sc_adata, mix_adata], [sc_annot, mix_annot], clust_vr,
-                                                              scRNA, n_hvg, N_p)
-        mix_labels = [lab.drop(['cell_count', 'total_umi_count', 'n_counts'], axis=1) for lab in mix_labels]
-
-        # create train/val/test split
-        adj_data, features, labels_binary_train, labels_binary_val, labels_binary_test, train_mask, pred_mask, val_mask, test_mask, new_label, true_label = split(
-            mix_counts, mix_labels, pre_process=1, split_val=.8)
-
-        self.labels_binary_train = torch.FloatTensor(labels_binary_train).to(device)
-        self.features = torch.sparse.FloatTensor(
-            torch.LongTensor([features[0][:, 0].tolist(), features[0][:, 1].tolist()]),
-            torch.FloatTensor(features[1])).to(device)
-        self.train_mask = torch.FloatTensor(train_mask).to(device)
-
-        #construct adjacency matrix
-        adj = stAdjConstruct(mix_counts, mix_labels, adj_data, k_filter=k_filter)
-        #preprocess adjacency matrix
-        adj = preprocess_adj(adj)
-
-        self.adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
-                                            torch.FloatTensor(adj.data.astype(np.int32))).to(device)
-
-        nfeat = self.features.size()[1]
-        nout = self.labels_binary_train.size()[1]
-        #initialize GCN module
-        self.model = GCN(nfeat, nhid, nout, bias, dropout).to(device)
-
-    def fit(self, lr=0.005, max_epochs=50, weight_decay=0):
-        """fit function for model training.
+    def __init__(self, nhid=32, bias=False, dropout=0, device="cpu"):
+        """Initialize the DSTG model.
 
         Parameters
         ----------
-        lr : float optional
-            learning rate.
-        max_epochs : int optional
-            maximum number of epochs to train.
-        weight_decay : float optional
-            weight decay parameter for optimization (Adam).
-
-        Returns
-        -------
-        None.
+        nhid : int
+            Number of units in the hidden layer (graph convolution).
+        bias : boolean optional
+            Include bias term, default False.
+        dropout : float optional
+            Dropout rate, default 0.
+        device : str
+            Computation device.
 
         """
-        X = self.features  # node features
-        adj = self.adj  # ajacency matrix
-        labels = self.labels_binary_train  # labels of pseudo spots (and real spots if provided)
-        labels_mask = self.train_mask  # mask to indicate which samples to use for training
+        super().__init__()
+        self.nhid = nhid
+        self.bias = bias
+        self.dropout = dropout
+        self.device = device
 
-        #device = self.device
+    def _init_model(self, dim_in, dim_out):
+        """Initialize GCN model."""
+        self.model = GCN(dim_in, self.nhid, dim_out, self.bias, self.dropout).to(self.device)
+
+    def fit(self, x, adj, y, train_mask, lr=0.005, max_epochs=50, weight_decay=0):
+        """Fit function for model training.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Gene expression feature (spot x gene).
+        adj : torch.Tensor
+            Spot similarity graph.
+        y : torch.Tensor
+            Cell-type portions (spot x cell-type).
+        train_mask : torch.Tensor
+            Mask indicating which spots (rows) should be used for training.
+        lr : float optional
+            Learning rate.
+        max_epochs : int optional
+            Maximum number of epochs to train.
+        weight_decay : float optional
+            Weight decay parameter for optimization (Adam).
+
+        """
+        x = x.to(self.device)
+        adj = adj.to(self.device)
+        y = y.to(self.device)
+        train_mask = train_mask.to(self.device)
+        self._init_model(x.shape[1], y.shape[1])
+
         model = self.model
         model.train()
         optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -238,70 +194,68 @@ class DSTGLearner:
         for epoch in range(max_epochs):
             t = time.time()
 
-            y_hat = model(X, adj)
-            loss = masked_softmax_cross_entropy(y_hat, labels, labels_mask)
+            y_pred = model(x, adj)
+            loss = masked_softmax_cross_entropy(y_pred, y, train_mask)
 
             if (epoch + 1) % 5 == 0:
-                print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(loss), "time=",
-                      "{:.5f}".format(time.time() - t))
-            #    _ = model(X, adj)
+                print(f"Epoch: {epoch + 1:04d}, train_loss={loss:.5f}, time={time.time() - t:.5f}")
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
+        model.eval()
+        self.pred = F.softmax(self.model(x, adj), dim=-1)
+
     def predict(self):
-        """prediction function.
-        Parameters
-        ----------
+        """Prediction function.
 
         Returns
         -------
-
         pred : torch tensor
-            predictions of cell-type proportions.
+            Predictions of cell-type proportions.
 
         """
-        self.model.eval()
-        X = self.features
-        adj = self.adj
-        fX = self.model(X, adj)
-        pred = F.softmax(fX, dim=1)
-        return pred
+        return self.pred
 
-    def score(self, pred, true_prop, score_metric='ce'):
+    def fit_and_predict(self, *args, **kwargs):
+        self.fit(*args, **kwargs)
+        return self.predict()
+
+    def score(self, pred, true_prop, score_metric="ce"):
         """Model performance score.
 
         Parameters
         ----------
-        pred :
-            predicted cell-type proportions.
-        true_prop :
-            true cell-type proportions.
-        score_metric :
-            metric used to assess prediction performance.
+        pred
+            Predicted cell-type proportions.
+        true_prop
+            True cell-type proportions.
+        score_metric
+            Metric used to assess prediction performance.
 
         Returns
         -------
         loss : float
-            loss between predicted and true labels.
+            Loss between predicted and true labels.
 
         """
         true_prop = true_prop.to(self.device)
         self.model.eval()
-        if score_metric == 'ce':
+        if score_metric == "ce":
             loss = F.cross_entropy(pred, true_prop)
-        elif score_metric == 'mse':
+        elif score_metric == "mse":
             loss = ((pred / torch.sum(pred, 1, keepdims=True) -
                      true_prop / torch.sum(true_prop, 1, keepdims=True))**2).mean()
         return loss.detach().item()
 
 
 def dropout_layer(x, dropout):
-    """dropout_layer.
+    """Dropout layer.
+
     Parameters
     ----------
-    x:
+    x
         input to dropout layer.
     dropout : float
         dropout rate (between 0 and 1).
@@ -310,9 +264,9 @@ def dropout_layer(x, dropout):
     -------
     out : torch tensor
         dropout output.
+
     """
-    if x.is_sparse:
-        #sparse input features
+    if x.is_sparse:  # sparse input features
         out = sparse_dropout(x, dropout)
         return out
     else:
@@ -321,18 +275,15 @@ def dropout_layer(x, dropout):
 
 
 def sparse_dropout(x, dropout):
-    """sparse_dropout.
+    """Sparse dropout.
+
     Parameters
     ----------
-    x:
-        input to dropout layer.
+    x
+        Input to dropout layer.
     dropout : float
-        dropout rate (between 0 and 1).
+        Dropout rate (between 0 and 1).
 
-    Returns
-    -------
-    out * (1. / (1-dropout)) : torch tensor
-        dropout output.
     """
 
     noise_shape = x._nnz()
@@ -348,32 +299,27 @@ def sparse_dropout(x, dropout):
     return out * (1. / (1 - dropout))
 
 
-"""Softmax cross-entropy loss with masking."""
-
-
 def masked_softmax_cross_entropy(preds, labels, mask):
-    """masked_softmax_cross_entropy.
+    """Softmax cross-entropy loss with masking.
+
     Parameters
     ----------
     preds:
-        cell-type proportion predictions from dstg model.
+        Cell-type proportion predictions from dstg model.
     labels :
-        true cell-type proportion labels.
+        True cell-type proportion labels.
     mask :
-        mask to indicate which samples to use in computing loss.
+        Mask to indicate which samples to use in computing loss.
 
     Returns
     -------
     loss : float
-        cross entropy loss between true and predicted cell-type proportions (mean reduced).
+        Cross entropy loss between true and predicted cell-type proportions (mean reduced).
+
     """
-    if (mask is None):
-        loss = F.cross_entropy(preds, labels, reduction='mean')
-        return loss
+    loss = F.cross_entropy(preds, labels, reduction="none")
+    if mask is None:
+        loss = loss.mean()
     else:
-        loss = F.cross_entropy(preds, labels, reduction='none')
-        mask = mask.type(torch.float32)
-        mask /= torch.mean(mask)
-        loss *= mask
-        loss = torch.mean(loss)
-        return loss
+        loss = (loss * mask.float()).sum() / mask.sum()
+    return loss

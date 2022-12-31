@@ -1810,7 +1810,7 @@ def gen_pseudo_spots(sc_counts, labels, clust_vr='cellType', nc_min=2, nc_max=10
         mix_counts, obs = gen_mix(tmp_sc_cnt, clust_vr=clust_vr, umi_cutoff=25000, downsample_counts=20000)
         #append this mix to sample of pseudo mixtures
         mix_X = np.append(mix_X, mix_counts, axis=0)
-        mix_obs = mix_obs.append(obs)
+        mix_obs = pd.concat((mix_obs, obs))
 
     mix_obs.index = pd.Index(['ps_mix_' + str(i + 1) for i in range(N_p)])
     #create AnnData object with sample of pseudo mixtures (obs)
@@ -1878,102 +1878,6 @@ def pseudo_spatial_process(counts, labels, clust_vr='cellType', scRNA=False, n_h
     return ([st_counts[0], st_counts[1]], labels, hvgs)
 
 
-def sample_mask(idx, l):
-    """Create mask."""
-    mask = np.zeros(l)
-    mask[idx] = 1
-    return np.array(mask, dtype=np.bool)
-
-
-def split(st_data, lab_label, pre_process, split_val=.9):
-    data1 = pd.DataFrame(st_data[0].X, index=st_data[0].obs.index, columns=st_data[0].var.index)
-    data2 = pd.DataFrame(st_data[1].X, index=st_data[1].obs.index, columns=st_data[1].var.index)
-
-    lab_label1 = lab_label[0]
-    lab_label2 = lab_label[1]
-
-    lab_data1 = data1.reset_index(drop=True)  #.transpose()
-    lab_data2 = data2.reset_index(drop=True)  #.transpose()
-
-    random.seed(123)
-    p_data = lab_data1
-    p_label = lab_label1
-
-    temd_train, temD_val, teml_train, temL_val = train_test_split(p_data, p_label, test_size=0.2, random_state=1)
-    temd_val, temd_test, teml_val, teml_test = train_test_split(temD_val, temL_val, test_size=0.5, random_state=1)
-
-    print((temd_train.index == teml_train.index).all())
-    print((temd_test.index == teml_test.index).all())
-    print((temd_val.index == teml_val.index).all())
-    data_train = temd_train
-    label_train = teml_train
-    data_test = temd_test
-    label_test = teml_test
-    data_val = temd_val
-    label_val = teml_val
-
-    data_train1 = data_train
-    data_test1 = data_test
-    data_val1 = data_val
-    label_train1 = label_train
-    label_test1 = label_test
-    label_val1 = label_val
-
-    train2 = pd.concat([data_train1, lab_data2])
-    lab_train2 = pd.concat([label_train1, lab_label2])
-
-    datas_train = np.array(train2)
-    datas_test = np.array(data_test1)
-    datas_val = np.array(data_val1)
-    labels_train = np.array(lab_train2)
-    labels_test = np.array(label_test1)
-    labels_val = np.array(label_val1)
-
-    #' convert pandas data frame to csr_matrix format
-    datas_tr = scipy.sparse.csr_matrix(datas_train.astype(np.float64))
-    datas_va = scipy.sparse.csr_matrix(datas_val.astype(np.float64))
-    datas_te = scipy.sparse.csr_matrix(datas_test.astype(np.float64))
-
-    M = len(data_train1)
-
-    #' 4) get the feature object by combining training, test, valiation sets
-    features = sp.vstack((sp.vstack((datas_tr, datas_va)), datas_te)).tolil()
-    if pre_process:
-        features = rowNormalizeFeatures(features)
-
-    labels_tr = labels_train
-    labels_va = labels_val
-    labels_te = labels_test
-
-    labels = np.concatenate([np.concatenate([labels_tr, labels_va]), labels_te])
-    Labels = pd.DataFrame(labels)
-
-    true_label = Labels
-
-    #' new label with binary values
-    new_label = labels
-    idx_train = range(M)
-    idx_pred = range(M, len(labels_tr))
-    idx_val = range(len(labels_tr), len(labels_tr) + len(labels_va))
-    idx_test = range(len(labels_tr) + len(labels_va), len(labels_tr) + len(labels_va) + len(labels_te))
-
-    train_mask = sample_mask(idx_train, new_label.shape[0])
-    pred_mask = sample_mask(idx_pred, new_label.shape[0])
-    val_mask = sample_mask(idx_val, new_label.shape[0])
-    test_mask = sample_mask(idx_test, new_label.shape[0])
-
-    labels_binary_train = np.zeros(new_label.shape)
-    labels_binary_val = np.zeros(new_label.shape)
-    labels_binary_test = np.zeros(new_label.shape)
-    labels_binary_train[train_mask, :] = new_label[train_mask, :]
-    labels_binary_val[val_mask, :] = new_label[val_mask, :]
-    labels_binary_test[test_mask, :] = new_label[test_mask, :]
-
-    adj_data = [data_train1, data_val1, data_test1, labels, lab_data2]
-
-    return adj_data, features, labels_binary_train, labels_binary_val, labels_binary_test, train_mask, pred_mask, val_mask, test_mask, new_label, true_label
-
-
 def l2norm(mat):
     stat = np.sqrt(np.sum(mat**2, axis=1))
     cols = mat.columns
@@ -1982,9 +1886,6 @@ def l2norm(mat):
     return mat
 
 
-#' @param num.cc Number of canonical vectors to calculate
-#' @param seed.use Random seed to set.
-#' @importFrom SVD
 def ccaEmbed(data1, data2, num_cc=30):
     random.seed(123)
     object1 = sklearn.preprocessing.scale(data1)
