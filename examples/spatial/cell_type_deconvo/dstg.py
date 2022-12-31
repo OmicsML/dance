@@ -69,6 +69,7 @@ mix_counts, mix_labels, hvgs = pseudo_spatial_process([sc_adata, mix_adata], [sc
                                                       args.n_hvg, args.num_pseudo)
 mix_labels = [lab.drop(["cell_count", "total_umi_count", "n_counts"], axis=1) for lab in mix_labels]
 
+# WARNING: features appear to have negative values, normalization does not make sense, need to check more
 features = np.vstack((mix_counts[0].X, mix_counts[1].X)).astype(np.float32)
 normalized_features = normalize(features, axis=1, mode="normalize")
 adata = anndata.AnnData(X=normalized_features)
