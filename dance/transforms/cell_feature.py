@@ -1,7 +1,6 @@
 import numpy as np
 from sklearn.decomposition import PCA
 
-from dance.data.base import BaseData
 from dance.transforms.base import BaseTransform
 from dance.typing import Optional
 from dance.utils.matrix import normalize
@@ -31,7 +30,7 @@ class WeightedFeaturePCA(BaseTransform):
         self.n_components = n_components
         self.split_name = split_name
 
-    def __call__(self, data: BaseData) -> BaseData:
+    def __call__(self, data):
         feat = data.get_x(self.split_name)  # cell x genes
         gene_pca = PCA(n_components=self.n_components)
 
@@ -56,7 +55,7 @@ class CellPCA(BaseTransform):
         self.channel = channel
         self.mod = mod
 
-    def __call__(self, data: BaseData) -> BaseData:
+    def __call__(self, data):
         feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
         pca = PCA(n_components=self.n_components)
 
