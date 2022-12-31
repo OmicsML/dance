@@ -83,8 +83,7 @@ data.set_config(feature_channel=[None, "DSTGraph"], feature_channel_type=[None, 
 x, y = torch.FloatTensor(x), torch.FloatTensor(y.values)
 adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
                                torch.FloatTensor(adj.data.astype(np.int32)))
-train_mask = torch.zeros(y.shape[0], dtype=torch.bool)
-train_mask[:len(mix_counts[0])] = True
+train_mask = data.get_split_mask("train", return_type="torch")
 
 # Train and evaluate model
 model = DSTG(nhid=args.nhid, bias=args.bias, dropout=args.dropout, device=device)
