@@ -50,7 +50,7 @@ light_options_dict: Dict[str, Tuple[str, str]] = {
     "predict_modality-scmogcn-adt2gex": "--subtask openproblems_bmmc_multiome_phase2_rna --device cuda --epoch 2",
     # Spatial
     "cell_type_deconvo-card-card_synth": "--dataset CARD_synthetic --max_iter 2",
-    "cell_type_deconvo-dstg-spotlight_synth": "--dataset SPOTLight_synthetic --nhid 32 --lr .1 --epochs 25",
+    "cell_type_deconvo-dstg-spotlight_synth": "--dataset SPOTLight_synthetic --nhid 32 --lr .1 --epochs 25 --device cuda",
     "cell_type_deconvo-spatialdecon-card_synth": "--dataset CARD_synthetic --lr .01 --max_iter 2 --bias 1 --device cuda",
     "cell_type_deconvo-spotlight-card_synth": "--dataset CARD_synthetic --lr .1 --max_iter 2 --rank 8 --bias 0 --device cuda",
     "spatial_domain-louvain-151507": "--sample_number 151507 --seed 10",

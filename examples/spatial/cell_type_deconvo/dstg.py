@@ -1,10 +1,10 @@
 import argparse
 from pprint import pprint
 
-import anndata
 import numpy as np
 import pandas as pd
 import torch
+from anndata import AnnData
 
 from dance.data import Data
 from dance.datasets.spatial import CellTypeDeconvoDatasetLite
@@ -59,8 +59,8 @@ sc_annot = sc_annot.loc[ct_select_ix]
 sc_count = sc_count.loc[ct_select_ix]
 
 # Set adata objects for sc ref and cell mixtures
-sc_adata = anndata.AnnData(sc_count, obs=sc_annot, dtype=np.float32)
-mix_adata = anndata.AnnData(mix_count, dtype=np.float32)
+sc_adata = AnnData(sc_count, obs=sc_annot, dtype=np.float32)
+mix_adata = AnnData(mix_count, dtype=np.float32)
 
 # pre-process: get variable genes --> normalize --> log1p --> standardize --> out
 # set scRNA to false if already using pseudo spot data with real spot data
@@ -72,7 +72,7 @@ mix_labels = [lab.drop(["cell_count", "total_umi_count", "n_counts"], axis=1) fo
 # WARNING: features appear to have negative values, normalization does not make sense, need to check more
 features = np.vstack((mix_counts[0].X, mix_counts[1].X)).astype(np.float32)
 normalized_features = normalize(features, axis=1, mode="normalize")
-adata = anndata.AnnData(X=normalized_features)
+adata = AnnData(X=normalized_features)
 adata.obsm["cell_type_portion"] = pd.concat(mix_labels).astype(np.float32).set_index(adata.obs_names)
 
 data = Data(adata, train_size=mix_counts[0].shape[0])
