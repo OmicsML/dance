@@ -14,6 +14,8 @@ class WeightedFeaturePCA(BaseTransform):
 
     """
 
+    _DISPLAY_ATTRS = ("n_components", "split_name")
+
     def __init__(self, n_components: int = 400, split_name: Optional[str] = None, **kwargs):
         """Initialize WeightedFeaturePCA.
 
@@ -47,6 +49,8 @@ class WeightedFeaturePCA(BaseTransform):
 
 
 class CellPCA(BaseTransform):
+
+    _DISPLAY_ATTRS = ("n_components", )
 
     def __init__(self, n_components: int = 400, *, channel: Optional[str] = None, mod: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)

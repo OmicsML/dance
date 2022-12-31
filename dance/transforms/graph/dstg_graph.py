@@ -17,6 +17,8 @@ class DSTGraph(BaseTransform):
 
     """
 
+    _DISPLAY_ATTRS = ("k_filter", "num_cc", "ref_split", "inf_split")
+
     def __init__(self, k_filter=200, num_cc=30, *, ref_split: str = "train", inf_split: str = "test", **kwargs):
         """Initialize DSTGraph.
 

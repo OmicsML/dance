@@ -7,6 +7,8 @@ from dance.utils.matrix import pairwise_distance
 
 class SpaGCNGraph(BaseTransform):
 
+    _DISPLAY_ATTRS = ("alpha", "beta")
+
     def __init__(self, alpha, beta, *, channels: Sequence[str] = ("spatial", "spatial_pixel", "image"),
                  channel_types: Sequence[str] = ("obsm", "obsm", "uns"), **kwargs):
         """Initialize SpaGCNGraph.

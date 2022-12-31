@@ -63,6 +63,8 @@ class CellFeatureGraph(BaseTransform):
 
 class PCACellFeatureGraph(BaseTransform):
 
+    _DISPLAY_ATTRS = ("n_components", "split_name")
+
     def __init__(self, n_components: int = 400, split_name: Optional[str] = None, *, mod: Optional[str] = None,
                  log_level: LogLevel = "WARNING"):
         super().__init__(log_level=log_level)
