@@ -1,10 +1,13 @@
 from abc import ABC, abstractmethod
 
 from dance import logger
-from dance.typing import Any, LogLevel, Optional
+from dance.data.base import BaseData
+from dance.typing import LogLevel, Optional, Tuple
 
 
 class BaseTransform(ABC):
+
+    _DISPLAY_ATTRS: Tuple[str] = ()
 
     def __init__(self, out: Optional[str] = None, log_level: LogLevel = "WARNING"):
         """Initialize transformation.
@@ -24,13 +27,15 @@ class BaseTransform(ABC):
         self.logger.setLevel(log_level)
         self.log_level = log_level
 
-    @abstractmethod
-    def __call__(self, data: Any) -> Any:
-        raise NotImplementedError
-
-    def __repr__(self) -> str:
-        return f"{self.name}()"
-
     @property
     def name(self) -> str:
         return self.__class__.__name__
+
+    def __repr__(self) -> str:
+        display_attrs_str_list = [f"{i}={getattr(self, i)!r}" for i in self._DISPLAY_ATTRS]
+        display_attrs_str = ", ".join(display_attrs_str_list)
+        return f"{self.name}({display_attrs_str})"
+
+    @abstractmethod
+    def __call__(self, data: BaseData) -> BaseData:
+        raise NotImplementedError

@@ -1,13 +1,14 @@
 import argparse
 
+import scanpy as sc
 from sklearn.metrics import adjusted_mutual_info_score
 
 from dance.data import Data
 from dance.datasets.spatial import SpotDataset
 from dance.modules.spatial.spatial_domain.spagcn import SpaGCN, refine
-from dance.transforms.cell_feature import CellPCA
+from dance.transforms import AnnDataTransform, CellPCA
 from dance.transforms.graph import SpaGCNGraph, SpaGCNGraph2D
-from dance.transforms.preprocess import log1p, normalize, prefilter_specialgenes
+from dance.transforms.preprocess import prefilter_specialgenes
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -44,12 +45,12 @@ if __name__ == "__main__":
     adata.uns["image"] = image
     adata.obsm["label"] = label
 
-    # prefilter_cells(adata)  # this operation will change the data shape
-    prefilter_specialgenes(adata)
-    normalize(adata)
-    log1p(adata)
-
     data = Data(adata, train_size="all")
+
+    # Data preprocessing pipeline
+    AnnDataTransform(prefilter_specialgenes)(data)
+    AnnDataTransform(sc.pp.normalize_total, target_sum=1e4)(data)
+    AnnDataTransform(sc.pp.log1p)(data)
 
     # Construct cell feature and spot graphs
     SpaGCNGraph(alpha=args.alpha, beta=args.beta, log_level="INFO")(data)

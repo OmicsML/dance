@@ -39,6 +39,7 @@ from statsmodels.formula.api import ols
 
 from dance import logger
 from dance.data import Data
+from dance.utils.deprecate import deprecated
 
 
 def set_seed(seed=1029):
@@ -87,14 +88,17 @@ def prefilter_specialgenes(adata, Gene1Pattern="ERCC", Gene2Pattern="MT-"):
     adata._inplace_subset_var(id_tmp)
 
 
+@deprecated
 def normalize(adata, counts_per_cell_after=1e4, log_transformed=False):
     sc.pp.normalize_per_cell(adata, counts_per_cell_after=counts_per_cell_after)
 
 
+@deprecated
 def normalize_total(adata, target_sum=1e4):
     sc.pp.normalize_total(adata, target_sum=target_sum)
 
 
+@deprecated
 def log1p(adata):
     sc.pp.log1p(adata)
 
