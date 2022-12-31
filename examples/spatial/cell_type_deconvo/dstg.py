@@ -1,13 +1,15 @@
 import argparse
 from pprint import pprint
 
+import anndata
 import numpy as np
+import pandas as pd
 import torch
-from anndata import AnnData
 
+from dance.data import Data
 from dance.datasets.spatial import CellTypeDeconvoDatasetLite
 from dance.modules.spatial.cell_type_deconvo.dstg import DSTG
-from dance.transforms.graph.dstg_graph import compute_dstg_adj
+from dance.transforms.graph import DSTGraph
 from dance.transforms.preprocess import pseudo_spatial_process
 from dance.utils.matrix import normalize
 
@@ -23,6 +25,7 @@ parser.add_argument("--n_hvg", type=int, default=2000, help="Number of HVGs.")
 parser.add_argument("--lr", type=float, default=1e-2, help="Learning rate.")
 parser.add_argument("--wd", type=float, default=1e-4, help="Weight decay.")
 parser.add_argument("--k_filter", type=int, default=200, help="Graph node filter.")
+parser.add_argument("--num_cc", type=int, default=30, help="Dimension of canonical correlation analysis.")
 parser.add_argument("--bias", type=bool, default=False, help="Include/Exclude bias term.")
 parser.add_argument("--nhid", type=int, default=16, help="Number of neurons in latent layer.")
 parser.add_argument("--dropout", type=float, default=0., help="Dropout rate.")
@@ -56,8 +59,8 @@ sc_annot = sc_annot.loc[ct_select_ix]
 sc_count = sc_count.loc[ct_select_ix]
 
 # Set adata objects for sc ref and cell mixtures
-sc_adata = AnnData(sc_count, obs=sc_annot, dtype=np.float32)
-mix_adata = AnnData(mix_count, dtype=np.float32)
+sc_adata = anndata.AnnData(sc_count, obs=sc_annot, dtype=np.float32)
+mix_adata = anndata.AnnData(mix_count, dtype=np.float32)
 
 # pre-process: get variable genes --> normalize --> log1p --> standardize --> out
 # set scRNA to false if already using pseudo spot data with real spot data
@@ -67,28 +70,26 @@ mix_counts, mix_labels, hvgs = pseudo_spatial_process([sc_adata, mix_adata], [sc
 mix_labels = [lab.drop(["cell_count", "total_umi_count", "n_counts"], axis=1) for lab in mix_labels]
 
 features = np.vstack((mix_counts[0].X, mix_counts[1].X)).astype(np.float32)
-x = normalize(torch.from_numpy(features), axis=1, mode="normalize")
-y = torch.from_numpy(np.vstack(mix_labels).astype(np.float32))
+normalized_features = normalize(features, axis=1, mode="normalize")
+adata = anndata.AnnData(X=normalized_features)
+adata.obsm["cell_type_portion"] = pd.concat(mix_labels).astype(np.float32).set_index(adata.obs_names)
+
+data = Data(adata, train_size=mix_counts[0].shape[0])
+DSTGraph(k_filter=args.k_filter, num_cc=args.num_cc)(data)
+data.set_config(feature_channel=[None, "DSTGraph"], feature_channel_type=[None, "obsp"],
+                label_channel="cell_type_portion")
+
+(x, adj), y = data.get_data(return_type="default")
+x, y = torch.FloatTensor(x), torch.FloatTensor(y.values)
+adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
+                               torch.FloatTensor(adj.data.astype(np.int32)))
 train_mask = torch.zeros(y.shape[0], dtype=torch.bool)
 train_mask[:len(mix_counts[0])] = True
 
-# Construct and process adjacency matrix
-pseudo_mix_counts, real_mix_counts = mix_counts
-adj = compute_dstg_adj(pseudo_mix_counts, real_mix_counts, k_filter=args.k_filter)
-adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
-                               torch.FloatTensor(adj.data.astype(np.int32)))
-
-# Initialize and train model
-dstg = DSTG(nhid=args.nhid, bias=args.bias, dropout=args.dropout, device=device)
-
-# Fit model
-dstg.fit(x, adj, y, train_mask, lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
-
-# Predict cell-type proportions and evaluate
-pred = dstg.predict()
-
-# Compute score
-mse = dstg.score(pred[args.num_pseudo:, :], torch.Tensor(true_p[ct_select].values), "mse")
+# Train and evaluate model
+model = DSTG(nhid=args.nhid, bias=args.bias, dropout=args.dropout, device=device)
+pred = model.fit_and_predict(x, adj, y, train_mask, lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
+mse = model.score(pred[args.num_pseudo:, :], torch.Tensor(true_p[ct_select].values), "mse")
 print(f"mse = {mse:7.4f}")
 """To reproduce DSTG benchmarks, please refer to command lines belows:
 

@@ -218,6 +218,10 @@ class DSTG:
         """
         return self.pred
 
+    def fit_and_predict(self, *args, **kwargs):
+        self.fit(*args, **kwargs)
+        return self.predict()
+
     def score(self, pred, true_prop, score_metric="ce"):
         """Model performance score.
 

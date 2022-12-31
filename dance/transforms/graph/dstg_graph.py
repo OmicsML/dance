@@ -10,18 +10,32 @@ from dance.transforms.base import BaseTransform
 
 class DSTGraph(BaseTransform):
 
-    def __init__(self, k_filter, **kwargs):
-        pass
+    def __init__(self, k_filter=200, num_cc=30, *, ref_split: str = "train", inf_split: str = "test", **kwargs):
+        super().__init__(**kwargs)
+
+        self.k_filter = k_filter
+        self.num_cc = num_cc
+        self.ref_split = ref_split
+        self.inf_split = inf_split
+
+    def __call__(self, data):
+        x_ref = data.get_feature(return_type="numpy", split_name=self.ref_split)
+        x_inf = data.get_feature(return_type="numpy", split_name=self.inf_split)
+
+        adj = compute_dstg_adj(x_ref, x_inf, k_filter=self.k_filter, num_cc=self.num_cc)
+        data.data.obsp[self.out] = adj
+
+        return data
 
 
-def compute_dstg_adj(pseudo_st_scale, real_st_scale, k_filter=1):
-    pseudo_st_df = pseudo_st_scale.to_df().T
-    real_st_df = real_st_scale.to_df().T
-    graph = construct_link_graph(pseudo_st_df, real_st_df, k_filter)
-
+def compute_dstg_adj(pseudo_st_scale, real_st_scale, k_filter=300, num_cc=30):
     num_ref = len(pseudo_st_scale)
     num_inf = len(real_st_scale)
     num_tot = num_ref + num_inf
+
+    pseudo_st_df = pd.DataFrame(pseudo_st_scale.T, columns=range(num_ref))
+    real_st_df = pd.DataFrame(real_st_scale.T, columns=range(num_ref, num_tot))
+    graph = construct_link_graph(pseudo_st_df, real_st_df, k_filter, num_cc)
 
     # Combine the spot index for pseudo (find) and real (index) into the graph node index
     index = np.concatenate((np.arange(num_ref), -np.ones(num_inf)))
