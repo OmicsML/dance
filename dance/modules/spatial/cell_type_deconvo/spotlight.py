@@ -15,7 +15,7 @@ from torch import nn, optim
 from torchnmf.nmf import NMF
 
 
-def cell_topic_profile(x, groups, ct_select, axis=0, method='median'):
+def cell_topic_profile(x, groups, ct_select, axis=0, method="median"):
     """Cell topic profile.
 
     Parameters
@@ -146,7 +146,7 @@ class SPOTlight:
     """
 
     def __init__(self, sc_count, sc_annot, mix_count, ct_varname, ct_select, rank=2, sc_profile=None, bias=False,
-                 init_bias=None, init='random', max_iter=1000, device="cpu"):
+                 init_bias=None, init="random", max_iter=1000, device="cpu"):
         super().__init__()
         self.device = device
         self.bias = bias
@@ -161,7 +161,7 @@ class SPOTlight:
 
         # Construct a cell profile matrix if not profided
         if sc_profile is None:
-            self.ref_sc_profile = cell_topic_profile(self.sc_count.values, cellTypes, ct_select, method='median')
+            self.ref_sc_profile = cell_topic_profile(self.sc_count.values, cellTypes, ct_select, method="median")
         else:
             self.ref_sc_profile = sc_profile
 
@@ -191,7 +191,7 @@ class SPOTlight:
 
         # Get cell-topic and mix-topic profiles
         # Get cell-topic profiles H_profile: cell-type group medians of coef H (topic x cells)
-        H_profile = cell_topic_profile(H.cpu().numpy().T, self.cellTypes, self.ct_select, method='median')
+        H_profile = cell_topic_profile(H.cpu().numpy().T, self.cellTypes, self.ct_select, method="median")
         H_profile = H_profile.to(self.device)
 
         # Get mix-topic profiles B: NNLS of basis W onto mix expression Y -- y ~ W*b
@@ -229,7 +229,7 @@ class SPOTlight:
 
         # Get cell-topic and mix-topic profiles
         # Get cell-topic profiles H_profile: cell-type group medians of coef H (topic x cells)
-        self.H_profile = cell_topic_profile(self.H.cpu().numpy().T, self.cellTypes, self.ct_select, method='median')
+        self.H_profile = cell_topic_profile(self.H.cpu().numpy().T, self.cellTypes, self.ct_select, method="median")
         self.H_profile = self.H_profile.to(self.device)
 
         # Get mix-topic profiles B: NNLS of basis W onto mix expression Y -- y ~ W*b

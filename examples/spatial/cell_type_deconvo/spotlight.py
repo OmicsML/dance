@@ -38,17 +38,17 @@ sc_count = dataset.data["ref_sc_count"]
 sc_profile = None
 sc_annot = dataset.data["ref_sc_annot"]
 init_background = None
-if 'init_background' in dataset.data:
-    init_background = dataset.data['init_background']
+if "init_background" in dataset.data:
+    init_background = dataset.data["init_background"]
 
 mix_count = dataset.data["mix_count"]
 true_p = dataset.data["true_p"]
 
 ct_select = sorted(set(sc_annot.cellType.unique().tolist()) & set(true_p.columns.tolist()))
-print('ct_select =', f'{ct_select}')
+print(f"{ct_select=}")
 
 true_p = torch.FloatTensor(true_p.loc[:, ct_select].values)
-if 'ref_cell_profile' in dataset.data:
+if "ref_cell_profile" in dataset.data:
     sc_profile = dataset.data["ref_cell_profile"]
     sc_profile = sc_profile.loc[:, ct_select].values
 
