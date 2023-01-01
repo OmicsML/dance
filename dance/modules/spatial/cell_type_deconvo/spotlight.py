@@ -12,7 +12,6 @@ spots with single-cell transcriptomes." Nucleic Acids Research (2021)
 import numpy as np
 import torch
 from torch import nn, optim
-from torch.autograd import Variable
 from torchnmf.nmf import NMF
 
 
@@ -93,9 +92,6 @@ class NNLS(nn.Module):
             Indicates number of iterations until training results print.
 
         """
-        x = Variable(x, requires_grad=True)
-        y = Variable(y)
-
         criterion = nn.MSELoss()
         optimizer = optim.Adam(self.model.parameters(), lr=lr)
 
@@ -221,8 +217,8 @@ class SPOTlight:
 
         """
 
-        x = Variable(torch.FloatTensor(self.sc_count), requires_grad=True).to(self.device)
-        y = Variable(torch.FloatTensor(self.mix_count)).to(self.device)
+        x = torch.FloatTensor(self.sc_count).to(self.device)
+        y = torch.FloatTensor(self.mix_count).to(self.device)
 
         # Run NMF on scRNA X
         self.nmf_model.fit(x, max_iter=max_iter)
