@@ -256,14 +256,14 @@ class SPOTlight:
         pred = P / torch.sum(P, axis=0, keepdims=True).clamp(min=1e-6)
         return pred
 
-    def score(self, pred, true_prop):
+    def score(self, pred, true):
         """Score function.
 
         Parameters
         ----------
         pred : torch.Tensor
             Predicted cell-type proportions.
-        true_prop : torch.Tensor
+        true : torch.Tensor
             True cell-type proportions.
 
         Returns
@@ -272,8 +272,7 @@ class SPOTlight:
             MSE loss between predicted and true cell-type proportions.
 
         """
-        true_prop = true_prop.to(self.device)
-        pred = pred / torch.sum(pred, 1, keepdims=True).clamp(min=1e-6)
-        true_prop = true_prop / torch.sum(true_prop, 1, keepdims=True).clamp(min=1e-6)
-        loss = ((pred - true_prop)**2).mean()
-        return loss.detach().item()
+        pred = pred.to(self.device)
+        true = true.to(self.device)
+        loss = nn.functional.mse_loss(pred, true)
+        return loss.item()
