@@ -1,8 +1,11 @@
 import argparse
 from pprint import pprint
 
+import numpy as np
 import torch
+from anndata import AnnData
 
+from dance.data import Data
 from dance.datasets.spatial import CellTypeDeconvoDatasetLite
 from dance.modules.spatial.cell_type_deconvo.spotlight import SPOTlight
 
@@ -34,37 +37,28 @@ else:
 # Load dataset
 dataset = CellTypeDeconvoDatasetLite(data_id=args.dataset, data_dir=args.datadir)
 
-sc_count = dataset.data["ref_sc_count"]
-sc_profile = None
-sc_annot = dataset.data["ref_sc_annot"]
-init_background = None
-if 'init_background' in dataset.data:
-    init_background = dataset.data['init_background']
+ref_count, ref_annot, count_matrix, cell_type_portion, spatial = dataset.load_data()
 
-mix_count = dataset.data["mix_count"]
-true_p = dataset.data["true_p"]
+# TODO: add ref index (or more flexible indexing option at init, e.g., as dict?) and combine with data
+ref_adata = AnnData(X=ref_count, obsm={"annot": ref_annot}, dtype=np.float32)
+adata = AnnData(X=count_matrix, obsm={"cell_type_portion": cell_type_portion}, dtype=np.float32)
 
-ct_select = sorted(set(sc_annot.cellType.unique().tolist()) & set(true_p.columns.tolist()))
-print('ct_select =', f'{ct_select}')
+# TODO: deprecate the need for ct_select by doing this in a preprocessing step -> convert ct into one-hot matrix
+ct_select = sorted(set(ref_annot.cellType.unique().tolist()) & set(cell_type_portion.columns.tolist()))
+print(f"{ct_select=}")
 
-true_p = torch.FloatTensor(true_p.loc[:, ct_select].values)
-if 'ref_cell_profile' in dataset.data:
-    sc_profile = dataset.data["ref_cell_profile"]
-    sc_profile = sc_profile.loc[:, ct_select].values
+data = Data(adata)
+data.set_config(label_channel="cell_type_portion")
 
-# Initialize and train model
-spotLight = SPOTlight(sc_count=sc_count, sc_annot=sc_annot, mix_count=mix_count, ct_varname="cellType",
-                      ct_select=ct_select, rank=args.rank, sc_profile=sc_profile, bias=args.bias,
-                      init_bias=init_background, max_iter=args.max_iter, device=device)
+# TODO: after removing ct_select, return as numpy
+x, y = data.get_data(return_type="default")
 
-# Fit model
-spotLight.fit(lr=args.lr, max_iter=args.max_iter)
+model = SPOTlight(ref_count, ref_annot, "cellType", ct_select, rank=args.rank, bias=args.bias, device=device)
+pred = model.fit_and_predict(x, lr=args.lr, max_iter=args.max_iter)
+mse = model.score(pred, y[ct_select].values)
 
-# Predict cell-type proportions and evaluate
-pred = spotLight.predict()
-
-# Compute score
-mse = spotLight.score(pred.T, true_p)
+print(f"Predicted cell-type proportions of  sample 1: {pred[0].numpy().round(3)}")
+print(f"True cell-type proportions of  sample 1: {y.iloc[0].tolist()}")
 print(f"mse = {mse:7.4f}")
 """To reproduce SpatialDecon benchmarks, please refer to command lines belows:
 
