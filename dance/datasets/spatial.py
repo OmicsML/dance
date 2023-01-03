@@ -195,7 +195,7 @@ class CellTypeDeconvoDataset:
             else:
                 print("unsupported file type. Please use csv or h5ad file types.")
 
-        print("load data succesfully....")
+        print("load data successfully....")
 
         return self
 

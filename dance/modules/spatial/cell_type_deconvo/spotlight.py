@@ -175,7 +175,7 @@ class SPOTlight:
         self.model = nn.Sequential(self.nmf_model, self.nnls_reg1, self.nnls_reg2)
 
     def forward(self):
-        # Get NMF decompositons
+        # Get NMF decompositions
         W = self.nmf_model.H.clone()
         H = self.nmf_model.W.clone().T
 

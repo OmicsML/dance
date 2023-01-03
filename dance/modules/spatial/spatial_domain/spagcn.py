@@ -61,7 +61,7 @@ def refine(sample_id, pred, dis, shape="hexagon"):
     elif shape == "square":
         num_nbs = 4
     else:
-        print("Shape not recongized, shape='hexagon' for Visium data, 'square' for ST data.")
+        print("Shape not recognized, shape='hexagon' for Visium data, 'square' for ST data.")
     for i in range(len(sample_id)):
         index = sample_id[i]
         dis_tmp = dis_df.loc[index, :].sort_values()

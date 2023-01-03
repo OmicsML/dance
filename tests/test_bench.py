@@ -183,11 +183,11 @@ def run_benchmarks(name, options_dict):
     # Overwrite sysargv and run test script
     args = options_dict[name]
     sys.argv = [None] + (args.split(" ") if args else [])
-    logging.info(f"Start runing [{name}] with {args=!r}")
+    logging.info(f"Start running [{name}] with {args=!r}")
     t = time.perf_counter()
     runpy.run_path(script_name, run_name="__main__")
     t = time.perf_counter() - t
-    logging.info(f"Finshed runing [{name}] - took {int(t // 3600)}:{int(t % 3600 // 60):02d}:{t % 60:05.2f}")
+    logging.info(f"Finished running [{name}] - took {int(t // 3600)}:{int(t % 3600 // 60):02d}:{t % 60:05.2f}")
 
     # Post run cleanup
     gc.collect()

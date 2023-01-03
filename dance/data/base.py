@@ -92,7 +92,7 @@ class BaseData(ABC):
 
         # Sum of sizes must be bounded by the data size
         if (tot_size := split_sizes.clip(0).sum()) > data_size:
-            raise ValueError(f"Total size {tot_size:,} exceeds total number of sampels {data_size:,}")
+            raise ValueError(f"Total size {tot_size:,} exceeds total number of samples {data_size:,}")
 
         logger.debug(f"Split sizes before conversion: {split_sizes.tolist()}")
         split_sizes[split_sizes == -1] = data_size - split_sizes.clip(0).sum()
@@ -207,7 +207,7 @@ class BaseData(ABC):
             return None
 
     def get_split_mask(self, split_name: str, return_type: FeatType = "numpy") -> Union[np.ndarray, torch.Tensor]:
-        """Obtain mask representation of a particualr split.
+        """Obtain mask representation of a particular split.
 
         Parameters
         ----------
