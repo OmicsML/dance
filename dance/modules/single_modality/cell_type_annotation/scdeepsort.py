@@ -43,7 +43,7 @@ class AdaptiveSAGE(nn.Module):
         dim_in : int
             Input feature dimensions.
         dim_out : int
-            output feature dimensinos.
+            output feature dimensions.
         alpha : Tensor
             Shared learnable parameters containing gene-cell interaction strengths and those for the cell and gene
             self-loops.

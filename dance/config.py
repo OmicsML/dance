@@ -33,7 +33,7 @@ def change_log_level(name: str = "dance", /, *, level: Union[str, int]):
     Parameters
     ----------
     name: str
-        Name of the logger whose log level is to be updated. Defaut set to global logger.
+        Name of the logger whose log level is to be updated. Default set to global logger.
     level: Union[str, int]
         Log level to be updated. Can be either the log level name (str type) or its corresponding code (int type).
 

@@ -56,7 +56,7 @@ def CARDref(Xinput, U, W, phi, max_iter, epsilon, V, b, sigma_e2, Lambda):
     accu_L = 0.0
     trac_xxt = (Xinput * Xinput).sum()
 
-    # Initialize values with constant matrix caculations for increasing speed
+    # Initialize values with constant matrix calculations for increasing speed
     UtX = U.T @ Xinput
     XtU = UtX.T
     UtXV = UtX @ V
@@ -65,7 +65,7 @@ def CARDref(Xinput, U, W, phi, max_iter, epsilon, V, b, sigma_e2, Lambda):
     diag_UtU = np.diag(UtU)
     if W is not None:
         colsum_W = np.sum(W, axis=1)
-        D = np.diag(colsum_W)  # diagnol matrix whose entries are column
+        D = np.diag(colsum_W)  # diagonal matrix whose entries are column
         L = D - phi * W  # graph laplacian
         colsum_W = colsum_W.reshape(nSample, 1)
         accu_L = np.sum(L)

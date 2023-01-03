@@ -132,14 +132,14 @@ def partition_at_level(dendrogram, level):
     Parameters
     ----------
     dendrogram : list of dict
-       a list of partitions, ie dictionnaries where keys of the i+1 are the
+       a list of partitions, ie dictionaries where keys of the i+1 are the
        values of the i.
     level : int
        the level which belongs to [0..len(dendrogram)-1]
 
     Returns
     -------
-    partition : dictionnary
+    partition : dictionary
        A dictionary where keys are the nodes and the values are the set it
        belongs to
 
@@ -269,7 +269,7 @@ def best_partition(graph, partition=None, weight='weight', resolution=1., random
 
     Returns
     -------
-    partition : dictionnary
+    partition : dictionary
        The partition, with communities numbered from 0 to number of communities
 
     Raises
@@ -416,7 +416,7 @@ def generate_dendrogram(graph, part_init=None, weight='weight', resolution=1., r
     if randomize is not None:
         warnings.warn("The `randomize` parameter will be deprecated in future "
                       "versions. Use `random_state` instead.", DeprecationWarning)
-        # If shouldn't randomize, we set a fixed seed to get determinisitc results
+        # If shouldn't randomize, we set a fixed seed to get deterministic results
         if randomize is False:
             random_state = 0
 

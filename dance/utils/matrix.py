@@ -11,7 +11,7 @@ def normalize(mat, *, mode: NormMode = "normalize", axis: int = 0, eps: float = 
     Parameters
     ----------
     mat
-        Input matrix to be notmalized, can be torch tensor or numpy array.
+        Input matrix to be normalized, can be torch tensor or numpy array.
     mode
         Normalization mode. **normalize** means divide the values by the sum. **standardize** means center then rescale
         by standard deviation. "minmax" means rescale the values along the axis of choice between zero and one.
