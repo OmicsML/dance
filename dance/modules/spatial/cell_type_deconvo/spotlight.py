@@ -267,7 +267,7 @@ class SPOTlight:
             MSE loss between predicted and true cell-type proportions.
 
         """
-        pred = torch.FloatTensor(pred).to(self.device)
-        true = torch.FloatTensor(true).to(self.device)
+        pred = pred.to(self.device)
+        true = true.to(self.device)
         loss = nn.functional.mse_loss(pred, true)
         return loss.item()
