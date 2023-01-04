@@ -55,9 +55,9 @@ x, y = data.get_data(return_type="default")
 
 model = SPOTlight(ref_count, ref_annot, "cellType", ct_select, rank=args.rank, bias=args.bias, device=device)
 pred = model.fit_and_predict(x, lr=args.lr, max_iter=args.max_iter)
-mse = model.score(pred, y[ct_select].values)
+mse = model.score(pred, torch.FloatTensor(y[ct_select].values))
 
-print(f"Predicted cell-type proportions of  sample 1: {pred[0].numpy().round(3)}")
+print(f"Predicted cell-type proportions of  sample 1: {pred[0].clone().cpu().numpy().round(3)}")
 print(f"True cell-type proportions of  sample 1: {y.iloc[0].tolist()}")
 print(f"mse = {mse:7.4f}")
 """To reproduce SpatialDecon benchmarks, please refer to command lines belows:
