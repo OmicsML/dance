@@ -72,7 +72,7 @@ def compute_dstg_adj(pseudo_st_scale, real_st_scale, k_filter=300, num_cc=30):
         edge_sets_dict[row].add(col)
         edge_sets_dict[col].add(row)
 
-    adj = nx.to_scipy_sparse_matrix(nx.from_dict_of_lists(edge_sets_dict))
+    adj = nx.to_scipy_sparse_array(nx.from_dict_of_lists(edge_sets_dict))
     adj_normalized = preprocess_adj(adj)
 
     return adj_normalized

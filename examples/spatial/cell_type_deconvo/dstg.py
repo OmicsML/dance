@@ -45,27 +45,22 @@ else:
 # Load dataset
 dataset = CellTypeDeconvoDatasetLite(data_id=args.dataset, data_dir=args.datadir)
 
-sc_count = dataset.data["ref_sc_count"]
-sc_annot = dataset.data["ref_sc_annot"]
+ref_count, ref_annot, count_matrix, cell_type_portion, _ = dataset.load_data()
 
-mix_count = dataset.data["mix_count"]
-true_p = dataset.data["true_p"]
-
-ct_select = sorted(set(sc_annot.cellType.unique().tolist()) & set(true_p.columns.tolist()))
+ct_select = sorted(set(ref_annot.cellType.unique().tolist()) & set(cell_type_portion.columns.tolist()))
 print(f"{ct_select=}")
-
-ct_select_ix = sc_annot[sc_annot["cellType"].isin(ct_select)].index
-sc_annot = sc_annot.loc[ct_select_ix]
-sc_count = sc_count.loc[ct_select_ix]
+ct_select_ix = ref_annot[ref_annot["cellType"].isin(ct_select)].index
+ref_annot = ref_annot.loc[ct_select_ix]
+ref_count = ref_count.loc[ct_select_ix]
 
 # Set adata objects for sc ref and cell mixtures
-sc_adata = AnnData(sc_count, obs=sc_annot, dtype=np.float32)
-mix_adata = AnnData(mix_count, dtype=np.float32)
+sc_adata = AnnData(ref_count, obs=ref_annot, dtype=np.float32)
+mix_adata = AnnData(count_matrix, dtype=np.float32)
 
 # pre-process: get variable genes --> normalize --> log1p --> standardize --> out
 # set scRNA to false if already using pseudo spot data with real spot data
 # set to true if the reference data is scRNA (to be used for generating pseudo spots)
-mix_counts, mix_labels, hvgs = pseudo_spatial_process([sc_adata, mix_adata], [sc_annot, None], "cellType", args.sc_ref,
+mix_counts, mix_labels, hvgs = pseudo_spatial_process([sc_adata, mix_adata], [ref_annot, None], "cellType", args.sc_ref,
                                                       args.n_hvg, args.num_pseudo)
 mix_labels = [lab.drop(["cell_count", "total_umi_count", "n_counts"], axis=1) for lab in mix_labels]
 
@@ -89,7 +84,7 @@ train_mask = data.get_split_mask("train", return_type="torch")
 # Train and evaluate model
 model = DSTG(nhid=args.nhid, bias=args.bias, dropout=args.dropout, device=device)
 pred = model.fit_and_predict(x, adj, y, train_mask, lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
-mse = model.score(pred[args.num_pseudo:, :], torch.Tensor(true_p[ct_select].values), "mse")
+mse = model.score(pred[args.num_pseudo:, :], torch.Tensor(cell_type_portion[ct_select].values), "mse")
 print(f"mse = {mse:7.4f}")
 """To reproduce DSTG benchmarks, please refer to command lines belows:
 
