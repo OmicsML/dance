@@ -12,12 +12,10 @@ from dance.transforms.preprocess import prefilter_specialgenes
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--sample_number", type=str, default="151673",
-        help="12 samples of human dorsolateral prefrontal cortex dataset supported in the task of spatial domain task")
+    parser.add_argument("--sample_number", type=str, default="151673",
+                        help="12 human dorsolateral prefrontal cortex datasets for the spatial domain task.")
     parser.add_argument("--beta", type=int, default=49, help="")
     parser.add_argument("--alpha", type=int, default=1, help="")
-    parser.add_argument("--seed", type=int, default=1, help="")
     parser.add_argument("--p", type=float, default=0.05,
                         help="percentage of total expression contributed by neighborhoods.")
     parser.add_argument("--l", type=float, default=0.5, help="the parameter to control percentage p.")
@@ -34,17 +32,16 @@ if __name__ == "__main__":
     parser.add_argument("--n_seed", type=int, default=100, help="")
     args = parser.parse_args()
 
-    # get data
+    # Load raw data
     dataset = SpotDataset(args.sample_number, data_dir="../../../data/spot")
-
-    # dataset.data has repeat name , be careful
     image, adata, spatial, spatial_pixel, label = dataset.load_data()
+
+    # Construct dance data object
     adata.var_names_make_unique()
     adata.obsm["spatial"] = spatial
     adata.obsm["spatial_pixel"] = spatial_pixel
     adata.uns["image"] = image
     adata.obsm["label"] = label
-
     data = Data(adata, train_size="all")
 
     # Data preprocessing pipeline
