@@ -1,5 +1,5 @@
 from dance.transforms import CellPCA, WeightedFeaturePCA
-from dance.transforms.graph import DSTGraph, PCACellFeatureGraph, SpaGCNGraph
+from dance.transforms.graph import DSTGraph, NeighborGraph, PCACellFeatureGraph, SpaGCNGraph
 
 
 def test_reprs(subtests):
@@ -10,6 +10,11 @@ def test_reprs(subtests):
     with subtests.test("WeightedFeaturePCA"):
         t = WeightedFeaturePCA(n_components=100, split_name="train")
         assert repr(t) == "WeightedFeaturePCA(n_components=100, split_name='train')"
+
+    with subtests.test("NeighborGraph"):
+        t = NeighborGraph(n_neighbors=10, n_pcs=None, knn=True, random_state=0, method="umap", metric="euclidean")
+        assert repr(t) == ("NeighborGraph(n_neighbors=10, n_pcs=None, knn=True, random_state=0, method='umap', "
+                           "metric='euclidean')")
 
     with subtests.test("PCACellFeatureGraph"):
         t = PCACellFeatureGraph(n_components=100, split_name="train")
