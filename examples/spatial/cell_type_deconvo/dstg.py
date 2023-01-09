@@ -47,11 +47,11 @@ dataset = CellTypeDeconvoDatasetLite(data_id=args.dataset, data_dir=args.datadir
 
 ref_count, ref_annot, count_matrix, cell_type_portion, _ = dataset.load_data()
 
-ct_select = sorted(set(ref_annot.cellType.unique().tolist()) & set(cell_type_portion.columns.tolist()))
-print(f"{ct_select=}")
-ct_select_ix = ref_annot[ref_annot["cellType"].isin(ct_select)].index
-ref_annot = ref_annot.loc[ct_select_ix]
-ref_count = ref_count.loc[ct_select_ix]
+# ct_select = sorted(set(ref_annot.cellType.unique().tolist()) & set(cell_type_portion.columns.tolist()))
+# print(f"{ct_select=}")
+# ct_select_ix = ref_annot[ref_annot["cellType"].isin(ct_select)].index
+# ref_annot = ref_annot.loc[ct_select_ix]
+# ref_count = ref_count.loc[ct_select_ix]
 
 # Set adata objects for sc ref and cell mixtures
 sc_adata = AnnData(ref_count, obs=ref_annot, dtype=np.float32)
@@ -84,7 +84,8 @@ train_mask = data.get_split_mask("train", return_type="torch")
 # Train and evaluate model
 model = DSTG(nhid=args.nhid, bias=args.bias, dropout=args.dropout, device=device)
 pred = model.fit_and_predict(x, adj, y, train_mask, lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
-mse = model.score(pred[args.num_pseudo:, :], torch.Tensor(cell_type_portion[ct_select].values), "mse")
+# mse = model.score(pred[args.num_pseudo:, :], torch.Tensor(cell_type_portion[ct_select].values), "mse")
+mse = model.score(pred[args.num_pseudo:, :], torch.Tensor(cell_type_portion.values), "mse")
 print(f"mse = {mse:7.4f}")
 """To reproduce DSTG benchmarks, please refer to command lines belows:
 

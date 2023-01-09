@@ -9,6 +9,7 @@ import pandas as pd
 import rdata
 import scanpy as sc
 
+from dance import logger
 from dance.data import download_file, download_unzip, unzip_file
 
 IGNORED_FILES = ["readme.txt"]
@@ -228,13 +229,46 @@ class CellTypeDeconvoDatasetLite:
             else:
                 warnings.warn(f"Unsupported file type {ext!r}. Use csv or h5ad file types.")
 
-    def load_data(self):
+    # def load_data(self, subset_common_celltypes: bool = True):
+    #     ref_count = self.data["ref_sc_count"]
+    #     ref_annot = self.data["ref_sc_annot"]
+    #     count_matrix = self.data["mix_count"]
+    #     cell_type_portion = self.data["true_p"]
+    #     if (spatial := self.data.get("spatial_location")) is None:
+    #         spatial = pd.DataFrame(0, index=count_matrix.index, columns=["x", "y"])
+    #     return ref_count, ref_annot, count_matrix, cell_type_portion, spatial
+
+    def load_data(self, subset_common_celltypes: bool = True):
+        """Load raw data.
+
+        Parameters
+        ----------
+        subset_common_celltypes
+            If set to True, then subset both the reference and the real data to contain only cell types that are
+            present in both reference and real.
+
+        """
         ref_count = self.data["ref_sc_count"]
         ref_annot = self.data["ref_sc_annot"]
         count_matrix = self.data["mix_count"]
         cell_type_portion = self.data["true_p"]
         if (spatial := self.data.get("spatial_location")) is None:
             spatial = pd.DataFrame(0, index=count_matrix.index, columns=["x", "y"])
+
+        # Obtain cell type info and subset to common cell types between ref and real if needed
+        ref_celltypes = set(ref_annot["cellType"].unique().tolist())
+        real_celltypes = set(cell_type_portion.columns.tolist())
+        logger.info(f"Number of cell types: reference = {len(ref_celltypes)}, real = {len(real_celltypes)}")
+        if subset_common_celltypes:
+            common_celltypes = sorted(ref_celltypes & real_celltypes)
+            logger.info(f"Subsetting to common cell types (n={common_celltypes}): {common_celltypes}")
+
+            idx = ref_annot[ref_annot["cellType"].isin(ct_select)].index
+            ref_annot = ref_annot.loc[idx]
+            ref_count = ref_count.loc[idx]
+
+            cell_type_portion = cell_type_portion[common_celltypes]
+
         return ref_count, ref_annot, count_matrix, cell_type_portion, spatial
 
 
