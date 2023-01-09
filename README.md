@@ -15,7 +15,7 @@ ______________________________________________________________________
 [![Slack](https://img.shields.io/badge/slack-OmicsML-brightgreen)](https://omicsml.slack.com)
 ![Twitter Follow](https://img.shields.io/twitter/follow/OmicsML?style=social)
 
-DANCE is a Python toolkit to support deep learning models for analyzing single-cell gene expression at scale. Our goal is to build up a deep learning community and bechmark platform for computational models in single-cell analysis. It includes three modules at present:
+DANCE is a Python toolkit to support deep learning models for analyzing single-cell gene expression at scale. Our goal is to build up a deep learning community and benchmark platform for computational models in single-cell analysis. It includes three modules at present:
 
 1. **Single-modality analysis**
 1. **Single-cell multimodal omics**
@@ -72,14 +72,14 @@ A key challenge to continually developing computational single-cell methods that
 More specifically, different studies prepare their datasets and perform evaluation differently,
 and not to mention the compatibility of different methods, as they could be written in different languages or using incompatible library versions.
 
-PyDANCE addresses these challenges by providing a unified Python packge implementing many popular computational single-cell methods (see [Implemented Algorithms](#implemented-algorithms)),
+PyDANCE addresses these challenges by providing a unified Python package implementing many popular computational single-cell methods (see [Implemented Algorithms](#implemented-algorithms)),
 as well as easily reproducible experiments by providing unified tools for
 
 - Data downloading
 - Data (pre-)processing and transformation (e.g. graph construction)
 - Model training and evaluation
 
-### Example: runing cell-type annotation benchmark using scDeepSort
+### Example: run cell-type annotation benchmark using scDeepSort
 
 - Step0. Install PyDANCE (see [Installation](#installation))
 - Step1. Navigate to the folder containing the corresponding example scrtip.
@@ -90,7 +90,7 @@ as well as easily reproducible experiments by providing unified tools for
   ```bash
   python scdeepsort.py --data_type scdeepsort --tissue Brain --test_data 2695
   ```
-- Step3. Wait for the experiment to finsh and check results.
+- Step3. Wait for the experiment to finish and check results.
 
 ## Installation
 
@@ -145,7 +145,7 @@ then you may need to uninstall `torch-spline-conv` (see https://github.com/pyg-t
 pip uninstall torch-spline-conv
 ```
 
-For more information about installation or other CUDA version options, check out the installation pages for the corresponding packges
+For more information about installation or other CUDA version options, check out the installation pages for the corresponding packages
 
 - [PyTorch](https://pytorch.org/get-started/)
 - [PyG](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html)
