@@ -326,13 +326,22 @@ def best_partition(graph, partition=None, weight='weight', resolution=1., random
 class Louvain:
     """Louvain class."""
 
-    def fit(self, adata, adj, partition=None, weight='weight', resolution=1., randomize=None, random_state=None):
+    def __init__(self, resolution: float = 1):
+        """Initialize Louvain.
+
+        Parameters
+        ----------
+        resolution
+            Resolution parameter.
+
+        """
+        self.resolution = resolution
+
+    def fit(self, adj, partition=None, weight='weight', randomize=None, random_state=None):
         """fit function for model training.
 
         Parameters
         ----------
-        adata :
-            input data.
         adj :
             adjacent matrix.
         partition : dict optional
@@ -340,8 +349,6 @@ class Louvain:
             belongs to
         weight : str, optional
             the key in graph to use as weight. Default to 'weight'
-        resolution : float optional
-            resolution.
         randomize : boolean, optional
             Will randomize the node evaluation order and the community evaluation
             order to get different partitions at each call
@@ -350,19 +357,16 @@ class Louvain:
             If RandomState instance, random_state is the random number generator;
             If None, the random number generator is the RandomState instance used
             by `np.random`.
-        Returns
-        -------
-        None.
 
         """
         # convert adata,adj into networkx
         print("adj to networkx graph .... ")
         if (adj - adj.T).sum() != 0:
             ValueError("louvain use no direction graph, but the input is not")
-        g = nx.from_numpy_matrix(adj)
+        g = nx.from_numpy_array(adj)
         print("convert over")
         print("start fit ... ")
-        self.dendo = generate_dendrogram(g, partition, weight, resolution, randomize, random_state)
+        self.dendo = generate_dendrogram(g, partition, weight, self.resolution, randomize, random_state)
 
         print("fit over ")
 
