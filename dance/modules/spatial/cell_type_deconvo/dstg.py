@@ -11,16 +11,11 @@ Briefings in Bioinformatics (2021)
 import time
 
 import numpy as np
-import scanpy as sc
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn.parameter import Parameter
-
-from dance.transforms.graph.dstg_graph import compute_dstg_adj
-from dance.transforms.preprocess import pseudo_spatial_process
-from dance.utils.matrix import normalize
 
 
 class GraphConvolution(nn.Module):

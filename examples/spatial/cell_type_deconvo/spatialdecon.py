@@ -36,19 +36,17 @@ dataset = CellTypeDeconvoDatasetLite(data_id=args.dataset, data_dir=args.datadir
 ref_count, ref_annot, count_matrix, cell_type_portion, spatial = dataset.load_data()
 adata = AnnData(X=count_matrix, obsm={"spatial": spatial, "cell_type_portion": cell_type_portion}, dtype=np.float32)
 
-ct_select = sorted(set(ref_annot.cellType.unique().tolist()) & set(cell_type_portion.columns.tolist()))
-print(f"{ct_select=}")
-
 data = Data(adata)
 data.set_config(label_channel="cell_type_portion")
-x, y = data.get_data(return_type="default")
+x, y = data.get_data(return_type="numpy")
 
 # Initialize and train model
-spaDecon = SpatialDecon(ref_count, ref_annot, ct_varname="cellType", ct_select=ct_select, bias=args.bias, device=device)
+spaDecon = SpatialDecon(ref_count, ref_annot, ct_varname="cellType", ct_select=cell_type_portion.columns.tolist(),
+                        bias=args.bias, device=device)
 pred = spaDecon.fit_and_predict(x, lr=args.lr, max_iter=args.max_iter, print_period=100)
 
 # Compute score
-mse = spaDecon.score(pred, y[ct_select].values)  # TODO: align cell type first
+mse = spaDecon.score(pred, y)
 print(f"mse = {mse:7.4f}")
 """To reproduce SpatialDecon benchmarks, please refer to command lines belows:
 

@@ -1685,201 +1685,118 @@ def findClassyGenes(expDat, sampTab, topX=25, dThresh=0, alpha1=0.05, alpha2=.00
 
 
 #######################################################
-#For Cell Type Deconvolution
+# For Cell Type Deconvolution
 #######################################################
 
 
-def rowNormalizeFeatures(features):
-    """Row-normalize feature matrix and convert to tuple representation."""
-    rowsum = np.array(features.sum(1))
-    r_inv = np.power(rowsum, -1).flatten()
-    r_inv[np.isinf(r_inv)] = 0.
-    r_mat_inv = sp.diags(r_inv)
-    features = r_mat_inv.dot(features)
-    return sparse_to_tuple(features)
-
-
-def sparse_to_tuple(sparse_mx):
-    """Convert sparse matrix to tuple representation."""
-
-    def to_tuple(mx):
-        if not sp.isspmatrix_coo(mx):
-            mx = mx.tocoo()
-        coords = np.vstack((mx.row, mx.col)).transpose()
-        values = mx.data
-        shape = mx.shape
-        return coords, values, shape
-
-    if isinstance(sparse_mx, list):
-        for i in range(len(sparse_mx)):
-            sparse_mx[i] = to_tuple(sparse_mx[i])
-    else:
-        sparse_mx = to_tuple(sparse_mx)
-    return sparse_mx
-
-
-def preprocess_adj(adj):
-    """Preprocessing of adjacency matrix for scGCN model and conversion to tuple
-    representation."""
-    adj_normalized = normalize_adj(adj + sp.eye(adj.shape[0]))
-    return adj_normalized  #sparse_to_tuple(adj_normalized)
-
-
-def normalize_adj(adj):
-    """Symmetrically normalize adjacency matrix."""
-    adj = sp.coo_matrix(adj)
-    rowsum = np.array(adj.sum(1))
-    d_inv_sqrt = np.power(rowsum, -0.5).flatten()
-    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.
-    d_mat_inv_sqrt = sp.diags(d_inv_sqrt)
-    return adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo()
-
-
-def normalize_pseudo_real_data(counts, log=True):
-    for i in range(len(counts)):
-        #norm_counts = sc.pp.normalize_total(counts[i])
-        normalize(adata=counts[i], counts_per_cell_after=1e4)
-        if log:
-            sc.pp.log1p(counts[i])
-
-
-def get_pVal(counts, labels):
-    if isinstance(counts, sp.csr_matrix):
-        y = counts.toarray().flatten()
-    else:
-        y = counts.flatten()
-    sub_g = pd.DataFrame({'y': y, 'x': labels})
-    lm = ols('y ~ x', data=sub_g).fit()
-    pval = sm.stats.anova_lm(lm, typ=1).loc[['x'], 'PR(>F)'][0]
-    #print(pval)
-    return (pval)
-
-
-#' select variable genes
-def select_var_genes_anova(counts, labels, clust_vr='cellType', nv=2000):
-    # D: number of genes
-    D = counts.shape[1]
-
-    #fit cell labels to cell expression, indidually for each gene
-    new_labels = labels[clust_vr]
-    #for each gene (column), anova fit cell labels to the gene's expression across cells (rows)
-    #get p-value corrected bonferroni for each gene
-    pv1 = [get_pVal(counts[:, d], new_labels) for d in range(D)]
-
-    #get indices of nv genes with highest pVal
-    egen = sorted(range(len(pv1)), key=lambda i: pv1[i], reverse=True)[:nv]
-
-    return (egen)
-
-
-def gen_mix(sc_counts, nc_min=2, nc_max=10, clust_vr='cellType', umi_cutoff=25000, downsample_counts=20000):
-    all_subclasses = sc_counts.obs[clust_vr].unique().tolist().copy()
+def gen_mix(sc_counts, nc_min=2, nc_max=10, clust_vr="cellType", umi_cutoff=25000, downsample_counts=20000):
+    all_subclasses = sc_counts.obs[clust_vr].unique().tolist()
     mix_counts = sc_counts.copy()
 
-    # sample between 2 and 10 cells randomly from the sc count matrix
-    #sc.pp.subsample(mix_counts, n_obs=n_mix, random_seed=None)
+    # Sample between 2 and 10 cells randomly from the sc count matrix
+    # sc.pp.subsample(mix_counts, n_obs=n_mix, random_seed=None)
     n_mix = random.choice(range(nc_min, nc_max + 1))
     sample_inds = np.random.choice(10, size=n_mix, replace=False)
     mix_counts = mix_counts[sorted(sample_inds)]
 
     # Combine (sum) their transcriptomic info (counts)
-    #downsample > 25k counts to <= 20k counts
-    #if np.sum(mix_counts.X) > umi_cutoff:
-    #    sc.pp.downsample_counts(mix_counts, total_counts=downsample_counts)
     if isinstance(mix_counts.X, sp.csr_matrix):
         mix_counts_X = sp.csr_matrix.sum(mix_counts.X, axis=0)
     else:
         mix_counts_X = np.sum(mix_counts.X, axis=0, keepdims=True)
 
-    subclasses = mix_counts.obs[clust_vr].unique().tolist().copy()
+    # Downsample counts
+    # if np.sum(mix_counts.X) > umi_cutoff:
+    #     sc.pp.downsample_counts(mix_counts, total_counts=downsample_counts)
 
     class_prop = mix_counts.obs[clust_vr].value_counts(normalize=True).sort_index().to_frame().T.reset_index(drop=True)
     obs = class_prop.copy()
     for subcl in list(set(all_subclasses) - set(class_prop.columns.tolist())):
         obs[subcl] = 0.0
     obs = obs.sort_index(axis=1)
-    obs['cell_count'] = n_mix
-    obs['total_umi_count'] = np.sum(mix_counts.X)
-    return (mix_counts_X, obs)
+    obs["cell_count"] = n_mix
+    obs["total_umi_count"] = np.sum(mix_counts.X)
+
+    return mix_counts_X, obs
 
 
-def gen_pseudo_spots(sc_counts, labels, clust_vr='cellType', nc_min=2, nc_max=10, N_p=1000, seed=0):
+def gen_pseudo_spots(sc_counts, labels, clust_vr="cellType", nc_min=2, nc_max=10, N_p=1000, seed=0):
     np.random.seed(seed)
     tmp_sc_cnt = sc_counts.copy()
 
     mix_X = np.empty((0, tmp_sc_cnt.n_vars))
     mix_obs = pd.DataFrame()
     for i in range(N_p):
-        #gets and combines a random mix of nc_min to nc_max cells
+        # gets and combines a random mix of nc_min to nc_max cells
         mix_counts, obs = gen_mix(tmp_sc_cnt, clust_vr=clust_vr, umi_cutoff=25000, downsample_counts=20000)
-        #append this mix to sample of pseudo mixtures
+        # append this mix to sample of pseudo mixtures
         mix_X = np.append(mix_X, mix_counts, axis=0)
         mix_obs = pd.concat((mix_obs, obs))
 
-    mix_obs.index = pd.Index(['ps_mix_' + str(i + 1) for i in range(N_p)])
-    #create AnnData object with sample of pseudo mixtures (obs)
-    #annotations: cell counts, cell type compositions
-    pseudo_counts = anndata.AnnData(X=mix_X, obs=mix_obs, var=sc_counts.var, dtype=mix_X.dtype)
-    return (pseudo_counts)
+    mix_obs.index = pd.Index(["ps_mix_" + str(i + 1) for i in range(N_p)])
+    # Create AnnData object with sample of pseudo mixtures (obs)
+    # annotations: cell counts, cell type compositions
+    pseudo_counts = anndata.AnnData(X=mix_X, obs=mix_obs, var=sc_counts.var, dtype=np.float32)
+    return pseudo_counts
 
 
-#' This function takes pseudo-spatail and real-spatial data to identify variable genes
-def pseudo_spatial_process(counts, labels, clust_vr='cellType', scRNA=False, n_hvg=2000, N_p=500):
-    #labels: sample (mix or spot) cell compositions
-    #counts: anndata type - one for scRNA or pseudo data, and one for real ST data
+def pseudo_spatial_process(counts, labels, clust_vr="cellType", scRNA=False, n_hvg=2000, N_p=500):
+    """Identify variable genes from pseudo- and real-spatial data.
+
+    Parameters
+    ---------
+    counts
+        Sample (pseudo or real) cell compositions.
+    labels
+        Cell type labels for pseudo and rel data.
+
+    """
     st_counts = [counts[0].copy(), counts[1].copy()]
-    #use common genes only
-    genes1 = set(st_counts[0].var.index)
-    genes2 = set(st_counts[1].var.index)
-    intersect_genes = genes1.intersection(genes2)
-    st_counts[0] = st_counts[0][:, list(intersect_genes)]
-    st_counts[1] = st_counts[1][:, list(intersect_genes)]
 
-    #if using scRNA data, generate pseudo ST data
-    if (scRNA):
-        print('generate pseudo ST from scRNA')
-        #get top nv variable genes in scRNA set
-        #sel_features = select_var_genes_anova(counts[0].X,labels[0],clust_vr=clust_vr, nv=n_hvg)
-        logX = st_counts[0].copy()
-        sc.pp.log1p(logX)
-        sc.pp.highly_variable_genes(logX, flavor='seurat', n_top_genes=n_hvg)
-        sel_features = list(logX.var[logX.var.highly_variable == True].index)
+    # use common genes only
+    common_genes = sorted(set(counts[0].var_names) & set(counts[1].var_names))
+    st_counts = [st_counts[0][:, common_genes], st_counts[1][:, common_genes]]
 
-        #subset on top nv genes
+    if scRNA:  # generate pseudo ST data
+        print("Generating pseudo ST from scRNA")
+
+        # Only use top nv variable genes in scRNA set
+        logX = sc.pp.log1p(st_counts[0], copy=True)
+        sc.pp.highly_variable_genes(logX, flavor="seurat", n_top_genes=n_hvg)
+        sel_features = logX.var[logX.var.highly_variable].index.tolist()
         st_counts = [st_counts[0][:, sel_features], st_counts[1][:, sel_features]]
 
-        #generate pseudo spots from scRNA (using variable genes) - as AnnData object
-        st_counts = [gen_pseudo_spots(st_counts[0], labels[0], clust_vr=clust_vr, N_p=N_p), st_counts[1]]
+        # Generate pseudo spots from scRNA (using variable genes)
+        st_counts = [gen_pseudo_spots(st_counts[0], labels[0], clust_vr=clust_vr, N_p=N_p), st_counts[1].copy()]
 
-    #otherwise, already using pseudo ST data -->
+    # Library size normalization (with log1p transfomration) of the pseudo and real ST data
+    for st_count in st_counts:
+        sc.pp.normalize_per_cell(st_count, counts_per_cell_after=1e4)
+        sc.pp.log1p(st_count)
 
-    #library size normalization of the pseudo and real ST data
-    #log indicates to apply log1p transformation after normalization
-    normalize_pseudo_real_data(st_counts, log=True)
+    # Find highly variable genes for both pseudo and real data
+    # flavors: seurat_v3 - expects raw count data
+    # flavors: seurat (default), cell_ranger - expect log data
+    batch_cnt = anndata.concat(st_counts, label="batch")
+    sc.pp.highly_variable_genes(batch_cnt, flavor="seurat", n_top_genes=n_hvg, batch_key="batch")
+    hvgs = batch_cnt.var[batch_cnt.var.highly_variable].index.tolist()
 
-    #find highly variable genes for both pseudo and real data
-    #flavors: seurat_v3 - expects raw count data
-    #flavors: seurat (default), cell_ranger - expect log data
-    batch_cnt = st_counts[0].concatenate(st_counts[1], index_unique=None)
+    st_counts[0]._inplace_subset_var(np.array(batch_cnt.var.highly_variable))
+    st_counts[1]._inplace_subset_var(np.array(batch_cnt.var.highly_variable))
 
-    sc.pp.highly_variable_genes(batch_cnt, flavor='seurat', n_top_genes=n_hvg, batch_key='batch')
-
-    hvgs = list(batch_cnt.var[batch_cnt.var.highly_variable == True].index)
-
-    st_counts[0]._inplace_subset_var(np.array(batch_cnt.var.highly_variable == True))
-    st_counts[1]._inplace_subset_var(np.array(batch_cnt.var.highly_variable == True))
-
-    #scale/standardize pseudo and real ST data
+    # Scale/standardize pseudo and real ST data
     sc.pp.scale(st_counts[0])
     sc.pp.scale(st_counts[1])
 
-    labels1 = st_counts[0].obs  #.drop(['cell_count', 'total_umi_count'], axis=1)
-    labels2 = pd.DataFrame(np.resize(labels1.values, (st_counts[1].shape[0], labels1.shape[1])),
-                           columns=labels1.columns, index=st_counts[1].obs.index)
-    labels = [labels1.reset_index(drop=True), labels2.reset_index(drop=True)]
+    label1 = st_counts[0].obs.drop(["cell_count", "total_umi_count", "n_counts"], axis=1)
+    if (label2 := labels[1]) is None:  # copy labels from pseudo spots
+        label2 = pd.DataFrame(np.resize(label1.values, (st_counts[1].shape[0], label1.shape[1])),
+                              columns=label1.columns, index=st_counts[1].obs.index)
+        label2 = label2.drop(["cell_count", "total_umi_count", "n_counts"], axis=1)
+    st_labels = [label1.reset_index(drop=True), label2.reset_index(drop=True)]
+    print("Finished  pre-processing")
 
-    print('Finished  pre-processing')
-    return ([st_counts[0], st_counts[1]], labels, hvgs)
+    return st_counts, st_labels, hvgs
 
 
 def l2norm(mat):

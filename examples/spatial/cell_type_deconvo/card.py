@@ -29,23 +29,17 @@ ref_count, ref_annot, count_matrix, cell_type_portion, spatial = dataset.load_da
 ref_adata = AnnData(X=ref_count, obsm={"annot": ref_annot}, dtype=np.float32)
 adata = AnnData(X=count_matrix, obsm={"spatial": spatial, "cell_type_portion": cell_type_portion}, dtype=np.float32)
 
-# TODO: deprecate the need for ct_select by doing this in a preprocessing step -> convert ct into one-hot matrix
-ct_select = sorted(set(ref_annot.cellType.unique().tolist()) & set(cell_type_portion.columns.tolist()))
-print(f"{ct_select=}")
-
 data = Data(adata)
 data.set_config(feature_channel=[None, "spatial"], feature_channel_type=[None, "obsm"],
                 label_channel="cell_type_portion")
+(x_count, x_spatial), y = data.get_data(return_type="numpy")
 
-# TODO: after removing ct_select, return as numpy
-(x_count, x_spatial), y = data.get_data(return_type="default")
-
-model = Card(ref_count, ref_annot, ct_varname="cellType", ct_select=ct_select)
-pred = model.fit_and_predict(x_count, x_spatial.values, max_iter=args.max_iter, epsilon=args.epsilon)
-mse = model.score(pred, y[ct_select].values)
+model = Card(ref_count, ref_annot, ct_varname="cellType", ct_select=cell_type_portion.columns.tolist())
+pred = model.fit_and_predict(x_count, x_spatial, max_iter=args.max_iter, epsilon=args.epsilon)
+mse = model.score(pred, y)
 
 print(f"Predicted cell-type proportions of  sample 1: {pred[0].round(3)}")
-print(f"True cell-type proportions of  sample 1: {y.iloc[0].tolist()}")
+print(f"True cell-type proportions of  sample 1: {y[0].round(3)}")
 print(f"mse = {mse:7.4f}")
 """To reproduce CARD benchmarks, please refer to command lines belows:
 
