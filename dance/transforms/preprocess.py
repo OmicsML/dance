@@ -1685,59 +1685,59 @@ def findClassyGenes(expDat, sampTab, topX=25, dThresh=0, alpha1=0.05, alpha2=.00
 
 
 #######################################################
-#For Cell Type Deconvolution
+# For Cell Type Deconvolution
 #######################################################
 
 
-def gen_mix(sc_counts, nc_min=2, nc_max=10, clust_vr='cellType', umi_cutoff=25000, downsample_counts=20000):
-    all_subclasses = sc_counts.obs[clust_vr].unique().tolist().copy()
+def gen_mix(sc_counts, nc_min=2, nc_max=10, clust_vr="cellType", umi_cutoff=25000, downsample_counts=20000):
+    all_subclasses = sc_counts.obs[clust_vr].unique().tolist()
     mix_counts = sc_counts.copy()
 
-    # sample between 2 and 10 cells randomly from the sc count matrix
-    #sc.pp.subsample(mix_counts, n_obs=n_mix, random_seed=None)
+    # Sample between 2 and 10 cells randomly from the sc count matrix
+    # sc.pp.subsample(mix_counts, n_obs=n_mix, random_seed=None)
     n_mix = random.choice(range(nc_min, nc_max + 1))
     sample_inds = np.random.choice(10, size=n_mix, replace=False)
     mix_counts = mix_counts[sorted(sample_inds)]
 
     # Combine (sum) their transcriptomic info (counts)
-    #downsample > 25k counts to <= 20k counts
-    #if np.sum(mix_counts.X) > umi_cutoff:
-    #    sc.pp.downsample_counts(mix_counts, total_counts=downsample_counts)
     if isinstance(mix_counts.X, sp.csr_matrix):
         mix_counts_X = sp.csr_matrix.sum(mix_counts.X, axis=0)
     else:
         mix_counts_X = np.sum(mix_counts.X, axis=0, keepdims=True)
 
-    subclasses = mix_counts.obs[clust_vr].unique().tolist().copy()
+    # Downsample counts
+    # if np.sum(mix_counts.X) > umi_cutoff:
+    #     sc.pp.downsample_counts(mix_counts, total_counts=downsample_counts)
 
     class_prop = mix_counts.obs[clust_vr].value_counts(normalize=True).sort_index().to_frame().T.reset_index(drop=True)
     obs = class_prop.copy()
     for subcl in list(set(all_subclasses) - set(class_prop.columns.tolist())):
         obs[subcl] = 0.0
     obs = obs.sort_index(axis=1)
-    obs['cell_count'] = n_mix
-    obs['total_umi_count'] = np.sum(mix_counts.X)
-    return (mix_counts_X, obs)
+    obs["cell_count"] = n_mix
+    obs["total_umi_count"] = np.sum(mix_counts.X)
+
+    return mix_counts_X, obs
 
 
-def gen_pseudo_spots(sc_counts, labels, clust_vr='cellType', nc_min=2, nc_max=10, N_p=1000, seed=0):
+def gen_pseudo_spots(sc_counts, labels, clust_vr="cellType", nc_min=2, nc_max=10, N_p=1000, seed=0):
     np.random.seed(seed)
     tmp_sc_cnt = sc_counts.copy()
 
     mix_X = np.empty((0, tmp_sc_cnt.n_vars))
     mix_obs = pd.DataFrame()
     for i in range(N_p):
-        #gets and combines a random mix of nc_min to nc_max cells
+        # gets and combines a random mix of nc_min to nc_max cells
         mix_counts, obs = gen_mix(tmp_sc_cnt, clust_vr=clust_vr, umi_cutoff=25000, downsample_counts=20000)
-        #append this mix to sample of pseudo mixtures
+        # append this mix to sample of pseudo mixtures
         mix_X = np.append(mix_X, mix_counts, axis=0)
         mix_obs = pd.concat((mix_obs, obs))
 
-    mix_obs.index = pd.Index(['ps_mix_' + str(i + 1) for i in range(N_p)])
-    #create AnnData object with sample of pseudo mixtures (obs)
-    #annotations: cell counts, cell type compositions
+    mix_obs.index = pd.Index(["ps_mix_" + str(i + 1) for i in range(N_p)])
+    # Create AnnData object with sample of pseudo mixtures (obs)
+    # annotations: cell counts, cell type compositions
     pseudo_counts = anndata.AnnData(X=mix_X, obs=mix_obs, var=sc_counts.var, dtype=mix_X.dtype)
-    return (pseudo_counts)
+    return pseudo_counts
 
 
 def pseudo_spatial_process(counts, labels, clust_vr="cellType", scRNA=False, n_hvg=2000, N_p=500):
@@ -1770,7 +1770,9 @@ def pseudo_spatial_process(counts, labels, clust_vr="cellType", scRNA=False, n_h
         st_counts = [gen_pseudo_spots(st_counts[0], labels[0], clust_vr=clust_vr, N_p=N_p), st_counts[1]]
 
     # Library size normalization (with log1p transfomration) of the pseudo and real ST data
-    normalize_pseudo_real_data(st_counts, log=True)
+    for st_count in st_counts:
+        sc.pp.normalize_per_cell(st_count, counts_per_cell_after=1e4)
+        sc.pp.log1p(st_count)
 
     # Find highly variable genes for both pseudo and real data
     # flavors: seurat_v3 - expects raw count data
