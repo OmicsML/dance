@@ -2,6 +2,7 @@ import glob
 import os
 import os.path as osp
 import warnings
+from pprint import pformat
 
 import anndata
 import cv2
@@ -229,15 +230,6 @@ class CellTypeDeconvoDatasetLite:
             else:
                 warnings.warn(f"Unsupported file type {ext!r}. Use csv or h5ad file types.")
 
-    # def load_data(self, subset_common_celltypes: bool = True):
-    #     ref_count = self.data["ref_sc_count"]
-    #     ref_annot = self.data["ref_sc_annot"]
-    #     count_matrix = self.data["mix_count"]
-    #     cell_type_portion = self.data["true_p"]
-    #     if (spatial := self.data.get("spatial_location")) is None:
-    #         spatial = pd.DataFrame(0, index=count_matrix.index, columns=["x", "y"])
-    #     return ref_count, ref_annot, count_matrix, cell_type_portion, spatial
-
     def load_data(self, subset_common_celltypes: bool = True):
         """Load raw data.
 
@@ -261,9 +253,9 @@ class CellTypeDeconvoDatasetLite:
         logger.info(f"Number of cell types: reference = {len(ref_celltypes)}, real = {len(real_celltypes)}")
         if subset_common_celltypes:
             common_celltypes = sorted(ref_celltypes & real_celltypes)
-            logger.info(f"Subsetting to common cell types (n={common_celltypes}): {common_celltypes}")
+            logger.info(f"Subsetting to common cell types (n={len(common_celltypes)}):\n{pformat(common_celltypes)}")
 
-            idx = ref_annot[ref_annot["cellType"].isin(ct_select)].index
+            idx = ref_annot[ref_annot["cellType"].isin(common_celltypes)].index
             ref_annot = ref_annot.loc[idx]
             ref_count = ref_count.loc[idx]
 
