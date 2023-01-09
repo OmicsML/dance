@@ -15,7 +15,8 @@ import warnings
 import networkx as nx
 import numpy as np
 
-# coding=utf-8
+PASS_MAX = -1
+MIN = 0.0000001
 
 
 class Status:
@@ -82,8 +83,8 @@ class Status:
                 self.degrees[com] = self.degrees.get(com, 0) + deg
                 self.gdegrees[node] = deg
                 inc = 0.
-                for neighbor, datas in graph[node].items():
-                    edge_weight = datas.get(weight, 1)
+                for neighbor, data in graph[node].items():
+                    edge_weight = data.get(weight, 1)
                     if edge_weight <= 0:
                         error = "Bad graph type ({})".format(type(graph))
                         raise ValueError(error)
@@ -93,10 +94,6 @@ class Status:
                         else:
                             inc += float(edge_weight) / 2.
                 self.internals[com] = self.internals.get(com, 0) + inc
-
-
-__PASS_MAX = -1
-__MIN = 0.0000001
 
 
 def check_random_state(seed):
@@ -168,7 +165,7 @@ def partition_at_level(dendrogram, level):
     return partition
 
 
-def modularity(partition, graph, weight='weight'):
+def modularity(partition, graph, weight="weight"):
     """Compute the modularity of a partition of a graph.
 
     Parameters
@@ -179,7 +176,7 @@ def modularity(partition, graph, weight='weight'):
     graph : networkx.Graph
        the networkx graph which is decomposed
     weight : str, optional
-        the key in graph to use as weight. Default to 'weight'
+        the key in graph to use as weight. Default to "weight"
 
 
     Returns
@@ -222,8 +219,8 @@ def modularity(partition, graph, weight='weight'):
     for node in graph:
         com = partition[node]
         deg[com] = deg.get(com, 0.) + graph.degree(node, weight=weight)
-        for neighbor, datas in graph[node].items():
-            edge_weight = datas.get(weight, 1)
+        for neighbor, data in graph[node].items():
+            edge_weight = data.get(weight, 1)
             if partition[neighbor] == com:
                 if neighbor == node:
                     inc[com] = inc.get(com, 0.) + float(edge_weight)
@@ -237,7 +234,7 @@ def modularity(partition, graph, weight='weight'):
     return res
 
 
-def best_partition(graph, partition=None, weight='weight', resolution=1., randomize=None, random_state=None):
+def best_partition(graph, partition=None, weight="weight", resolution=1., randomize=None, random_state=None):
     """Compute the partition of the graph nodes which maximises the modularity (or
     try..) using the Louvain heuristices.
 
@@ -252,7 +249,7 @@ def best_partition(graph, partition=None, weight='weight', resolution=1., random
        the algorithm will start using this partition of the nodes.
        It's a dictionary where keys are their nodes and values the communities
     weight : str, optional
-        the key in graph to use as weight. Default to 'weight'
+        the key in graph to use as weight. Default to "weight"
     resolution :  double, optional
         Will change the size of the communities, default to 1.
         represents the time described in
@@ -296,7 +293,7 @@ def best_partition(graph, partition=None, weight='weight', resolution=1., random
     >>> import community as community_louvain
     >>> import networkx as nx
     >>> G = nx.erdos_renyi_graph(100, 0.01)
-    >>> partion = community_louvain.best_partition(G)
+    >>> partition = community_louvain.best_partition(G)
 
     >>> # display a graph with its communities:
     >>> # as Erdos-Renyi graphs don't have true community structure,
@@ -312,7 +309,7 @@ def best_partition(graph, partition=None, weight='weight', resolution=1., random
     >>> # draw the graph
     >>> pos = nx.spring_layout(G)
     >>> # color the nodes according to their partition
-    >>> cmap = cm.get_cmap('viridis', max(partition.values()) + 1)
+    >>> cmap = cm.get_cmap("viridis", max(partition.values()) + 1)
     >>> nx.draw_networkx_nodes(G, pos, partition.keys(), node_size=40,
     >>>                        cmap=cmap, node_color=list(partition.values()))
     >>> nx.draw_networkx_edges(G, pos, alpha=0.5)
@@ -337,7 +334,7 @@ class Louvain:
         """
         self.resolution = resolution
 
-    def fit(self, adj, partition=None, weight='weight', randomize=None, random_state=None):
+    def fit(self, adj, partition=None, weight="weight", randomize=None, random_state=None):
         """fit function for model training.
 
         Parameters
@@ -348,7 +345,7 @@ class Louvain:
             a dictionary where keys are graph nodes and values the part the node
             belongs to
         weight : str, optional
-            the key in graph to use as weight. Default to 'weight'
+            the key in graph to use as weight. Default to "weight"
         randomize : boolean, optional
             Will randomize the node evaluation order and the community evaluation
             order to get different partitions at each call
@@ -411,7 +408,7 @@ class Louvain:
 # add by us
 
 
-def generate_dendrogram(graph, part_init=None, weight='weight', resolution=1., randomize=None, random_state=None):
+def generate_dendrogram(graph, part_init=None, weight="weight", resolution=1., randomize=None, random_state=None):
     if graph.is_directed():
         raise TypeError("Bad graph type, use only non directed graph")
 
@@ -443,8 +440,8 @@ def generate_dendrogram(graph, part_init=None, weight='weight', resolution=1., r
     status = Status()
     status.init(current_graph, weight, part_init)
     status_list = list()
-    __one_level(current_graph, status, weight, resolution, random_state)
-    new_mod = __modularity(status, resolution)
+    _one_level(current_graph, status, weight, resolution, random_state)
+    new_mod = _modularity(status, resolution)
     partition = __renumber(status.node2com)
     status_list.append(partition)
     mod = new_mod
@@ -452,9 +449,9 @@ def generate_dendrogram(graph, part_init=None, weight='weight', resolution=1., r
     status.init(current_graph, weight)
 
     while True:
-        __one_level(current_graph, status, weight, resolution, random_state)
-        new_mod = __modularity(status, resolution)
-        if new_mod - mod < __MIN:
+        _one_level(current_graph, status, weight, resolution, random_state)
+        new_mod = _modularity(status, resolution)
+        if new_mod - mod < MIN:
             break
         partition = __renumber(status.node2com)
         status_list.append(partition)
@@ -478,7 +475,7 @@ def induced_graph(partition, graph, weight="weight"):
     graph : networkx.Graph
         the initial graph
     weight : str, optional
-        the key in graph to use as weight. Default to 'weight'
+        the key in graph to use as weight. Default to "weight"
 
 
     Returns
@@ -503,8 +500,8 @@ def induced_graph(partition, graph, weight="weight"):
     ret = nx.Graph()
     ret.add_nodes_from(partition.values())
 
-    for node1, node2, datas in graph.edges(data=True):
-        edge_weight = datas.get(weight, 1)
+    for node1, node2, data in graph.edges(data=True):
+        edge_weight = data.get(weight, 1)
         com1 = partition[node1]
         com2 = partition[node2]
         w_prec = ret.get_edge_data(com1, com2, {weight: 0}).get(weight, 1)
@@ -558,69 +555,69 @@ def load_binary(data):
     return graph
 
 
-def __one_level(graph, status, weight_key, resolution, random_state):
+def _one_level(graph, status, weight_key, resolution, random_state):
     """Compute one level of communities."""
     modified = True
     nb_pass_done = 0
-    cur_mod = __modularity(status, resolution)
+    cur_mod = _modularity(status, resolution)
     new_mod = cur_mod
 
-    while modified and nb_pass_done != __PASS_MAX:
+    while modified and nb_pass_done != PASS_MAX:
         cur_mod = new_mod
         modified = False
         nb_pass_done += 1
 
-        for node in __randomize(graph.nodes(), random_state):
+        for node in _randomize(graph.nodes(), random_state):
             com_node = status.node2com[node]
             degc_totw = status.gdegrees.get(node, 0.) / (status.total_weight * 2.)  # NOQA
-            neigh_communities = __neighcom(node, graph, status, weight_key)
-            remove_cost = - neigh_communities.get(com_node,0) + \
+            neigh_communities = _neighcom(node, graph, status, weight_key)
+            remove_cost = - neigh_communities.get(com_node, 0) + \
                 resolution * (status.degrees.get(com_node, 0.) - status.gdegrees.get(node, 0.)) * degc_totw
-            __remove(node, com_node, neigh_communities.get(com_node, 0.), status)
+            _remove(node, com_node, neigh_communities.get(com_node, 0.), status)
             best_com = com_node
             best_increase = 0
-            for com, dnc in __randomize(neigh_communities.items(), random_state):
+            for com, dnc in _randomize(neigh_communities.items(), random_state):
                 incr = remove_cost + dnc - \
                        resolution * status.degrees.get(com, 0.) * degc_totw
                 if incr > best_increase:
                     best_increase = incr
                     best_com = com
-            __insert(node, best_com, neigh_communities.get(best_com, 0.), status)
+            _insert(node, best_com, neigh_communities.get(best_com, 0.), status)
             if best_com != com_node:
                 modified = True
-        new_mod = __modularity(status, resolution)
-        if new_mod - cur_mod < __MIN:
+        new_mod = _modularity(status, resolution)
+        if new_mod - cur_mod < MIN:
             break
 
 
-def __neighcom(node, graph, status, weight_key):
+def _neighcom(node, graph, status, weight_key):
     """Compute the communities in the neighborhood of node in the graph given with the
     decomposition node2com."""
     weights = {}
-    for neighbor, datas in graph[node].items():
+    for neighbor, data in graph[node].items():
         if neighbor != node:
-            edge_weight = datas.get(weight_key, 1)
+            edge_weight = data.get(weight_key, 1)
             neighborcom = status.node2com[neighbor]
             weights[neighborcom] = weights.get(neighborcom, 0) + edge_weight
 
     return weights
 
 
-def __remove(node, com, weight, status):
+def _remove(node, com, weight, status):
     """Remove node from community com and modify status."""
     status.degrees[com] = (status.degrees.get(com, 0.) - status.gdegrees.get(node, 0.))
     status.internals[com] = float(status.internals.get(com, 0.) - weight - status.loops.get(node, 0.))
     status.node2com[node] = -1
 
 
-def __insert(node, com, weight, status):
+def _insert(node, com, weight, status):
     """Insert node into community and modify status."""
     status.node2com[node] = com
     status.degrees[com] = (status.degrees.get(com, 0.) + status.gdegrees.get(node, 0.))
     status.internals[com] = float(status.internals.get(com, 0.) + weight + status.loops.get(node, 0.))
 
 
-def __modularity(status, resolution):
+def _modularity(status, resolution):
     """Fast compute the modularity of the partition of the graph using status
     precomputed."""
     links = float(status.total_weight)
@@ -633,7 +630,7 @@ def __modularity(status, resolution):
     return result
 
 
-def __randomize(items, random_state):
+def _randomize(items, random_state):
     """Returns a List containing a random permutation of items."""
     randomized_items = list(items)
     random_state.shuffle(randomized_items)
