@@ -151,6 +151,7 @@ class SPOTlight:
         self.ct_select = ct_select
         self.rank = rank
 
+        # TODO: extract to preprocessing transformation and remove ct_select from input
         # Subset sc samples on selected cell types (mutual between sc and mix cell data)
         ct_select_ix = ref_annot[ref_annot[ct_varname].isin(ct_select)].index
         self.ref_annot = ref_annot.loc[ct_select_ix]

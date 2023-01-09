@@ -106,6 +106,7 @@ class SpatialDecon:
 
         self.device = device
 
+        # TODO: extract to preprocessing transformation and remove ct_select from input
         # Subset sc samples on selected cell types (mutual between sc and mix cell data)
         ct_select_ix = sc_annot[sc_annot[ct_varname].isin(ct_select)].index
         self.sc_annot = sc_annot.loc[ct_select_ix]
