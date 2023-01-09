@@ -1823,63 +1823,61 @@ def gen_pseudo_spots(sc_counts, labels, clust_vr='cellType', nc_min=2, nc_max=10
     return (pseudo_counts)
 
 
-#' This function takes pseudo-spatail and real-spatial data to identify variable genes
-def pseudo_spatial_process(counts, labels, clust_vr='cellType', scRNA=False, n_hvg=2000, N_p=500):
-    #labels: sample (mix or spot) cell compositions
-    #counts: anndata type - one for scRNA or pseudo data, and one for real ST data
+def pseudo_spatial_process(counts, labels, clust_vr="cellType", scRNA=False, n_hvg=2000, N_p=500):
+    """Identify variable genes from pseudo- and real-spatial data.
+
+    Parameters
+    ---------
+    counts
+        Sample (pseudo or real) cell compositions.
+    labels
+        Cell type labels for pseudo and rel data.
+
+    """
     st_counts = [counts[0].copy(), counts[1].copy()]
-    #use common genes only
-    genes1 = set(st_counts[0].var.index)
-    genes2 = set(st_counts[1].var.index)
-    intersect_genes = genes1.intersection(genes2)
-    st_counts[0] = st_counts[0][:, list(intersect_genes)]
-    st_counts[1] = st_counts[1][:, list(intersect_genes)]
 
-    #if using scRNA data, generate pseudo ST data
-    if (scRNA):
-        print('generate pseudo ST from scRNA')
-        #get top nv variable genes in scRNA set
-        #sel_features = select_var_genes_anova(counts[0].X,labels[0],clust_vr=clust_vr, nv=n_hvg)
-        logX = st_counts[0].copy()
-        sc.pp.log1p(logX)
-        sc.pp.highly_variable_genes(logX, flavor='seurat', n_top_genes=n_hvg)
-        sel_features = list(logX.var[logX.var.highly_variable == True].index)
+    # use common genes only
+    common_genes = sorted(set(counts[0].var_names) & set(counts[1].var_names))
+    st_counts = [st_counts[0][:, common_genes], st_counts[1][:, common_genes]]
 
-        #subset on top nv genes
+    if scRNA:  # generate pseudo ST data
+        print("Generating pseudo ST from scRNA")
+
+        # Only use top nv variable genes in scRNA set
+        logX = sc.pp.log1p(st_counts[0], copy=True)
+        sc.pp.highly_variable_genes(logX, flavor="seurat", n_top_genes=n_hvg)
+        sel_features = logX.var[logX.var.highly_variable].index.tolist()
         st_counts = [st_counts[0][:, sel_features], st_counts[1][:, sel_features]]
 
-        #generate pseudo spots from scRNA (using variable genes) - as AnnData object
+        # Generate pseudo spots from scRNA (using variable genes)
         st_counts = [gen_pseudo_spots(st_counts[0], labels[0], clust_vr=clust_vr, N_p=N_p), st_counts[1]]
 
-    #otherwise, already using pseudo ST data -->
-
-    #library size normalization of the pseudo and real ST data
-    #log indicates to apply log1p transformation after normalization
+    # Library size normalization (with log1p transfomration) of the pseudo and real ST data
     normalize_pseudo_real_data(st_counts, log=True)
 
-    #find highly variable genes for both pseudo and real data
-    #flavors: seurat_v3 - expects raw count data
-    #flavors: seurat (default), cell_ranger - expect log data
+    # Find highly variable genes for both pseudo and real data
+    # flavors: seurat_v3 - expects raw count data
+    # flavors: seurat (default), cell_ranger - expect log data
     batch_cnt = st_counts[0].concatenate(st_counts[1], index_unique=None)
+    sc.pp.highly_variable_genes(batch_cnt, flavor="seurat", n_top_genes=n_hvg, batch_key="batch")
+    hvgs = batch_cnt.var[batch_cnt.var.highly_variable].index.tolist()
 
-    sc.pp.highly_variable_genes(batch_cnt, flavor='seurat', n_top_genes=n_hvg, batch_key='batch')
+    st_counts[0]._inplace_subset_var(np.array(batch_cnt.var.highly_variable))
+    st_counts[1]._inplace_subset_var(np.array(batch_cnt.var.highly_variable))
 
-    hvgs = list(batch_cnt.var[batch_cnt.var.highly_variable == True].index)
-
-    st_counts[0]._inplace_subset_var(np.array(batch_cnt.var.highly_variable == True))
-    st_counts[1]._inplace_subset_var(np.array(batch_cnt.var.highly_variable == True))
-
-    #scale/standardize pseudo and real ST data
+    # Scale/standardize pseudo and real ST data
     sc.pp.scale(st_counts[0])
     sc.pp.scale(st_counts[1])
 
-    labels1 = st_counts[0].obs  #.drop(['cell_count', 'total_umi_count'], axis=1)
-    labels2 = pd.DataFrame(np.resize(labels1.values, (st_counts[1].shape[0], labels1.shape[1])),
-                           columns=labels1.columns, index=st_counts[1].obs.index)
-    labels = [labels1.reset_index(drop=True), labels2.reset_index(drop=True)]
+    label1 = st_counts[0].obs.drop(["cell_count", "total_umi_count", "n_counts"], axis=1)
+    if (label2 := labels[1]) is None:  # copy labels from pseudo spots
+        label2 = pd.DataFrame(np.resize(label1.values, (st_counts[1].shape[0], label1.shape[1])),
+                              columns=label1.columns, index=st_counts[1].obs.index)
+        label2 = label2.drop(["cell_count", "total_umi_count", "n_counts"], axis=1)
+    st_labels = [label1.reset_index(drop=True), label2.reset_index(drop=True)]
+    print("Finished  pre-processing")
 
-    print('Finished  pre-processing')
-    return ([st_counts[0], st_counts[1]], labels, hvgs)
+    return st_counts, st_labels, hvgs
 
 
 def l2norm(mat):
