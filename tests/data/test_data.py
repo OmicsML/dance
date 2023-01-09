@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pytest
 from anndata import AnnData
 
@@ -53,7 +54,7 @@ def test_data_basic_properties(subtests):
 
 
 def test_get_data(subtests):
-    adata = AnnData(X=X)
+    adata = AnnData(X=X, obs=pd.DataFrame(X, columns=["a", "b"]), var=pd.DataFrame(X.T, columns=["x", "y", "z"]))
     adata.obsm["feature1"] = X + 10
     adata.obsm["feature2"] = X + 20
     adata.layers["layer_feature"] = X + 30
@@ -100,3 +101,11 @@ def test_get_data(subtests):
         assert x_varp.tolist() == [[5, 8], [8, 14]]
         assert x_layer.tolist() == [[30, 31], [31, 32]]
         assert y.tolist() == [[0], [1]]
+
+    with subtests.test("Single column feature"):
+        data = Data(adata, train_size=2)
+        data.set_config(feature_channel=["a", "z"], feature_channel_type=["obs", "var"], label_channel="label")
+
+        (x1, x2), _ = data.get_train_data()
+        assert x1.tolist() == [0, 1, 2]
+        assert x2.tolist() == [2, 3]
