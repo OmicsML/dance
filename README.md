@@ -21,17 +21,28 @@ DANCE is a Python toolkit to support deep learning models for analyzing single-c
 1. **Single-cell multimodal omics**
 1. **Spatially resolved transcriptomics**
 
-OmicsML Homepage: https://omicsml.ai/ \
+### Useful links
+
+OmicsML Homepage: https://omicsml.ai \
 DANCE Open Source: https://github.com/OmicsML/dance \
 DANCE Documentation: https://pydance.readthedocs.io/en/latest/ \
 DANCE Package Paper: https://www.biorxiv.org/content/10.1101/2022.10.19.512741v2 \
 Survey Paper: https://arxiv.org/abs/2210.12385
 
-Join the Community: \
+### Join the Community
+
 Slack: https://join.slack.com/t/omicsml/shared_invite/zt-1hxdz7op3-E5K~EwWF1xDvhGZFrB9AbA \
 Twitter: https://twitter.com/OmicsML \
 Wechat Group Assistant: 736180290 \
 Email: danceteamgnn@gmail.com
+
+### Contributing
+
+Community-wide contribution is the key for a sustainable development and
+continual growth of the DANCE package. We deeply appreciate any contribution
+made to improve the DANCE code base. If you would like to get started, please
+refer to our brief [guidelines](CONTRIBUTING.md) about our automated quality
+controls, as well as setting up the `dev` environments.
 
 ## Reference
 
@@ -54,7 +65,6 @@ If our work could help your research, please cite our DANCE package paper or sur
   journal={arXiv preprint arXiv:2210.12385},
   year={2022}
 }
-
 ```
 
 ## Usage
@@ -345,39 +355,3 @@ Note: * Benchmark datasets were renormalied before running the original implemen
 | SpatialDecon | MSE               | .0014 / .009                 | .0077 / N/A                       | .0055 / N/A                            |
 | SPOTlight    | MSE               | .0098 / N/A                  | .0246 / 0.118                     | .0109 / .16                            |
 | CARD         | MSE               | .0012 / N/A                  | .0078 / 0.0062                    | .0076 / N/A                            |
-
-## Dev notes
-
-### Dev installation
-
-Install PyDANCE with extra dependencies for dev
-
-```bash
-pip install -e ."[dev]"
-```
-
-Make sure dependencies have specific pinned versions
-
-```bash
-pip install -r requirements.txt
-```
-
-Install pre-commit hooks for code quality checks
-
-```bash
-pre-commit install
-```
-
-### Run tests
-
-Run all tests on current environment using pytest
-
-```bash
-pytest -v
-```
-
-Run full test from the ground up including environment set up using [tox](https://tox.wiki/en/latest/) on CPU
-
-```bash
-tox -e python3.8-cpu
-```
