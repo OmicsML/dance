@@ -37,7 +37,7 @@ class BaseData(ABC):
 
     _FEATURE_CONFIGS: List[str] = ["feature_mod", "feature_channel", "feature_channel_type"]
     _LABEL_CONFIGS: List[str] = ["label_mod", "label_channel", "label_channel_type"]
-    _DATA_CHANNELS: List[str] = ["obsm", "varm", "obsp", "varp", "layers", "uns"]
+    _DATA_CHANNELS: List[str] = ["obs", "var", "obsm", "varm", "obsp", "varp", "layers", "uns"]
 
     def __init__(self, data: Union[AnnData, MuData], train_size: Optional[int] = None, val_size: int = 0,
                  test_size: int = -1):
@@ -230,6 +230,27 @@ class BaseData(ABC):
     def get_feature(self, *, split_name: Optional[str] = None, return_type: FeatType = "numpy",
                     channel: Optional[str] = None, channel_type: Optional[str] = "obsm",
                     mod: Optional[str] = None):  # yapf: disable
+        """Retrieve features from data.
+
+        Parameters
+        ----------
+        split_name
+            Name of the split to retrieve. If not set, return all.
+        return_type
+            How should the features be returned. **numpy**: return as a numpy array; **torch**: return as a torch
+            tensor; **anndata**: return as an anndata object.
+        channel
+            Return a particular channel as features. If `channel_type` is `obs`, then return the column named by
+            `channel`, similarly for `var`. If `channel_type` is `obsm`, `obsp`, `varm`, `varp`, `layers`, or `uns`,
+            then return the value correspond to the `channel` in the dictionary. If `channel` is not specified
+            (default), then return the default layer (`.X`).
+        channel_type
+            Channel type to use, default to `obsm`.
+        mod
+            Modality to use, default to `None`. Options other than `None` are only available when the underlying
+            data object is :class:`~mudata.Mudata`.
+
+        """
         # Pick modality
         if mod is None:
             data = self.data
@@ -262,7 +283,7 @@ class BaseData(ABC):
 
         # Extract specific split
         if split_name is not None:
-            if channel_type.startswith("obs") or channel_type == "layers":
+            if channel_type in ["obsm", "obsp", "layers"]:
                 idx = self.get_split_idx(split_name, error_on_miss=True)
                 feature = feature[idx] if channel_type == "obsm" else feature[idx][:, idx]
             elif channel_type.startswith("var"):
@@ -325,14 +346,6 @@ class Data(BaseData):
         return_type
             How should the features be returned. **numpy**: return as a numpy array; **torch**: return as a torch
             tensor; **anndata**: return as an anndata object.
-        layer
-            Return a particular layer as features.
-        channel
-            Return a particular obsm channel as features.
-
-        Notes
-        -----
-        If both `layer` and `channel` are not specified (default), then return the default layer as features.
 
         """
         x = self.get_x(split_name, return_type, **x_kwargs)
