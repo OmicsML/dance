@@ -1736,7 +1736,7 @@ def gen_pseudo_spots(sc_counts, labels, clust_vr="cellType", nc_min=2, nc_max=10
     mix_obs.index = pd.Index(["ps_mix_" + str(i + 1) for i in range(N_p)])
     # Create AnnData object with sample of pseudo mixtures (obs)
     # annotations: cell counts, cell type compositions
-    pseudo_counts = anndata.AnnData(X=mix_X, obs=mix_obs, var=sc_counts.var, dtype=mix_X.dtype)
+    pseudo_counts = anndata.AnnData(X=mix_X, obs=mix_obs, var=sc_counts.var, dtype=np.float32)
     return pseudo_counts
 
 
@@ -1767,7 +1767,7 @@ def pseudo_spatial_process(counts, labels, clust_vr="cellType", scRNA=False, n_h
         st_counts = [st_counts[0][:, sel_features], st_counts[1][:, sel_features]]
 
         # Generate pseudo spots from scRNA (using variable genes)
-        st_counts = [gen_pseudo_spots(st_counts[0], labels[0], clust_vr=clust_vr, N_p=N_p), st_counts[1]]
+        st_counts = [gen_pseudo_spots(st_counts[0], labels[0], clust_vr=clust_vr, N_p=N_p), st_counts[1].copy()]
 
     # Library size normalization (with log1p transfomration) of the pseudo and real ST data
     for st_count in st_counts:
@@ -1777,7 +1777,7 @@ def pseudo_spatial_process(counts, labels, clust_vr="cellType", scRNA=False, n_h
     # Find highly variable genes for both pseudo and real data
     # flavors: seurat_v3 - expects raw count data
     # flavors: seurat (default), cell_ranger - expect log data
-    batch_cnt = st_counts[0].concatenate(st_counts[1], index_unique=None)
+    batch_cnt = anndata.concat(st_counts, label="batch")
     sc.pp.highly_variable_genes(batch_cnt, flavor="seurat", n_top_genes=n_hvg, batch_key="batch")
     hvgs = batch_cnt.var[batch_cnt.var.highly_variable].index.tolist()
 

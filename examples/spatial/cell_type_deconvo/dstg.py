@@ -60,7 +60,7 @@ mix_counts, mix_labels, hvgs = pseudo_spatial_process([sc_adata, mix_adata], [re
 # WARNING: features appear to have negative values, normalization does not make sense, need to check more
 features = np.vstack((mix_counts[0].X, mix_counts[1].X)).astype(np.float32)
 normalized_features = normalize(features, axis=1, mode="normalize")
-adata = AnnData(X=normalized_features)
+adata = AnnData(X=normalized_features, dtype=np.float32)
 adata.obsm["cell_type_portion"] = pd.concat(mix_labels).astype(np.float32).set_index(adata.obs_names)
 
 data = Data(adata, train_size=mix_counts[0].shape[0])
