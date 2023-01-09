@@ -32,6 +32,11 @@ extensions = [
     'sphinxcontrib.napoleon',
 ]
 
+intersphinx_mapping = {
+    'mudata': ('https://mudata.readthedocs.io/en/stable/', None),
+    'scanpy': ('https://scanpy.readthedocs.io/en/stable/', None),
+}
+
 templates_path = ['_templates']
 exclude_patterns = []
 
