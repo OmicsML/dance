@@ -51,3 +51,20 @@ Run full test from the ground up including environment set up using
 ```bash
 tox -e python3.8-cpu
 ```
+
+## Building documentation
+
+1. Install `dance` with doc dependencies
+
+   ```bash
+   pip install -e ."[doc]"
+   ```
+
+1. Build the documentation
+
+   ```bash
+   cd docs
+   make html
+   ```
+
+You can now view the documentation page by opening `docs/build/html/index.html`
