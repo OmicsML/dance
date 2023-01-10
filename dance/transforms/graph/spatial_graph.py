@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import pairwise_distances
+from sklearn.neighbors import NearestNeighbors
 
 from dance.transforms.base import BaseTransform
 from dance.typing import Sequence
@@ -101,5 +102,47 @@ class SMEGraph(BaseTransform):
         adj_m = (1 - pairwise_distances(morph_feat, metric="cosine")).clip(0)
         adj_g = 1 - pairwise_distances(gene_feat, metric="correlation")
         adj = adj_p * adj_m * adj_g
+
+        data.data.obsp[self.out] = adj
+
+
+class StagateGraph(BaseTransform):
+    """STAGATE spatial graph."""
+
+    _MODELS = ("radius", "knn")
+    _DISPLAY_ATTRS = ("model_name", "radius", "n_neighbors")
+
+    def __init__(self, model_name: str = "radius", *, radius: float = 1, n_neighbors: int = 5,
+                 channel: str = "spatial_pixel", channel_type: str = "obsm", **kwargs):
+        """Initialize StagateGraph.
+
+        Parameters
+        ----------
+        model_name
+            Type of graph to construct. Currently support `radius` and `knn`. See
+            :class:`~sklearn.neighbors.NearestNeighbors` for more info.
+        radius
+            Radius parameter for `radius_neighbors_graph`.
+        n_neighbors
+            Number of neighbors for `kneighbors_graph`.
+
+        """
+        super().__init__(**kwargs)
+
+        if not isinstance(model_name, str) or (model_name.lower() not in self._MODELS):
+            raise ValueError(f"Unknown model {model_name!r}, available options are {self._MODELS}")
+        self.model_name = model_name
+        self.radius = radius
+        self.n_neighbors = n_neighbors
+        self.channel = channel
+        self.channel_type = channel_type
+
+    def __call__(self, data):
+        xy_pixel = data.get_feature(return_type="numpy", channel=self.channel, channel_type=self.channel_type)
+
+        if self.model_name.lower() == "radius":
+            adj = NearestNeighbors(radius=self.radius).fit(xy_pixel).radius_neighbors_graph(xy_pixel)
+        elif self.model_name.lower() == "knn":
+            adj = NearestNeighbors(n_neighbors=self.n_neighbors).fit(xy_pixel).kneighbors_graph(xy_pixel)
 
         data.data.obsp[self.out] = adj
