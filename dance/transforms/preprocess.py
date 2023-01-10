@@ -1,5 +1,6 @@
 import collections
 import itertools
+import math
 import os
 import pprint
 import random
@@ -10,7 +11,6 @@ from pathlib import Path
 from typing import List, Optional, Union
 
 import anndata
-import cv2
 import dgl
 import dgl.function as fn
 import numpy as np
@@ -23,22 +23,18 @@ import sklearn.feature_extraction.text
 import sklearn.neighbors
 import sklearn.preprocessing
 import sklearn.utils.extmath
-import statsmodels.api as sm
 import statsmodels.stats.multitest as smt
 import torch
 import torch.nn.functional as F
 from anndata import AnnData
 from dgl.sampling import pack_traces, random_walk
 from scipy import stats
-from scipy.sparse import csr_matrix, load_npz, save_npz, spmatrix, vstack
+from scipy.sparse import csr_matrix, spmatrix
 from scipy.stats import expon
-from sklearn.decomposition import PCA
-from sklearn.linear_model import LinearRegression, LogisticRegression, SGDClassifier
+from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.model_selection import train_test_split
-from statsmodels.formula.api import ols
 
 from dance import logger
-from dance.data import Data
 from dance.utils.deprecate import deprecated
 
 
@@ -2031,263 +2027,6 @@ def SVD(mat, num_cc):
     u = U[:, 0:int(num_cc)]
     v = V[0:int(num_cc), :].transpose()
     return u, v, d
-
-
-#######################################################
-#For Spatial Domain
-#######################################################
-
-import math
-
-import numpy as np
-import pandas as pd
-import torch
-import torchvision as tv
-from anndata import AnnData
-from scipy.sparse import csr_matrix
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import pairwise_distances
-from tqdm import tqdm
-
-
-class ImageModel:
-
-    def __init__(self, name='resnet50', device='cpu'):
-        support_model_name = {"resnet50", "inception_v3", "xception", "vgg16"}
-        if name not in support_model_name:
-            ValueError("{} is not supported".format(name))
-        self.model = getattr(tv.models, name)(pretrained=True)
-        self.model.fc = torch.nn.Sequential()
-        self.model = self.model.to(device)
-        self.mean = np.array([0.406, 0.485, 0.456])
-        self.std = np.array([0.225, 0.229, 0.224])
-
-    def preprocess(self, x):
-        # x: cv2 image
-        # y = (x - mean) / std
-        x = (x - self.mean) / self.std
-        x = x.transpose((2, 0, 1))
-        x = torch.from_numpy(x).float()
-        return x
-
-    def encoder(self, x):
-        # extract last linear layers
-        feature = self.model(x)
-        # flatten
-        feature = feature.view(feature.size(0), -1)
-        return feature
-
-
-def extract_feature(adata, image, cnn_base="resnet50", n_components=50, verbose=False, seeds=1, crop_size=20,
-                    cnn_target_size=299, device="cpu", test=False):
-    if test:
-        fake_feature = np.random.rand(adata.n_obs, n_components)
-        fake_pca_img_feature = np.random.rand(adata.n_obs, n_components)
-        adata.obsm["X_tile_feature"] = fake_feature
-        adata.obsm["X_morphology"] = fake_pca_img_feature
-        return
-
-    feature_df = pd.DataFrame()
-    model = ImageModel(cnn_base)
-    model.model = model.model.to(device)
-    for i in tqdm(range(len(adata)), desc="Extracting feature", bar_format="{l_bar}{bar} [ time left: {remaining} ]"):
-
-        x = adata.obs["x_pixel"][i]
-        y = adata.obs["y_pixel"][i]
-
-        img = image[x - crop_size:x + crop_size, y - crop_size:y + crop_size, :]
-        img = cv2.resize(img, (cnn_target_size, cnn_target_size))
-        img = model.preprocess(img)
-        img = img.unsqueeze(0)
-        img = img.to(device)
-        feature = model.encoder(img)
-        feature = feature.detach().cpu().numpy()
-        feature_df[i] = feature.reshape(-1)
-
-    tile_feature = feature_df.transpose().to_numpy()
-
-    pca = PCA(n_components=n_components, random_state=seeds)
-    pca_img_feature = pca.fit_transform(tile_feature)
-    adata.obsm["X_tile_feature"] = tile_feature
-    adata.obsm["X_morphology"] = pca_img_feature
-
-
-def calculate_weight_matrix(
-    adata,
-    adata_imputed=None,
-    pseudo_spots=False,
-    platform="Visium",
-):
-    # change to our dataframe
-    # get pixel and coordinate
-    img_row = adata.obs["imagerow"]
-    img_col = adata.obs["imagecol"]
-    array_row = adata.obs["array_row"]
-    array_col = adata.obs["array_col"]
-    rate = 3
-
-    reg_row = LinearRegression().fit(array_row.values.reshape(-1, 1), img_row)
-
-    reg_col = LinearRegression().fit(array_col.values.reshape(-1, 1), img_col)
-
-    if pseudo_spots and adata_imputed:
-        pd = pairwise_distances(
-            adata_imputed.obs[["imagecol", "imagerow"]],
-            adata.obs[["imagecol", "imagerow"]],
-            metric="euclidean",
-        )
-        unit = math.sqrt(reg_row.coef_**2 + reg_col.coef_**2)
-        pd_norm = np.where(pd >= unit, 0, 1)
-
-        md = 1 - pairwise_distances(
-            adata_imputed.obsm["X_morphology"],
-            adata.obsm["X_morphology"],
-            metric="cosine",
-        )
-        md[md < 0] = 0
-
-        adata_imputed.uns["physical_distance"] = pd_norm
-        adata_imputed.uns["morphological_distance"] = md
-
-        adata_imputed.uns["weights_matrix_all"] = (adata_imputed.uns["physical_distance"] *
-                                                   adata_imputed.uns["morphological_distance"])
-
-    else:
-        pd = pairwise_distances(adata.obs[["imagecol", "imagerow"]], metric="euclidean")
-        unit = math.sqrt(reg_row.coef_**2 + reg_col.coef_**2)
-        pd_norm = np.where(pd >= rate * unit, 0, 1)
-
-        md = 1 - pairwise_distances(adata.obsm["X_morphology"], metric="cosine")
-        md[md < 0] = 0
-
-        gd = 1 - pairwise_distances(adata.obsm["X_pca"], metric="correlation")
-        adata.uns["gene_expression_correlation"] = gd
-        adata.uns["physical_distance"] = pd_norm
-        adata.uns["morphological_distance"] = md
-
-        adata.uns["weights_matrix_all"] = (adata.uns["physical_distance"] * adata.uns["morphological_distance"] *
-                                           adata.uns["gene_expression_correlation"])
-        adata.uns["weights_matrix_pd_gd"] = (adata.uns["physical_distance"] * adata.uns["gene_expression_correlation"])
-        adata.uns["weights_matrix_pd_md"] = (adata.uns["physical_distance"] * adata.uns["morphological_distance"])
-        adata.uns["weights_matrix_gd_md"] = (adata.uns["gene_expression_correlation"] *
-                                             adata.uns["morphological_distance"])
-
-
-def pca(adata, n_components=50, seeds=1):
-    pca = PCA(n_components=n_components, random_state=seeds)
-    pca.fit(adata.X.toarray())
-    adata.obsm["X_pca"] = pca.transform(adata.X.toarray())
-
-
-def impute_neighbour(
-    adata: AnnData,
-    count_embed=None,
-    weights="weights_matrix_all",
-    copy=False,
-):
-    coor = adata.obs[["imagecol", "imagerow"]]
-
-    weights_matrix = adata.uns[weights]
-
-    lag_coor = []
-
-    weights_list = []
-
-    with tqdm(
-            total=len(adata),
-            desc="Adjusting data",
-            bar_format="{l_bar}{bar} [ time left: {remaining} ]",
-    ) as pbar:
-        for i in range(len(coor)):
-
-            main_weights = weights_matrix[i]
-
-            if weights == "physical_distance":
-                current_neighbour = main_weights.argsort()[-6:]
-            else:
-                current_neighbour = main_weights.argsort()[-3:]
-
-            surrounding_count = count_embed[current_neighbour]
-            surrounding_weights = main_weights[current_neighbour]
-            if surrounding_weights.sum() > 0:
-                surrounding_weights_scaled = (surrounding_weights / surrounding_weights.sum())
-                weights_list.append(surrounding_weights_scaled)
-
-                surrounding_count_adjusted = np.multiply(surrounding_weights_scaled.reshape(-1, 1), surrounding_count)
-                surrounding_count_final = np.sum(surrounding_count_adjusted, axis=0)
-
-            else:
-                surrounding_count_final = np.zeros(count_embed.shape[1])
-                weights_list.append(np.zeros(len(current_neighbour)))
-            lag_coor.append(surrounding_count_final)
-            pbar.update(1)
-
-    imputed_data = np.array(lag_coor)
-    key_added = "imputed_data"
-    adata.obsm[key_added] = imputed_data
-
-    adata.obsm["top_weights"] = np.array(weights_list)
-
-    return adata if copy else None
-
-
-def SME_normalize(
-    adata,
-    use_data="raw",
-    weights="weights_matrix_all",
-    platform="Visium",
-    copy=False,
-):
-    if use_data == "raw":
-        if isinstance(adata.X, csr_matrix):
-            count_embed = adata.X.toarray()
-        elif isinstance(adata.X, np.ndarray):
-            count_embed = adata.X
-        elif isinstance(adata.X, pd.Dataframe):
-            count_embed = adata.X.values
-        else:
-            raise ValueError(f"""\
-                    {type(adata.X)} is not a valid type.
-                    """)
-    else:
-        count_embed = adata.obsm[use_data]
-
-    calculate_weight_matrix(adata, platform=platform)
-
-    impute_neighbour(adata, count_embed=count_embed, weights=weights)
-
-    imputed_data = adata.obsm["imputed_data"].astype(float)
-    imputed_data[imputed_data == 0] = np.nan
-    adjusted_count_matrix = np.nanmean(np.array([count_embed, imputed_data]), axis=0)
-
-    key_added = use_data + "_SME_normalized"
-    adata.obsm[key_added] = adjusted_count_matrix
-
-    print("The data adjusted by SME is added to adata.obsm['" + key_added + "']")
-
-    return adata if copy else None
-
-
-# define scale function to replace scanpy.pp.scale
-# scale function is used to normalize the data by the mean and standard deviation of the data and clip the data to the range of max and min
-def scale(adata, maxvalue=None, use_raw=False, copy=False):
-    # adata.X is sparse
-    try:
-        data = adata.X.toarray()
-    except:
-        data = adata.X
-    mean, std = data.mean(axis=0), data.std(axis=0)
-    adata.X = (data - mean) / (std + 0.00001)
-    if maxvalue is not None:
-        adata.X = np.clip(adata.X, -maxvalue, maxvalue)
-    if use_raw:
-        adata.raw = adata.copy()
-    return adata if copy else None
-
-
-def sc_scale(adata, maxvalue=None, use_raw=False, copy=False):
-    # adata.X is sparse
-    sc.pp.scale(adata)
 
 
 ##############################

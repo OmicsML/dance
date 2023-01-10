@@ -1,4 +1,3 @@
-import itertools
 import os
 import pickle
 import time
@@ -10,7 +9,6 @@ import dgl
 import networkx as nx
 import numpy as np
 import pandas as pd
-import scanpy as sc
 import sklearn
 import torch
 from dgl import nn as dglnn
@@ -19,11 +17,11 @@ from scipy.sparse import csc_matrix
 from scipy.spatial import distance, distance_matrix, minkowski_distance
 from sklearn.decomposition import PCA, TruncatedSVD
 from sklearn.metrics import pairwise_distances as pair
-from sklearn.neighbors import KDTree, kneighbors_graph
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.neighbors import kneighbors_graph
 from sklearn.preprocessing import normalize
 from torch.nn import functional as F
 
-import dance.transforms.preprocess
 from dance import logger
 
 
@@ -38,7 +36,6 @@ def csr_cosine_similarity(input_csr_matrix):
 
 
 def cosine_similarity_gene(input_matrix):
-    from sklearn.metrics.pairwise import cosine_similarity
     res = cosine_similarity(input_matrix)
     res = np.abs(res)
     return res
@@ -884,34 +881,6 @@ def basic_feature_graph_propagation(g, layers=3, alpha=0.5, beta=0.5, cell_init=
     if verbose: print(hcell[-1].abs().mean())
 
     return hcell[1:]
-
-
-##############################
-# neighbor_graph for stlearn #
-##############################
-
-
-def neighbors_get_adj(adata, n_neighbors=10, n_pcs=10, n_jobs=1, use_rep=None, knn=True, random_state=None,
-                      method='umap', metric='euclidean', metric_kwargs={}, copy=False, obsp=None, neighbors_key=None):
-
-    sc.pp.neighbors(
-        adata,
-        n_neighbors=n_neighbors,
-        n_pcs=n_pcs,
-        use_rep=use_rep,
-        knn=knn,
-        random_state=random_state,
-        method=method,
-        metric=metric,
-        metric_kwds=metric_kwargs,
-        copy=copy,
-    )
-
-    choose_graph = getattr(sc._utils, "_choose_graph", None)
-    adjacency = choose_graph(adata, obsp, neighbors_key)
-
-    print("Created k-Nearest-Neighbor graph in adata.uns['neighbors'] ")
-    return adjacency
 
 
 ##### scGNN create adjacency, likely much overlap with above functions, nested function defs to avoid possible namespace conflicts
