@@ -55,6 +55,7 @@ class MorphologyFeature(BaseTransform):
         xy_pixel = data.get_feature(return_type="numpy", channel=self.channels[0], channel_type=self.channel_types[0])
         image = data.get_feature(return_type="numpy", channel=self.channels[1], channel_type=self.channel_types[1])
 
+        # TODO: improve computational efficiency by processing images in batch.
         features = []
         for x, y in tqdm(xy_pixel, desc="Extracting feature", bar_format="{l_bar}{bar} [ time left: {remaining} ]"):
             img = self._crop_and_process(image, x, y).to(self.device)
