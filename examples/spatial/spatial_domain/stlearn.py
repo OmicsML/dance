@@ -1,77 +1,70 @@
 import argparse
-import os
 
 import scanpy as sc
-from sklearn.decomposition import PCA
 
+from dance.data import Data
 from dance.datasets.spatial import SpotDataset
-from dance.modules.spatial.spatial_domain import louvain, stlearn
-from dance.modules.spatial.spatial_domain.spagcn import SpaGCN
-from dance.modules.spatial.spatial_domain.stlearn import stKmeans, stPrepare
-from dance.transforms.graph_construct import construct_graph, neighbors_get_adj
-from dance.transforms.preprocess import (SME_normalize, extract_feature, log1p, normalize, normalize_total, pca,
-                                         prefilter_cells, prefilter_genes, prefilter_specialgenes, sc_scale, scale,
-                                         set_seed)
+from dance.modules.spatial.spatial_domain.stlearn import StKmeans, StLouvain
+from dance.transforms import AnnDataTransform, CellPCA, MorphologyFeature, SMEFeature
+from dance.transforms.graph import NeighborGraph, SMEGraph
+from dance.transforms.preprocess import set_seed
 
-if __name__ == '__main__':
+MODES = ["louvain", "kmeans"]
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--sample_number", type=str, default="151673",
-        help="12 samples of human dorsolateral prefrontal cortex dataset supported in the task of spatial domain task.")
+    parser.add_argument("--sample_number", type=str, default="151673",
+                        help="12 human dorsolateral prefrontal cortex datasets for the spatial domain task.")
+    parser.add_argument("--mode", type=str, default="louvain", choices=MODES)
     parser.add_argument("--n_clusters", type=int, default=17, help="the number of clusters")
     parser.add_argument("--seed", type=int, default=2)
     parser.add_argument("--n_components", type=int, default=50, help="the number of components in PCA")
-    parser.add_argument("--device", type=str, default='cuda', help="device for resnet extract feature")
+    parser.add_argument("--device", type=str, default="cuda", help="device for resnet extract feature")
     args = parser.parse_args()
 
     set_seed(args.seed)
 
-    # get data
+    # Load raw data
     dataset = SpotDataset(args.sample_number, data_dir="../../../data/spot")
-    ## dataset.data has repeat name , be careful
+    image, adata, spatial, spatial_pixel, label = dataset.load_data()
 
-    # build graph
-    # dataset.adj = construct_graph(dataset.data.obs['x'], dataset.data.obs['y'], dataset.data.obs['x_pixel'], dataset.data.obs['y_pixel'], dataset.img, beta=49, alpha=1, histology=True)
+    # Construct dance data object
+    adata.var_names_make_unique()
+    adata.obsm["spatial"] = spatial
+    adata.obsm["spatial_pixel"] = spatial_pixel
+    adata.uns["image"] = image
+    adata.obsm["label"] = label
+    data = Data(adata, train_size="all")
 
-    # preprocess data
-    dataset.data.var_names_make_unique()
+    # Data preprocessing pipeline
+    AnnDataTransform(sc.pp.filter_genes, min_cells=1)(data)
+    AnnDataTransform(sc.pp.normalize_total, target_sum=1e4)(data)
+    AnnDataTransform(sc.pp.log1p)(data)
 
-    # prefilter_cells(dataset.data) # this operation will change the data shape
-    # prefilter_specialgenes(dataset.data)
-    sc.pp.filter_genes(dataset.data, min_cells=1)
-    normalize_total(dataset.data)
-    log1p(dataset.data)
+    # Construct spot feature graph
+    MorphologyFeature(n_components=args.n_components, device=args.device)(data)
+    CellPCA(n_components=args.n_components)(data)
+    SMEGraph()(data)
+    SMEFeature(n_components=args.n_components)(data)
+    NeighborGraph(n_neighbors=args.n_clusters, n_pcs=10, channel="SMEFeature")(data)
 
-    extract_feature(dataset.data, image=dataset.img, n_components=args.n_components, device="cuda")
-    # pca for gene expression data
-    pca(dataset.data, n_components=args.n_components)
+    if args.mode == "kmeans":
+        data.set_config(feature_channel="SMEFeature", feature_channel_type="obsm", label_channel="label")
+        x, y = data.get_data(return_type="default")
 
-    # X_pca
-    stPrepare(dataset.data)
-    data_SME = dataset.data.copy()
-    SME_normalize(data_SME, use_data='raw')
-    data_SME.X = data_SME.obsm['raw_SME_normalized']
-    sc_scale(data_SME)
+        model = StKmeans(n_clusters=args.n_clusters)
+    elif args.mode == "louvain":
+        data.set_config(feature_channel="NeighborGraph", feature_channel_type="obsp", label_channel="label")
+        x, y = data.get_data(return_type="default")
 
-    mypca = PCA(n_components=50)
-    data_SME.obsm["X_pca"] = mypca.fit_transform(data_SME.X)
+        model = StLouvain(resolution=0.6)
+    else:
+        raise ValueError(f"Unknown mode {args.mode!r}, available options are {MODES}")
 
-    # Option 1: kmeans
-    # stKmeans(dataset.data, n_clusters=19)
-    # model = stlearn.StKmeans(n_clusters=7)
-    # stKmeans(dataset.data, n_clusters=args.n_clusters)
-    # model = stlearn.StKmeans(n_clusters=args.n_clusters)
-    # model.fit(dataset.data)
-    # prediction = model.predict()
-    # print("prediction:", prediction)
-    # print(model.score(dataset.data.obs['label'].values)) # 0.1989
-
-    # Option 2: Louvain
-    data_SME.adj = neighbors_get_adj(data_SME, n_neighbors=args.n_clusters, use_rep='X_pca')
-    model = stlearn.StLouvain()
-    model.fit(data_SME, data_SME.adj, resolution=0.6)
-    predict = model.predict()
-    print(model.score(data_SME.obs['label'].values))  # 0. 31  # 0.366
+    model.fit(x)
+    prediction = model.predict()
+    score = model.score(y.values.ravel())
+    print(f"ARI: {score:.4f}")
 """ To reproduce stlearn on other samples, please refer to command lines belows:
 NOTE: since the stlearn method is unstable, you have to run multiple times to get
       best performance.
