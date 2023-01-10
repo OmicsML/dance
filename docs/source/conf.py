@@ -35,6 +35,7 @@ extensions = [
 intersphinx_mapping = {
     'mudata': ('https://mudata.readthedocs.io/en/stable/', None),
     'scanpy': ('https://scanpy.readthedocs.io/en/stable/', None),
+    'sklearn': ('https://scikit-learn.org/stable', None),
 }
 
 templates_path = ['_templates']
