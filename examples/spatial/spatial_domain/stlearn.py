@@ -4,15 +4,18 @@ import scanpy as sc
 
 from dance.data import Data
 from dance.datasets.spatial import SpotDataset
-from dance.modules.spatial.spatial_domain.stlearn import StLouvain
+from dance.modules.spatial.spatial_domain.stlearn import StKmeans, StLouvain
 from dance.transforms import AnnDataTransform, CellPCA, MorphologyFeature, SMEFeature
 from dance.transforms.graph import NeighborGraph, SMEGraph
 from dance.transforms.preprocess import set_seed
+
+MODES = ["louvain", "kmeans"]
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--sample_number", type=str, default="151673",
                         help="12 human dorsolateral prefrontal cortex datasets for the spatial domain task.")
+    parser.add_argument("--mode", type=str, default="louvain", choices=MODES)
     parser.add_argument("--n_clusters", type=int, default=17, help="the number of clusters")
     parser.add_argument("--seed", type=int, default=2)
     parser.add_argument("--n_components", type=int, default=50, help="the number of components in PCA")
@@ -44,11 +47,21 @@ if __name__ == "__main__":
     SMEGraph()(data)
     SMEFeature(n_components=args.n_components)(data)
     NeighborGraph(n_neighbors=args.n_clusters, n_pcs=10, channel="SMEFeature")(data)
-    data.set_config(feature_channel="NeighborGraph", feature_channel_type="obsp", label_channel="label")
-    adj, y = data.get_data(return_type="default")
 
-    model = StLouvain(resolution=0.6)
-    model.fit(adj)
+    if args.mode == "kmeans":
+        data.set_config(feature_channel="SMEFeature", feature_channel_type="obsm", label_channel="label")
+        x, y = data.get_data(return_type="default")
+
+        model = StKmeans(n_clusters=args.n_clusters)
+    elif args.mode == "louvain":
+        data.set_config(feature_channel="NeighborGraph", feature_channel_type="obsp", label_channel="label")
+        x, y = data.get_data(return_type="default")
+
+        model = StLouvain(resolution=0.6)
+    else:
+        raise ValueError(f"Unknown mode {args.mode!r}, available options are {MODES}")
+
+    model.fit(x)
     prediction = model.predict()
     score = model.score(y.values.ravel())
     print(f"ARI: {score:.4f}")
