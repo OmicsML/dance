@@ -36,7 +36,7 @@ class WeightedFeaturePCA(BaseTransform):
         feat = data.get_x(self.split_name)  # cell x genes
         gene_pca = PCA(n_components=self.n_components)
 
-        self.logger.info(f"Start decomposing {self.split_name} features {feat.shape}")
+        self.logger.info(f"Start decomposing {self.split_name} features {feat.shape} (k={self.n_components})")
         gene_feat = gene_pca.fit_transform(feat.T)  # decompose into gene features
         self.logger.info(f"Total explained variance: {gene_pca.explained_variance_ratio_.sum():.2%}")
 
@@ -63,7 +63,7 @@ class CellPCA(BaseTransform):
         feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
         pca = PCA(n_components=self.n_components)
 
-        self.logger.info(f"Start generating cell PCA features {feat.shape}")
+        self.logger.info(f"Start generating cell PCA features {feat.shape} (k={self.n_components})")
         cell_feat = pca.fit_transform(feat)
         evr = pca.explained_variance_ratio_
         self.logger.info(f"Top 10 explained variances: {evr[:10]}")
