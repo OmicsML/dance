@@ -9,21 +9,18 @@ graph attention auto-encoder." Nature communications 13.1 (2022): 1-12.
 
 """
 
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import scanpy as sc
 import scipy.sparse as sp
-import sklearn.neighbors
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from sklearn import mixture
+from sklearn.metrics.cluster import adjusted_rand_score
 from torch import Tensor
 from torch.nn import Parameter
 from torch_geometric.data import Data
 from torch_geometric.nn.conv import MessagePassing
-from torch_geometric.nn.dense.linear import Linear
 from torch_geometric.utils import add_self_loops, remove_self_loops, softmax
 from torch_sparse import SparseTensor, set_diag
 from tqdm import tqdm
@@ -40,53 +37,13 @@ def transfer_pytorch_data(adata, adj):
     return data
 
 
-def Stats_Spatial_Net(adata):
-    Num_edge = adata.uns['Spatial_Net']['Cell1'].shape[0]
-    Mean_edge = Num_edge / adata.shape[0]
-    plot_df = pd.value_counts(pd.value_counts(adata.uns['Spatial_Net']['Cell1']))
-    plot_df = plot_df / adata.shape[0]
-    fig, ax = plt.subplots(figsize=[3, 2])
-    plt.ylabel('Percentage')
-    plt.xlabel('')
-    plt.title('Number of Neighbors (Mean=%.2f)' % Mean_edge)
-    ax.bar(plot_df.index, plot_df)
-
-
-def mclust_P(adata, num_cluster, used_obsm='STAGATE', modelNames='EEE'):
-    from sklearn import mixture
-    g = mixture.GaussianMixture(n_components=num_cluster, covariance_type='tied', warm_start=True, n_init=100,
+def mclust(adata, num_cluster, used_obsm="STAGATE", modelNames="EEE"):
+    g = mixture.GaussianMixture(n_components=num_cluster, covariance_type="tied", warm_start=True, n_init=100,
                                 max_iter=300, reg_covar=1.4663143602030552e-04, random_state=36282,
                                 tol=0.00022187708009762592)
     res = g.fit_predict(adata.obsm[used_obsm])
-    adata.obs['mclust'] = res
+    adata.obs["mclust"] = res
     return adata
-
-
-'''
-def mclust_R(adata, num_cluster, modelNames='EEE', used_obsm='STAGATE', random_seed=2020):
-    """\
-    Clustering using the mclust algorithm.
-    The parameters are the same as those in the R package mclust.
-    """
-
-    np.random.seed(random_seed)
-    import rpy2.robjects as robjects
-    robjects.r.library("mclust")
-
-    import rpy2.robjects.numpy2ri
-    rpy2.robjects.numpy2ri.activate()
-    r_random_seed = robjects.r['set.seed']
-    r_random_seed(random_seed)
-    rmclust = robjects.r['Mclust']
-
-    res = rmclust(rpy2.robjects.numpy2ri.numpy2rpy(adata.obsm[used_obsm]), num_cluster, modelNames)
-    mclust_res = np.array(res[-2])
-
-    adata.obs['mclust'] = mclust_res
-    adata.obs['mclust'] = adata.obs['mclust'].astype('int')
-    adata.obs['mclust'] = adata.obs['mclust'].astype('category')
-    return adata
-'''
 
 
 class GATConv(MessagePassing):
@@ -95,7 +52,7 @@ class GATConv(MessagePassing):
 
     def __init__(self, in_channels, out_channels, heads: int = 1, concat: bool = True, negative_slope: float = 0.2,
                  dropout: float = 0.0, add_self_loops=True, bias=True, **kwargs):
-        kwargs.setdefault('aggr', 'add')
+        kwargs.setdefault("aggr", "add")
         super().__init__(node_dim=0, **kwargs)
 
         self.in_channels = in_channels
@@ -126,12 +83,12 @@ class GATConv(MessagePassing):
         # We first transform the input node features. If a tuple is passed, we
         # transform source and target node features via separate weights:
         if isinstance(x, Tensor):
-            assert x.dim() == 2, "Static graphs not supported in 'GATConv'"
+            assert x.dim() == 2, "Static graphs not supported in GATConv"
             # x_src = x_dst = self.lin_src(x).view(-1, H, C)
             x_src = x_dst = torch.mm(x, self.lin_src).view(-1, H, C)
         else:  # Tuple of source and target node features:
             x_src, x_dst = x
-            assert x_src.dim() == 2, "Static graphs not supported in 'GATConv'"
+            assert x_src.dim() == 2, "Static graphs not supported in GATConv"
             x_src = self.lin_src(x_src).view(-1, H, C)
             if x_dst is not None:
                 x_dst = self.lin_dst(x_dst).view(-1, H, C)
@@ -142,7 +99,7 @@ class GATConv(MessagePassing):
             return x[0].mean(dim=1)
             # return x[0].view(-1, self.heads * self.out_channels)
 
-        if tied_attention == None:
+        if tied_attention is None:
             # Next, we compute node-level attention coefficients, both for source
             # and target nodes (if present):
             alpha_src = (x_src * self.att_src).sum(dim=-1)
@@ -180,7 +137,7 @@ class GATConv(MessagePassing):
             if isinstance(edge_index, Tensor):
                 return out, (edge_index, alpha)
             elif isinstance(edge_index, SparseTensor):
-                return out, edge_index.set_value(alpha, layout='coo')
+                return out, edge_index.set_value(alpha, layout="coo")
         else:
             return out
 
@@ -196,7 +153,7 @@ class GATConv(MessagePassing):
         return x_j * alpha.unsqueeze(-1)
 
     def __repr__(self):
-        return '{}({}, {}, heads={})'.format(self.__class__.__name__, self.in_channels, self.out_channels, self.heads)
+        return "{}({}, {}, heads={})".format(self.__class__.__name__, self.in_channels, self.out_channels, self.heads)
 
 
 class Stagate(torch.nn.Module):
@@ -219,21 +176,19 @@ class Stagate(torch.nn.Module):
         self.conv4 = GATConv(num_hidden, in_dim, heads=1, concat=False, dropout=0, add_self_loops=False, bias=False)
 
     def forward(self, features, edge_index):
-        """forward function for training.
+        """Forward function for training.
 
         Parameters
         ----------
         features :
-            node features.
+            Node features.
         edge_index :
-            adjacent matrix.
+            Adjacent matrix.
 
         Returns
         -------
-        h2 :
-            the second hidden layer.
-        h4 :
-            the forth hidden layer.
+        Tuple[Tensor, Tensor]
+            The second and the forth hidden layerx.
 
         """
         h1 = F.elu(self.conv1(features, edge_index))
@@ -247,56 +202,50 @@ class Stagate(torch.nn.Module):
 
         return h2, h4  # F.log_softmax(x, dim=-1)
 
-    def fit(self, adata, graph, n_epochs=1, lr=0.001, key_added='STAGATE', gradient_clipping=5., pre_resolution=0.2,
+    def fit(self, adata, graph, n_epochs=1, lr=0.001, key_added="STAGATE", gradient_clipping=5., pre_resolution=0.2,
             weight_decay=0.0001, verbose=True, random_seed=0, save_loss=False, save_reconstrction=False,
-            device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')):
-        """fit function for training.
+            device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")):
+        """Fit function for training.
 
         Parameters
         ----------
         adata :
-            input data.
+            Input data.
         graph :
-            graph structure.
+            Graph structure.
         n_epochs : int optional
-            number of epochs.
+            Number of epochs.
         lr : float optional
-            learning rate.
+            Learning rate.
         key_added : str optional
-            by default 'STAGATE'.
+            Default "STAGATE".
         gradient_clipping : float optional
-            gradient clipping.
+            Gradient clipping.
         pre_resolution : float optional
-            pre resolution.
+            Pre-resolution.
         weight_decay : float optional
-            weight decay.
+            Weight decay.
         verbose : bool optional
-            verbose, by default to be True.
+            Verbosity, by default to be True.
         random_seed : int optional
-            random seed by default to be 0.
+            Random seed.
         save_loss : bool optional
-            by default to be False.
+            Whether to save loss or not.
         save_reconstrction : bool optional
-            by default to be False.
+            Whether to save reconstruction or not.
         device : str optional
-            to indicate gpu or cpu device.
-
-        Returns
-        -------
-        None.
+            Computation device.
 
         """
         adata.X = sp.csr_matrix(adata.X)
 
-        if 'highly_variable' in adata.var.columns:
-            adata_Vars = adata[:, adata.var['highly_variable']]
+        if "highly_variable" in adata.var.columns:
+            adata_Vars = adata[:, adata.var["highly_variable"]]
         else:
             adata_Vars = adata
 
         if verbose:
-            print('Size of Input: ', adata_Vars.shape)
-        if 'Spatial_Net' not in adata.uns.keys():
-            raise ValueError("Spatial_Net is not existed! Run Cal_Spatial_Net first!")
+            print("Size of Input: ", adata_Vars.shape)
 
         data = transfer_pytorch_data(adata_Vars, graph)
 
@@ -320,39 +269,25 @@ class Stagate(torch.nn.Module):
         model.eval()
         z, out = model(data.x, data.edge_index)
 
-        STAGATE_rep = z.to('cpu').detach().numpy()
+        STAGATE_rep = z.to("cpu").detach().numpy()
         adata.obsm[key_added] = STAGATE_rep
 
         if save_loss:
-            adata.uns['STAGATE_loss'] = loss
+            adata.uns["STAGATE_loss"] = loss
         if save_reconstrction:
-            ReX = out.to('cpu').detach().numpy()
+            ReX = out.to("cpu").detach().numpy()
             ReX[ReX < 0] = 0
-            adata.layers['STAGATE_ReX'] = ReX
+            adata.layers["STAGATE_ReX"] = ReX
 
         print("post process...")
-        sc.pp.neighbors(adata, use_rep='STAGATE')
+        sc.pp.neighbors(adata, use_rep="STAGATE")
         sc.tl.umap(adata)
-        #adata = mclust_R(adata, used_obsm='STAGATE', num_cluster=7)
-        adata = mclust_P(adata, used_obsm='STAGATE', num_cluster=7)
+        adata = mclust(adata, used_obsm="STAGATE", num_cluster=7)
         self.adata = adata
 
-    def predict(self, ):
-        """prediction function.
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        self.y_pred :
-            predicted label.
-
-        """
-        data_dropna = self.adata.obs.dropna()
-        self.y_pred = data_dropna['mclust']
-        self.target = data_dropna['ground_truth']
-        return data_dropna['mclust']
+    def predict(self):
+        """Prediction function."""
+        return self.adata.obs["mclust"].values
 
     def score(self, y_true=None):
         """score function to get score of prediction.
@@ -360,15 +295,13 @@ class Stagate(torch.nn.Module):
         Parameters
         ----------
         y_true :
-            ground truth label.
+            Ground truth label.
 
         Returns
         -------
-        score : float
-            metric eval score.
+        float
+            Adjusted rand index score.
 
         """
-        from sklearn.metrics.cluster import adjusted_rand_score
-        score = adjusted_rand_score(self.target, self.y_pred)
-        print("ARI {}".format(adjusted_rand_score(self.target, self.y_pred)))
+        score = adjusted_rand_score(y_true, self.predict())
         return score
