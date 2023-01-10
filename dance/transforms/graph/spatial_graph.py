@@ -1,4 +1,6 @@
 import numpy as np
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import pairwise_distances
 
 from dance.transforms.base import BaseTransform
 from dance.typing import Sequence
@@ -69,3 +71,35 @@ class SpaGCNGraph2D(BaseTransform):
         x = data.get_feature(channel=self.channel, channel_type="obsm", return_type="numpy")
         data.data.obsp[self.out] = pairwise_distance(x.astype(np.float32), dist_func_id=0)
         return data
+
+
+class SMEGraph(BaseTransform):
+    """Spatial Morphological gene Expression graph."""
+
+    def __init__(self, radius: float = 3, *,
+                 channels: Sequence[str] = ("spatial", "spatial_pixel", "MorphologyFeature", "CellPCA"),
+                 channel_types: Sequence[str] = ("obsm", "obsm", "obsm", "obsm"), **kwargs):
+        super().__init__(**kwargs)
+
+        self.radius = radius
+        self.channels = channels
+        self.channel_types = channel_types
+
+    def __call__(self, data):
+        xy = data.get_feature(return_type="numpy", channel=self.channels[0], channel_type=self.channel_types[0])
+        xy_pixel = data.get_feature(return_type="numpy", channel=self.channels[1], channel_type=self.channel_types[1])
+        morph_feat = data.get_feature(return_type="numpy", channel=self.channels[2], channel_type=self.channel_types[2])
+        gene_feat = data.get_feature(return_type="numpy", channel=self.channels[3], channel_type=self.channel_types[3])
+
+        reg_x = LinearRegression().fit(xy[:, 0:1], xy_pixel[:, 0:1])
+        reg_y = LinearRegression().fit(xy[:, 1:2], xy_pixel[:, 1:2])
+        unit = np.sqrt(reg_x.coef_**2 + reg_y.coef_**2)
+
+        # TODO: only captures topk, which are the ones that will be used by SMEFeature.
+        pdist = pairwise_distances(xy_pixel, metric="euclidean")
+        adj_p = np.where(pdist >= self.radius * unit, 0, 1)
+        adj_m = (1 - pairwise_distances(morph_feat, metric="cosine")).clip(0)
+        adj_g = 1 - pairwise_distances(gene_feat, metric="correlation")
+        adj = adj_p * adj_m * adj_g
+
+        data.data.obsp[self.out] = adj
