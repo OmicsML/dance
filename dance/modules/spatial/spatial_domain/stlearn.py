@@ -11,8 +11,9 @@ cell-cell interactions and spatial trajectories within undissociated tissues." B
 
 # load kmeans from sklearn
 from sklearn.cluster import KMeans
+from sklearn.metrics.cluster import adjusted_rand_score
 
-from .louvain import Louvain
+from dance.modules.spatial.spatial_domain.louvain import Louvain
 
 
 # kmeans for adata
@@ -107,34 +108,30 @@ class StKmeans:
 
         Parameters
         ----------
-        adata :
-            input data.
+        y_true
+            Cluster labels.
 
         Returns
         -------
-        self.score :
-            score.
+        float
+            Adjusted rand index score.
 
         """
-        from sklearn.metrics.cluster import adjusted_rand_score
         score = adjusted_rand_score(y_true, self.y_pred)
-        print("ARI {}".format(adjusted_rand_score(y_true, self.y_pred)))
         return score
 
 
 class StLouvain:
     """StLouvain class."""
 
-    def __init__(self):
-        self.model = Louvain()
+    def __init__(self, resolution: float = 1):
+        self.model = Louvain(resolution)
 
-    def fit(self, adata, adj, partition=None, weight='weight', resolution=1., randomize=None, random_state=None):
-        """fit function for model training.
+    def fit(self, adj, partition=None, weight='weight', randomize=None, random_state=None):
+        """Fit function for model training.
 
         Parameters
         ----------
-        adata :
-            input data.
         adj :
             adjacent matrix.
         partition : dict optional
@@ -157,44 +154,28 @@ class StLouvain:
         None.
 
         """
-        self.data = adata
-        self.model.fit(adata, adj, partition, weight, resolution, randomize, random_state)
+        self.model.fit(adj, partition, weight, randomize, random_state)
 
     def predict(self):
-        """prediction function.
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        self.y_pred :
-            predicted label.
-
-        """
+        """Prediction function."""
 
         self.y_pred = self.model.predict()
         self.y_pred = [self.y_pred[i] for i in range(len(self.y_pred))]
-        self.data.obs['predict'] = self.y_pred
         return self.y_pred
 
     def score(self, y_true):
-        """score function.
+        """Score function.
 
         Parameters
         ----------
-        adata :
-            input data.
+        y_true
+            Cluster labels.
 
         Returns
         -------
-        self.score :
-            score.
+        float
+            Adjusted rand index score.
 
         """
-        self.data.obs['ground'] = y_true
-        tempdata = self.data.obs.dropna()
-        from sklearn.metrics.cluster import adjusted_rand_score
-        score = adjusted_rand_score(tempdata['ground'], tempdata['predict'])
-        print("ARI {}".format(adjusted_rand_score(tempdata['ground'], tempdata['predict'])))
+        score = adjusted_rand_score(y_true, self.y_pred)
         return score
