@@ -48,7 +48,7 @@ controls, as well as setting up the `dev` environments.
 
 If our work could help your research, please cite our DANCE package paper or survey paper:
 
-```
+```bibtex
 @article{ding2022dance,
   title={DANCE: A Deep Learning Library and Benchmark for Single-Cell Analysis},
   author={Ding, Jiayuan and Wen, Hongzhi and Tang, Wenzhuo and Liu, Renming and Li, Zhaoheng and Venegas, Julian and Su, Runze and Molho, Dylan and Jin, Wei and Zuo, Wangyang and others},
@@ -58,7 +58,7 @@ If our work could help your research, please cite our DANCE package paper or sur
 }
 ```
 
-```
+```bibtex
 @article{molho2022deep,
   title={Deep Learning in Single-Cell Analysis},
   author={Molho, Dylan and Ding, Jiayuan and Li, Zhaoheng and Wen, Hongzhi and Tang, Wenzhuo and Wang, Yixin and Venegas, Julian and Jin, Wei and Liu, Renming and Su, Runze and others},
