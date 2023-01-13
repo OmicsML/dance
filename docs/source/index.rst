@@ -3,10 +3,10 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-PyDANCE documentation
-=====================
+DANCE documentation
+===================
 
-**PyDANCE** is a Python toolkit to support deep learning models for analyzing
+**DANCE** is a Python toolkit to support deep learning models for analyzing
 single-cell gene expression at scale. It includes three modules at present:
 
 #. **Single-modality analysis**
@@ -20,12 +20,12 @@ analysis.
 Getting started
 ---------------
 
-To install the pydance package, first make sure you have correctly set up
+To install the DANCE package, first make sure you have correctly set up
 dependencies such as
 `PyTorch <https://pytorch.org/get-started/>`_,
 `PyG <https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html>`_, and
 `DGL <https://www.dgl.ai/pages/start.html>`_.
-Then, simply install the pydance package from
+Then, simply install the DANCE package from
 `PyPI <https://pypi.org/project/pydance/>`_ via
 
 .. code-block:: bash
@@ -33,9 +33,9 @@ Then, simply install the pydance package from
    pip install pydance
 
 Alternatively, use our installation script provided in our
-`Github <https://github.com/OmicsML/dance>`_ repository to setup a `pydance`
+`Github <https://github.com/OmicsML/dance>`_ repository to setup a `dance`
 `conda <https://conda.io/projects/conda/en/latest/index.html>`_
-environment with all necessary dependencies as well as PyDANCE.
+environment with all necessary dependencies as well as DANCE.
 
 .. code-block:: bash
 
