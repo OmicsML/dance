@@ -44,9 +44,9 @@ made to improve the DANCE code base. If you would like to get started, please
 refer to our brief [guidelines](CONTRIBUTING.md) about our automated quality
 controls, as well as setting up the `dev` environments.
 
-## Reference
+## Citation
 
-If our work could help your research, please cite our DANCE package paper or survey paper:
+If you find our work useful in your research, please consider citing our DANCE package or survey paper:
 
 ```bibtex
 @article{ding2022dance,
@@ -169,7 +169,7 @@ Install from PyPI
 pip install pydance
 ```
 
-Install the latest dev version from source
+Or, install the latest dev version from source
 
 ```bash
 git clone https://github.com/OmicsML/dance.git
