@@ -136,7 +136,7 @@ Then, install CUDA enabled packages (PyTorch, PyG, DGL) with CUDA 10.2:
 
 ```bash
 conda install pytorch=1.12.1 torchvision cudatoolkit=10.2 -c pytorch -y
-conda install dgl-cu102 -c dglteam -y
+conda install dgl-cuda10.2 -c dglteam -y
 pip install torch-geometric==2.1.0 torch-scatter torch-sparse torch-cluster -f https://data.pyg.org/whl/torch-1.12.1+cu102.html
 ```
 
