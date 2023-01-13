@@ -71,9 +71,9 @@ If you find our work useful in your research, please consider citing our DANCE p
 
 ### Overview
 
-In release 1.0, the main usage of the PyDANCE is to provide readily available experiment reproduction
+In release 1.0, the main usage of the DANCE is to provide readily available experiment reproduction
 (see detail information about the reproduced performance [below](#implemented-algorithms)).
-Users can easily reproduce selected experiments presented in the original papers for the computational single-cell methods implemented in PyDANCE, which can be found under [`examples/`](examples).
+Users can easily reproduce selected experiments presented in the original papers for the computational single-cell methods implemented in DANCE, which can be found under [`examples/`](examples).
 
 ### Motivation
 
@@ -82,7 +82,7 @@ A key challenge to continually developing computational single-cell methods that
 More specifically, different studies prepare their datasets and perform evaluation differently,
 and not to mention the compatibility of different methods, as they could be written in different languages or using incompatible library versions.
 
-PyDANCE addresses these challenges by providing a unified Python package implementing many popular computational single-cell methods (see [Implemented Algorithms](#implemented-algorithms)),
+DANCE addresses these challenges by providing a unified Python package implementing many popular computational single-cell methods (see [Implemented Algorithms](#implemented-algorithms)),
 as well as easily reproducible experiments by providing unified tools for
 
 - Data downloading
@@ -91,7 +91,7 @@ as well as easily reproducible experiments by providing unified tools for
 
 ### Example: run cell-type annotation benchmark using scDeepSort
 
-- Step0. Install PyDANCE (see [Installation](#installation))
+- Step0. Install DANCE (see [Installation](#installation))
 - Step1. Navigate to the folder containing the corresponding example scrtip.
   In this case, it is [`examples/single_modality/cell_type_annotation`](examples/single_modality/cell_type_annotation).
 - Step2. Obtain command line interface (CLI) options for a particular experiment to reproduce at the end of the
@@ -108,7 +108,7 @@ as well as easily reproducible experiments by providing unified tools for
 
 The full installation process might be a bit tedious and could involve some debugging when using CUDA enabled packages.
 Thus, we provide an `install.sh` script that simplifies the installation process, assuming the user have [conda](https://conda.io/projects/conda/en/latest/index.html) set up on their machines.
-The installation script creates a conda environment `pydance` and install the PyDANCE package along with all its dependencies with a apseicifc CUDA version.
+The installation script creates a conda environment `dance` and install the DANCE package along with all its dependencies with a apseicifc CUDA version.
 Currently, three options are accepted: `cpu`, `cu102`, and `cu113`.
 For example, to install the DANCE package using CUDA10.2 in a `dance-env` conda environment, simply run:
 
@@ -118,7 +118,7 @@ git clone git@github.com:OmicsML/dance.git && cd dance
 source install.sh cu102 dance-env
 ```
 
-**Note**: the first argument for cuda version is mandatory, while the second argument for conda environment name is optional (default is `pydance`).
+**Note**: the first argument for cuda version is mandatory, while the second argument for conda environment name is optional (default is `dance`).
 
 <details>
 <summary><H3>Custom install</H3></summary>
@@ -126,10 +126,10 @@ source install.sh cu102 dance-env
 
 **Step1. Setup environment**
 
-First create a conda environment for pydance (optional)
+First create a conda environment for dance (optional)
 
 ```bash
-conda create -n pydance python=3.8 -y && conda activate dance-dev
+conda create -n dance python=3.8 -y && conda activate dance-dev
 ```
 
 Then, install CUDA enabled packages (PyTorch, PyG, DGL) with CUDA 10.2:
@@ -161,7 +161,7 @@ For more information about installation or other CUDA version options, check out
 - [PyG](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html)
 - [DGL](https://www.dgl.ai/pages/start.html)
 
-**Step2. Install PyDANCE**
+**Step2. Install DANCE**
 
 Install from PyPI
 

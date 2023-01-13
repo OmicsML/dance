@@ -1,17 +1,17 @@
 #!/bin/sh --login
-# This is an optional installation script for setting up the pydance package
+# This is an optional installation script for setting up the DANCE package
 # without much headache of dealing with setting up CUDA enabled packages, such
 # as PyTorch, Pytorch Geometric (PYG), and Deep Graph Library (DGL).
 #
 # Example:
-# $ source install.sh cu102  # install pydance with CUDA 10.2
+# $ source install.sh cu102  # install dance with CUDA 10.2
 #
 # To uninstall and remove the dance environment:
 # $ conda remove -n dance --all
 
 trap "echo Try using source instead of sh? && trap - ERR && return 1" ERR
 
-# Check required version specificiation input
+# Check required version specification input
 if [ -z $1 ]; then
     echo "ERROR: Please provide CUDA information, available options are [cpu,cu102,cu113]"
     return 1
@@ -63,12 +63,12 @@ conda install pytorch==${PYTORCH_VERSION} torchvision==${TORCHVISION_VERSION} ${
 conda install pyg==${PYG_VERSION} -c pyg -y
 conda install ${DGL_OPT} -c dglteam -y
 
-# Finally, install pydance
+# Finally, install the DANCE pckage
 pip install -e .
 
-printf "Successfully installed pydance, be sure to activate the conda environment via:\n"
+printf "Successfully installed DANCE, be sure to activate the conda environment via:\n"
 printf "\n    \$ conda activate ${envname}\n"
-printf "\nTo uninstall and remove the pydance environment:\n"
+printf "\nTo uninstall and remove the DANCE environment:\n"
 printf "\n    \$ conda remove -n ${envname} --all\n\n"
 
 trap - ERR
