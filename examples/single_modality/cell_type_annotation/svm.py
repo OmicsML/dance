@@ -26,11 +26,10 @@ if __name__ == "__main__":
     params = parser.parse_args()
     pprint(vars(params))
 
-    dataloader = CellTypeDataset(data_type="svm", random_seed=params.random_seed, train_dataset=params.train_dataset,
-                                 test_dataset=params.test_dataset, species=params.species, tissue=params.tissue,
-                                 train_dir=params.train_dir, test_dir=params.test_dir, dense_dim=params.dense_dim,
-                                 statistics_path=params.statistics_path, map_path=params.map_path,
-                                 threshold=params.threshold, gpu=params.gpu)
+    dataloader = CellTypeDataset(data_type="svm", train_dataset=params.train_dataset, test_dataset=params.test_dataset,
+                                 species=params.species, tissue=params.tissue, train_dir=params.train_dir,
+                                 test_dir=params.test_dir, statistics_path=params.statistics_path,
+                                 map_path=params.map_path, threshold=params.threshold)
 
     adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
     adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)

@@ -6,7 +6,6 @@ from dance.modules.single_modality.cell_type_annotation.singlecellnet import Sin
 from dance.utils.preprocess import cell_label_to_df
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--data_type", type=str, default="singlecellnet")
     parser.add_argument("--random_seed", type=int, default=10)
@@ -28,10 +27,9 @@ if __name__ == "__main__":
     parser.add_argument("--stratify", type=bool, default=True)
     args = parser.parse_args()
 
-    dataloader = CellTypeDataset(random_seed=args.random_seed, data_type="singlecellnet", proj_path=args.proj_path,
-                                 train_dir=args.train_dir, test_dir=args.test_dir, train_dataset=args.train_dataset,
-                                 test_dataset=args.test_dataset, species=args.species, tissue=args.tissue,
-                                 map_path=args.map_path)
+    dataloader = CellTypeDataset(data_type="singlecellnet", proj_path=args.proj_path, train_dir=args.train_dir,
+                                 test_dir=args.test_dir, train_dataset=args.train_dataset, map_path=args.map_path,
+                                 test_dataset=args.test_dataset, species=args.species, tissue=args.tissue)
 
     adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
     adata.obsm[args.dLevel] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)

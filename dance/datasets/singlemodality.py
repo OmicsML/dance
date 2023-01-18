@@ -8,27 +8,22 @@ import anndata as ad
 import h5py
 import numpy as np
 import pandas as pd
-import scanpy as sc
 import torch
 from torch.utils.data import Dataset
 
 from dance.data import download_file, download_unzip
 from dance.transforms.preprocess import (get_map_dict, load_actinn_data, load_annotation_data,
-                                         load_imputation_data_internal, load_svm_data, splitCommonAnnData)
+                                         load_imputation_data_internal, load_svm_data)
 
 
 @dataclass
 class CellTypeDatasetParams:
     random_seed = None
-    dense_dim = None
     proj_path = None
     train_dataset = None
     test_dataset = None
     species = None
     tissue = None
-    score = None
-    gpu = None
-    evaluate = None
     train_dir = None
     test_dir = None
     statistics_path = None
@@ -36,32 +31,25 @@ class CellTypeDatasetParams:
     filetype = None
     threshold = None
     exclude_rate = None
-    test_rate = None
 
 
 class CellTypeDataset():
 
-    def __init__(self, data_type="scdeepsort", random_seed=10, proj_path="./", dense_dim=None, train_dataset=None,
-                 test_dataset=None, species=None, tissue=None, score=True, gpu=None, evaluate=None, train_dir=None,
-                 test_dir=None, statistics_path=None, map_path=None, filetype=None, threshold=None, exclude_rate=None,
-                 test_rate=None, data_dir="./", train_set=None, train_label=None, test_set=None, test_label=None,
-                 X_celltypist=None, labels_celltypist=None, genes_celltypist=None, transpose_input_celltypist=False,
-                 singlecellnet_type="Lung", svm_settings=None):
+    def __init__(self, data_type="scdeepsort", proj_path="./", train_dataset=None, test_dataset=None, species=None,
+                 tissue=None, train_dir=None, test_dir=None, statistics_path=None, map_path=None, filetype=None,
+                 threshold=None, exclude_rate=None, data_dir="./", train_set=None, train_label=None, test_set=None,
+                 test_label=None, X_celltypist=None, labels_celltypist=None, genes_celltypist=None,
+                 transpose_input_celltypist=False, singlecellnet_type="Lung", svm_settings=None):
         self.data_dir = data_dir
         self.data_type = data_type
         if data_type == "scdeepsort":
             self.download_pretrained_data()
         self.params = CellTypeDatasetParams()
-        self.params.random_seed = random_seed
-        self.params.dense_dim = dense_dim
         self.params.proj_path = proj_path
         self.params.train_dataset = train_dataset
         self.params.test_dataset = test_dataset
         self.params.species = species
         self.params.tissue = tissue
-        self.params.score = score
-        self.params.gpu = gpu
-        self.params.evaluate = evaluate
         self.params.train_dir = train_dir
         self.params.test_dir = test_dir
         self.params.statistics_path = statistics_path
@@ -69,7 +57,6 @@ class CellTypeDataset():
         self.params.filetype = filetype
         self.params.threshold = threshold
         self.params.exclude_rate = exclude_rate
-        self.params.test_rate = test_rate
         self.train_set = train_set
         self.train_label = train_label
         self.test_set = test_set
@@ -283,14 +270,9 @@ class CellTypeDataset():
             return load_annotation_data(self.params)
 
         if self.data_type == "svm":
-            if self.is_complete():
-                pass
-            else:
+            if not self.is_complete():
                 if self.data_type == "svm":
                     self.download_benchmark_data()
-                if self.data_type == "svm_exp":
-                    self.download_example_data()
-                assert self.is_complete()
 
             return load_svm_data(self.params)
 
@@ -425,16 +407,8 @@ class ImputationDatasetParams:
 
 class ImputationDataset():
 
-    def __init__(
-            self,
-            random_seed=10,
-            gpu=-1,
-            # evaluate = None,
-            filetype=None,
-            data_dir="data",
-            train_dataset="human_stemcell",
-            test_dataset="pbmc",
-            min_counts=1):
+    def __init__(self, random_seed=10, gpu=-1, filetype=None, data_dir="data", train_dataset="human_stemcell",
+                 test_dataset="pbmc", min_counts=1):
         self.params = ImputationDatasetParams
         self.params.data_dir = data_dir
         self.params.random_seed = random_seed

@@ -729,13 +729,6 @@ def convert_type_to_label(types, type_to_label_dict):
     return labels
 
 
-# Function to create placeholders
-def create_placeholders(n_x, n_y):
-    X = torch.zeros(n_x)
-    Y = torch.zeros(n_y)
-    return X, Y
-
-
 def load_actinn_data(train_data_paths: List[str], train_label_paths: List[str], test_data_path: str,
                      test_label_path: str, normalize: bool = False):
     # TODO: multiple test datasets
@@ -765,7 +758,7 @@ def load_actinn_data(train_data_paths: List[str], train_label_paths: List[str], 
     logger.info("Cell Types in training set:\n%s", pprint.pformat(type_to_label_dict_out))
     train_label = convert_type_to_label(train_label.iloc[:, 1], type_to_label_dict_out)
     train_label = one_hot_matrix(train_label, nt)
-    logger.info(f"# Trainng cells: {train_label.shape[1]:,}")
+    logger.info(f"# Training cells: {train_label.shape[1]:,}")
 
     total_test_cells = test_label.shape[0]
     indicator = test_label.iloc[:, 1].isin(type_to_label_dict_out)
