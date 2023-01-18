@@ -1,3 +1,4 @@
+import collections
 import glob
 import os
 import os.path as osp
@@ -11,9 +12,11 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
+from dance import logger
 from dance.data import download_file, download_unzip
 from dance.transforms.preprocess import (get_map_dict, load_actinn_data, load_annotation_data,
-                                         load_imputation_data_internal, load_svm_data)
+                                         load_imputation_data_internal)
+from dance.typing import Dict, List, Optional, Set, Tuple
 
 
 @dataclass
@@ -274,7 +277,7 @@ class CellTypeDataset():
                 if self.data_type == "svm":
                     self.download_benchmark_data()
 
-            return load_svm_data(self.params)
+            return self._load_data()
 
         if self.data_type == "actinn":
             self.download_benchmark_data()
@@ -315,6 +318,83 @@ class CellTypeDataset():
             return adata, cell_labels, idx_to_label, train_size
 
         return self
+
+    def _load_data(self, ct_col: str = "Cell_type"):
+        species = self.params.species
+        tissue = self.params.tissue
+        train_dataset_ids = self.params.train_dataset
+        test_dataset_ids = self.params.test_dataset
+        proj_path = self.params.proj_path
+        train_dir = osp.join(proj_path, self.params.train_dir)
+        test_dir = osp.join(proj_path, self.params.test_dir)
+        map_path = osp.join(proj_path, self.params.map_path, self.params.species)
+
+        # Load raw data
+        train_feat_paths, train_label_paths = self._get_data_paths(train_dir, species, tissue, train_dataset_ids)
+        test_feat_paths, test_label_paths = self._get_data_paths(test_dir, species, tissue, test_dataset_ids)
+        train_feat, test_feat = (self._load_dfs(paths, transpose=True) for paths in (train_feat_paths, test_feat_paths))
+        train_label, test_label = (self._load_dfs(paths) for paths in (train_label_paths, test_label_paths))
+
+        # Combine features (only use features that are present in the training data)
+        train_size = train_feat.shape[0]
+        feat_df = pd.concat(train_feat.align(test_feat, axis=1, join="left", fill_value=0)).fillna(0)
+        adata = ad.AnnData(feat_df, dtype=np.float32)
+
+        # Convert cell type labels and map test cell type names to train
+        idx_to_label = sorted(train_label[ct_col].unique())
+        cell_type_mappings: Dict[str, Set[str]] = self.get_map_dict(map_path, tissue)
+        train_labels = [{i} for i in train_label[ct_col]]
+        test_labels = list(map(cell_type_mappings.get, test_label[ct_col]))
+        labels: List[Set[str]] = train_labels + test_labels
+
+        return adata, labels, idx_to_label, train_size
+
+    @staticmethod
+    def _get_data_paths(data_dir: str, species: str, tissue: str, dataset_ids: List[str], *, filetype: str = "csv",
+                        feat_suffix: str = "data", label_suffix: str = "celltype") -> Tuple[List[str], List[str]]:
+        feat_paths, label_paths = [], []
+        for path_list, suffix in zip((feat_paths, label_paths), (feat_suffix, label_suffix)):
+            for i in dataset_ids:
+                path_list.append(osp.join(data_dir, species, f"{species}_{tissue}{i}_{suffix}.{filetype}"))
+        return feat_paths, label_paths
+
+    @staticmethod
+    def _load_dfs(paths: List[str], *, index_col: Optional[int] = 0, transpose: bool = False, **kwargs):
+        dfs = []
+        for path in paths:
+            logger.info(f"Loading data from {path}")
+            df = pd.read_csv(path, index_col=index_col, **kwargs)
+            # Labels: cell x cell-type; Data: feature x cell (need to transpose)
+            df = df.T if transpose else df
+            # Add dataset info to index
+            dataset_name = "_".join(osp.basename(path).split("_")[:-1])
+            df.index = dataset_name + "_" + df.index.astype(str)
+            dfs.append(df)
+        combined_df = pd.concat(dfs)
+        return combined_df
+
+    @staticmethod
+    def get_map_dict(map_file_path: str, tissue: str) -> Dict[str, Set[str]]:
+        """Load cell-type mappings.
+
+        Parameters
+        ----------
+        map_file_path
+            Path to the mapping file.
+        tissue
+            Tissue of interest.
+
+        Notes
+        -----
+        Merge mapping across all test sets for the required tissue.
+
+        """
+        map_df = pd.read_excel(osp.join(map_file_path, "map.xlsx"))
+        map_dict = collections.defaultdict(set)
+        for _, row in map_df.iterrows():
+            if row["Tissue"] == tissue:
+                map_dict[row["Celltype"]] = row["Training dataset cell type"]
+        return dict(map_dict)
 
 
 class ClusteringDataset():
