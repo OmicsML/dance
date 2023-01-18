@@ -39,7 +39,7 @@ class CellTypeDatasetParams:
 class CellTypeDataset():
 
     def __init__(self, data_type="scdeepsort", proj_path="./", train_dataset=None, test_dataset=None, species=None,
-                 tissue=None, train_dir=None, test_dir=None, statistics_path=None, map_path=None, filetype=None,
+                 tissue=None, train_dir="train", test_dir="test", statistics_path=None, map_path="map", filetype="csv",
                  threshold=None, exclude_rate=None, data_dir="./", train_set=None, train_label=None, test_set=None,
                  test_label=None, X_celltypist=None, labels_celltypist=None, genes_celltypist=None,
                  transpose_input_celltypist=False, singlecellnet_type="Lung", svm_settings=None):
