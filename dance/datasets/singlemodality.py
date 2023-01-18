@@ -281,7 +281,7 @@ class CellTypeDataset():
 
         if self.data_type == "actinn":
             self.download_benchmark_data()
-            return load_actinn_data(self.train_set, self.train_label, self.test_set, self.test_label)
+            return self._load_data()
 
         if self.data_type in ["celltypist", "singlecellnet"]:
             self.download_benchmark_data(download_pretrained=False)

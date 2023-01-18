@@ -1,11 +1,12 @@
 import argparse
-import os.path as osp
 
 import numpy as np
+import scanpy as sc
 
 from dance.data import Data
 from dance.datasets.singlemodality import CellTypeDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
+from dance.transforms import AnnDataTransform, FilterGenesPercentile
 from dance.utils.preprocess import cell_label_to_df
 
 if __name__ == "__main__":
@@ -27,28 +28,19 @@ if __name__ == "__main__":
     parser.add_argument("--train_dir", default="train")
     args = parser.parse_args()
 
-    # Load data
-    # TODO: make directly pass species, tissue, dataset ids instead of paths, as done in the svm example
-    train_data_paths = [
-        osp.join(args.train_dir, args.species, f"{args.species}_{args.tissue}{i}_data.csv") for i in args.train_dataset
-    ]
-    train_label_paths = [
-        osp.join(args.train_dir, args.species, f"{args.species}_{args.tissue}{i}_celltype.csv")
-        for i in args.train_dataset
-    ]
-    # TODO: multiple test data
-    test_data_path = osp.join(args.test_dir, args.species,
-                              f"{args.species}_{args.tissue}{args.test_dataset[0]}_data.csv")
-    test_label_path = osp.join(args.test_dir, args.species,
-                               f"{args.species}_{args.tissue}{args.test_dataset[0]}_celltype.csv")
-
-    dataloader = CellTypeDataset(data_type="actinn", train_set=train_data_paths, train_label=train_label_paths,
-                                 test_set=test_data_path, test_label=test_label_path)
+    dataloader = CellTypeDataset(data_type="svm", train_dataset=args.train_dataset, test_dataset=args.test_dataset,
+                                 species=args.species, tissue=args.tissue)
 
     adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
     adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)
     data = Data(adata, train_size=train_size)
     data.set_config(label_channel="cell_type")
+
+    AnnDataTransform(sc.pp.normalize_total, target_sum=1e4)(data)
+    AnnDataTransform(sc.pp.log1p)(data)
+    FilterGenesPercentile(min_val=1, max_val=99, log_level="INFO")(data)
+    AnnDataTransform(sc.pp.scale)(data)
+    FilterGenesPercentile(min_val=1, max_val=99, log_level="INFO")(data)
 
     model = ACTINN(input_dim=data.num_features, output_dim=len(idx_to_label), hidden_dims=args.hidden_dims,
                    lr=args.learning_rate, device=args.device, num_epochs=args.num_epochs, batch_size=args.batch_size,
