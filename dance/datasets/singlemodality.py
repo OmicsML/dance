@@ -113,33 +113,30 @@ class CellTypeDataset():
             return
 
         urls = {
-            "train_mouse_Brain753_celltype":
-            "https://www.dropbox.com/s/x2katwk93z06sgw/mouse_Brain753_celltype.csv?dl=1",
-            "train_mouse_Brain753_data": "https://www.dropbox.com/s/3f3wbplgo3xa4ww/mouse_Brain753_data.csv?dl=1",
-            "train_mouse_Brain3285_celltype":
-            "https://www.dropbox.com/s/ozsobozk3ihkrqg/mouse_Brain3285_celltype.csv?dl=1",
-            "train_mouse_Brain3285_data": "https://www.dropbox.com/s/zjrloejx8iqdqsa/mouse_Brain3285_data.csv?dl=1",
-            "train_mouse_Kidney4682_celltype":
-            "https://www.dropbox.com/s/3plrve7g9v428ec/mouse_Kidney4682_celltype.csv?dl=1",
-            "train_mouse_Kidney4682_data": "https://www.dropbox.com/s/olf5nirtieu1ikq/mouse_Kidney4682_data.csv?dl=1",
-            "train_mouse_Spleen1970_celltype":
-            "https://www.dropbox.com/s/3ea64vk546fjxvr/mouse_Spleen1970_celltype.csv?dl=1",
-            "train_mouse_Spleen1970_data": "https://www.dropbox.com/s/c4te0fr1qicqki8/mouse_Spleen1970_data.csv?dl=1",
-            "test_mouse_Brain2695_celltype":
-            "https://www.dropbox.com/s/gh72dk7i0p7fggu/mouse_Brain2695_celltype.csv?dl=1",
-            "test_mouse_Brain2695_data": "https://www.dropbox.com/s/ufianih66xjqxdu/mouse_Brain2695_data.csv?dl=1",
-            "test_mouse_Kidney203_celltype":
-            "https://www.dropbox.com/s/t4eyaig889qdiz2/mouse_Kidney203_celltype.csv?dl=1",
-            "test_mouse_Kidney203_data": "https://www.dropbox.com/s/kmos1ceubumgmpj/mouse_Kidney203_data.csv?dl=1",
-            "test_mouse_Spleen1759_celltype":
-            "https://www.dropbox.com/s/gczehvgai873mhb/mouse_Spleen1759_celltype.csv?dl=1",
-            "test_mouse_Spleen1759_data": "https://www.dropbox.com/s/fl8t7rbo5dmznvq/mouse_Spleen1759_data.csv?dl=1",
-        }
+            # Mouse spleen benchmark
+            "train_mouse_Spleen1970_celltype.csv":  "https://www.dropbox.com/s/3ea64vk546fjxvr?dl=1",
+            "train_mouse_Spleen1970_data.csv":      "https://www.dropbox.com/s/c4te0fr1qicqki8?dl=1",
+            "test_mouse_Spleen1759_celltype.csv":   "https://www.dropbox.com/s/gczehvgai873mhb?dl=1",
+            "test_mouse_Spleen1759_data.csv":       "https://www.dropbox.com/s/fl8t7rbo5dmznvq?dl=1",
+            # Mouse brain benchmark
+            "train_mouse_Brain753_celltype.csv":    "https://www.dropbox.com/s/x2katwk93z06sgw?dl=1",
+            "train_mouse_Brain753_data.csv":        "https://www.dropbox.com/s/3f3wbplgo3xa4ww?dl=1",
+            "train_mouse_Brain3285_celltype.csv":   "https://www.dropbox.com/s/ozsobozk3ihkrqg?dl=1",
+            "train_mouse_Brain3285_data.csv":       "https://www.dropbox.com/s/zjrloejx8iqdqsa?dl=1",
+            "test_mouse_Brain2695_celltype.csv":    "https://www.dropbox.com/s/gh72dk7i0p7fggu?dl=1",
+            "test_mouse_Brain2695_data.csv":        "https://www.dropbox.com/s/ufianih66xjqxdu?dl=1",
+            # Mouse kidney benchmark
+            "train_mouse_Kidney4682_celltype.csv":  "https://www.dropbox.com/s/3plrve7g9v428ec?dl=1",
+            "train_mouse_Kidney4682_data.csv":      "https://www.dropbox.com/s/olf5nirtieu1ikq?dl=1",
+            "test_mouse_Kidney203_celltype.csv":    "https://www.dropbox.com/s/t4eyaig889qdiz2?dl=1",
+            "test_mouse_Kidney203_data.csv":        "https://www.dropbox.com/s/kmos1ceubumgmpj?dl=1",
+        }  # yapf: disable
 
         # Download training and testing data
         for name, url in urls.items():
-            filename = url.split("/")[-1].split("?")[0]
-            filepath = osp.join(self.data_dir, *name.split("_")[:2], filename)
+            parts = name.split("_")  # [train|test]_{species}_{tissue}{id}_[celltype|data].csv
+            filename = "_".join(parts[1:])
+            filepath = osp.join(self.data_dir, *parts[:2], filename)
             download_file(url, filepath)
 
         if download_map:
