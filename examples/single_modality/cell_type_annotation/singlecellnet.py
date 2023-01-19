@@ -9,14 +9,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--data_type", type=str, default="singlecellnet")
     parser.add_argument("--random_seed", type=int, default=10)
-    parser.add_argument("--train_dataset", default=4682, type=int, help="train id")
-    parser.add_argument("--test_dataset", default=203, type=int, help="test id")
+    parser.add_argument("--train_dataset", type=int, nargs="+", default=[4682], help="List of training dataset ids.")
+    parser.add_argument("--test_dataset", type=int, nargs="+", default=[203], help="List testing training dataset ids.")
     parser.add_argument("--species", default="mouse", type=str)
     parser.add_argument("--tissue", default="Kidney", type=str)
-    parser.add_argument("--train_dir", type=str, default="train")
-    parser.add_argument("--test_dir", type=str, default="test")
-    parser.add_argument("--proj_path", type=str, default="./")
-    parser.add_argument("--map_path", type=str, default="map/mouse/")
     parser.add_argument("--nTopGenes", type=int, default=100)
     parser.add_argument("--nRand", type=int, default=100)
     parser.add_argument("--nTrees", type=int, default=100)
@@ -27,8 +23,7 @@ if __name__ == "__main__":
     parser.add_argument("--stratify", type=bool, default=True)
     args = parser.parse_args()
 
-    dataloader = CellTypeDataset(data_type="singlecellnet", proj_path=args.proj_path, train_dir=args.train_dir,
-                                 test_dir=args.test_dir, train_dataset=args.train_dataset, map_path=args.map_path,
+    dataloader = CellTypeDataset(data_type="singlecellnet", train_dataset=args.train_dataset,
                                  test_dataset=args.test_dataset, species=args.species, tissue=args.tissue)
 
     adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
@@ -50,7 +45,7 @@ if __name__ == "__main__":
 """To reproduce SingleCellNet benchmarks, please refer to command lines belows:
 
 Mouse Brain
-$ python singlecellnet.py --species mouse --tissue Brain --train_dataset 753 --test_dataset 2695
+$ python singlecellnet.py --species mouse --tissue Brain --train_dataset 753 3285 --test_dataset 2695
 
 Mouse Spleen
 $ python singlecellnet.py --species mouse --tissue Spleen --train_dataset 1970 --test_dataset 1759
