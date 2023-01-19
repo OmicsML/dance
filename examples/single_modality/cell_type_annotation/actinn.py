@@ -25,10 +25,8 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
     parser.add_argument("--species", default="mouse")
     parser.add_argument("--test_dataset", nargs="+", default=[299], help="List of testing dataset ids.")
-    parser.add_argument("--test_dir", default="test")
     parser.add_argument("--tissue", default="Testis")
     parser.add_argument("--train_dataset", nargs="+", default=[2216], help="List of training dataset ids.")
-    parser.add_argument("--train_dir", default="train")
     args = parser.parse_args()
 
     dataloader = CellTypeDataset(data_type="actinn", train_dataset=args.train_dataset, test_dataset=args.test_dataset,

@@ -2,13 +2,12 @@ import collections
 import itertools
 import math
 import os
-import pprint
 import random
 import time
 import warnings
 from itertools import combinations
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import anndata
 import dgl
@@ -25,11 +24,10 @@ import sklearn.preprocessing
 import sklearn.utils.extmath
 import statsmodels.stats.multitest as smt
 import torch
-import torch.nn.functional as F
 from anndata import AnnData
 from dgl.sampling import pack_traces, random_walk
 from scipy import stats
-from scipy.sparse import csr_matrix, spmatrix
+from scipy.sparse import spmatrix
 from scipy.stats import expon
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.model_selection import train_test_split
@@ -523,122 +521,7 @@ def load_annotation_data(params):
 
 
 #######################################################
-#For Single Cell ACTINN
-#######################################################
-
-
-# Get common genes, normalize  and scale the sets
-def scale_sets(sets, normalize=True):
-    # input -- a list of all the sets to be scaled
-    # output -- scaled sets
-    # normalize -- Skip library size + log normalize if set to False (scDeepsort data prenormalized)
-    common_genes = set(sets[0].index)
-    for i in range(1, len(sets)):
-        common_genes = set.intersection(set(sets[i].index), common_genes)
-    common_genes = sorted(list(common_genes))
-    sep_point = [0]
-    for i in range(len(sets)):
-        sets[i] = sets[i].loc[common_genes, ]
-        sep_point.append(sets[i].shape[1])
-    total_set = np.array(pd.concat(sets, axis=1, sort=False), dtype=np.float32)
-    if normalize:
-        total_set = np.divide(total_set, np.sum(total_set, axis=0, keepdims=True)) * 10000
-        total_set = np.log2(total_set + 1)
-        expr = np.sum(total_set, axis=1)
-        total_set = total_set[np.logical_and(expr >= np.percentile(expr, 1), expr <= np.percentile(expr, 99)), ]
-        cv = np.std(total_set, axis=1) / np.mean(total_set, axis=1)
-        total_set = total_set[np.logical_and(cv >= np.percentile(cv, 1), cv <= np.percentile(cv, 99)), ]
-    for i in range(len(sets)):
-        sets[i] = total_set[:, sum(sep_point[:(i + 1)]):sum(sep_point[:(i + 2)])]
-    return sets
-
-
-# Turn labels into matrix
-def one_hot_matrix(labels, C):
-    # input -- labels (true labels of the sets), C (# types)
-    # output -- one hot matrix with shape (# types, # samples)
-    labels = torch.tensor(labels)
-    C = torch.tensor(C)
-    one_hot_matrix = F.one_hot(labels, C)
-    return one_hot_matrix.T
-
-
-# Make types to labels dictionary
-def type_to_label_dict(types):
-    # input -- types
-    # output -- type_to_label dictionary
-    type_to_label_dict = {}
-    all_type = sorted(set(types))
-    for i in range(len(all_type)):
-        type_to_label_dict[all_type[i]] = i
-    return type_to_label_dict
-
-
-# Convert types to labels
-def convert_type_to_label(types, type_to_label_dict):
-    # input -- list of types, and type_to_label dictionary
-    # output -- list of labels
-    types = list(types)
-    labels = list()
-    for type in types:
-        labels.append(type_to_label_dict[type])
-    return labels
-
-
-def load_actinn_data(train_data_paths: List[str], train_label_paths: List[str], test_data_path: str,
-                     test_label_path: str, normalize: bool = False):
-    # TODO: multiple test datasets
-    train_set_dfs = []
-    train_label_dfs = []
-    for train_data_path, train_label_path in zip(train_data_paths, train_label_paths):
-        train_set_df = pd.read_csv(train_data_path, index_col=0)
-        train_set_df.index = train_set_df.index.str.upper()
-        train_set_df = train_set_df.loc[~train_set_df.index.duplicated(keep="first")]
-        train_label_df = pd.read_csv(train_label_path, index_col=0)
-
-        train_set_dfs.append(train_set_df)
-        train_label_dfs.append(train_label_df)
-
-    train_set = pd.concat(train_set_dfs, axis=1, join="inner")
-    train_label = pd.concat(train_label_dfs, axis=0)
-
-    test_set = pd.read_csv(test_data_path, index_col=0)
-    test_set.index = test_set.index.str.upper()
-    test_set = test_set.loc[~test_set.index.duplicated(keep="first")]
-    test_label = pd.read_csv(test_label_path, index_col=0)
-
-    nt = train_label.iloc[:, 1].unique().size
-    train_set, test_set = scale_sets([train_set, test_set], normalize=normalize)
-    type_to_label_dict_out = type_to_label_dict(train_label.iloc[:, 1])
-    label_to_type_dict = {v: k for k, v in type_to_label_dict_out.items()}
-    logger.info("Cell Types in training set:\n%s", pprint.pformat(type_to_label_dict_out))
-    train_label = convert_type_to_label(train_label.iloc[:, 1], type_to_label_dict_out)
-    train_label = one_hot_matrix(train_label, nt)
-    logger.info(f"# Training cells: {train_label.shape[1]:,}")
-
-    total_test_cells = test_label.shape[0]
-    indicator = test_label.iloc[:, 1].isin(type_to_label_dict_out)
-    test_label = test_label[indicator]
-    test_set = test_set[:, indicator]
-    test_label = convert_type_to_label(test_label.iloc[:, 1], type_to_label_dict_out)
-    test_label = one_hot_matrix(test_label, nt)
-    logger.info(f"# Testing cells {test_label.shape[1]:,} (original number of cells = {total_test_cells:,})")
-
-    x_adata = AnnData(sp.csr_matrix(np.hstack((train_set, test_set)).T), dtype=np.float32)
-    train_size = train_set.shape[1]
-    tot_size = x_adata.shape[0]
-
-    labels = [set() for _ in range(tot_size)]
-    for i, j in zip(*np.where(np.hstack((train_label, test_label)).T)):
-        labels[i].add(label_to_type_dict[j])
-
-    idx_to_label = list(map(label_to_type_dict.get, range(len(label_to_type_dict))))
-
-    return x_adata, labels, idx_to_label, train_size
-
-
-#######################################################
-#For Celltypist Model
+# For Celltypist Model
 #######################################################
 import logging
 
