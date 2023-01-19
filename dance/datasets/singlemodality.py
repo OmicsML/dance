@@ -2,6 +2,7 @@ import collections
 import glob
 import os
 import os.path as osp
+import pprint
 import sys
 from dataclasses import dataclass
 
@@ -341,11 +342,18 @@ class CellTypeDataset():
         adata = ad.AnnData(feat_df, dtype=np.float32)
 
         # Convert cell type labels and map test cell type names to train
-        idx_to_label = sorted(train_label[ct_col].unique())
+        cell_types = set(train_label[ct_col].unique())
+        idx_to_label = sorted(cell_types)
         cell_type_mappings: Dict[str, Set[str]] = self.get_map_dict(map_path, tissue)
-        train_labels = [{i} for i in train_label[ct_col]]
-        test_labels = list(map(cell_type_mappings.get, test_label[ct_col]))
+        train_labels, test_labels = train_label[ct_col].tolist(), []
+        for i in test_label[ct_col]:
+            test_labels.append(i if i in cell_types else cell_type_mappings.get(i))
         labels: List[Set[str]] = train_labels + test_labels
+
+        logger.info(f"Loaded expression data: {adata}")
+        logger.info(f"Number of training samples: {train_feat.shape[0]:,}")
+        logger.info(f"Number of testing samples: {test_feat.shape[0]:,}")
+        logger.info(f"Cell-types (n={len(idx_to_label)}):\n{pprint.pformat(idx_to_label)}")
 
         return adata, labels, idx_to_label, train_size
 
@@ -393,7 +401,7 @@ class CellTypeDataset():
         map_dict = collections.defaultdict(set)
         for _, row in map_df.iterrows():
             if row["Tissue"] == tissue:
-                map_dict[row["Celltype"]] = row["Training dataset cell type"]
+                map_dict[row["Celltype"]].add("Training dataset cell type")
         return dict(map_dict)
 
 
