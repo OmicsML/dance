@@ -346,6 +346,10 @@ class CellTypeDataset():
             test_labels.append(i if i in cell_types else cell_type_mappings.get(i))
         labels: List[Set[str]] = train_labels + test_labels
 
+        logger.debug("Mapped test cell-types:")
+        for i, j, k in zip(test_label.index, test_label[ct_col], test_labels):
+            logger.debug(f"{i}:{j}\t-> {k}")
+
         logger.info(f"Loaded expression data: {adata}")
         logger.info(f"Number of training samples: {train_feat.shape[0]:,}")
         logger.info(f"Number of testing samples: {test_feat.shape[0]:,}")
