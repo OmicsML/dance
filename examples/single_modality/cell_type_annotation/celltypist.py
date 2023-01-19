@@ -24,8 +24,8 @@ if __name__ == "__main__":
                         help="Training algorithm -- weather it will be stochastic gradient descent", default=True)
     args = parser.parse_args()
 
-    dataloader = CellTypeDataset(data_type="celltypist", train_dataset=args.train_dataset,
-                                 test_dataset=args.test_dataset, species=args.species, tissue=args.tissue)
+    dataloader = CellTypeDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset, species=args.species,
+                                 tissue=args.tissue)
 
     adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
     adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs_names)

@@ -19,7 +19,7 @@ if __name__ == "__main__":
     params = parser.parse_args()
     pprint(vars(params))
 
-    dataloader = CellTypeDataset(data_type="svm", train_dataset=params.train_dataset, test_dataset=params.test_dataset,
+    dataloader = CellTypeDataset(train_dataset=params.train_dataset, test_dataset=params.test_dataset,
                                  species=params.species, tissue=params.tissue)
 
     adata, cell_labels, idx_to_label, train_size = dataloader.load_data()

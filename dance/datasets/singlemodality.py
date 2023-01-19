@@ -38,15 +38,13 @@ class CellTypeDatasetParams:
 
 class CellTypeDataset():
 
-    def __init__(self, data_type="scdeepsort", proj_path="./", train_dataset=None, test_dataset=None, species=None,
+    def __init__(self, download_all=False, proj_path="./", train_dataset=None, test_dataset=None, species=None,
                  tissue=None, train_dir="train", test_dir="test", statistics_path=None, map_path="map", filetype="csv",
                  threshold=None, exclude_rate=None, data_dir="./", train_set=None, train_label=None, test_set=None,
                  test_label=None, X_celltypist=None, labels_celltypist=None, genes_celltypist=None,
                  transpose_input_celltypist=False, singlecellnet_type="Lung", svm_settings=None):
         self.data_dir = data_dir
-        self.data_type = data_type
-        if data_type == "scdeepsort":
-            self.download_pretrained_data()
+        self.download_all = download_all
         self.params = CellTypeDatasetParams()
         self.params.proj_path = proj_path
         self.params.train_dataset = train_dataset
@@ -158,13 +156,6 @@ class CellTypeDataset():
         os.system(f"rm {self.data_dir}/example.zip?dl=0")
         os.system(f"rm -r {self.data_dir}/example")
 
-    def download_pretrained_data(self):
-        """Download pretrained model and label maps."""
-        os.system("wget https://www.dropbox.com/s/i5mufqwc1hy97m4/pretrained.zip?dl=0")
-        os.system(f"mv pretrained.zip?dl=0 {self.data_dir}")
-        os.system(f"unzip {self.data_dir}/pretrained.zip?dl=0")
-        os.system(f"rm {self.data_dir}/pretrained.zip?dl=0")
-
     def download_actinn_data(self):
         """Download pretrained model and label maps."""
         os.system("wget https://www.dropbox.com/s/me2zu2rok9twcjg/actinn_data.zip?dl=0")
@@ -258,33 +249,12 @@ class CellTypeDataset():
         return True
 
     def load_data(self):
-        # Load data from existing h5ad files, or download files and load data.
-        if self.data_type == "scdeepsort" or self.data_type == "scdeepsort_exp":
-            if not self.is_complete():
-                if self.data_type == "scdeepsort":
-                    self.download_all_data()
-                if self.data_type == "scdeepsort_exp":
-                    self.download_benchmark_data()
-                assert self.is_complete()
-
-            return self._load_data()
-
-        if self.data_type == "svm":
-            if not self.is_complete():
-                if self.data_type == "svm":
-                    self.download_benchmark_data()
-
-            return self._load_data()
-
-        if self.data_type == "actinn":
+        # Load data from existing files, or download files and load data.
+        if self.download_all:
+            self.download_all_data()
+        elif not self.is_complete():
             self.download_benchmark_data()
-            return self._load_data()
-
-        if self.data_type in ["celltypist", "singlecellnet"]:
-            self.download_benchmark_data()
-            return self._load_data()
-
-        return self
+        return self._load_data()
 
     def _load_data(self, ct_col: str = "Cell_type"):
         species = self.params.species

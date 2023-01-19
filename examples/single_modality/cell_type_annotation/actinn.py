@@ -35,8 +35,8 @@ if __name__ == "__main__":
 
     logger.setLevel(args.log_level)
 
-    dataloader = CellTypeDataset(data_type="actinn", train_dataset=args.train_dataset, test_dataset=args.test_dataset,
-                                 species=args.species, tissue=args.tissue)
+    dataloader = CellTypeDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset, tissue=args.tissue,
+                                 species=args.species)
 
     adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
     adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)

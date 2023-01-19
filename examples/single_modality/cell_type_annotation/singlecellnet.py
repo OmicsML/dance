@@ -7,7 +7,6 @@ from dance.utils.preprocess import cell_label_to_df
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--data_type", type=str, default="singlecellnet")
     parser.add_argument("--random_seed", type=int, default=10)
     parser.add_argument("--train_dataset", type=int, nargs="+", default=[4682], help="List of training dataset ids.")
     parser.add_argument("--test_dataset", type=int, nargs="+", default=[203], help="List testing training dataset ids.")
@@ -23,8 +22,8 @@ if __name__ == "__main__":
     parser.add_argument("--stratify", type=bool, default=True)
     args = parser.parse_args()
 
-    dataloader = CellTypeDataset(data_type="singlecellnet", train_dataset=args.train_dataset,
-                                 test_dataset=args.test_dataset, species=args.species, tissue=args.tissue)
+    dataloader = CellTypeDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset, species=args.species,
+                                 tissue=args.tissue)
 
     adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
     adata.obsm[args.dLevel] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)

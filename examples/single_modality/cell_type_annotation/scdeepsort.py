@@ -31,9 +31,9 @@ if __name__ == "__main__":
     params = parser.parse_args()
     pprint(vars(params))
 
-    dataloader = CellTypeDataset(data_type="scdeepsort_exp", species=params.species, tissue=params.tissue,
-                                 threshold=params.threshold, exclude_rate=params.exclude_rate,
-                                 test_dataset=params.test_dataset, train_dataset=params.train_dataset)
+    dataloader = CellTypeDataset(species=params.species, tissue=params.tissue, threshold=params.threshold,
+                                 exclude_rate=params.exclude_rate, test_dataset=params.test_dataset,
+                                 train_dataset=params.train_dataset)
 
     adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
     adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)
