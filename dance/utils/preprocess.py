@@ -37,6 +37,7 @@ def cell_label_to_df(cell_labels: List[Optional[Union[str, Set[str]]]], idx_to_l
         if labels is None:
             miss_counts += 1
             logger.debug(f"Cell #{i} did not match any cell type in the training set.")
+            continue
         elif isinstance(labels, str):
             labels = [labels]
 
