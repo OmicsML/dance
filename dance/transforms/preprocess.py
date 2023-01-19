@@ -1,12 +1,9 @@
-import collections
-import itertools
 import math
 import os
 import random
 import time
 import warnings
 from itertools import combinations
-from pathlib import Path
 from typing import Optional, Union
 
 import anndata
@@ -56,7 +53,7 @@ def prefilter_cells(adata, min_counts=None, max_counts=None, min_genes=200, max_
     id_tmp = np.logical_and(id_tmp,
                             sc.pp.filter_cells(adata.X, max_counts=max_counts)[0]) if max_counts is not None else id_tmp
     adata._inplace_subset_obs(id_tmp)
-    adata.raw = sc.pp.log1p(adata, copy=True)  #check the rowname
+    adata.raw = sc.pp.log1p(adata, copy=True)  # check the rowname
     print("the var_names of adata.raw: adata.raw.var_names.is_unique=:", adata.raw.var_names.is_unique)
 
 
@@ -98,7 +95,7 @@ def log1p(adata):
 
 
 def calculate_log_library_size(Dataset):
-    ### Dataset is raw read counts, and should be cells * features
+    # Dataset is raw read counts, and should be cells * features
 
     Nsamples = np.shape(Dataset)[0]
     library_sum = np.log(np.sum(Dataset, axis=1))
@@ -317,11 +314,6 @@ class SAINTRandomWalkSampler(SAINTSampler):
 #######################################################
 # For Celltypist Model
 #######################################################
-import logging
-
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-logger = logging.getLogger(__name__)
-_samples_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "samples")
 
 
 def get_sample_data_celltypist(filename: str) -> str:
