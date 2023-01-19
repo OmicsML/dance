@@ -17,6 +17,9 @@ if __name__ == "__main__":
     parser.add_argument("--lambd", type=float, default=0.01, help="Regularization parameter")
     parser.add_argument("--learning_rate", type=float, default=0.01, help="Learning rate")
     parser.add_argument("--num_epochs", type=int, default=50, help="Number of epochs")
+    parser.add_argument(
+        "--normalize", action="store_true", help="Whether to perform the normalization described in ACTINN. "
+        "Disabled by default since the scDeepSort data is already normalized")
     parser.add_argument("--print_cost", action="store_true", help="Print cost when training")
     parser.add_argument("--runs", type=int, default=10, help="Number of repetitions")
     parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
@@ -28,7 +31,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_dir", default="train")
     args = parser.parse_args()
 
-    dataloader = CellTypeDataset(data_type="svm", train_dataset=args.train_dataset, test_dataset=args.test_dataset,
+    dataloader = CellTypeDataset(data_type="actinn", train_dataset=args.train_dataset, test_dataset=args.test_dataset,
                                  species=args.species, tissue=args.tissue)
 
     adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
@@ -36,11 +39,12 @@ if __name__ == "__main__":
     data = Data(adata, train_size=train_size)
     data.set_config(label_channel="cell_type")
 
-    AnnDataTransform(sc.pp.normalize_total, target_sum=1e4)(data)
-    AnnDataTransform(sc.pp.log1p)(data)
-    FilterGenesPercentile(min_val=1, max_val=99, log_level="INFO")(data)
-    AnnDataTransform(sc.pp.scale)(data)
-    FilterGenesPercentile(min_val=1, max_val=99, log_level="INFO")(data)
+    if args.normalize:  # disabled by default because data from scDeepSort is already processed
+        AnnDataTransform(sc.pp.filter_genes, min_counts=1)(data)
+        AnnDataTransform(sc.pp.normalize_total, target_sum=1e4)(data)
+        AnnDataTransform(sc.pp.log1p, base=2)(data)
+        FilterGenesPercentile(min_val=1, max_val=99, mode="sum", log_level="INFO")(data)
+        FilterGenesPercentile(min_val=1, max_val=99, mode="cv", log_level="INFO")(data)
 
     model = ACTINN(input_dim=data.num_features, output_dim=len(idx_to_label), hidden_dims=args.hidden_dims,
                    lr=args.learning_rate, device=args.device, num_epochs=args.num_epochs, batch_size=args.batch_size,
