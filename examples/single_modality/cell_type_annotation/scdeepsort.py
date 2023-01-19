@@ -54,7 +54,7 @@ if __name__ == "__main__":
     y_test = data.get_y(split_name="test", return_type="torch")
     num_labels = y_test.shape[1]
 
-    # TODO: make api for the following blcok?
+    # TODO: make api for the following block?
     g = data.data.uns["CellFeatureGraph"]
     num_genes = data.num_features
     gene_ids = torch.arange(num_genes)

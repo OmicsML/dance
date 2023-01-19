@@ -773,211 +773,8 @@ def SGDClassifier_celltypist(indata, labels, alpha, max_iter, n_jobs, mini_batch
 
 
 #######################################################
-#For singlecellnet
+# For singlecellnet
 #######################################################
-
-
-def ctMerge(sampTab, annCol, ctVect, newName):
-    oldRows = np.isin(sampTab[annCol], ctVect)
-    newSampTab = sampTab.copy()
-    newSampTab.loc[oldRows, annCol] = newName
-    return newSampTab
-
-
-def ctRename(sampTab, annCol, oldName, newName):
-    oldRows = sampTab[annCol] == oldName
-    newSampTab = sampTab.copy()
-    newSampTab.loc[oldRows, annCol] = newName
-    return newSampTab
-
-
-def splitCommonAnnData(adata, ncells, dLevel="cell_ontology_class", cellid=None, cells_reserved=3):
-    if cellid == None:
-        adata.obs[cellid] = adata.obs.index
-    cts = set(adata.obs[dLevel])
-
-    trainingids = np.empty(0)
-    for ct in cts:
-        print(ct, ": ")
-        aX = adata[adata.obs[dLevel] == ct, :]
-        ccount = aX.n_obs - cells_reserved
-        ccount = min([ccount, ncells])
-        print(aX.n_obs)
-        trainingids = np.append(trainingids, np.random.choice(aX.obs[cellid].values, ccount, replace=False))
-
-    val_ids = np.setdiff1d(adata.obs[cellid].values, trainingids, assume_unique=True)
-    aTrain = adata[np.isin(adata.obs[cellid], trainingids, assume_unique=True), :]
-    aTest = adata[np.isin(adata.obs[cellid], val_ids, assume_unique=True), :]
-    return ([aTrain, aTest])
-
-
-def splitCommon(expData, ncells, sampTab, dLevel="cell_ontology_class", cells_reserved=3):
-    cts = set(sampTab[dLevel])
-    trainingids = np.empty(0)
-    for ct in cts:
-        aX = expData.loc[sampTab[dLevel] == ct, :]
-        print(ct, ": ")
-        ccount = len(aX.index) - cells_reserved
-        ccount = min([ccount, ncells])
-        print(ccount)
-        trainingids = np.append(trainingids, np.random.choice(aX.index.values, ccount, replace=False))
-    val_ids = np.setdiff1d(sampTab.index, trainingids, assume_unique=True)
-    aTrain = expData.loc[np.isin(sampTab.index.values, trainingids, assume_unique=True), :]
-    aTest = expData.loc[np.isin(sampTab.index.values, val_ids, assume_unique=True), :]
-    return ([aTrain, aTest])
-
-
-def annSetUp(species="mmusculus"):
-    annot = sc.queries.biomart_annotations(
-        species,
-        ["external_gene_name", "go_id"],
-    )
-    return annot
-
-
-def getGenesFromGO(GOID, annList):
-    if (str(type(GOID)) != "<class 'str'>"):
-        return annList.loc[annList.go_id.isin(GOID), :].external_gene_name.sort_values().to_numpy()
-    else:
-        return annList.loc[annList.go_id == GOID, :].external_gene_name.sort_values().to_numpy()
-
-
-def dumbfunc(aNamedList):
-    return aNamedList.index.values
-
-
-def GEP_makeMean(expDat, groupings, type='mean'):
-    if (type == "mean"):
-        return expDat.groupby(groupings).mean()
-    if (type == "median"):
-        return expDat.groupby(groupings).median()
-
-
-def utils_myDist(expData):
-    numSamps = len(expData.index)
-    result = np.subtract(np.ones([numSamps, numSamps]), expData.T.corr())
-    del result.index.name
-    del result.columns.name
-    return result
-
-
-def utils_stripwhite(string):
-    return string.strip()
-
-
-def utils_myDate():
-    d = datetime.datetime.today()
-    return d.strftime("%b_%d_%Y")
-
-
-def utils_strip_fname(string):
-    sp = string.split("/")
-    return sp[len(sp) - 1]
-
-
-def utils_stderr(x):
-    return (stats.sem(x))
-
-
-def zscore(x, meanVal, sdVal):
-    return np.subtract(x, meanVal) / sdVal
-
-
-def zscoreVect(genes, expDat, tVals, ctt, cttVec):
-    res = {}
-    x = expDat.loc[cttVec == ctt, :]
-    for gene in genes:
-        xvals = x[gene]
-        res[gene] = pd.series(data=zscore(xvals, tVals[ctt]['mean'][gene], tVals[ctt]['sd'][gene]),
-                              index=xvals.index.values)
-    return res
-
-
-def downSampleW(vector, total=1e5, dThresh=0):
-    vSum = np.sum(vector)
-    dVector = total / vSum
-    res = dVector * vector
-    res[res < dThresh] = 0
-    return res
-
-
-def weighted_down(expDat, total, dThresh=0):
-    rSums = expDat.sum(axis=1)
-    dVector = np.divide(total, rSums)
-    res = expDat.mul(dVector, axis=0)
-    res[res < dThresh] = 0
-    return res
-
-
-def trans_prop(expDat, total, dThresh=0):
-    rSums = expDat.sum(axis=1)
-    dVector = np.divide(total, rSums)
-    res = expDat.mul(dVector, axis=0)
-    res[res < dThresh] = 0
-    return np.log(res + 1)
-
-
-def trans_zscore_col(expDat):
-    return expDat.apply(stats.zscore, axis=0)
-
-
-def trans_zscore_row(expDat):
-    return expDat.T.apply(stats.zscore, axis=0).T
-
-
-def trans_binarize(expData, threshold=1):
-    expData[expData < threshold] = 0
-    expData[expData > 0] = 1
-    return expData
-
-
-def getUniqueGenes(genes, transID='id', geneID='symbol'):
-    genes2 = genes.copy()
-    genes2.index = genes2[transID]
-    genes2.drop_duplicates(subset=geneID, inplace=True, keep="first")
-    del genes2.index.name
-    return genes2
-
-
-def removeRed(expData, genes, transID="id", geneID="symbol"):
-    genes2 = getUniqueGenes(genes, transID, geneID)
-    return expData.loc[:, genes2.index.values]
-
-
-def cn_correctZmat_col(zmat):
-
-    def myfuncInf(vector):
-        mx = np.max(vector[vector < np.inf])
-        mn = np.min(vector[vector > (np.inf * -1)])
-        res = vector.copy()
-        res[res > mx] = mx
-        res[res < mn] = mn
-        return res
-
-    return zmat.apply(myfuncInf, axis=0)
-
-
-def cn_correctZmat_row(zmat):
-
-    def myfuncInf(vector):
-        mx = np.max(vector[vector < np.inf])
-        mn = np.min(vector[vector > (np.inf * -1)])
-        res = vector.copy()
-        res[res > mx] = mx
-        res[res < mn] = mn
-        return res
-
-    return zmat.apply(myfuncInf, axis=1)
-
-
-def makeExpMat(adata):
-    expMat = pd.DataFrame(adata.X, index=adata.obs_names, columns=adata.var_names)
-    return expMat
-
-
-def makeSampTab(adata):
-    sampTab = adata.obs
-    return sampTab
 
 
 def sc_statTab(expDat, dThresh=0):
@@ -1019,10 +816,6 @@ def sc_compMu(
     return expDat.apply(singleGene, axis=0, args=(threshold, )).fillna(0)
 
 
-def repNA(df):
-    return df.fillna(0)
-
-
 def sc_fano(vector):
     return np.true_divide(np.var(vector), np.mean(vector))
 
@@ -1036,41 +829,6 @@ def sc_filterGenes(geneStats, alpha1=0.1, alpha2=0.01, mu=2):
                                                                             geneStats.mu > mu))].index.values
 
 
-def sc_filterCells(sampTab, minVal=1e3, maxValQuant=0.95):
-    q = np.quantile(sampTab.umis, maxValQuant)
-    return sampTab[np.logical_and(sampTab.umis > minVal, sampTab.umis < q)].index.values
-
-
-def sc_findEnr(expDat, sampTab, dLevel="group"):
-    summ = expDat.groupby(sampTab[dLevel]).median()
-    dict = {}
-    for n in range(0, summ.index.size):
-        temp = np.subtract(summ.iloc[n, :], summ.drop(index=summ.index.values[n]).apply(np.median, axis=0))
-        dict[summ.index.values[n]] = summ.columns.values[np.argsort(-1 * temp)].tolist()
-    return dict
-
-
-def enrDiff(expDat, sampTab, dLevel="group"):
-    groups = np.unique(sampTab[dLevel])
-    summ = expDat.groupby(sampTab[dLevel]).median()
-    ref = summ.copy()
-    for n in range(0, ref.index.size):
-        summ.iloc[n, :] = np.subtract(summ.iloc[n, :], ref.drop(index=ref.index.values[n]).apply(np.median, axis=0))
-    return summ
-
-
-def binGenesAlpha(geneStats, nbins=20):
-    max = np.max(geneStats['alpha'])
-    min = np.min(geneStats['alpha'])
-    rrange = max - min
-    inc = rrange / nbins
-    threshs = np.arange(max, min, -1 * inc)
-    res = pd.DataFrame(index=geneStats.index.values, data=np.arange(0, geneStats.index.size, 1), columns=["bin"])
-    for i in range(0, len(threshs)):
-        res.loc[geneStats["alpha"] <= threshs[i], 0] = len(threshs) - i
-    return res
-
-
 def binGenes(geneStats, nbins=20, meanType="overall_mean"):
     max = np.max(geneStats[meanType])
     min = np.min(geneStats[meanType])
@@ -1081,24 +839,6 @@ def binGenes(geneStats, nbins=20, meanType="overall_mean"):
     for i in range(0, len(threshs)):
         res.loc[geneStats[meanType] <= threshs[i], "bin"] = len(threshs) - i
     return res
-
-
-def findVarGenes(geneStats, zThresh=2, meanType="overall_mean"):
-    zscs = pd.DataFrame(index=geneStats.index.values, data=np.zeros([geneStats.index.size, 3]),
-                        columns=["alpha", meanType, "mu"])
-    mTypes = ["alpha", meanType, "mu"]
-    scaleVar = ["fano", "fano", "cov"]
-    for i in range(0, 3):
-        sg = binGenes(geneStats, meanType=mTypes[i])
-        bbins = np.unique(sg["bin"])
-        for b in bbins:
-            if (np.unique(geneStats.loc[sg.bin == b, scaleVar[i]]).size > 1):
-                tmpZ = stats.zscore(geneStats.loc[sg.bin == b, scaleVar[i]])
-            else:
-                tmpZ = np.zeros(geneStats.loc[sg.bin == b, scaleVar[i]].index.size).T
-            zscs.loc[sg.bin == b, mTypes[i]] = tmpZ
-    return (zscs.loc[np.logical_and(zscs.iloc[:, 0] > zThresh,
-                                    np.logical_and(zscs.iloc[:, 1] > zThresh, zscs.iloc[:, 2] > zThresh))].index.values)
 
 
 def sc_sampR_to_pattern(sampR):
@@ -1138,82 +878,8 @@ def sc_testPattern(pattern, expDat):
     return res
 
 
-def par_findSpecGenes(expDat, sampTab, dLevel="group", minSet=True):
-    if minSet:
-        samps = minTab(sampTab, dLevel)
-    else:
-        samps = sampTab.copy()
-    pats = sc_sampR_to_pattern(samps[dLevel])
-    exps = expDat.loc[samps.index, :]
-    res = {}
-    levels = list(pats.keys())
-    for i in range(0, len(levels)):
-        res[levels[i]] = sc_testPattern(pats[levels[i]], exps)
-    return res
-
-
 def getTopGenes(xDat, topN=3):
     return xDat.sort_values(by='cval', ascending=False).index.values[0:topN]
-
-
-def getSpecGenes(xDatList, topN=50):
-    groups = list(xDatList.keys())
-    allG = []
-    for i in range(0, len(groups)):
-        topNs = getTopGenes(xDatList[groups[i]], topN)
-        allG.append(topNs)
-    allG = np.array(allG).reshape(-1, 1)
-    u, c = np.unique(allG, return_counts=True)
-    u[c > 1] = np.nan
-    allG[~np.isin(allG, u)] = np.nan
-    specGenes = allG.reshape(len(groups), topN)
-    res = {}
-    for i in range(0, len(specGenes)):
-        res[groups[i]] = specGenes[i, ~pd.isnull(specGenes[i])].tolist()
-    return res
-
-
-def getTopGenesList(xDatList, topN=50):
-    groups = list(xDatList.keys())
-    temp = []
-    for i in range(0, len(groups)):
-        topNs = getTopGenes(xDatList[groups[i]], topN)
-        res = ", ".join(topNs)
-        temp.append(res)
-    res = {}
-    for i in range(0, len(groups)):
-        res[groups[i]] = temp[i]
-    return res
-
-
-def csRenameOrth(adQuery, adTrain, orthTable, speciesQuery='human', speciesTrain='mouse'):
-    _, _, cgenes = np.intersect1d(adQuery.var_names.values, orthTable[speciesQuery], return_indices=True)
-    _, _, ccgenes = np.intersect1d(adTrain.var_names.values, orthTable[speciesTrain], return_indices=True)
-    temp1 = np.zeros(len(orthTable.index.values), dtype=bool)
-    temp2 = np.zeros(len(orthTable.index.values), dtype=bool)
-    temp1[cgenes] = True
-    temp2[ccgenes] = True
-    common = np.logical_and(temp1, temp2)
-    oTab = orthTable.loc[common.T, :]
-    adT = adTrain[:, oTab[speciesTrain]]
-    adQ = adQuery[:, oTab[speciesQuery]]
-    adQ.var_names = adT.var_names
-    return [adQ, adT]
-
-
-def csRenameOrth2(expQuery, expTrain, orthTable, speciesQuery='human', speciesTrain='mouse'):
-    _, _, cgenes = np.intersect1d(expQuery.columns.values, orthTable[speciesQuery], return_indices=True)
-    _, _, ccgenes = np.intersect1d(expTrain.columns.values, orthTable[speciesTrain], return_indices=True)
-    temp1 = np.zeros(len(orthTable.index.values), dtype=bool)
-    temp2 = np.zeros(len(orthTable.index.values), dtype=bool)
-    temp1[cgenes] = True
-    temp2[ccgenes] = True
-    common = np.logical_and(temp1, temp2)
-    oTab = orthTable.loc[common.T, :]
-    expT = expTrain.loc[:, oTab[speciesTrain]]
-    expQ = expQuery.loc[:, oTab[speciesQuery]]
-    expQ.columns = expT.columns
-    return [expQ, expT]
 
 
 def makePairTab(genes):
@@ -1241,19 +907,6 @@ def getClassGenes(diffRes, topX=25, bottom=True):
     if bottom:
         l = len(sortRes) - topX
         ans = np.append(ans, sortRes.index.values[l:]).flatten()
-    return ans
-
-
-def addRandToSampTab(classRes, sampTab, desc, id="cell_name"):
-    cNames = classRes.index.values
-    snames = sampTab.index.values
-    rnames = np.setdiff1d(cNames, snames)
-    stNew = pd.DataFrame()
-    stNew["rid"] = rnames
-    stNew["rdesc"] = "rand"
-    stTop = sampTab[[id, desc]]
-    stNew.columns = [id, desc]
-    ans = stTop.append(stNew)
     return ans
 
 
@@ -1318,36 +971,6 @@ def query_transform(expMat, genePairs):
     ans = boolArray.astype(int)
     ans.columns = genePairs
     return (ans)
-
-
-def pair_transform(expMat):
-    pTab = makePairTab(expMat)
-    npairs = len(pTab.index)
-    ans = pd.DataFrame(0, index=expMat.index, columns=np.arange(npairs))
-    genes1 = pTab['genes1'].values
-    genes2 = pTab['genes2'].values
-    expTemp = expMat.loc[:, np.unique(np.concatenate([genes1, genes2]))]
-    ans = pd.DataFrame(0, index=expTemp.index, columns=np.arange(npairs))
-    ans = ans.astype(pd.SparseDtype("int", 0))
-    temp1 = expTemp.loc[:, genes1]
-    temp2 = expTemp.loc[:, genes2]
-    temp1.columns = np.arange(npairs)
-    temp2.columns = np.arange(npairs)
-    boolArray = temp1 > temp2
-    ans = boolArray.astype(int)
-    ans.columns = genePairs
-    return (ans)
-
-
-def gnrBP(expDat, cellLabels, topX=50):
-    myPatternG = sc_sampR_to_pattern(cellLabels)
-    levels = list(myPatternG.keys())
-    ans = {}
-    for i in range(0, len(levels)):
-        xres = sc_testPattern(myPatternG[levels[i]], expDat)
-        tmpAns = findBestPairs(xres, topX)
-        ans[levels[i]] = tmpAns
-    return ans
 
 
 def ptGetTop(expDat, cell_labels, cgenes_list=None, topX=50, sliceSize=5000, quickPairs=True):
