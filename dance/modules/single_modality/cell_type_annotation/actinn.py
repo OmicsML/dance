@@ -113,9 +113,6 @@ class ACTINN(nn.Module):
         for i in range(0, len(self.model), 2):  # TODO: replace with weight_decay
             loss += self.lambd * torch.sum(self.model[i].weight**2) / 2
 
-        if self.print_cost:
-            print(loss)
-
         return loss
 
     def random_batches(self, x, y, batch_size=32, seed=None):
@@ -165,13 +162,19 @@ class ACTINN(nn.Module):
             epoch_seed = seed if seed is None else seed + epoch
             batches = self.random_batches(x_train, y_train, self.batch_size, epoch_seed)
 
+            tot_cost = tot_size = 0
             for batch_x, batch_y in batches:
                 batch_cost = self.compute_loss(self.forward(batch_x), batch_y)
+                tot_cost += batch_cost.item()
+                tot_size += 1
 
                 optimizer.zero_grad()
                 batch_cost.backward()
                 optimizer.step()
                 lr_scheduler.step()
+
+            if (epoch % 10 == 0) and self.print_cost:
+                print(f"Epoch: {epoch:>4d} Loss: {tot_cost / tot_size:6.4f}")
 
         print("Parameters have been trained!")
 
