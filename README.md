@@ -223,7 +223,7 @@ Note: the data split modality of DeepImpute is different from ScGNN and GraphSCI
 | scDeepsort    | ACC               | 0.363/0.363                         | 0.965 /0.965                         | 0.901/0.911                         |
 | Celltypist\*  | ACC               | 0.680/0.666                         | 0.966/0.848                          | 0.879/0.832                         |
 | singleCellNet | ACC               | 0.693/0.803                         | 0.975/0.975                          | 0.795/0.842                         |
-| ACTINN        | ACC               | 0.860/0.778                         | 0.516/0.236                          | 0.829/0.798                         |
+| ACTINN        | ACC               | 0.727/0.778                         | 0.657/0.236                          | 0.762/0.798                         |
 | SVM           | ACC               | 0.683/0.683                         | 0.056/0.049                          | 0.704/0.695                         |
 
 Note: * Benchmark datasets were renormalied before running the original implementation of Celltypist to match its form requirements.
