@@ -400,7 +400,7 @@ class CellTypeDataset():
         map_dict = collections.defaultdict(set)
         for _, row in map_df.iterrows():
             if row["Tissue"] == tissue:
-                map_dict[row["Celltype"]].add("Training dataset cell type")
+                map_dict[row["Celltype"]].add(row["Training dataset cell type"])
         return dict(map_dict)
 
 
