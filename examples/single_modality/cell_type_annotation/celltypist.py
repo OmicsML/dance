@@ -7,21 +7,21 @@ from dance.utils.preprocess import cell_label_to_df
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--random_seed", type=int, default=10)
-    parser.add_argument("--train_dataset", type=int, nargs="+", default=[4682], help="List of training dataset ids.")
-    parser.add_argument("--test_dataset", type=int, nargs="+", default=[203], help="List testing training dataset ids.")
-    parser.add_argument("--cell_type_train", type=str, help="name for the cell type information for training data",
-                        default="Cell_type")
     parser.add_argument("--cell_type_test", type=str, help="name for the cell type information for test data",
                         default="Cell_type")
-    parser.add_argument("--check_expression", type=bool,
-                        help="whether to check the normalization of training and test data", default=False)
-    parser.add_argument("--species", default="mouse", type=str)
-    parser.add_argument("--tissue", default="Kidney", type=str)
-    parser.add_argument("--n_jobs", type=int, help="Number of jobs", default=10)
+    parser.add_argument("--cell_type_train", type=str, help="name for the cell type information for training data",
+                        default="Cell_type")
+    parser.add_argument("--check_expression", action="store_true",
+                        help="whether to check the normalization of training and test data")
     parser.add_argument("--max_iter", type=int, help="Max iteration during training", default=5)
-    parser.add_argument("--use_SGD", type=bool,
-                        help="Training algorithm -- weather it will be stochastic gradient descent", default=True)
+    parser.add_argument("--n_jobs", type=int, help="Number of jobs", default=10)
+    parser.add_argument("--random_seed", type=int, default=10)
+    parser.add_argument("--species", default="mouse", type=str)
+    parser.add_argument("--test_dataset", type=int, nargs="+", default=[203], help="List testing training dataset ids.")
+    parser.add_argument("--tissue", default="Kidney", type=str)
+    parser.add_argument("--train_dataset", type=int, nargs="+", default=[4682], help="List of training dataset ids.")
+    parser.add_argument("--use_SGD", action="store_true",
+                        help="Training algorithm -- weather it will be stochastic gradient descent")
     args = parser.parse_args()
 
     dataloader = CellTypeDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset, species=args.species,
