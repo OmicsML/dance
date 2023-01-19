@@ -15,7 +15,7 @@ from torch.utils.data import Dataset
 
 from dance import logger
 from dance.data import download_file, download_unzip
-from dance.transforms.preprocess import get_map_dict, load_annotation_data, load_imputation_data_internal
+from dance.transforms.preprocess import load_imputation_data_internal
 from dance.typing import Dict, List, Optional, Set, Tuple
 
 
@@ -267,7 +267,7 @@ class CellTypeDataset():
                     self.download_benchmark_data()
                 assert self.is_complete()
 
-            return load_annotation_data(self.params)
+            return self._load_data()
 
         if self.data_type == "svm":
             if not self.is_complete():

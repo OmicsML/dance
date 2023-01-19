@@ -220,7 +220,7 @@ Note: the data split modality of DeepImpute is different from ScGNN and GraphSCI
 
 | Model         | Evaluation Metric | Mouse Brain 2695 (current/reported) | Mouse Spleen 1759 (current/reported) | Mouse Kidney 203 (current/reported) |
 | ------------- | ----------------- | ----------------------------------- | ------------------------------------ | ----------------------------------- |
-| scDeepsort    | ACC               | 0.363/0.363                         | 0.965 /0.965                         | 0.901/0.911                         |
+| scDeepsort    | ACC               | 0.542/0.363                         | 0.969/0.965                          | 0.847/0.911                         |
 | Celltypist\*  | ACC               | 0.680/0.666                         | 0.966/0.848                          | 0.879/0.832                         |
 | singleCellNet | ACC               | 0.693/0.803                         | 0.975/0.975                          | 0.795/0.842                         |
 | ACTINN        | ACC               | 0.727/0.778                         | 0.657/0.236                          | 0.762/0.798                         |
