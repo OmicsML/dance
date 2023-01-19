@@ -3,10 +3,12 @@ import argparse
 import numpy as np
 import scanpy as sc
 
+from dance import logger
 from dance.data import Data
 from dance.datasets.singlemodality import CellTypeDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.transforms import AnnDataTransform, FilterGenesPercentile
+from dance.typing import LOGLEVELS
 from dance.utils.preprocess import cell_label_to_df
 
 if __name__ == "__main__":
@@ -16,6 +18,7 @@ if __name__ == "__main__":
     parser.add_argument("--hidden_dims", nargs="+", type=int, default=[100, 50, 25], help="Hidden dimensions.")
     parser.add_argument("--lambd", type=float, default=0.01, help="Regularization parameter")
     parser.add_argument("--learning_rate", type=float, default=0.01, help="Learning rate")
+    parser.add_argument("--log_level", type=str, default="INFO", choices=LOGLEVELS)
     parser.add_argument("--num_epochs", type=int, default=50, help="Number of epochs")
     parser.add_argument(
         "--normalize", action="store_true", help="Whether to perform the normalization described in ACTINN. "
@@ -28,6 +31,8 @@ if __name__ == "__main__":
     parser.add_argument("--tissue", default="Testis")
     parser.add_argument("--train_dataset", nargs="+", default=[2216], help="List of training dataset ids.")
     args = parser.parse_args()
+
+    logger.setLevel(args.log_level)
 
     dataloader = CellTypeDataset(data_type="actinn", train_dataset=args.train_dataset, test_dataset=args.test_dataset,
                                  species=args.species, tissue=args.tissue)
