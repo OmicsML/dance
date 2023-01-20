@@ -91,14 +91,14 @@ if __name__ == "__main__":
     print(args)
 """Reproduction information
 10X PBMC:
-python sctag.py --pretrain_epochs 100 --data_file='10X_PBMC' --W_a=0.01 --W_x=3 --W_c=0.1 --dropout=0.5
+python sctag.py --pretrain_epochs 100 --data_file 10X_PBMC --W_a 0.01 --W_x 3 --W_c 0.1 --dropout 0.5
 
 Mouse ES:
-python sctag.py --pretrain_epochs 100 --data_file='mouse_ES_cell' --W_a=0.01 --W_x=0.75 --W_c=1
+python sctag.py --pretrain_epochs 100 --data_file mouse_ES_cell --W_a 0.01 --W_x 0.75 --W_c 1
 
 Worm Neuron:
-python sctag.py --data_file='worm_neuron_cell' --W_a=0.01 --W_x=2 --W_c=0.25 --k=1
+python sctag.py --data_file worm_neuron_cell --W_a 0.01 --W_x 2 --W_c 0.25 --k 1
 
 Mouse Bladder:
-python sctag.py --pretrain_epochs 100 --data_file='mouse_bladder_cell' --W_a=0.1 --W_x=2.5 --W_c=3
+python sctag.py --pretrain_epochs 100 --data_file mouse_bladder_cell --W_a 0.1 --W_x 2.5 --W_c 3
 """

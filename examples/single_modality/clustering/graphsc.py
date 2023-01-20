@@ -76,14 +76,14 @@ args = parser.parse_args()
 pipeline(**vars(args))
 """ Reproduction information
 10X PBMC:
-python graphsc.py --dataset='10X_PBMC'
+python graphsc.py --dataset 10X_PBMC
 
 Mouse ES:
-python graphsc.py --dataset='mouse_ES_cell'
+python graphsc.py --dataset mouse_ES_cell
 
 Worm Neuron:
-python graphsc.py --dataset='worm_neuron_cell'
+python graphsc.py --dataset worm_neuron_cell
 
 Mouse Bladder:
-python graphsc.py --dataset='mouse_bladder_cell'
+python graphsc.py --dataset mouse_bladder_cell
 """

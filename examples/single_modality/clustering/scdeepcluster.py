@@ -96,14 +96,14 @@ if __name__ == "__main__":
     print("ACC: {:.4f}, NMI: {:.4f}, ARI: {:.4f}".format(acc, nmi, ari))
 """ Reproduction information
 10X PBMC:
-python scdeepcluster.py --data_file='10X_PBMC'
+python scdeepcluster.py --data_file 10X_PBMC
 
 Mouse ES:
-python scdeepcluster.py --data_file='mouse_ES_cell'
+python scdeepcluster.py --data_file mouse_ES_cell
 
 Worm Neuron:
-python scdeepcluster.py --data_file='worm_neuron_cell' --pretrain_epochs 300
+python scdeepcluster.py --data_file worm_neuron_cell --pretrain_epochs 300
 
 Mouse Bladder:
-python scdeepcluster.py --data_file='mouse_bladder_cell' --pretrain_epochs 300 --sigma=2.75
+python scdeepcluster.py --data_file mouse_bladder_cell --pretrain_epochs 300 --sigma 2.75
 """

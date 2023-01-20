@@ -108,14 +108,14 @@ if __name__ == "__main__":
     print("ACC: {:.4f}, NMI: {:.4f}, ARI: {:.4f}".format(acc, nmi, ari))
 """Reproduction information
 10X PBMC:
-python scdsc.py --name='10X_PBMC' --method='cos' --topk=30 --v=7 --binary_crossentropy_loss=0.75 --ce_loss=0.5 --re_loss=0.1 --zinb_loss=2.5 --sigma=0.4
+python scdsc.py --name 10X_PBMC --method cos --topk 30 --v 7 --binary_crossentropy_loss 0.75 --ce_loss 0.5 --re_loss 0.1 --zinb_loss 2.5 --sigma 0.4
 
 Mouse Bladder:
-python scdsc.py --name='mouse_bladder_cell' --method='p' --topk=50 --v=7 --binary_crossentropy_loss=2.5 --ce_loss=0.1 --re_loss=0.5 --zinb_loss=1.5 --sigma=0.6
+python scdsc.py --name mouse_bladder_cell --method p --topk 50 --v 7 --binary_crossentropy_loss 2.5 --ce_loss 0.1 --re_loss 0.5 --zinb_loss 1.5 --sigma 0.6
 
 Mouse ES:
-python scdsc.py --name='mouse_ES_cell' --method='heat' --topk=50 --v=7 --binary_crossentropy_loss=0.1 --ce_loss=0.01 --re_loss=1.5 --zinb_loss=0.5 --sigma=0.1
+python scdsc.py --name mouse_ES_cell --method heat --topk 50 --v 7 --binary_crossentropy_loss 0.1 --ce_loss 0.01 --re_loss 1.5 --zinb_loss 0.5 --sigma 0.1
 
 Worm Neuron:
-python scdsc.py --name='worm_neuron_cell' --method='p' --topk=20 --v=7 --binary_crossentropy_loss=2 --ce_loss=2 --re_loss=3 --zinb_loss=0.1 --sigma=0.4
+python scdsc.py --name worm_neuron_cell --method p --topk 20 --v 7 --binary_crossentropy_loss 2 --ce_loss 2 --re_loss 3 --zinb_loss 0.1 --sigma 0.4
 """
