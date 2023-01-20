@@ -119,9 +119,11 @@ class Model():
             if self.description[x] != '':
                 base += f"\n    {x}: {self.description[x]}"
         if len(self.cell_types) == 2:
-            base += f"\n    cell types: {self.cell_types[0]}, {self.cell_types[1]}\n    features: {self.features[0]}, {self.features[1]}, ..., {self.features[-1]}"
+            base += f"\n    cell types: {self.cell_types[0]}, {self.cell_types[1]}"
+            base += f"\n    features: {self.features[0]}, {self.features[1]}, ..., {self.features[-1]}"
         else:
-            base += f"\n    cell types: {self.cell_types[0]}, {self.cell_types[1]}, ..., {self.cell_types[-1]}\n    features: {self.features[0]}, {self.features[1]}, ..., {self.features[-1]}"
+            base += f"\n    cell types: {self.cell_types[0]}, {self.cell_types[1]}, ..., {self.cell_types[-1]}"
+            base += "\n    features: {self.features[0]}, {self.features[1]}, ..., {self.features[-1]}"
         return base
 
     def predict_labels_and_prob(self, indata) -> tuple:
@@ -241,7 +243,7 @@ def get_all_models() -> list:
 def download_if_required() -> None:
     """Download models if there are none present in the `models` directory."""
     if len([m for m in os.listdir(models_path) if m.endswith(".pkl")]) == 0:
-        logger.info(f" No available models. Downloading...")
+        logger.info(" No available models. Downloading...")
         download_models()
 
 
@@ -315,7 +317,7 @@ def download_models(force_update: bool = False, model: Optional[Union[str, list,
         provided_no = len(model_list)
         filtered_no = len(models_json["models"])
         if filtered_no == 0:
-            raise ValueError(f" No models match the celltypist model repertoire. Please provide valid model names")
+            raise ValueError("No models match the celltypist model repertoire. Please provide valid model names")
         elif provided_no == filtered_no:
             logger.info(f" Total models to download: {provided_no}")
         else:
@@ -353,7 +355,7 @@ def models_description(on_the_fly: bool = False) -> pd.DataFrame:
         A :class:`~pandas.DataFrame` object with model descriptions.
 
     """
-    logger.info(f" Detailed model information can be found at `https://www.celltypist.org/models`")
+    logger.info("Detailed model information can be found at `https://www.celltypist.org/models`")
     if on_the_fly:
         filenames = get_all_models()
         descriptions = [Model.load(filename).description['details'] for filename in filenames]
@@ -382,11 +384,13 @@ class AnnotationResult():
     Attributes
     ----------
     predicted_labels
-        Predicted labels including the individual prediction results and (if majority voting is done) majority voting results.
+        Predicted labels including the individual prediction results and (if majority voting is done) majority voting
+        results.
     decision_matrix
         Decision matrix with the decision score of each cell belonging to a given cell type.
     probability_matrix
-        Probability matrix representing the probability each cell belongs to a given cell type (transformed from decision matrix by the sigmoid function).
+        Probability matrix representing the probability each cell belongs to a given cell type (transformed from
+        decision matrix by the sigmoid function).
     cell_count
         Number of input cells which undergo the prediction process.
     adata
@@ -407,8 +411,9 @@ class AnnotationResult():
 
         ----------
         by: str
-            Column name of :attr:`~celltypist.classifier.AnnotationResult.predicted_labels` specifying the prediction type which the summary is based on.
-            Set to `'majority_voting'` if you want to summarize for the majority voting classifier.
+            Column name of :attr:`~celltypist.classifier.AnnotationResult.predicted_labels` specifying the prediction
+            type which the summary is based on. Set to `'majority_voting'` if you want to summarize for the majority
+            voting classifier.
             (Default: `'predicted_labels'`)
 
         Returns
@@ -429,33 +434,34 @@ class AnnotationResult():
         Parameters
         ----------
         insert_labels: bool optional
-            Whether to insert the predicted cell type labels and (if majority voting is done) majority voting-based labels into the AnnData object.
-            (Default: `True`)
+            Whether to insert the predicted cell type labels and (if majority voting is done) majority voting-based
+            labels into the AnnData object. (Default: `True`)
         insert_conf: bool optional
-            Whether to insert the confidence scores into the AnnData object.
-            (Default: `True`)
+            Whether to insert the confidence scores into the AnnData object. (Default: `True`)
         insert_conf_by: str optional
-            Column name of :attr:`~celltypist.classifier.AnnotationResult.predicted_labels` specifying the prediction type which the confidence scores are based on.
-            Setting to `'majority_voting'` will insert the confidence scores corresponding to the majority-voting result.
+            Column name of :attr:`~celltypist.classifier.AnnotationResult.predicted_labels` specifying the prediction
+            type which the confidence scores are based on. Setting to `'majority_voting'` will insert the confidence
+            scores corresponding to the majority-voting result.
             (Default: `'predicted_labels'`)
         insert_decision: bool optional
-            Whether to insert the decision matrix into the AnnData object.
-            (Default: `False`)
+            Whether to insert the decision matrix into the AnnData object. (Default: `False`)
         insert_prob: bool optional
-            Whether to insert the probability matrix into the AnnData object. This will override the decision matrix even when `insert_decision` is set to `True`.
-            (Default: `False`)
+            Whether to insert the probability matrix into the AnnData object. This will override the decision matrix
+            even when `insert_decision` is set to `True`. (Default: `False`)
         prefix:  str optional
             Prefix for the inserted columns in the AnnData object. Default to no prefix used.
 
         Returns
         ----------
         :class:`~anndata.AnnData`
-            Depending on whether majority voting is done, an :class:`~anndata.AnnData` object with the following columns (prefixed with `prefix`) added to the observation metadata:
+            Depending on whether majority voting is done, an :class:`~anndata.AnnData` object with the following columns
+            (prefixed with `prefix`) added to the observation metadata:
             1) **predicted_labels**, individual prediction outcome for each cell.
             2) **over_clustering**, over-clustering result for the cells.
             3) **majority_voting**, the cell type label assigned to each cell after the majority voting process.
             4) **conf_score**, the confidence score of each cell.
-            5) **name of each cell type**, which represents the decision scores (or probabilities if `insert_prob` is `True`) of a given cell type across cells.
+            5) **name of each cell type**, which represents the decision scores (or probabilities if `insert_prob` is
+               `True`) of a given cell type across cells.
 
         """
         if insert_labels:
@@ -465,17 +471,16 @@ class AnnotationResult():
                 self.adata.obs[f"{prefix}conf_score"] = self.probability_matrix.max(axis=1).values
             elif insert_conf_by == 'majority_voting':
                 if insert_conf_by not in self.predicted_labels:
-                    raise KeyError(
-                        f" Did not find the column `majority_voting` in the `AnnotationResult.predicted_labels`, perform majority voting beforehand or use `insert_conf_by = 'predicted_labels'` instead"
-                    )
+                    raise KeyError(" Did not find the column `majority_voting` in the "
+                                   "`AnnotationResult.predicted_labels`, perform majority voting beforehand or use "
+                                   "`insert_conf_by = 'predicted_labels'` instead")
                 self.adata.obs[f"{prefix}conf_score"] = [
                     row[self.predicted_labels.majority_voting[index]]
                     for index, row in self.probability_matrix.iterrows()
                 ]
             else:
-                raise KeyError(
-                    f" Unrecognized `insert_conf_by` value ('{insert_conf_by}'), should be one of `'predicted_labels'` or `'majority_voting'`"
-                )
+                raise KeyError(f" Unrecognized `insert_conf_by` value ('{insert_conf_by}'), should be one of "
+                               "`'predicted_labels'` or `'majority_voting'`")
         if insert_prob:
             self.adata.obs[[f"{prefix}{x}" for x in self.probability_matrix.columns]] = self.probability_matrix
         elif insert_decision:
@@ -490,8 +495,8 @@ class AnnotationResult():
         folder: str
             Path to a folder which stores the output figures.
         plot_probability: bool optional
-            Whether to also plot the decision score and probability distributions of each cell type across the test cells.
-            If `True`, a number of figures will be generated (may take some time if the input data is large).
+            Whether to also plot the decision score and probability distributions of each cell type across the test
+            cells. If `True`, a number of figures will be generated (may take some time if the input data is large).
             (Default: `False`)
         format: str optional
             Format of output figures. Default to vector PDF files (note dots are still drawn with png backend).
@@ -502,11 +507,14 @@ class AnnotationResult():
         Returns
         ----------
         None
-            Depending on whether majority voting is done and `plot_probability`, multiple UMAP plots showing the prediction and majority voting results in the `folder`:
+            Depending on whether majority voting is done and `plot_probability`, multiple UMAP plots showing the
+            prediction and majority voting results in the `folder`:
             1) **predicted_labels**, individual prediction outcome for each cell overlaid onto the UMAP.
             2) **over_clustering**, over-clustering result of the cells overlaid onto the UMAP.
-            3) **majority_voting**, the cell type label assigned to each cell after the majority voting process overlaid onto the UMAP.
-            4) **name of each cell type**, which represents the decision scores and probabilities of a given cell type distributed across cells overlaid onto the UMAP.
+            3) **majority_voting**, the cell type label assigned to each cell after the majority voting process overlaid
+               onto the UMAP.
+            4) **name of each cell type**, which represents the decision scores and probabilities of a given cell type
+               distributed across cells overlaid onto the UMAP.
 
         """
         if not os.path.isdir(folder):
@@ -571,10 +579,14 @@ class AnnotationResult():
 
     def __repr__(self):
         base = f"CellTypist prediction result for {self.cell_count} query cells"
-        base += f"\n    predicted_labels: data frame with {self.predicted_labels.shape[1]} {'columns' if self.predicted_labels.shape[1] > 1 else 'column'} ({str(list(self.predicted_labels.columns))[1:-1]})"
-        base += f"\n    decision_matrix: data frame with {self.cell_count} query cells and {self.decision_matrix.shape[1]} cell types"
-        base += f"\n    probability_matrix: data frame with {self.cell_count} query cells and {self.probability_matrix.shape[1]} cell types"
-        base += f"\n    adata: AnnData object referred"
+        base += f"\n    predicted_labels: data frame with {self.predicted_labels.shape[1]} "
+        base += f"{'columns' if self.predicted_labels.shape[1] > 1 else 'column'} "
+        base += f"({str(list(self.predicted_labels.columns))[1:-1]})"
+        base += f"\n    decision_matrix: data frame with {self.cell_count} query cells and "
+        base += f"{self.decision_matrix.shape[1]} cell types"
+        base += f"\n    probability_matrix: data frame with {self.cell_count} query cells and "
+        base += f"{self.probability_matrix.shape[1]} cell types"
+        base += "\n    adata: AnnData object referred"
         return base
 
 
@@ -691,7 +703,8 @@ class Classifier():
         ----------
         resolution: float optional
             Resolution parameter for leiden clustering which controls the coarseness of the clustering.
-            Default to 5, 10, 15, 20, 25 and 30 for datasets with cell numbers less than 5k, 20k, 40k, 100k, 200k and above, respectively.
+            Default to 5, 10, 15, 20, 25 and 30 for datasets with cell numbers less than 5k, 20k, 40k, 100k, 200k and
+            above, respectively.
 
         Returns
         ----------
@@ -734,12 +747,13 @@ class Classifier():
         Parameters
         ----------
         predictions: AnnotationResult
-            An :class:`~celltypist.classifier.AnnotationResult` object containing the :attr:`~celltypist.classifier.AnnotationResult.predicted_labels`.
+            An :class:`~celltypist.classifier.AnnotationResult` object containing the
+            :attr:`~celltypist.classifier.AnnotationResult.predicted_labels`.
         over_clustering: Union[list, tuple, np.ndarray, pd.Series, pd.Index]
             A list, tuple, numpy array, pandas series or index containing the over-clustering information.
         min_prop: float
-            For the dominant cell type within a subcluster, the minimum proportion of cells required to support naming of the subcluster by this cell type.
-            (Default: 0)
+            For the dominant cell type within a subcluster, the minimum proportion of cells required to support naming
+            of the subcluster by this cell type. (Default: 0)
 
         Returns
         ----------
@@ -789,8 +803,8 @@ class Celltypist:
         ----------
         X: Path optional
             Path to the input count matrix (supported types are csv, txt, tsv, tab and mtx) or AnnData (h5ad).
-            Also accepts the input as an :class:`~anndata.AnnData` object, or any array-like objects already loaded in memory.
-            See `check_expression` for detailed format requirements.
+            Also accepts the input as an :class:`~anndata.AnnData` object, or any array-like objects already loaded in
+            memory. See `check_expression` for detailed format requirements.
             A cell-by-gene format is desirable (see `transpose_input` for more information).
         labels: Union[str, list, tuple, np.ndarray, pd.Series, pd.Index] optional
             Path to the file containing cell type label per line corresponding to the cells in `X`.
@@ -805,64 +819,57 @@ class Celltypist:
             (Default: `False`)
         check_expression: bool optional
             Check whether the expression matrix in the input data is supplied as required.
-            Except the case where a path to the raw count table file is specified, all other inputs for `X` should be in log1p normalized expression to 10000 counts per cell.
-            Set to `False` if you want to train the data regardless of the expression formats.
-            (Default: `True`)
+            Except the case where a path to the raw count table file is specified, all other inputs for `X` should be
+            in log1p normalized expression to 10000 counts per cell. Set to `False` if you want to train the data
+            regardless of the expression formats. (Default: `True`)
         C: float optional
-            Inverse of L2 regularization strength for traditional logistic classifier. A smaller value can possibly improve model generalization while at the cost of decreased accuracy.
-            This argument is ignored if SGD learning is enabled (`use_SGD = True`).
-            (Default: 1.0)
+            Inverse of L2 regularization strength for traditional logistic classifier. A smaller value can possibly
+            improve model generalization while at the cost of decreased accuracy. This argument is ignored if SGD
+            learning is enabled (`use_SGD = True`). (Default: 1.0)
         solver: str optional
-            Algorithm to use in the optimization problem for traditional logistic classifier.
-            The default behavior is to choose the solver according to the size of the input data.
-            This argument is ignored if SGD learning is enabled (`use_SGD = True`).
+            Algorithm to use in the optimization problem for traditional logistic classifier. The default behavior is
+            to choose the solver according to the size of the input data. This argument is ignored if SGD learning is
+            enabled (`use_SGD = True`).
         max_iter: int optional
             Maximum number of iterations before reaching the minimum of the cost function.
             Try to decrease `max_iter` if the cost function does not converge for a long time.
-            This argument is for both traditional and SGD logistic classifiers, and will be ignored if mini-batch SGD training is conducted (`use_SGD = True` and `mini_batch = True`).
-            (Default: 1000)
+            This argument is for both traditional and SGD logistic classifiers, and will be ignored if mini-batch SGD
+            training is conducted (`use_SGD = True` and `mini_batch = True`). (Default: 1000)
         n_jobs: int optional
             Number of CPUs used. Default to one CPU. `-1` means all CPUs are used.
             This argument is for both traditional and SGD logistic classifiers.
         use_SGD: bool optional
-            Whether to implement SGD learning for the logistic classifier.
-            (Default: `False`)
+            Whether to implement SGD learning for the logistic classifier. (Default: `False`)
         alpha: float optional
-            L2 regularization strength for SGD logistic classifier. A larger value can possibly improve model generalization while at the cost of decreased accuracy.
-            This argument is ignored if SGD learning is disabled (`use_SGD = False`).
-            (Default: 0.0001)
+            L2 regularization strength for SGD logistic classifier. A larger value can possibly improve model
+            generalization while at the cost of decreased accuracy. This argument is ignored if SGD learning is disabled
+            (`use_SGD = False`). (Default: 0.0001)
         mini_batch: bool optional
             Whether to implement mini-batch training for the SGD logistic classifier.
             Setting to `True` may improve the training efficiency for large datasets (for example, >100k cells).
-            This argument is ignored if SGD learning is disabled (`use_SGD = False`).
-            (Default: `False`)
+            This argument is ignored if SGD learning is disabled (`use_SGD = False`). (Default: `False`)
         batch_number: int optional
-            The number of batches used for training in each epoch. Each batch contains `batch_size` cells.
-            For datasets which cannot be binned into `batch_number` batches, all batches will be used.
-            This argument is relevant only if mini-batch SGD training is conducted (`use_SGD = True` and `mini_batch = True`).
-            (Default: 100)
+            The number of batches used for training in each epoch. Each batch contains `batch_size` cells. For datasets
+            which cannot be binned into `batch_number` batches, all batches will be used. This argument is relevant
+            only if mini-batch SGD training is conducted (`use_SGD = True` and `mini_batch = True`). (Default: 100)
         batch_size: int optional
-            The number of cells within each batch.
-            This argument is relevant only if mini-batch SGD training is conducted (`use_SGD = True` and `mini_batch = True`).
-            (Default: 1000)
+            The number of cells within each batch. This argument is relevant only if mini-batch SGD training is
+            conducted (`use_SGD = True` and `mini_batch = True`). (Default: 1000)
         epochs: int optional
-            The number of epochs for the mini-batch training procedure.
-            The default values of `batch_number`, `batch_size`, and `epochs` together allow observing ~10^6 training cells.
-            This argument is relevant only if mini-batch SGD training is conducted (`use_SGD = True` and `mini_batch = True`).
-            (Default: 10)
+            The number of epochs for the mini-batch training procedure. The default values of `batch_number`,
+            `batch_size`, and `epochs` together allow observing ~10^6 training cells. This argument is relevant only if
+            mini-batch SGD training is conducted (`use_SGD = True` and `mini_batch = True`). (Default: 10)
         balance_cell_type: bool optional
-            Whether to balance the cell type frequencies in mini-batches during each epoch.
-            Setting to `True` will sample rare cell types with a higher probability, ensuring close-to-even cell type distributions in mini-batches.
-            This argument is relevant only if mini-batch SGD training is conducted (`use_SGD = True` and `mini_batch = True`).
-            (Default: `False`)
+            Whether to balance the cell type frequencies in mini-batches during each epoch. Setting to `True` will
+            sample rare cell types with a higher probability, ensuring close-to-even cell type distributions in
+            mini-batches. This argument is relevant only if mini-batch SGD training is conducted (`use_SGD = True` and
+            `mini_batch = True`). (Default: `False`)
         feature_selection: bool optional
-            Whether to perform two-pass data training where the first round is used for selecting important features/genes using SGD learning.
-            If `True`, the training time will be longer.
-            (Default: `False`)
+            Whether to perform two-pass data training where the first round is used for selecting important
+            features/genes using SGD learning. If `True`, the training time will be longer. (Default: `False`)
         top_genes: int optional
             The number of top genes selected from each class/cell-type based on their absolute regression coefficients.
-            The final feature set is combined across all classes (i.e., union).
-            (Default: 300)
+            The final feature set is combined across all classes (i.e., union). (Default: 300)
         date: str optional
             Free text of the date of the model. Default to the time when the training is completed.
         details: str optional
@@ -874,7 +881,8 @@ class Celltypist:
         version: str optional
             Free text of the version of the model.
         **kwargs
-            Other keyword arguments passed to :class:`~sklearn.linear_model.LogisticRegression` (`use_SGD = False`) or :class:`~sklearn.linear_model.SGDClassifier` (`use_SGD = True`).
+            Other keyword arguments passed to :class:`~sklearn.linear_model.LogisticRegression` (`use_SGD = False`) or
+            :class:`~sklearn.linear_model.SGDClassifier` (`use_SGD = True`).
 
         Returns
         -------
@@ -967,14 +975,15 @@ class Celltypist:
             This argument can be provided in several ways:
             1) an input plain file with the over-clustering result of one cell per line.
             2) a string key specifying an existing metadata column in the AnnData (pre-created by the user).
-            3) a python list, tuple, numpy array, pandas series or index representing the over-clustering result of the input cells.
-            4) if none of the above is provided, will use a heuristic over-clustering approach according to the size of input data.
+            3) a python list, tuple, numpy array, pandas series or index representing the over-clustering result of the
+               input cells.
+            4) if none of the above is provided, will use a heuristic over-clustering approach according to the size of
+               input data.
             Ignored if `majority_voting` is set to `False`.
         min_prop: float optional
-            For the dominant cell type within a subcluster, the minimum proportion of cells required to support naming of the subcluster by this cell type.
-            Ignored if `majority_voting` is set to `False`.
-            Subcluster that fails to pass this proportion threshold will be assigned `'Heterogeneous'`.
-            (Default: 0)
+            For the dominant cell type within a subcluster, the minimum proportion of cells required to support naming
+            of the subcluster by this cell type. Ignored if `majority_voting` is set to `False`. Subcluster that fails
+            to pass this proportion threshold will be assigned `'Heterogeneous'`. (Default: 0)
 
         Returns
         ----------
