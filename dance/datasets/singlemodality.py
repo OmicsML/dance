@@ -147,21 +147,6 @@ class CellTypeDataset():
             download_unzip("https://www.dropbox.com/sh/s2cxcrzl2ama9zp/AACKwiYtS8hbOOudQLIMDvXUa?dl=1",
                            osp.join(self.data_dir, "pretrained"))
 
-    def download_example_data(self):
-        # download example data
-        os.system("wget https://www.dropbox.com/s/5lbdytwpip0kl58/example.zip?dl=0")
-        os.system(f"mv example.zip?dl=0 {self.data_dir}")
-        os.system(f"unzip {self.data_dir} /example.zip?dl=0")
-        os.system(f"mv {self.data_dir}/example/* {self.data_dir}")
-        os.system(f"rm {self.data_dir}/example.zip?dl=0")
-        os.system(f"rm -r {self.data_dir}/example")
-
-    def download_actinn_data(self):
-        """Download pretrained model and label maps."""
-        os.system("wget https://www.dropbox.com/s/me2zu2rok9twcjg/actinn_data.zip?dl=0")
-        os.system("unzip actinn_data.zip?dl=0")
-        os.system("rm actinn_data.zip?dl=0")
-
     def is_complete(self):
         """Check if data is complete."""
         check = [
@@ -211,41 +196,6 @@ class CellTypeDataset():
                 print(f"file {name} doesn't exist")
                 return False
         # TODO: check pretrained data
-        return True
-
-    def is_actinn_complete(self):
-        # check whether data is complete or not
-        check = ["test_data"]
-        for i in check:
-            if not os.path.exists(i):
-                print(f"file {i} doesn't exist")
-                return False
-        return True
-
-    def is_singlecellnet_complete(self):
-        # check whether data is complete or not
-        check = [
-            "Bladder",
-            "Fat",
-            "Heart",
-            "Kidney",
-            "L_Intestine",
-            "Lung",
-            "Mammary_Gland",
-            "Marrow",
-            "Pancreas",
-            "Skel_Muscle",
-            "Skin",
-            "Trachea",
-        ]
-        for i in check:
-            if i == "Lung":
-                file_i = "adLung_TabSen_100920.h5ad"
-            else:
-                file_i = "ad" + i + "_TabSen_101320.h5ad"
-            if not os.path.exists(file_i):
-                print(f"file {i} doesn't exist")
-                return False
         return True
 
     def load_data(self):
