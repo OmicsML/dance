@@ -8,7 +8,7 @@ from anndata import AnnData
 
 from dance.data import Data
 from dance.datasets.spatial import CellTypeDeconvoDatasetLite
-from dance.modules.spatial.cell_type_deconvo.dstg import DSTG
+from dance.modules.spatial.cell_type_deconvo import DSTG
 from dance.transforms.graph import DSTGraph
 from dance.transforms.preprocess import pseudo_spatial_process
 from dance.utils.matrix import normalize

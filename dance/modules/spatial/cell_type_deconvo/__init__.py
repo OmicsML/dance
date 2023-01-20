@@ -5,7 +5,7 @@ from .spotlight import SPOTlight
 
 __all__ = [
     "Card",
-    "DSTGLearner",
+    "DSTG",
     "SpatialDecon",
     "SPOTlight",
 ]
