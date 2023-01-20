@@ -1,17 +1,19 @@
 import numpy as np
 from pandas import DataFrame, Index
 
+from dance import logger
 from dance.typing import List, Optional, Sequence, Set, Union
 
 
-def cell_label_to_df(cell_labels: List[Union[str, Set[str]]], idx_to_label: List[str],
+def cell_label_to_df(cell_labels: List[Optional[Union[str, Set[str]]]], idx_to_label: List[str],
                      index: Optional[Union[Sequence[str], Index]] = None) -> DataFrame:
     """Convert cell labels into AnnData of label matrix.
 
     Parameters
     ----------
     cell_labels
-        List of str or set of str. Each corresponds to the relevant cell type(s) for that cell.
+        List of str or set of str (or `None` if the cell type information is not available or do not match the training
+        cell type data). Each corresponds to the relevant cell type(s) for that cell.
     idx_to_label
         List of cell type names, used to define the column orders in the label matrix.
     obs
@@ -19,8 +21,8 @@ def cell_label_to_df(cell_labels: List[Union[str, Set[str]]], idx_to_label: List
 
     Returns
     -------
-    y_adata
-        An AnnData object containing the label matrix, where each row represents a cell and each column represents a
+    ct_label_df
+        An pandas DataFrame containing the label matrix, where each row represents a cell and each column represents a
         cell type. An entry is marked as ones if the cell is related to that particular cell type, otherwise it is set
         to zero.
 
@@ -29,9 +31,22 @@ def cell_label_to_df(cell_labels: List[Union[str, Set[str]]], idx_to_label: List
     num_labels = len(idx_to_label)
     label_to_idx = {j: i for i, j in enumerate(idx_to_label)}
 
+    miss_counts = 0
     y = np.zeros((num_samples, num_labels), dtype=np.float32)
-    for i in range(num_samples):
-        for j in map(label_to_idx.get, cell_labels[i]):
+    for i, labels in enumerate(cell_labels):
+        if labels is None:
+            miss_counts += 1
+            logger.debug(f"Cell #{i} did not match any cell type in the training set.")
+            continue
+        elif isinstance(labels, str):
+            labels = [labels]
+
+        for j in map(label_to_idx.get, labels):
             y[i, j] = 1
 
-    return DataFrame(y, index=index, columns=idx_to_label)
+    ct_label_df = DataFrame(y, index=index, columns=idx_to_label)
+
+    if miss_counts > 0:
+        logger.warning(f"{miss_counts:,} cells (out of {num_samples:,}) did not match any training cell-types.")
+
+    return ct_label_df

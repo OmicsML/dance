@@ -1,6 +1,8 @@
+import collections
 import glob
 import os
 import os.path as osp
+import pprint
 import sys
 from dataclasses import dataclass
 
@@ -8,27 +10,23 @@ import anndata as ad
 import h5py
 import numpy as np
 import pandas as pd
-import scanpy as sc
 import torch
 from torch.utils.data import Dataset
 
+from dance import logger
 from dance.data import download_file, download_unzip
-from dance.transforms.preprocess import (get_map_dict, load_actinn_data, load_annotation_data,
-                                         load_imputation_data_internal, load_svm_data, splitCommonAnnData)
+from dance.transforms.preprocess import load_imputation_data_internal
+from dance.typing import Dict, List, Optional, Set, Tuple
 
 
 @dataclass
 class CellTypeDatasetParams:
     random_seed = None
-    dense_dim = None
     proj_path = None
     train_dataset = None
     test_dataset = None
     species = None
     tissue = None
-    score = None
-    gpu = None
-    evaluate = None
     train_dir = None
     test_dir = None
     statistics_path = None
@@ -36,32 +34,23 @@ class CellTypeDatasetParams:
     filetype = None
     threshold = None
     exclude_rate = None
-    test_rate = None
 
 
 class CellTypeDataset():
 
-    def __init__(self, data_type="scdeepsort", random_seed=10, proj_path="./", dense_dim=None, train_dataset=None,
-                 test_dataset=None, species=None, tissue=None, score=True, gpu=None, evaluate=None, train_dir=None,
-                 test_dir=None, statistics_path=None, map_path=None, filetype=None, threshold=None, exclude_rate=None,
-                 test_rate=None, data_dir="./", train_set=None, train_label=None, test_set=None, test_label=None,
-                 X_celltypist=None, labels_celltypist=None, genes_celltypist=None, transpose_input_celltypist=False,
-                 singlecellnet_type="Lung", svm_settings=None):
+    def __init__(self, download_all=False, proj_path="./", train_dataset=None, test_dataset=None, species=None,
+                 tissue=None, train_dir="train", test_dir="test", statistics_path=None, map_path="map", filetype="csv",
+                 threshold=None, exclude_rate=None, data_dir="./", train_set=None, train_label=None, test_set=None,
+                 test_label=None, X_celltypist=None, labels_celltypist=None, genes_celltypist=None,
+                 transpose_input_celltypist=False, singlecellnet_type="Lung", svm_settings=None):
         self.data_dir = data_dir
-        self.data_type = data_type
-        if data_type == "scdeepsort":
-            self.download_pretrained_data()
+        self.download_all = download_all
         self.params = CellTypeDatasetParams()
-        self.params.random_seed = random_seed
-        self.params.dense_dim = dense_dim
         self.params.proj_path = proj_path
         self.params.train_dataset = train_dataset
         self.params.test_dataset = test_dataset
         self.params.species = species
         self.params.tissue = tissue
-        self.params.score = score
-        self.params.gpu = gpu
-        self.params.evaluate = evaluate
         self.params.train_dir = train_dir
         self.params.test_dir = test_dir
         self.params.statistics_path = statistics_path
@@ -69,7 +58,6 @@ class CellTypeDataset():
         self.params.filetype = filetype
         self.params.threshold = threshold
         self.params.exclude_rate = exclude_rate
-        self.params.test_rate = test_rate
         self.train_set = train_set
         self.train_label = train_label
         self.test_set = test_set
@@ -123,33 +111,30 @@ class CellTypeDataset():
             return
 
         urls = {
-            "train_mouse_Brain753_celltype":
-            "https://www.dropbox.com/s/x2katwk93z06sgw/mouse_Brain753_celltype.csv?dl=1",
-            "train_mouse_Brain753_data": "https://www.dropbox.com/s/3f3wbplgo3xa4ww/mouse_Brain753_data.csv?dl=1",
-            "train_mouse_Brain3285_celltype":
-            "https://www.dropbox.com/s/ozsobozk3ihkrqg/mouse_Brain3285_celltype.csv?dl=1",
-            "train_mouse_Brain3285_data": "https://www.dropbox.com/s/zjrloejx8iqdqsa/mouse_Brain3285_data.csv?dl=1",
-            "train_mouse_Kidney4682_celltype":
-            "https://www.dropbox.com/s/3plrve7g9v428ec/mouse_Kidney4682_celltype.csv?dl=1",
-            "train_mouse_Kidney4682_data": "https://www.dropbox.com/s/olf5nirtieu1ikq/mouse_Kidney4682_data.csv?dl=1",
-            "train_mouse_Spleen1970_celltype":
-            "https://www.dropbox.com/s/3ea64vk546fjxvr/mouse_Spleen1970_celltype.csv?dl=1",
-            "train_mouse_Spleen1970_data": "https://www.dropbox.com/s/c4te0fr1qicqki8/mouse_Spleen1970_data.csv?dl=1",
-            "test_mouse_Brain2695_celltype":
-            "https://www.dropbox.com/s/gh72dk7i0p7fggu/mouse_Brain2695_celltype.csv?dl=1",
-            "test_mouse_Brain2695_data": "https://www.dropbox.com/s/ufianih66xjqxdu/mouse_Brain2695_data.csv?dl=1",
-            "test_mouse_Kidney203_celltype":
-            "https://www.dropbox.com/s/t4eyaig889qdiz2/mouse_Kidney203_celltype.csv?dl=1",
-            "test_mouse_Kidney203_data": "https://www.dropbox.com/s/kmos1ceubumgmpj/mouse_Kidney203_data.csv?dl=1",
-            "test_mouse_Spleen1759_celltype":
-            "https://www.dropbox.com/s/gczehvgai873mhb/mouse_Spleen1759_celltype.csv?dl=1",
-            "test_mouse_Spleen1759_data": "https://www.dropbox.com/s/fl8t7rbo5dmznvq/mouse_Spleen1759_data.csv?dl=1",
-        }
+            # Mouse spleen benchmark
+            "train_mouse_Spleen1970_celltype.csv":  "https://www.dropbox.com/s/3ea64vk546fjxvr?dl=1",
+            "train_mouse_Spleen1970_data.csv":      "https://www.dropbox.com/s/c4te0fr1qicqki8?dl=1",
+            "test_mouse_Spleen1759_celltype.csv":   "https://www.dropbox.com/s/gczehvgai873mhb?dl=1",
+            "test_mouse_Spleen1759_data.csv":       "https://www.dropbox.com/s/fl8t7rbo5dmznvq?dl=1",
+            # Mouse brain benchmark
+            "train_mouse_Brain753_celltype.csv":    "https://www.dropbox.com/s/x2katwk93z06sgw?dl=1",
+            "train_mouse_Brain753_data.csv":        "https://www.dropbox.com/s/3f3wbplgo3xa4ww?dl=1",
+            "train_mouse_Brain3285_celltype.csv":   "https://www.dropbox.com/s/ozsobozk3ihkrqg?dl=1",
+            "train_mouse_Brain3285_data.csv":       "https://www.dropbox.com/s/zjrloejx8iqdqsa?dl=1",
+            "test_mouse_Brain2695_celltype.csv":    "https://www.dropbox.com/s/gh72dk7i0p7fggu?dl=1",
+            "test_mouse_Brain2695_data.csv":        "https://www.dropbox.com/s/ufianih66xjqxdu?dl=1",
+            # Mouse kidney benchmark
+            "train_mouse_Kidney4682_celltype.csv":  "https://www.dropbox.com/s/3plrve7g9v428ec?dl=1",
+            "train_mouse_Kidney4682_data.csv":      "https://www.dropbox.com/s/olf5nirtieu1ikq?dl=1",
+            "test_mouse_Kidney203_celltype.csv":    "https://www.dropbox.com/s/t4eyaig889qdiz2?dl=1",
+            "test_mouse_Kidney203_data.csv":        "https://www.dropbox.com/s/kmos1ceubumgmpj?dl=1",
+        }  # yapf: disable
 
         # Download training and testing data
         for name, url in urls.items():
-            filename = url.split("/")[-1].split("?")[0]
-            filepath = osp.join(self.data_dir, *name.split("_")[:2], filename)
+            parts = name.split("_")  # [train|test]_{species}_{tissue}{id}_[celltype|data].csv
+            filename = "_".join(parts[1:])
+            filepath = osp.join(self.data_dir, *parts[:2], filename)
             download_file(url, filepath)
 
         if download_map:
@@ -170,13 +155,6 @@ class CellTypeDataset():
         os.system(f"mv {self.data_dir}/example/* {self.data_dir}")
         os.system(f"rm {self.data_dir}/example.zip?dl=0")
         os.system(f"rm -r {self.data_dir}/example")
-
-    def download_pretrained_data(self):
-        """Download pretrained model and label maps."""
-        os.system("wget https://www.dropbox.com/s/i5mufqwc1hy97m4/pretrained.zip?dl=0")
-        os.system(f"mv pretrained.zip?dl=0 {self.data_dir}")
-        os.system(f"unzip {self.data_dir}/pretrained.zip?dl=0")
-        os.system(f"rm {self.data_dir}/pretrained.zip?dl=0")
 
     def download_actinn_data(self):
         """Download pretrained model and label maps."""
@@ -271,68 +249,100 @@ class CellTypeDataset():
         return True
 
     def load_data(self):
-        # Load data from existing h5ad files, or download files and load data.
-        if self.data_type == "scdeepsort" or self.data_type == "scdeepsort_exp":
-            if not self.is_complete():
-                if self.data_type == "scdeepsort":
-                    self.download_all_data()
-                if self.data_type == "scdeepsort_exp":
-                    self.download_benchmark_data()
-                assert self.is_complete()
-
-            return load_annotation_data(self.params)
-
-        if self.data_type == "svm":
-            if self.is_complete():
-                pass
-            else:
-                if self.data_type == "svm":
-                    self.download_benchmark_data()
-                if self.data_type == "svm_exp":
-                    self.download_example_data()
-                assert self.is_complete()
-
-            return load_svm_data(self.params)
-
-        if self.data_type == "actinn":
+        # Load data from existing files, or download files and load data.
+        if self.download_all:
+            self.download_all_data()
+        elif not self.is_complete():
             self.download_benchmark_data()
-            return load_actinn_data(self.train_set, self.train_label, self.test_set, self.test_label)
+        return self._load_data()
 
-        if self.data_type in ["celltypist", "singlecellnet"]:
-            self.download_benchmark_data(download_pretrained=False)
-            map_dict = get_map_dict(self.params.map_path, self.params.tissue)  # load map
-            train_data = pd.read_csv(
-                osp.join(self.params.proj_path, self.params.train_dir, self.params.species,
-                         self.params.species + "_" + self.params.tissue + str(self.params.train_dataset) + "_data.csv"),
-                index_col=0)
-            train_celltype = pd.read_csv(
-                osp.join(
-                    self.params.proj_path, self.params.train_dir, self.params.species,
-                    self.params.species + "_" + self.params.tissue + str(self.params.train_dataset) + "_celltype.csv"),
-                index_col=1)
-            test_data = pd.read_csv(
-                osp.join(self.params.proj_path, self.params.test_dir, self.params.species,
-                         self.params.species + "_" + self.params.tissue + str(self.params.test_dataset) + "_data.csv"),
-                index_col=0)
-            test_celltype = pd.read_csv(
-                osp.join(
-                    self.params.proj_path, self.params.test_dir, self.params.species,
-                    self.params.species + "_" + self.params.tissue + str(self.params.test_dataset) + "_celltype.csv"),
-                index_col=1)
+    def _load_data(self, ct_col: str = "Cell_type"):
+        species = self.params.species
+        tissue = self.params.tissue
+        train_dataset_ids = self.params.train_dataset
+        test_dataset_ids = self.params.test_dataset
+        proj_path = self.params.proj_path
+        train_dir = osp.join(proj_path, self.params.train_dir)
+        test_dir = osp.join(proj_path, self.params.test_dir)
+        map_path = osp.join(proj_path, self.params.map_path, self.params.species)
 
-            train_size = train_data.shape[1]
-            df = pd.concat(train_data.T.align(test_data.T, axis=1, join="left", fill_value=0))
-            adata = ad.AnnData(df, dtype=np.float32)
-            adata.obs_names_make_unique()
+        # Load raw data
+        train_feat_paths, train_label_paths = self._get_data_paths(train_dir, species, tissue, train_dataset_ids)
+        test_feat_paths, test_label_paths = self._get_data_paths(test_dir, species, tissue, test_dataset_ids)
+        train_feat, test_feat = (self._load_dfs(paths, transpose=True) for paths in (train_feat_paths, test_feat_paths))
+        train_label, test_label = (self._load_dfs(paths) for paths in (train_label_paths, test_label_paths))
 
-            idx_to_label = sorted(train_celltype["Cell_type"].unique())
-            cell_labels = [{i} for i in train_celltype["Cell_type"].tolist()]
-            for i in test_celltype["Cell_type"].tolist():
-                cell_labels.append(map_dict[self.params.test_dataset][i])
+        # Combine features (only use features that are present in the training data)
+        train_size = train_feat.shape[0]
+        feat_df = pd.concat(train_feat.align(test_feat, axis=1, join="left", fill_value=0)).fillna(0)
+        adata = ad.AnnData(feat_df, dtype=np.float32)
 
-            return adata, cell_labels, idx_to_label, train_size
+        # Convert cell type labels and map test cell type names to train
+        cell_types = set(train_label[ct_col].unique())
+        idx_to_label = sorted(cell_types)
+        cell_type_mappings: Dict[str, Set[str]] = self.get_map_dict(map_path, tissue)
+        train_labels, test_labels = train_label[ct_col].tolist(), []
+        for i in test_label[ct_col]:
+            test_labels.append(i if i in cell_types else cell_type_mappings.get(i))
+        labels: List[Set[str]] = train_labels + test_labels
 
-        return self
+        logger.debug("Mapped test cell-types:")
+        for i, j, k in zip(test_label.index, test_label[ct_col], test_labels):
+            logger.debug(f"{i}:{j}\t-> {k}")
+
+        logger.info(f"Loaded expression data: {adata}")
+        logger.info(f"Number of training samples: {train_feat.shape[0]:,}")
+        logger.info(f"Number of testing samples: {test_feat.shape[0]:,}")
+        logger.info(f"Cell-types (n={len(idx_to_label)}):\n{pprint.pformat(idx_to_label)}")
+
+        return adata, labels, idx_to_label, train_size
+
+    @staticmethod
+    def _get_data_paths(data_dir: str, species: str, tissue: str, dataset_ids: List[str], *, filetype: str = "csv",
+                        feat_suffix: str = "data", label_suffix: str = "celltype") -> Tuple[List[str], List[str]]:
+        feat_paths, label_paths = [], []
+        for path_list, suffix in zip((feat_paths, label_paths), (feat_suffix, label_suffix)):
+            for i in dataset_ids:
+                path_list.append(osp.join(data_dir, species, f"{species}_{tissue}{i}_{suffix}.{filetype}"))
+        return feat_paths, label_paths
+
+    @staticmethod
+    def _load_dfs(paths: List[str], *, index_col: Optional[int] = 0, transpose: bool = False, **kwargs):
+        dfs = []
+        for path in paths:
+            logger.info(f"Loading data from {path}")
+            df = pd.read_csv(path, index_col=index_col, **kwargs)
+            # Labels: cell x cell-type; Data: feature x cell (need to transpose)
+            df = df.T if transpose else df
+            # Add dataset info to index
+            dataset_name = "_".join(osp.basename(path).split("_")[:-1])
+            df.index = dataset_name + "_" + df.index.astype(str)
+            dfs.append(df)
+        combined_df = pd.concat(dfs)
+        return combined_df
+
+    @staticmethod
+    def get_map_dict(map_file_path: str, tissue: str) -> Dict[str, Set[str]]:
+        """Load cell-type mappings.
+
+        Parameters
+        ----------
+        map_file_path
+            Path to the mapping file.
+        tissue
+            Tissue of interest.
+
+        Notes
+        -----
+        Merge mapping across all test sets for the required tissue.
+
+        """
+        map_df = pd.read_excel(osp.join(map_file_path, "map.xlsx"))
+        map_dict = collections.defaultdict(set)
+        for _, row in map_df.iterrows():
+            if row["Tissue"] == tissue:
+                map_dict[row["Celltype"]].add(row["Training dataset cell type"])
+        return dict(map_dict)
 
 
 class ClusteringDataset():
@@ -425,16 +435,8 @@ class ImputationDatasetParams:
 
 class ImputationDataset():
 
-    def __init__(
-            self,
-            random_seed=10,
-            gpu=-1,
-            # evaluate = None,
-            filetype=None,
-            data_dir="data",
-            train_dataset="human_stemcell",
-            test_dataset="pbmc",
-            min_counts=1):
+    def __init__(self, random_seed=10, gpu=-1, filetype=None, data_dir="data", train_dataset="human_stemcell",
+                 test_dataset="pbmc", min_counts=1):
         self.params = ImputationDatasetParams
         self.params.data_dir = data_dir
         self.params.random_seed = random_seed

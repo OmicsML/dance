@@ -1,14 +1,10 @@
-import collections
-import itertools
 import math
 import os
-import pprint
 import random
 import time
 import warnings
 from itertools import combinations
-from pathlib import Path
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import anndata
 import dgl
@@ -25,11 +21,10 @@ import sklearn.preprocessing
 import sklearn.utils.extmath
 import statsmodels.stats.multitest as smt
 import torch
-import torch.nn.functional as F
 from anndata import AnnData
 from dgl.sampling import pack_traces, random_walk
 from scipy import stats
-from scipy.sparse import csr_matrix, spmatrix
+from scipy.sparse import spmatrix
 from scipy.stats import expon
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.model_selection import train_test_split
@@ -58,7 +53,7 @@ def prefilter_cells(adata, min_counts=None, max_counts=None, min_genes=200, max_
     id_tmp = np.logical_and(id_tmp,
                             sc.pp.filter_cells(adata.X, max_counts=max_counts)[0]) if max_counts is not None else id_tmp
     adata._inplace_subset_obs(id_tmp)
-    adata.raw = sc.pp.log1p(adata, copy=True)  #check the rowname
+    adata.raw = sc.pp.log1p(adata, copy=True)  # check the rowname
     print("the var_names of adata.raw: adata.raw.var_names.is_unique=:", adata.raw.var_names.is_unique)
 
 
@@ -100,7 +95,7 @@ def log1p(adata):
 
 
 def calculate_log_library_size(Dataset):
-    ### Dataset is raw read counts, and should be cells * features
+    # Dataset is raw read counts, and should be cells * features
 
     Nsamples = np.shape(Dataset)[0]
     library_sum = np.log(np.sum(Dataset, axis=1))
@@ -316,486 +311,9 @@ class SAINTRandomWalkSampler(SAINTSampler):
         return sampled_nodes.numpy()
 
 
-#####################################
-# Cell Type Annotation for ScDeepSort
-#####################################
-
-
-def get_map_dict(map_path: Path, tissue):
-    map_df = pd.read_excel(os.path.join(map_path, 'map.xlsx'))
-
-    # {num: {test_cell1: {train_cell1, train_cell2}, {test_cell2:....}}, num_2:{}...}
-    map_dic = dict()
-    for idx, row in enumerate(map_df.itertuples()):
-        if getattr(row, 'Tissue') == tissue:
-            num = getattr(row, 'num')
-            test_celltype = getattr(row, 'Celltype')
-            train_celltype = getattr(row, '_5')
-            if map_dic.get(getattr(row, 'num')) is None:
-                map_dic[num] = dict()
-                map_dic[num][test_celltype] = set()
-            elif map_dic[num].get(test_celltype) is None:
-                map_dic[num][test_celltype] = set()
-            map_dic[num][test_celltype].add(train_celltype)
-    return map_dic
-
-
-def normalize_weight(graph: dgl.DGLGraph):
-    # normalize weight & add self-loop
-
-    in_degrees = graph.in_degrees()
-    print(in_degrees)
-    print(graph.number_of_nodes())
-    for i in range(graph.number_of_nodes()):
-        src, dst, in_edge_id = graph.in_edges(i, form='all')
-        if src.shape[0] == 0:
-            continue
-        edge_w = graph.edata['weight'][in_edge_id]
-        graph.edata['weight'][in_edge_id] = in_degrees[i] * edge_w / torch.sum(edge_w)
-
-
-def get_id_to_gene(gene_statistics_path):
-    id2gene = []
-    with open(gene_statistics_path, encoding='utf-8') as f:
-        for line in f:
-            id2gene.append(line.strip())
-    return id2gene
-
-
-def get_id_to_label(cell_statistics_path):
-    id2label = []
-    with open(cell_statistics_path, encoding='utf-8') as f:
-        for line in f:
-            id2label.append(line.strip())
-    return id2label
-
-
-def get_id_2_gene(species_data_path, species, tissue, filetype):
-    data_path = species_data_path
-    data_files = list(data_path.glob(f'{species}_{tissue}*_data.{filetype}'))
-    if len(data_files) < 1:
-        raise FileNotFoundError(f"Missing data files {data_path}/{species}_{tissue}*_data.{filetype}")
-
-    genes = set()
-    for file in data_files:
-        if filetype == 'csv':
-            data = pd.read_csv(file, dtype=np.str, header=0).values[:, 0]
-        else:
-            data = pd.read_csv(file, compression='gzip', header=0).values[:, 0]
-        genes = genes.union(set(data))
-    return sorted(genes)
-
-
-def get_id_2_label_and_label_statistics(species_data_path, species, tissue):
-    data_path = species_data_path
-    cell_files = data_path.glob(f'{species}_{tissue}*_celltype.csv')
-    cell_types = set()
-    cell_type_list = list()
-    for file in cell_files:
-        df = pd.read_csv(file, dtype=np.str, header=0)
-        df['Cell_type'] = df['Cell_type'].map(str.strip)
-        cell_types = set(df.values[:, 2]) | cell_types
-        cell_type_list.extend(df.values[:, 2].tolist())
-    id2label = list(cell_types)
-    label_statistics = dict(collections.Counter(cell_type_list))
-    return id2label, label_statistics
-
-
-def save_statistics(statistics_path, id2label, id2gene, tissue):
-    gene_path = statistics_path / f'{tissue}_genes.txt'
-    label_path = statistics_path / f'{tissue}_cell_type.txt'
-    with open(gene_path, 'w', encoding='utf-8') as f:
-        for gene in id2gene:
-            f.write(gene + '\r\n')
-    with open(label_path, 'w', encoding='utf-8') as f:
-        for label in id2label:
-            f.write(label + '\r\n')
-
-
-def load_annotation_data(params):
-    species = params.species
-    tissue = params.tissue
-    test = params.test_dataset
-
-    proj_path = Path(params.proj_path)
-    species_data_path = proj_path / "train" / species
-    statistics_path = proj_path / "pretrained" / species / "statistics"
-
-    map_path = proj_path / "map" / params.species
-    map_dict = get_map_dict(map_path, tissue)
-
-    if not species_data_path.exists():
-        raise NotImplementedError
-
-    # generate gene statistics file
-    id2gene = get_id_2_gene(species_data_path, species, tissue, filetype=params.filetype)
-    # generate cell label statistics file
-    id2label, label_statistics = get_id_2_label_and_label_statistics(species_data_path, species, tissue)
-    total_cell = sum(label_statistics.values())
-    for label, num in label_statistics.items():
-        if num / total_cell <= params.exclude_rate:
-            id2label.remove(label)  # remove exclusive labels
-    # prepare unified genes
-    gene2id = {gene: idx for idx, gene in enumerate(id2gene)}
-    num_genes = len(id2gene)
-    # prepare unified labels
-    num_labels = len(id2label)
-    label2id = {label: idx for idx, label in enumerate(id2label)}
-    save_statistics(statistics_path, id2label, id2gene, tissue)
-    print(f"Number of genes: {num_genes:,}, number of labels: {num_labels:,}")
-
-    all_labels = []
-    dfs = []
-    data_ids = []
-    train_size = 0
-
-    data_path = species_data_path
-    data_files = data_path.glob(f"*{params.species}_{tissue}*_data.{params.filetype}")
-    for data_file in data_files:
-        data_id = "".join(list(filter(str.isdigit, data_file.name)))
-        type_file = species_data_path / f"{params.species}_{tissue}{data_id}_celltype.csv"
-        data_ids.append(data_id)
-
-        # load celltype file then update labels accordingly
-        cell2type = pd.read_csv(type_file, index_col=0)
-        cell2type.columns = ["cell", "type"]
-        cell2type["type"] = cell2type["type"].map(str.strip)
-        cell2type["id"] = cell2type["type"].map(label2id)
-        # filter out cells not in label-text
-        filter_cell = np.where(~pd.isnull(cell2type["id"]))[0]
-        cell2type = cell2type.iloc[filter_cell]
-
-        assert not cell2type["id"].isnull().any(), "something wrong about celltype file."
-        all_labels += [{i} for i in cell2type["type"].tolist()]
-
-        if params.filetype not in ["csv", "gz"]:
-            print(f"Not supported type for {data_path}. Please verify your data file")
-            continue
-
-        # load data file then update graph
-        df = pd.read_csv(data_file, index_col=0).transpose(copy=True)  # (cell, gene)
-
-        # filter out cells not in label-text
-        df = df.iloc[filter_cell]
-        assert cell2type["cell"].tolist() == df.index.tolist()
-
-        # filter out useless columns if exists (when using gene intersection)
-        col = [c for c in df.columns if c in gene2id]
-        df = df[col]
-        dfs.append(df)
-        train_size += df.shape[0]
-
-        print(f"{params.species}_{tissue}{data_id}_data.{params.filetype} -> "
-              f"Nonzero Ratio: {df.fillna(0).astype(bool).sum().sum() / df.size * 100:.2f}%")
-
-    for data_id in test:
-        data_path = proj_path / params.test_dir / params.species / f"{params.species}_{tissue}{data_id}_data.{params.filetype}"
-        type_path = proj_path / params.test_dir / params.species / f"{params.species}_{tissue}{data_id}_celltype.csv"
-        data_ids.append(data_id)
-
-        # load celltype file then update labels accordingly
-        cell2type = pd.read_csv(type_path, index_col=0)
-        cell2type.columns = ["cell", "type"]
-        cell2type["type"] = cell2type["type"].map(str.strip)
-        all_labels += list(map(map_dict[data_id].get, cell2type["type"].tolist()))
-
-        if params.filetype not in ["csv", "gz"]:
-            print(f"Not supported type for {data_path}. Please verify your data file")
-            continue
-
-        df = pd.read_csv(data_path, index_col=0).transpose(copy=True)  # (cell, gene)
-        col = [c for c in df.columns if c in gene2id]
-        df = df[col]
-        dfs.append(df)
-
-        print(f"{params.species}_{tissue}{data_id}_data.{params.filetype} -> "
-              f"Nonzero Ratio: {df.fillna(0).astype(bool).sum().sum() / df.size * 100:.2f}%")
-
-    df_combined = pd.concat(dfs).fillna(0)
-    adata = anndata.AnnData(df_combined, dtype=np.float32)
-    adata.obs_names_make_unique()
-
-    data_ids_list = list(itertools.chain.from_iterable([i] * j.shape[0] for i, j in zip(data_ids, dfs)))
-    ids_df = pd.DataFrame(data_ids_list, index=adata.obs_names)
-    adata.obs["data_id"] = ids_df
-
-    return adata, all_labels, id2label, train_size
-
-
-########################################
-# Cell Type Annotation for SVM
-###########################################
-
-
-def get_id_2_gene_svm(gene_statistics_path, train_dir, tissue):
-    if not gene_statistics_path.exists():
-        data_files = Path(train_dir).glob(f"*{tissue}*_data.csv")
-        genes = None
-        for file in data_files:
-            data = pd.read_csv(file, dtype=np.str, header=0).values[:, 0]
-            if genes is None:
-                genes = set(data)
-            else:
-                genes = genes | set(data)
-        id2gene = list(genes)
-        id2gene.sort()
-        with open(gene_statistics_path, "w", encoding="utf-8") as f:
-            for gene in id2gene:
-                f.write(gene + "\r\n")
-    else:
-        id2gene = []
-        with open(gene_statistics_path, encoding="utf-8") as f:
-            for line in f:
-                id2gene.append(line.strip())
-    return id2gene
-
-
-def get_id_2_label_svm(cell_statistics_path, train_dir, tissue):
-    if not cell_statistics_path.exists():
-        data_path = Path(train_dir)
-        cell_files = data_path.glob(f"*{tissue}*_celltype.csv")
-        cell_types = set()
-        for file in cell_files:
-            df = pd.read_csv(file, dtype=np.str, header=0)
-            df["Cell_type"] = df["Cell_type"].map(str.strip)
-            cell_types = set(df.values[:, 2]) | cell_types
-            # cell_types = set(pd.read_csv(file, dtype=np.str, header=0).values[:, 2]) | cell_types
-        id2label = list(cell_types)
-        with open(cell_statistics_path, "w", encoding="utf-8") as f:
-            for cell_type in id2label:
-                f.write(cell_type + "\r\n")
-    else:
-        id2label = []
-        with open(cell_statistics_path, encoding="utf-8") as f:
-            for line in f:
-                id2label.append(line.strip())
-    return id2label
-
-
-def load_svm_data(params):
-    train = params.train_dataset
-    test = params.test_dataset
-    tissue = params.tissue
-    species = params.species
-    statistics_path = Path(params.statistics_path)
-    map_path = Path(params.map_path) / species
-
-    map_dict = get_map_dict(map_path, tissue)
-
-    gene_statistics_path = statistics_path / (tissue + "_genes.txt")  # train+test gene
-    cell_statistics_path = statistics_path / (tissue + "_cell_type.txt")  # train labels
-
-    # generate gene statistics file
-    id2gene = get_id_2_gene_svm(gene_statistics_path, os.path.join(params.train_dir, species), tissue)
-    # generate cell label statistics file
-    id2label = get_id_2_label_svm(cell_statistics_path, os.path.join(params.train_dir, species), tissue)
-
-    train_num, test_num = 0, 0
-    # prepare unified genes
-    gene2id = {gene: idx for idx, gene in enumerate(id2gene)}
-    num_genes = len(id2gene)
-    num_labels = len(id2label)
-    # prepare unified labels
-    label2id = {label: idx for idx, label in enumerate(id2label)}
-    logger.info(f"Total number of genes: {num_genes:,}")
-    logger.info(f"Training cell types (n={num_labels}):\n{pprint.pformat(sorted(id2label))}")
-
-    labels = []
-    test_index_dict = dict()  # test-num: [begin-index, end-index]
-    test_cell_id_dict = dict()  # test-num: ["c1", "c2"...]
-    # TODO
-    matrices = []
-    print(train, test)
-    for num in train + test:
-        start = time.time()
-        if num in train:
-            data_path = os.path.join(params.train_dir, species, params.species + "_" + tissue + str(num) + "_data.csv")
-            type_path = os.path.join(params.train_dir, species,
-                                     params.species + "_" + tissue + str(num) + "_celltype.csv")
-        else:
-            data_path = os.path.join(params.test_dir, species, params.species + "_" + tissue + str(num) + "_data.csv")
-            type_path = os.path.join(params.test_dir, species,
-                                     params.species + "_" + tissue + str(num) + "_celltype.csv")
-
-        # load celltype file then update labels accordingly
-        cell2type = pd.read_csv(type_path, index_col=0)
-        cell2type.columns = ["cell", "type"]
-        cell2type["type"] = cell2type["type"].map(str.strip)
-
-        if num in train:
-            cell2type["id"] = cell2type["type"].map(label2id)
-            assert not cell2type["id"].isnull().any(), "something wrong in celltype file."
-            for cell_type in cell2type["type"].tolist():
-                labels.append({cell_type})
-        else:
-            for cell_type in cell2type["type"].tolist():
-                labels.append(map_dict[num][cell_type])
-
-        # load data file then update graph
-        df = pd.read_csv(data_path, index_col=0)  # (gene, cell)
-        if num in test:
-            test_cell_id_dict[num] = list(df.columns)
-        df = df.transpose(copy=True)  # (cell, gene)
-
-        assert cell2type["cell"].tolist() == df.index.tolist()
-        df = df.rename(columns=gene2id)
-        # filter out useless columns if exists (when using gene intersection)
-        col = [c for c in df.columns if c in gene2id.values()]
-        df = df[col]
-        print(f"Nonzero Ratio: {df.fillna(0).astype(bool).sum().sum() / df.size * 100:.2f}%")
-        # maintain inter-datasets index for graph and RNA-seq values
-        arr = df.to_numpy()
-        row_idx, col_idx = np.nonzero(arr > params.threshold)  # intra-dataset index
-        non_zeros = arr[(row_idx, col_idx)]  # non-zero values
-
-        gene_idx = df.columns[col_idx].astype(int).tolist()  # gene_index
-        info_shape = (len(df), num_genes)
-        info = csr_matrix((non_zeros, (row_idx, gene_idx)), shape=info_shape)
-        matrices.append(info)
-
-        if num in train:
-            train_num += len(df)
-        else:
-            test_index_dict[num] = list(range(train_num + test_num, train_num + test_num + len(df)))
-            test_num += len(df)
-        print(f"Costs {time.time() - start:.3f} s in total.")
-
-    sparse_feat = sp.vstack(matrices)  # cell x gene
-    x_adata = AnnData(sparse_feat, dtype=np.float32)
-
-    return x_adata, labels, id2label, train_num
-
-
 #######################################################
-#For Single Cell ACTINN
+# For Celltypist Model
 #######################################################
-
-
-# Get common genes, normalize  and scale the sets
-def scale_sets(sets, normalize=True):
-    # input -- a list of all the sets to be scaled
-    # output -- scaled sets
-    # normalize -- Skip library size + log normalize if set to False (scDeepsort data prenormalized)
-    common_genes = set(sets[0].index)
-    for i in range(1, len(sets)):
-        common_genes = set.intersection(set(sets[i].index), common_genes)
-    common_genes = sorted(list(common_genes))
-    sep_point = [0]
-    for i in range(len(sets)):
-        sets[i] = sets[i].loc[common_genes, ]
-        sep_point.append(sets[i].shape[1])
-    total_set = np.array(pd.concat(sets, axis=1, sort=False), dtype=np.float32)
-    if normalize:
-        total_set = np.divide(total_set, np.sum(total_set, axis=0, keepdims=True)) * 10000
-        total_set = np.log2(total_set + 1)
-        expr = np.sum(total_set, axis=1)
-        total_set = total_set[np.logical_and(expr >= np.percentile(expr, 1), expr <= np.percentile(expr, 99)), ]
-        cv = np.std(total_set, axis=1) / np.mean(total_set, axis=1)
-        total_set = total_set[np.logical_and(cv >= np.percentile(cv, 1), cv <= np.percentile(cv, 99)), ]
-    for i in range(len(sets)):
-        sets[i] = total_set[:, sum(sep_point[:(i + 1)]):sum(sep_point[:(i + 2)])]
-    return sets
-
-
-# Turn labels into matrix
-def one_hot_matrix(labels, C):
-    # input -- labels (true labels of the sets), C (# types)
-    # output -- one hot matrix with shape (# types, # samples)
-    labels = torch.tensor(labels)
-    C = torch.tensor(C)
-    one_hot_matrix = F.one_hot(labels, C)
-    return one_hot_matrix.T
-
-
-# Make types to labels dictionary
-def type_to_label_dict(types):
-    # input -- types
-    # output -- type_to_label dictionary
-    type_to_label_dict = {}
-    all_type = sorted(set(types))
-    for i in range(len(all_type)):
-        type_to_label_dict[all_type[i]] = i
-    return type_to_label_dict
-
-
-# Convert types to labels
-def convert_type_to_label(types, type_to_label_dict):
-    # input -- list of types, and type_to_label dictionary
-    # output -- list of labels
-    types = list(types)
-    labels = list()
-    for type in types:
-        labels.append(type_to_label_dict[type])
-    return labels
-
-
-# Function to create placeholders
-def create_placeholders(n_x, n_y):
-    X = torch.zeros(n_x)
-    Y = torch.zeros(n_y)
-    return X, Y
-
-
-def load_actinn_data(train_data_paths: List[str], train_label_paths: List[str], test_data_path: str,
-                     test_label_path: str, normalize: bool = False):
-    # TODO: multiple test datasets
-    train_set_dfs = []
-    train_label_dfs = []
-    for train_data_path, train_label_path in zip(train_data_paths, train_label_paths):
-        train_set_df = pd.read_csv(train_data_path, index_col=0)
-        train_set_df.index = train_set_df.index.str.upper()
-        train_set_df = train_set_df.loc[~train_set_df.index.duplicated(keep="first")]
-        train_label_df = pd.read_csv(train_label_path, index_col=0)
-
-        train_set_dfs.append(train_set_df)
-        train_label_dfs.append(train_label_df)
-
-    train_set = pd.concat(train_set_dfs, axis=1, join="inner")
-    train_label = pd.concat(train_label_dfs, axis=0)
-
-    test_set = pd.read_csv(test_data_path, index_col=0)
-    test_set.index = test_set.index.str.upper()
-    test_set = test_set.loc[~test_set.index.duplicated(keep="first")]
-    test_label = pd.read_csv(test_label_path, index_col=0)
-
-    nt = train_label.iloc[:, 1].unique().size
-    train_set, test_set = scale_sets([train_set, test_set], normalize=normalize)
-    type_to_label_dict_out = type_to_label_dict(train_label.iloc[:, 1])
-    label_to_type_dict = {v: k for k, v in type_to_label_dict_out.items()}
-    logger.info("Cell Types in training set:\n%s", pprint.pformat(type_to_label_dict_out))
-    train_label = convert_type_to_label(train_label.iloc[:, 1], type_to_label_dict_out)
-    train_label = one_hot_matrix(train_label, nt)
-    logger.info(f"# Trainng cells: {train_label.shape[1]:,}")
-
-    total_test_cells = test_label.shape[0]
-    indicator = test_label.iloc[:, 1].isin(type_to_label_dict_out)
-    test_label = test_label[indicator]
-    test_set = test_set[:, indicator]
-    test_label = convert_type_to_label(test_label.iloc[:, 1], type_to_label_dict_out)
-    test_label = one_hot_matrix(test_label, nt)
-    logger.info(f"# Testing cells {test_label.shape[1]:,} (original number of cells = {total_test_cells:,})")
-
-    x_adata = AnnData(sp.csr_matrix(np.hstack((train_set, test_set)).T), dtype=np.float32)
-    train_size = train_set.shape[1]
-    tot_size = x_adata.shape[0]
-
-    labels = [set() for _ in range(tot_size)]
-    for i, j in zip(*np.where(np.hstack((train_label, test_label)).T)):
-        labels[i].add(label_to_type_dict[j])
-
-    idx_to_label = list(map(label_to_type_dict.get, range(len(label_to_type_dict))))
-
-    return x_adata, labels, idx_to_label, train_size
-
-
-#######################################################
-#For Celltypist Model
-#######################################################
-import logging
-
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-logger = logging.getLogger(__name__)
-_samples_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "samples")
 
 
 def get_sample_data_celltypist(filename: str) -> str:
@@ -1041,211 +559,8 @@ def SGDClassifier_celltypist(indata, labels, alpha, max_iter, n_jobs, mini_batch
 
 
 #######################################################
-#For singlecellnet
+# For singlecellnet
 #######################################################
-
-
-def ctMerge(sampTab, annCol, ctVect, newName):
-    oldRows = np.isin(sampTab[annCol], ctVect)
-    newSampTab = sampTab.copy()
-    newSampTab.loc[oldRows, annCol] = newName
-    return newSampTab
-
-
-def ctRename(sampTab, annCol, oldName, newName):
-    oldRows = sampTab[annCol] == oldName
-    newSampTab = sampTab.copy()
-    newSampTab.loc[oldRows, annCol] = newName
-    return newSampTab
-
-
-def splitCommonAnnData(adata, ncells, dLevel="cell_ontology_class", cellid=None, cells_reserved=3):
-    if cellid == None:
-        adata.obs[cellid] = adata.obs.index
-    cts = set(adata.obs[dLevel])
-
-    trainingids = np.empty(0)
-    for ct in cts:
-        print(ct, ": ")
-        aX = adata[adata.obs[dLevel] == ct, :]
-        ccount = aX.n_obs - cells_reserved
-        ccount = min([ccount, ncells])
-        print(aX.n_obs)
-        trainingids = np.append(trainingids, np.random.choice(aX.obs[cellid].values, ccount, replace=False))
-
-    val_ids = np.setdiff1d(adata.obs[cellid].values, trainingids, assume_unique=True)
-    aTrain = adata[np.isin(adata.obs[cellid], trainingids, assume_unique=True), :]
-    aTest = adata[np.isin(adata.obs[cellid], val_ids, assume_unique=True), :]
-    return ([aTrain, aTest])
-
-
-def splitCommon(expData, ncells, sampTab, dLevel="cell_ontology_class", cells_reserved=3):
-    cts = set(sampTab[dLevel])
-    trainingids = np.empty(0)
-    for ct in cts:
-        aX = expData.loc[sampTab[dLevel] == ct, :]
-        print(ct, ": ")
-        ccount = len(aX.index) - cells_reserved
-        ccount = min([ccount, ncells])
-        print(ccount)
-        trainingids = np.append(trainingids, np.random.choice(aX.index.values, ccount, replace=False))
-    val_ids = np.setdiff1d(sampTab.index, trainingids, assume_unique=True)
-    aTrain = expData.loc[np.isin(sampTab.index.values, trainingids, assume_unique=True), :]
-    aTest = expData.loc[np.isin(sampTab.index.values, val_ids, assume_unique=True), :]
-    return ([aTrain, aTest])
-
-
-def annSetUp(species="mmusculus"):
-    annot = sc.queries.biomart_annotations(
-        species,
-        ["external_gene_name", "go_id"],
-    )
-    return annot
-
-
-def getGenesFromGO(GOID, annList):
-    if (str(type(GOID)) != "<class 'str'>"):
-        return annList.loc[annList.go_id.isin(GOID), :].external_gene_name.sort_values().to_numpy()
-    else:
-        return annList.loc[annList.go_id == GOID, :].external_gene_name.sort_values().to_numpy()
-
-
-def dumbfunc(aNamedList):
-    return aNamedList.index.values
-
-
-def GEP_makeMean(expDat, groupings, type='mean'):
-    if (type == "mean"):
-        return expDat.groupby(groupings).mean()
-    if (type == "median"):
-        return expDat.groupby(groupings).median()
-
-
-def utils_myDist(expData):
-    numSamps = len(expData.index)
-    result = np.subtract(np.ones([numSamps, numSamps]), expData.T.corr())
-    del result.index.name
-    del result.columns.name
-    return result
-
-
-def utils_stripwhite(string):
-    return string.strip()
-
-
-def utils_myDate():
-    d = datetime.datetime.today()
-    return d.strftime("%b_%d_%Y")
-
-
-def utils_strip_fname(string):
-    sp = string.split("/")
-    return sp[len(sp) - 1]
-
-
-def utils_stderr(x):
-    return (stats.sem(x))
-
-
-def zscore(x, meanVal, sdVal):
-    return np.subtract(x, meanVal) / sdVal
-
-
-def zscoreVect(genes, expDat, tVals, ctt, cttVec):
-    res = {}
-    x = expDat.loc[cttVec == ctt, :]
-    for gene in genes:
-        xvals = x[gene]
-        res[gene] = pd.series(data=zscore(xvals, tVals[ctt]['mean'][gene], tVals[ctt]['sd'][gene]),
-                              index=xvals.index.values)
-    return res
-
-
-def downSampleW(vector, total=1e5, dThresh=0):
-    vSum = np.sum(vector)
-    dVector = total / vSum
-    res = dVector * vector
-    res[res < dThresh] = 0
-    return res
-
-
-def weighted_down(expDat, total, dThresh=0):
-    rSums = expDat.sum(axis=1)
-    dVector = np.divide(total, rSums)
-    res = expDat.mul(dVector, axis=0)
-    res[res < dThresh] = 0
-    return res
-
-
-def trans_prop(expDat, total, dThresh=0):
-    rSums = expDat.sum(axis=1)
-    dVector = np.divide(total, rSums)
-    res = expDat.mul(dVector, axis=0)
-    res[res < dThresh] = 0
-    return np.log(res + 1)
-
-
-def trans_zscore_col(expDat):
-    return expDat.apply(stats.zscore, axis=0)
-
-
-def trans_zscore_row(expDat):
-    return expDat.T.apply(stats.zscore, axis=0).T
-
-
-def trans_binarize(expData, threshold=1):
-    expData[expData < threshold] = 0
-    expData[expData > 0] = 1
-    return expData
-
-
-def getUniqueGenes(genes, transID='id', geneID='symbol'):
-    genes2 = genes.copy()
-    genes2.index = genes2[transID]
-    genes2.drop_duplicates(subset=geneID, inplace=True, keep="first")
-    del genes2.index.name
-    return genes2
-
-
-def removeRed(expData, genes, transID="id", geneID="symbol"):
-    genes2 = getUniqueGenes(genes, transID, geneID)
-    return expData.loc[:, genes2.index.values]
-
-
-def cn_correctZmat_col(zmat):
-
-    def myfuncInf(vector):
-        mx = np.max(vector[vector < np.inf])
-        mn = np.min(vector[vector > (np.inf * -1)])
-        res = vector.copy()
-        res[res > mx] = mx
-        res[res < mn] = mn
-        return res
-
-    return zmat.apply(myfuncInf, axis=0)
-
-
-def cn_correctZmat_row(zmat):
-
-    def myfuncInf(vector):
-        mx = np.max(vector[vector < np.inf])
-        mn = np.min(vector[vector > (np.inf * -1)])
-        res = vector.copy()
-        res[res > mx] = mx
-        res[res < mn] = mn
-        return res
-
-    return zmat.apply(myfuncInf, axis=1)
-
-
-def makeExpMat(adata):
-    expMat = pd.DataFrame(adata.X, index=adata.obs_names, columns=adata.var_names)
-    return expMat
-
-
-def makeSampTab(adata):
-    sampTab = adata.obs
-    return sampTab
 
 
 def sc_statTab(expDat, dThresh=0):
@@ -1287,10 +602,6 @@ def sc_compMu(
     return expDat.apply(singleGene, axis=0, args=(threshold, )).fillna(0)
 
 
-def repNA(df):
-    return df.fillna(0)
-
-
 def sc_fano(vector):
     return np.true_divide(np.var(vector), np.mean(vector))
 
@@ -1304,41 +615,6 @@ def sc_filterGenes(geneStats, alpha1=0.1, alpha2=0.01, mu=2):
                                                                             geneStats.mu > mu))].index.values
 
 
-def sc_filterCells(sampTab, minVal=1e3, maxValQuant=0.95):
-    q = np.quantile(sampTab.umis, maxValQuant)
-    return sampTab[np.logical_and(sampTab.umis > minVal, sampTab.umis < q)].index.values
-
-
-def sc_findEnr(expDat, sampTab, dLevel="group"):
-    summ = expDat.groupby(sampTab[dLevel]).median()
-    dict = {}
-    for n in range(0, summ.index.size):
-        temp = np.subtract(summ.iloc[n, :], summ.drop(index=summ.index.values[n]).apply(np.median, axis=0))
-        dict[summ.index.values[n]] = summ.columns.values[np.argsort(-1 * temp)].tolist()
-    return dict
-
-
-def enrDiff(expDat, sampTab, dLevel="group"):
-    groups = np.unique(sampTab[dLevel])
-    summ = expDat.groupby(sampTab[dLevel]).median()
-    ref = summ.copy()
-    for n in range(0, ref.index.size):
-        summ.iloc[n, :] = np.subtract(summ.iloc[n, :], ref.drop(index=ref.index.values[n]).apply(np.median, axis=0))
-    return summ
-
-
-def binGenesAlpha(geneStats, nbins=20):
-    max = np.max(geneStats['alpha'])
-    min = np.min(geneStats['alpha'])
-    rrange = max - min
-    inc = rrange / nbins
-    threshs = np.arange(max, min, -1 * inc)
-    res = pd.DataFrame(index=geneStats.index.values, data=np.arange(0, geneStats.index.size, 1), columns=["bin"])
-    for i in range(0, len(threshs)):
-        res.loc[geneStats["alpha"] <= threshs[i], 0] = len(threshs) - i
-    return res
-
-
 def binGenes(geneStats, nbins=20, meanType="overall_mean"):
     max = np.max(geneStats[meanType])
     min = np.min(geneStats[meanType])
@@ -1349,24 +625,6 @@ def binGenes(geneStats, nbins=20, meanType="overall_mean"):
     for i in range(0, len(threshs)):
         res.loc[geneStats[meanType] <= threshs[i], "bin"] = len(threshs) - i
     return res
-
-
-def findVarGenes(geneStats, zThresh=2, meanType="overall_mean"):
-    zscs = pd.DataFrame(index=geneStats.index.values, data=np.zeros([geneStats.index.size, 3]),
-                        columns=["alpha", meanType, "mu"])
-    mTypes = ["alpha", meanType, "mu"]
-    scaleVar = ["fano", "fano", "cov"]
-    for i in range(0, 3):
-        sg = binGenes(geneStats, meanType=mTypes[i])
-        bbins = np.unique(sg["bin"])
-        for b in bbins:
-            if (np.unique(geneStats.loc[sg.bin == b, scaleVar[i]]).size > 1):
-                tmpZ = stats.zscore(geneStats.loc[sg.bin == b, scaleVar[i]])
-            else:
-                tmpZ = np.zeros(geneStats.loc[sg.bin == b, scaleVar[i]].index.size).T
-            zscs.loc[sg.bin == b, mTypes[i]] = tmpZ
-    return (zscs.loc[np.logical_and(zscs.iloc[:, 0] > zThresh,
-                                    np.logical_and(zscs.iloc[:, 1] > zThresh, zscs.iloc[:, 2] > zThresh))].index.values)
 
 
 def sc_sampR_to_pattern(sampR):
@@ -1406,82 +664,8 @@ def sc_testPattern(pattern, expDat):
     return res
 
 
-def par_findSpecGenes(expDat, sampTab, dLevel="group", minSet=True):
-    if minSet:
-        samps = minTab(sampTab, dLevel)
-    else:
-        samps = sampTab.copy()
-    pats = sc_sampR_to_pattern(samps[dLevel])
-    exps = expDat.loc[samps.index, :]
-    res = {}
-    levels = list(pats.keys())
-    for i in range(0, len(levels)):
-        res[levels[i]] = sc_testPattern(pats[levels[i]], exps)
-    return res
-
-
 def getTopGenes(xDat, topN=3):
     return xDat.sort_values(by='cval', ascending=False).index.values[0:topN]
-
-
-def getSpecGenes(xDatList, topN=50):
-    groups = list(xDatList.keys())
-    allG = []
-    for i in range(0, len(groups)):
-        topNs = getTopGenes(xDatList[groups[i]], topN)
-        allG.append(topNs)
-    allG = np.array(allG).reshape(-1, 1)
-    u, c = np.unique(allG, return_counts=True)
-    u[c > 1] = np.nan
-    allG[~np.isin(allG, u)] = np.nan
-    specGenes = allG.reshape(len(groups), topN)
-    res = {}
-    for i in range(0, len(specGenes)):
-        res[groups[i]] = specGenes[i, ~pd.isnull(specGenes[i])].tolist()
-    return res
-
-
-def getTopGenesList(xDatList, topN=50):
-    groups = list(xDatList.keys())
-    temp = []
-    for i in range(0, len(groups)):
-        topNs = getTopGenes(xDatList[groups[i]], topN)
-        res = ", ".join(topNs)
-        temp.append(res)
-    res = {}
-    for i in range(0, len(groups)):
-        res[groups[i]] = temp[i]
-    return res
-
-
-def csRenameOrth(adQuery, adTrain, orthTable, speciesQuery='human', speciesTrain='mouse'):
-    _, _, cgenes = np.intersect1d(adQuery.var_names.values, orthTable[speciesQuery], return_indices=True)
-    _, _, ccgenes = np.intersect1d(adTrain.var_names.values, orthTable[speciesTrain], return_indices=True)
-    temp1 = np.zeros(len(orthTable.index.values), dtype=bool)
-    temp2 = np.zeros(len(orthTable.index.values), dtype=bool)
-    temp1[cgenes] = True
-    temp2[ccgenes] = True
-    common = np.logical_and(temp1, temp2)
-    oTab = orthTable.loc[common.T, :]
-    adT = adTrain[:, oTab[speciesTrain]]
-    adQ = adQuery[:, oTab[speciesQuery]]
-    adQ.var_names = adT.var_names
-    return [adQ, adT]
-
-
-def csRenameOrth2(expQuery, expTrain, orthTable, speciesQuery='human', speciesTrain='mouse'):
-    _, _, cgenes = np.intersect1d(expQuery.columns.values, orthTable[speciesQuery], return_indices=True)
-    _, _, ccgenes = np.intersect1d(expTrain.columns.values, orthTable[speciesTrain], return_indices=True)
-    temp1 = np.zeros(len(orthTable.index.values), dtype=bool)
-    temp2 = np.zeros(len(orthTable.index.values), dtype=bool)
-    temp1[cgenes] = True
-    temp2[ccgenes] = True
-    common = np.logical_and(temp1, temp2)
-    oTab = orthTable.loc[common.T, :]
-    expT = expTrain.loc[:, oTab[speciesTrain]]
-    expQ = expQuery.loc[:, oTab[speciesQuery]]
-    expQ.columns = expT.columns
-    return [expQ, expT]
 
 
 def makePairTab(genes):
@@ -1509,19 +693,6 @@ def getClassGenes(diffRes, topX=25, bottom=True):
     if bottom:
         l = len(sortRes) - topX
         ans = np.append(ans, sortRes.index.values[l:]).flatten()
-    return ans
-
-
-def addRandToSampTab(classRes, sampTab, desc, id="cell_name"):
-    cNames = classRes.index.values
-    snames = sampTab.index.values
-    rnames = np.setdiff1d(cNames, snames)
-    stNew = pd.DataFrame()
-    stNew["rid"] = rnames
-    stNew["rdesc"] = "rand"
-    stTop = sampTab[[id, desc]]
-    stNew.columns = [id, desc]
-    ans = stTop.append(stNew)
     return ans
 
 
@@ -1586,36 +757,6 @@ def query_transform(expMat, genePairs):
     ans = boolArray.astype(int)
     ans.columns = genePairs
     return (ans)
-
-
-def pair_transform(expMat):
-    pTab = makePairTab(expMat)
-    npairs = len(pTab.index)
-    ans = pd.DataFrame(0, index=expMat.index, columns=np.arange(npairs))
-    genes1 = pTab['genes1'].values
-    genes2 = pTab['genes2'].values
-    expTemp = expMat.loc[:, np.unique(np.concatenate([genes1, genes2]))]
-    ans = pd.DataFrame(0, index=expTemp.index, columns=np.arange(npairs))
-    ans = ans.astype(pd.SparseDtype("int", 0))
-    temp1 = expTemp.loc[:, genes1]
-    temp2 = expTemp.loc[:, genes2]
-    temp1.columns = np.arange(npairs)
-    temp2.columns = np.arange(npairs)
-    boolArray = temp1 > temp2
-    ans = boolArray.astype(int)
-    ans.columns = genePairs
-    return (ans)
-
-
-def gnrBP(expDat, cellLabels, topX=50):
-    myPatternG = sc_sampR_to_pattern(cellLabels)
-    levels = list(myPatternG.keys())
-    ans = {}
-    for i in range(0, len(levels)):
-        xres = sc_testPattern(myPatternG[levels[i]], expDat)
-        tmpAns = findBestPairs(xres, topX)
-        ans[levels[i]] = tmpAns
-    return ans
 
 
 def ptGetTop(expDat, cell_labels, cgenes_list=None, topX=50, sliceSize=5000, quickPairs=True):
