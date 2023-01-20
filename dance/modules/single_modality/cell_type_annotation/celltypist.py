@@ -1,8 +1,4 @@
 import os
-import pathlib
-import pickle
-from datetime import datetime
-from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -15,14 +11,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 
 from dance import logger
-
-celltypist_path = os.getenv('CELLTYPIST_FOLDER', default=os.path.join(str(pathlib.Path.home()), '.celltypist'))
-pathlib.Path(celltypist_path).mkdir(parents=True, exist_ok=True)
-data_path = os.path.join(celltypist_path, "data")
-models_path = os.path.join(data_path, "models")
-pathlib.Path(models_path).mkdir(parents=True, exist_ok=True)
-
-_samples_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "samples")
+from dance.typing import Optional, Union
 
 
 class Model():
@@ -97,13 +86,6 @@ class Model():
             scores = np.column_stack([-scores, scores])
         probs = expit(scores)
         return scores, probs, self.classifier.classes_[scores.argmax(axis=1)]
-
-    def write(self, file: str) -> None:
-        """Write out the model."""
-        obj = dict(Model=self.classifier, Scaler_=self.scaler, description=self.description)
-        file = os.path.splitext(file)[0] + '.pkl'
-        with open(file, 'wb') as output:
-            pickle.dump(obj, output)
 
     def extract_top_markers(self, cell_type: str, top_n: int = 10, only_positive: bool = True) -> np.ndarray:
         """Extract the top driving genes for a given cell type.
@@ -554,40 +536,20 @@ class Celltypist:
         self.scaler = scaler
         self.description = description
 
-    def fit(self, X=None, labels: Optional[Union[str, list, tuple, np.ndarray, pd.Series,
-                                                 pd.Index]] = None, genes: Optional[Union[str, list, tuple, np.ndarray,
-                                                                                          pd.Series, pd.Index]] = None,
-            transpose_input: bool = False, check_expression: bool = True, C: float = 1.0, solver: Optional[str] = None,
-            max_iter: int = 1000, n_jobs: Optional[int] = None, use_SGD: bool = False, alpha: float = 0.0001,
-            mini_batch: bool = False, batch_number: int = 100, batch_size: int = 1000, epochs: int = 10,
-            balance_cell_type: bool = False, feature_selection: bool = False, top_genes: int = 300, date: str = '',
-            details: str = '', url: str = '', source: str = '', version: str = '', **kwargs):
+    def fit(self, indata: np.array, labels: Optional[Union[str, list, tuple, np.ndarray, pd.Series, pd.Index]] = None,
+            C: float = 1.0, solver: Optional[str] = None, max_iter: int = 1000, n_jobs: Optional[int] = None,
+            use_SGD: bool = False, alpha: float = 0.0001, mini_batch: bool = False, batch_number: int = 100,
+            batch_size: int = 1000, epochs: int = 10, balance_cell_type: bool = False, feature_selection: bool = False,
+            top_genes: int = 300, **kwargs):
         """Train a celltypist model using mini-batch (optional) logistic classifier with
         a global solver or stochastic gradient descent (SGD) learning.
 
         Parameters
         ----------
-        X: Path optional
-            Path to the input count matrix (supported types are csv, txt, tsv, tab and mtx) or AnnData (h5ad).
-            Also accepts the input as an :class:`~anndata.AnnData` object, or any array-like objects already loaded in
-            memory. See `check_expression` for detailed format requirements.
-            A cell-by-gene format is desirable (see `transpose_input` for more information).
-        labels: Union[str, list, tuple, np.ndarray, pd.Series, pd.Index] optional
-            Path to the file containing cell type label per line corresponding to the cells in `X`.
-            Also accepts any list-like objects already loaded in memory (such as an array).
-            If `X` is specified as an AnnData, this argument can also be set as a column name from cell metadata.
-        genes: Union[str, list, tuple, np.ndarray, pd.Series, pd.Index] Optional
-            Path to the file containing one gene per line corresponding to the genes in `X`.
-            Also accepts any list-like objects already loaded in memory (such as an array).
-            Note `genes` will be extracted from `X` where possible (e.g., `X` is an AnnData or data frame).
-        transpose_input: bool
-            Whether to transpose the input matrix. Set to `True` if `X` is provided in a gene-by-cell format.
-            (Default: `False`)
-        check_expression: bool optional
-            Check whether the expression matrix in the input data is supplied as required.
-            Except the case where a path to the raw count table file is specified, all other inputs for `X` should be
-            in log1p normalized expression to 10000 counts per cell. Set to `False` if you want to train the data
-            regardless of the expression formats. (Default: `True`)
+        indata: np.ndarray
+            Input gene expression matrix (cell x gene).
+        labels: np.array
+            1-D numpy array indicating cell-type identities of each cell (in index of the cell-types).
         C: float optional
             Inverse of L2 regularization strength for traditional logistic classifier. A smaller value can possibly
             improve model generalization while at the cost of decreased accuracy. This argument is ignored if SGD
@@ -636,16 +598,6 @@ class Celltypist:
         top_genes: int optional
             The number of top genes selected from each class/cell-type based on their absolute regression coefficients.
             The final feature set is combined across all classes (i.e., union). (Default: 300)
-        date: str optional
-            Free text of the date of the model. Default to the time when the training is completed.
-        details: str optional
-            Free text of the description of the model.
-        url: str optional
-            Free text of the (possible) download url of the model.
-        source: str optional
-            Free text of the source (publication, database, etc.) of the model.
-        version: str optional
-            Free text of the version of the model.
         **kwargs
             Other keyword arguments passed to :class:`~sklearn.linear_model.LogisticRegression` (`use_SGD = False`) or
             :class:`~sklearn.linear_model.SGDClassifier` (`use_SGD = True`).
@@ -658,15 +610,11 @@ class Celltypist:
         """
         # Prepare
         logger.info("Preparing data before training")
-        indata, labels, genes = prepare_data_celltypist(X, labels, genes)
-        # indata = to_array_celltypist(indata)
-        labels = np.array(labels)
-        genes = np.array(genes)
+        genes = np.arange(indata.shape[1]).astype(str)
 
         # Scaler
         logger.info("Scaling input data")
         scaler = StandardScaler()
-        # indata = scaler.fit_transform(indata[:, ~flag] if flag.sum() > 0 else indata)
         indata = scaler.fit_transform(indata)
         indata[indata > 10] = 10
 
@@ -707,16 +655,7 @@ class Celltypist:
 
         # Model finalization
         classifier.features = genes
-        if not date:
-            date = str(datetime.now())
-        description = {
-            'date': date,
-            'details': details,
-            'url': url,
-            'source': source,
-            'version': version,
-            'number_celltypes': len(classifier.classes_)
-        }
+        description = {'number_celltypes': len(classifier.classes_)}
         logger.info("Model training done")
 
         self.classifier = classifier
@@ -821,27 +760,6 @@ class Celltypist:
             return (true[range(num_samples), pred.ravel()]).sum() / num_samples
         else:
             return accuracy_score(pred, true)
-
-
-def to_vector_celltypist(_vector_or_file):
-    if isinstance(_vector_or_file, str):
-        try:
-            return pd.read_csv(_vector_or_file, header=None)[0].values
-        except Exception as e:
-            raise Exception(f"?? {e}")
-    else:
-        return _vector_or_file
-
-
-def prepare_data_celltypist(x, y, genes):
-    adata = AnnData(pd.DataFrame(x, columns=list(map(str, range(x.shape[1])))))
-    adata.var_names_make_unique()
-
-    indata = adata.X
-    genes = adata.var_names
-    labels = to_vector_celltypist(y)
-
-    return indata, labels, genes
 
 
 def LRClassifier_celltypist(indata, labels, C, solver, max_iter, n_jobs, **kwargs) -> LogisticRegression:
