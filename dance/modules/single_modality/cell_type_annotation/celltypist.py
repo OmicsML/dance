@@ -378,7 +378,7 @@ class Classifier():
         self.indata = self.adata.X
         self.indata_genes = self.adata.var_names
         self.indata_names = self.adata.obs_names
-        logger.info(f"Input data has {self.indata.shape[0]} cells and {len(self.indata_genes)} genes")
+        logger.info(f"Input data has {self.indata.shape[0]:,} cells and {len(self.indata_genes):,} genes")
 
     def celltype(self) -> AnnotationResult:
         """Run celltyping jobs to predict cell types of input data.
@@ -398,7 +398,7 @@ class Classifier():
         if k_x.sum() == 0:
             raise ValueError("No features overlap with the model. Please provide gene symbols")
         else:
-            logger.info(f"{k_x.sum()} features used for prediction")
+            logger.info(f"{k_x.sum():,} features used for prediction")
         k_x_idx = np.where(k_x)[0]
         self.indata_genes = self.indata_genes[k_x_idx]
         lr_idx = np.where(np.isin(self.model.classifier.features, self.indata_genes))[0]
@@ -777,11 +777,11 @@ def LRClassifier_celltypist(indata, labels, C, solver, max_iter, n_jobs, **kwarg
     elif solver not in ('liblinear', 'lbfgs', 'newton-cg', 'sag', 'saga'):
         raise ValueError("?? Invalid `solver`, should be one of `'liblinear'`, `'lbfgs'`, `'newton-cg'`, "
                          "`'sag'`, and `'saga'`")
-    logger.info("?? Training data using logistic regression")
+    logger.info("Training data using logistic regression")
     if (no_cells > 100000) and (indata.shape[1] > 10000):
         logger.warn(f"?? Warning: it may take a long time to train this dataset with {no_cells} cells and "
                     f"{indata.shape[1]} genes, try to downsample cells and/or restrict genes to a subset (e.g., hvgs)")
-    print("LRClassifier training start...")
+    logger.info("LRClassifier training start...")
     classifier = LogisticRegression(C=C, solver=solver, max_iter=max_iter, multi_class='ovr', n_jobs=n_jobs, **kwargs)
     classifier.fit(indata, labels)
     return classifier
@@ -796,15 +796,15 @@ def SGDClassifier_celltypist(indata, labels, alpha, max_iter, n_jobs, mini_batch
     """
     classifier = SGDClassifier(loss='log_loss', alpha=alpha, max_iter=max_iter, n_jobs=n_jobs, **kwargs)
     if not mini_batch:
-        logger.info("?? Training data using SGD logistic regression")
+        logger.info("Training data using SGD logistic regression")
         if (len(labels) > 100000) and (indata.shape[1] > 10000):
             logger.warn(f"?? Warning: it may take a long time to train this dataset with {len(labels)} cells and "
                         f"{indata.shape[1]} genes, try to downsample cells and/or restrict genes to a subset "
                         "(e.g., hvgs)")
-        print("SGDlassifier training start...")
+        logger.info("SGDlassifier training start...")
         classifier.fit(indata, labels)
     else:
-        logger.info("?? Training data using mini-batch SGD logistic regression")
+        logger.info("Training data using mini-batch SGD logistic regression")
         no_cells = len(labels)
         if no_cells < 10000:
             logger.warn(f"?? Warning: the number of cells ({no_cells}) is not big enough to conduct a proper "
@@ -820,13 +820,13 @@ def SGDClassifier_celltypist(indata, labels, alpha, max_iter, n_jobs, mini_batch
             mapping = pd.Series(1 / (celltype_freq[1] * len_celltype), index=celltype_freq[0])
             p = mapping[labels].values
         for epoch in range(1, (epochs + 1)):
-            logger.info(f"? Epochs: [{epoch}/{epochs}]")
+            logger.info(f"Epochs: [{epoch}/{epochs}]")
             if not balance_cell_type:
                 sampled_cell_index = np.random.choice(no_cells, no_cells_sample, replace=False)
             else:
                 sampled_cell_index = np.random.choice(no_cells, no_cells_sample, replace=False, p=p)
             for start in starts:
-                print("SGDlassifier training start...")
+                logger.info("SGDlassifier training start...")
                 classifier.partial_fit(indata[sampled_cell_index[start:start + batch_size]],
                                        labels[sampled_cell_index[start:start + batch_size]], classes=np.unique(labels))
     return classifier
