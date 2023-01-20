@@ -19,10 +19,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from scipy.sparse import issparse
 from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
-# from models import GraphConvolution
 from torch.nn.parameter import Parameter
 
 from dance import utils
@@ -37,20 +34,19 @@ def refine(sample_id, pred, dis, shape="hexagon"):
 
     Parameters
     ----------
-    sample_id :
-        sample id
-    pred :
-        initial prediction
-    dis :
-        graph structure
-    shape : str optional
-        by default as "hexagon"
-
+    sample_id
+        Sample id.
+    pred
+        Initial prediction.
+    dis
+        Graph structure.
+    shape : str
+        Shape parameter.
 
     Returns
     -------
-    refined_pred :
-        refined prediction.
+    refined_pred
+        Refined predictions.
 
     """
     refined_pred = []
@@ -105,53 +101,34 @@ class GraphConvolution(nn.Module):
             return output
 
     def __repr__(self):
-        return self.__class__.__name__ + ' (' \
-               + str(self.in_features) + ' -> ' \
-               + str(self.out_features) + ')'
+        return f"{self.__class__.__name__}({self.in_features} -> {self.out_features})"
 
 
 class SimpleGCDEC(nn.Module):
-    """Basic model used in SpaGCN training.
+    """Basic model used in SpaGCN training."""
 
-    Parameters
-    ----------
-    nfeat : int
-        input feature dimension
-
-    nhid : int
-        output feature dimension
-
-    alpha : float optional
-        alpha, by default as 0.2
-
-    """
-
-    def __init__(self, nfeat, nhid, alpha=0.2):
-        super().__init__()
-        self.gc = GraphConvolution(nfeat, nhid)
-        self.nhid = nhid
-        #self.mu determined by the init method
-        self.alpha = alpha
-
-    def forward(self, x, adj):
-        """forward function.
+    def __init__(self, nfeat, nhid, alpha=0.2, device="cpu"):
+        """Initialize SimpleGCDEC.
 
         Parameters
         ----------
-        x :
-            node features.
-        adj :
-            adjacent matrix.
-
-
-        Returns
-        -------
-        x :
-            the output of graph convolution layer.
-        q :
-            the probability of assigning cell i to cluster j.
+        nfeat : int
+            Input feature dimension.
+        nhid : int
+            Output feature dimension.
+        alpha : float optional
+            Alphat parameter.
 
         """
+        super().__init__()
+        self.gc = GraphConvolution(nfeat, nhid)
+        self.nhid = nhid
+        # self.mu is determined by the init method
+        self.alpha = alpha
+        self.device = device
+
+    def forward(self, x, adj):
+        """Forward function."""
         x = self.gc(x, adj)
         q = 1.0 / ((1.0 + torch.sum((x.unsqueeze(1) - self.mu)**2, dim=2) / self.alpha) + 1e-8)
         q = q**(self.alpha + 1.0) / 2.0
@@ -159,22 +136,7 @@ class SimpleGCDEC(nn.Module):
         return x, q
 
     def loss_function(self, p, q):
-        """objective function as a Kullback–Leibler (KL) divergence loss.
-
-        Parameters
-        ----------
-        p :
-            target distribution.
-        q :
-            the probability of assigning cell i to cluster j.
-
-
-        Returns
-        -------
-        loss :
-            Kullback–Leibler (KL) divergence loss.
-
-        """
+        """Objective function as a Kullback–Leibler (KL) divergence loss."""
 
         def kld(target, pred):
             return torch.mean(torch.sum(target * torch.log(target / (pred + 1e-6)), dim=1))
@@ -183,18 +145,18 @@ class SimpleGCDEC(nn.Module):
         return loss
 
     def target_distribution(self, q):
-        """generate an auxiliary target distribution based on q the probability of
+        """Generate an auxiliary target distribution based on q the probability of
         assigning cell i to cluster j.
 
         Parameters
         ----------
-        q :
-            the probability of assigning cell i to cluster j.
+        q
+            The probability of assigning cell i to cluster j.
 
         Returns
         -------
-        p :
-            target distribution.
+        p
+            Target distribution.
 
         """
         p = q**2 / torch.sum(q, dim=0)
@@ -202,43 +164,39 @@ class SimpleGCDEC(nn.Module):
         return p
 
     def fit(self, X, adj, lr=0.001, max_epochs=5000, update_interval=3, trajectory_interval=50, weight_decay=5e-4,
-            opt="sgd", init="louvain", n_neighbors=10, res=0.4, n_clusters=10, init_spa=True, tol=1e-3, device="cuda"):
-        """fit function for model training.
+            opt="sgd", init="louvain", n_neighbors=10, res=0.4, n_clusters=10, init_spa=True, tol=1e-3):
+        """Fit function for model training.
 
         Parameters
         ----------
-        X :
-            node features.
-        adj :
-            adjacent matrix.
-        lr : float optional
-            learning rate.
-        max_epochs : int optional
-            max epochs.
-        update_interval: int optional
-            interval for update
-        trajectory_interval: int optional
-            trajectory interval
-        weight_decay : float optional
-            weight decay.
-        opt : str optional
-            optimization.
-        init : str optional
+        X
+            Node features.
+        adj
+            Adjacent matrix.
+        lr : float
+            Learning rate.
+        max_epochs : int
+            Maximum number of epochs.
+        update_interval : int
+            Interval for update.
+        trajectory_interval: int
+            Trajectory interval.
+        weight_decay : float
+            Weight decay.
+        opt : str
+            Optimizer.
+        init : str
             "louvain" or "kmeans".
-        n_neighbors : int optional
-            the number of neighbors used in louvain.
-        res : float optional
-            used for louvain .
-        n_clusters : int optional
-            the number of clusters usedd in kmeans.
-        init_spa : bool optional
-            initialize spatial.
-        tol : float optional
-            tolerant value for searching l.
-
-        Returns
-        -------
-        None.
+        n_neighbors : int
+            The number of neighbors used in louvain.
+        res : float
+            Used for louvain.
+        n_clusters : int
+            The number of clusters usedd in kmeans.
+        init_spa : bool
+            Initialize spatial.
+        tol : float
+            Tolerant value for searching l.
 
         """
         self.trajectory = []
@@ -248,17 +206,17 @@ class SimpleGCDEC(nn.Module):
             optimizer = optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
 
         features = self.gc(torch.FloatTensor(X), torch.FloatTensor(adj))
-        #----------------------------------------------------------------
+        # ---------------------------------------------------------------------
         if init == "kmeans":
             print("Initializing cluster centers with kmeans, n_clusters known")
             self.n_clusters = n_clusters
             kmeans = KMeans(self.n_clusters, n_init=20)
             if init_spa:
-                #------Kmeans use exp and spatial
+                # Kmeans using both expression and spatial information
                 y_pred = kmeans.fit_predict(features.detach().numpy())
             else:
-                #------Kmeans only use exp info, no spatial
-                y_pred = kmeans.fit_predict(X)  #Here we use X as numpy
+                # Kmeans using only expression information
+                y_pred = kmeans.fit_predict(X)  # use X as numpy
         elif init == "louvain":
             print("Initializing cluster centers with louvain, resolution = ", res)
             if init_spa:
@@ -271,7 +229,7 @@ class SimpleGCDEC(nn.Module):
 
             y_pred = adata.obs['louvain'].astype(int).to_numpy()
             self.n_clusters = len(np.unique(y_pred))
-        #----------------------------------------------------------------
+        # ---------------------------------------------------------------------
         y_pred_last = y_pred
         self.mu = Parameter(torch.Tensor(self.n_clusters, self.nhid))
         X = torch.FloatTensor(X)
@@ -281,17 +239,10 @@ class SimpleGCDEC(nn.Module):
         Group = pd.Series(y_pred, index=np.arange(0, features.shape[0]), name="Group")
         Mergefeature = pd.concat([features, Group], axis=1)
         cluster_centers = np.asarray(Mergefeature.groupby("Group").mean())
-
-        # judge have or no cuda device in torch
-        if torch.cuda.is_available():
-            if device == "cuda":
-                device = torch.device("cuda")
-        else:
-            device = torch.device("cpu")
-
         self.mu.data.copy_(torch.Tensor(cluster_centers))
 
-        # copy data and model in cuda
+        # Copy data and model in cuda
+        device = self.device
         self = self.to(device)
         X = X.to(device)
         adj = adj.to(device)
@@ -311,7 +262,7 @@ class SimpleGCDEC(nn.Module):
             if epoch % trajectory_interval == 0:
                 self.trajectory.append(torch.argmax(q, dim=1).data.cpu().numpy())
 
-            #Check stop criterion
+            # Check stop criterion
             y_pred = torch.argmax(q, dim=1).data.detach().cpu().numpy()
             delta_label = np.sum(y_pred != y_pred_last).astype(np.float32) / X.shape[0]
             y_pred_last = y_pred
@@ -321,7 +272,7 @@ class SimpleGCDEC(nn.Module):
                 print("Total epoch:", epoch)
                 break
 
-        # recover model and data in cpu
+        # Recover model and data in cpu
         self = self.cpu()
         X = X.cpu()
         adj = adj.cpu()
@@ -342,14 +293,8 @@ class SimpleGCDEC(nn.Module):
         cluster_centers = np.asarray(Mergefeature.groupby("Group").mean())
         self.mu.data.copy_(torch.Tensor(cluster_centers))
 
-        # judge have or no cuda device in torch
-        if torch.cuda.is_available():
-            if device == "cuda":
-                device = torch.device("cuda")
-        else:
-            device = torch.device("cpu")
-
-        # copy data and model in cuda
+        # Copy data and model in cuda
+        device = self.device
         self = self.to(device)
         X = X.to(device)
         adj = adj.to(device)
@@ -366,7 +311,8 @@ class SimpleGCDEC(nn.Module):
             loss = self.loss_function(p, q)
             loss.backward()
             optimizer.step()
-        # recover model and data in cpu
+
+        # Recover model and data in cpu
         self = self.cpu()
         X = X.cpu()
         adj = adj.cpu()
@@ -409,8 +355,6 @@ class GC_DEC(nn.Module):
         return loss
 
     def target_distribution(self, q):
-        #weight = q ** 2 / q.sum(0)
-        #return torch.transpose((torch.transpose(weight,0,1) / weight.sum(1)),0,1)e
         p = q**2 / torch.sum(q, dim=0)
         p = p / torch.sum(p, dim=1, keepdim=True)
         return p
@@ -425,20 +369,18 @@ class GC_DEC(nn.Module):
             optimizer = optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
 
         features, _ = self.forward(torch.FloatTensor(X), torch.FloatTensor(adj))
-        #----------------------------------------------------------------
+        # ---------------------------------------------------------------------
         if init == "kmeans":
-            #Kmeans only use exp info, no spatial
-            #kmeans = KMeans(self.n_clusters, n_init=20)
-            #y_pred = kmeans.fit_predict(X)  #Here we use X as numpy
-            #Kmeans use exp and spatial
+            # Kmeans using only expression information
             kmeans = KMeans(self.n_clusters, n_init=20)
             y_pred = kmeans.fit_predict(features.detach().numpy())
         elif init == "louvain":
+            # Louvain using only expression information
             adata = sc.AnnData(features.detach().numpy())
             sc.pp.neighbors(adata, n_neighbors=n_neighbors)
             sc.tl.louvain(adata, resolution=res)
             y_pred = adata.obs['louvain'].astype(int).to_numpy()
-        #----------------------------------------------------------------
+        # ---------------------------------------------------------------------
         X = torch.FloatTensor(X)
         adj = torch.FloatTensor(adj)
         self.trajectory.append(y_pred)
@@ -515,17 +457,17 @@ class SpaGCN:
         Parameters
         ----------
         p : float
-            percentage.
+            Percentage.
         adj :
-            adjacent matrix.
-        start : float optional
-            starting value for searching l.
-        end : float optional
-            ending value for searching l.
-        tol : float optional
-            tolerant value for searching l.
-        max_run : int optional
-            Max runs.
+            Adjacent matrix.
+        start : float
+            Starting value for searching l.
+        end : float
+            Ending value for searching l.
+        tol : float
+            Tolerant value for searching l.
+        max_run : int
+            Maximum number of runs.
 
         Returns
         -------
@@ -537,27 +479,19 @@ class SpaGCN:
         return l
 
     def set_l(self, l):
-        """set l.
+        """Set l.
 
         Parameters
         ----------
         l : float
-            the parameter to control percentage p.
-
-        Returns
-        -------
-        None.
+            The parameter to control percentage p.
 
         """
         self.l = l
 
     def search_set_res(self, embed, adj, l, target_num, start=0.4, step=0.1, tol=5e-3, lr=0.05, max_epochs=10,
                        r_seed=100, t_seed=100, n_seed=100, max_run=10):
-        """search res.
-
-        res: Resolution in the initial Louvain's Clustering methods.
-
-        """
+        """Search for optimal resolution parameter."""
         random.seed(r_seed)
         torch.manual_seed(t_seed)
         np.random.seed(n_seed)
@@ -603,55 +537,38 @@ class SpaGCN:
         self.res = res
         return res
 
-    def fit(
-            self,
-            embed,
-            adj,
-            num_pcs=50,
-            lr=0.005,
-            max_epochs=2000,
-            weight_decay=0,
-            opt="admin",
-            init_spa=True,
-            init="louvain",  #louvain or kmeans
-            n_neighbors=10,  #for louvain
-            n_clusters=None,  #for kmeans
-            res=0.4,  #for louvain
-            tol=1e-3):
-        """fit function for model training.
+    def fit(self, embed, adj, num_pcs=50, lr=0.005, max_epochs=2000, weight_decay=0, opt="admin", init_spa=True,
+            init="louvain", n_neighbors=10, n_clusters=None, res=0.4, tol=1e-3):
+        """Fit function for model training.
 
         Parameters
         ----------
-        embed :
-            input data.
-        adj :
-            adjacent matrix.
+        embed
+            Input data.
+        adj
+            Adjacent matrix.
         num_pcs : int
-            the number of component used in PCA.
+            The number of component used in PCA.
         lr : float
-            learning rate.
+            Learning rate.
         max_epochs : int
-            max epochs.
+            Maximum number of epochs.
         weight_decay : float
-            weight decay.
+            Weight decay.
         opt : str
-            optimization.
+            Optimizer.
         init_spa : bool
-            initialize spatial.
+            Initialize spatial.
         init : str
             "louvain" or "kmeans".
         n_neighbors : int
-            the number of neighbors used in louvain.
+            The number of neighbors used by Louvain.
         n_clusters : int
-            the number of clusters usedd in kmeans.
+            The number of clusters usedd by kmeans.
         res : float
-            used for louvain .
+            The resolution parameter used by Louvain.
         tol : float
-            tolerant value for searching l.
-
-        Returns
-        -------
-        None.
+            Oolerant value for searching l.
 
         """
         self.num_pcs = num_pcs
@@ -678,17 +595,12 @@ class SpaGCN:
         self.adj_exp = adj_exp
 
     def predict(self):
-        """prediction function.
-
-        Parameters
-        ----------
+        """Prediction function.
 
         Returns
         -------
-        y_pred : numpy
-            predicted label.
-        prob : numpy
-            predicted probability.
+        Tuple[np.ndarray, np.ndarray]
+            The predicted labels and the predicted probabilities.
 
         """
         z, q = self.model.predict(self.embed, self.adj_exp)
@@ -699,7 +611,7 @@ class SpaGCN:
         return y_pred, prob
 
     def score(self, y_true):
-        """score function to get score of prediction.
+        """Score function to evaluate the prediction performance.
 
         Parameters
         ----------
