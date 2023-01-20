@@ -12,11 +12,11 @@ import scanpy as sc
 from anndata import AnnData
 from matplotlib import pyplot as plt
 from scipy.special import expit
+from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 
 from dance import logger
-from dance.transforms.preprocess import LRClassifier_celltypist, SGDClassifier_celltypist, prepare_data_celltypist
 
 celltypist_path = os.getenv('CELLTYPIST_FOLDER', default=os.path.join(str(pathlib.Path.home()), '.celltypist'))
 pathlib.Path(celltypist_path).mkdir(parents=True, exist_ok=True)
@@ -1046,3 +1046,91 @@ class Celltypist:
             return (true[range(num_samples), pred.ravel()]).sum() / num_samples
         else:
             return accuracy_score(pred, true)
+
+
+def to_vector_celltypist(_vector_or_file):
+    if isinstance(_vector_or_file, str):
+        try:
+            return pd.read_csv(_vector_or_file, header=None)[0].values
+        except Exception as e:
+            raise Exception(f"?? {e}")
+    else:
+        return _vector_or_file
+
+
+def prepare_data_celltypist(x, y, genes):
+    adata = AnnData(pd.DataFrame(x, columns=list(map(str, range(x.shape[1])))))
+    adata.var_names_make_unique()
+
+    indata = adata.X
+    genes = adata.var_names
+    labels = to_vector_celltypist(y)
+
+    return indata, labels, genes
+
+
+def LRClassifier_celltypist(indata, labels, C, solver, max_iter, n_jobs, **kwargs) -> LogisticRegression:
+    """For internal use.
+
+    Get the logistic Classifier.
+
+    """
+    no_cells = len(labels)
+    if solver is None:
+        solver = 'sag' if no_cells > 50000 else 'lbfgs'
+    elif solver not in ('liblinear', 'lbfgs', 'newton-cg', 'sag', 'saga'):
+        raise ValueError("?? Invalid `solver`, should be one of `'liblinear'`, `'lbfgs'`, `'newton-cg'`, "
+                         "`'sag'`, and `'saga'`")
+    logger.info("?? Training data using logistic regression")
+    if (no_cells > 100000) and (indata.shape[1] > 10000):
+        logger.warn(f"?? Warning: it may take a long time to train this dataset with {no_cells} cells and "
+                    f"{indata.shape[1]} genes, try to downsample cells and/or restrict genes to a subset (e.g., hvgs)")
+    print("LRClassifier training start...")
+    classifier = LogisticRegression(C=C, solver=solver, max_iter=max_iter, multi_class='ovr', n_jobs=n_jobs, **kwargs)
+    classifier.fit(indata, labels)
+    return classifier
+
+
+def SGDClassifier_celltypist(indata, labels, alpha, max_iter, n_jobs, mini_batch, batch_number, batch_size, epochs,
+                             balance_cell_type, **kwargs) -> SGDClassifier:
+    """For internal use.
+
+    Get the SGDClassifier.
+
+    """
+    classifier = SGDClassifier(loss='log_loss', alpha=alpha, max_iter=max_iter, n_jobs=n_jobs, **kwargs)
+    if not mini_batch:
+        logger.info("?? Training data using SGD logistic regression")
+        if (len(labels) > 100000) and (indata.shape[1] > 10000):
+            logger.warn(f"?? Warning: it may take a long time to train this dataset with {len(labels)} cells and "
+                        f"{indata.shape[1]} genes, try to downsample cells and/or restrict genes to a subset "
+                        "(e.g., hvgs)")
+        print("SGDlassifier training start...")
+        classifier.fit(indata, labels)
+    else:
+        logger.info("?? Training data using mini-batch SGD logistic regression")
+        no_cells = len(labels)
+        if no_cells < 10000:
+            logger.warn(f"?? Warning: the number of cells ({no_cells}) is not big enough to conduct a proper "
+                        "mini-batch training. You may consider using traditional SGD classifier (mini_batch = False)")
+        if no_cells <= batch_size:
+            raise ValueError(f"?? Number of cells ({no_cells}) is fewer than the batch size ({batch_size}). Decrease "
+                             "`batch_size`, or use SGD directly (mini_batch = False)")
+        no_cells_sample = min([batch_number * batch_size, no_cells])
+        starts = np.arange(0, no_cells_sample, batch_size)
+        if balance_cell_type:
+            celltype_freq = np.unique(labels, return_counts=True)
+            len_celltype = len(celltype_freq[0])
+            mapping = pd.Series(1 / (celltype_freq[1] * len_celltype), index=celltype_freq[0])
+            p = mapping[labels].values
+        for epoch in range(1, (epochs + 1)):
+            logger.info(f"? Epochs: [{epoch}/{epochs}]")
+            if not balance_cell_type:
+                sampled_cell_index = np.random.choice(no_cells, no_cells_sample, replace=False)
+            else:
+                sampled_cell_index = np.random.choice(no_cells, no_cells_sample, replace=False, p=p)
+            for start in starts:
+                print("SGDlassifier training start...")
+                classifier.partial_fit(indata[sampled_cell_index[start:start + batch_size]],
+                                       labels[sampled_cell_index[start:start + batch_size]], classes=np.unique(labels))
+    return classifier
