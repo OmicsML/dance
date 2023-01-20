@@ -118,9 +118,11 @@ class Model():
         return self.features[np.argsort(-coef_vector)][:top_n]
 
 
+# TODO: repurpose this to general purpose anlaysis tools
+# (dance.tools? -> e.g., dance.tools.SummaryFrequency(data), how about preds?)
 class AnnotationResult():
-    """
-    Class that represents the result of a celltyping annotation process.
+    """Class that represents the result of a celltyping annotation process.
+
     Parameters
     ----------
     labels
@@ -146,6 +148,7 @@ class AnnotationResult():
         Number of input cells which undergo the prediction process.
     adata
         An :class:`~anndata.AnnData` object representing the input data.
+
     """
 
     def __init__(self, labels: pd.DataFrame, decision_mat: pd.DataFrame, prob_mat: pd.DataFrame, adata: AnnData):
@@ -375,7 +378,7 @@ class Classifier():
         self.indata = self.adata.X
         self.indata_genes = self.adata.var_names
         self.indata_names = self.adata.obs_names
-        logger.info(f"Input data has {self.indata.shape[0]} cells and {len(self.indata_genes)} genes")
+        logger.info(f"Input data has {self.indata.shape[0]:,} cells and {len(self.indata_genes):,} genes")
 
     def celltype(self) -> AnnotationResult:
         """Run celltyping jobs to predict cell types of input data.
@@ -395,7 +398,7 @@ class Classifier():
         if k_x.sum() == 0:
             raise ValueError("No features overlap with the model. Please provide gene symbols")
         else:
-            logger.info(f"{k_x.sum()} features used for prediction")
+            logger.info(f"{k_x.sum():,} features used for prediction")
         k_x_idx = np.where(k_x)[0]
         self.indata_genes = self.indata_genes[k_x_idx]
         lr_idx = np.where(np.isin(self.model.classifier.features, self.indata_genes))[0]
@@ -662,10 +665,9 @@ class Celltypist:
         self.scaler = scaler
         self.description = description
 
-    def predict(self, x: np.ndarray, check_expression: bool = False, load_model: bool = False,
-                majority_voting: bool = False, over_clustering: Optional[Union[str, list, tuple, np.ndarray, pd.Series,
-                                                                               pd.Index]] = None,
-                min_prop: float = 0) -> AnnotationResult:
+    def predict(self, x: np.ndarray, as_obj: bool = False, majority_voting: bool = False,
+                over_clustering: Optional[Union[str, list, tuple, np.ndarray, pd.Series, pd.Index]] = None,
+                min_prop: float = 0) -> Union[np.ndarray, AnnotationResult]:
         """Run the prediction and (optional) majority voting to annotate the input
         dataset.
 
@@ -673,6 +675,9 @@ class Celltypist:
         ----------
         x: np.ndarray
             Input expression matrix (cell x gene).
+        as_obj: bool
+            If set to `True`, then return the prediction results are :class:`~AnnotationResult`. Otherwise, return the
+            predicted cell-label indexes ad 1-d numpy array instead. (Default: `False`)
         majority_voting: bool optional
             Whether to refine the predicted labels by running the majority voting classifier after over-clustering.
             (Default: `False`)
@@ -690,15 +695,6 @@ class Celltypist:
             of the subcluster by this cell type. Ignored if `majority_voting` is set to `False`. Subcluster that fails
             to pass this proportion threshold will be assigned `'Heterogeneous'`. (Default: 0)
 
-        Returns
-        ----------
-        output :class:`~celltypist.classifier.AnnotationResult`
-            An :class:`~celltypist.classifier.AnnotationResult` object. Four important attributes within this class are:
-            1) :attr:`~celltypist.classifier.AnnotationResult.predicted_labels`, predicted labels from celltypist.
-            2) :attr:`~celltypist.classifier.AnnotationResult.decision_matrix`, decision matrix from celltypist.
-            3) :attr:`~celltypist.classifier.AnnotationResult.probability_matrix`, probability matrix from celltypist.
-            4) :attr:`~celltypist.classifier.AnnotationResult.adata`, AnnData representation of the input data.
-
         """
         # Construct classifier
         lr_classifier = Model(self.classifier, self.scaler, self.description)
@@ -706,13 +702,20 @@ class Celltypist:
 
         # Predict
         predictions = clf.celltype()
-        if not majority_voting:
-            return predictions
-        if predictions.cell_count <= 50:
-            logger.warn(f" Warning: the input number of cells ({predictions.cell_count}) is too few to conduct proper "
-                        "over-clustering; no majority voting is performed")
-            return predictions
 
+        if majority_voting:
+            if predictions.cell_count <= 50:
+                logger.warn("The input number of cells ({predictions.cell_count}) is too few to conduct "
+                            "proper over-clustering; no majority voting is performed")
+            else:
+                predictions = self._majority_voting(predictions, clf, over_clustering, min_prop)
+
+        if not as_obj:
+            predictions = predictions.predicted_labels["predicted_labels"].values
+
+        return predictions
+
+    def _majority_voting(self, predictions, clf, over_clustering, min_prop) -> AnnotationResult:
         # Over clustering
         if over_clustering is None:
             over_clustering = clf.over_cluster()
@@ -721,19 +724,19 @@ class Celltypist:
             if over_clustering in clf.adata.obs:
                 over_clustering = clf.adata.obs[over_clustering]
             else:
-                logger.info(f" Did not identify '{over_clustering}' as a cell metadata column, "
+                logger.info(f"Did not identify '{over_clustering}' as a cell metadata column, "
                             "assume it to be a plain text file")
                 try:
                     with open(over_clustering) as f:
                         over_clustering = [x.strip() for x in f.readlines()]
                 except Exception as e:
                     raise Exception(f" {e}")
+
         if len(over_clustering) != clf.adata.n_obs:
-            raise ValueError(f" Length of `over_clustering` ({len(over_clustering)}) does not match "
+            raise ValueError(f"Length of `over_clustering` ({len(over_clustering)}) does not match "
                              f"the number of input cells ({clf.adata.n_obs})")
 
         # Majority voting
-        print(predictions)
         return Classifier.majority_vote(predictions, over_clustering, min_prop=min_prop)
 
     def score(self, pred, true):
@@ -774,11 +777,11 @@ def LRClassifier_celltypist(indata, labels, C, solver, max_iter, n_jobs, **kwarg
     elif solver not in ('liblinear', 'lbfgs', 'newton-cg', 'sag', 'saga'):
         raise ValueError("?? Invalid `solver`, should be one of `'liblinear'`, `'lbfgs'`, `'newton-cg'`, "
                          "`'sag'`, and `'saga'`")
-    logger.info("?? Training data using logistic regression")
+    logger.info("Training data using logistic regression")
     if (no_cells > 100000) and (indata.shape[1] > 10000):
         logger.warn(f"?? Warning: it may take a long time to train this dataset with {no_cells} cells and "
                     f"{indata.shape[1]} genes, try to downsample cells and/or restrict genes to a subset (e.g., hvgs)")
-    print("LRClassifier training start...")
+    logger.info("LRClassifier training start...")
     classifier = LogisticRegression(C=C, solver=solver, max_iter=max_iter, multi_class='ovr', n_jobs=n_jobs, **kwargs)
     classifier.fit(indata, labels)
     return classifier
@@ -793,15 +796,15 @@ def SGDClassifier_celltypist(indata, labels, alpha, max_iter, n_jobs, mini_batch
     """
     classifier = SGDClassifier(loss='log_loss', alpha=alpha, max_iter=max_iter, n_jobs=n_jobs, **kwargs)
     if not mini_batch:
-        logger.info("?? Training data using SGD logistic regression")
+        logger.info("Training data using SGD logistic regression")
         if (len(labels) > 100000) and (indata.shape[1] > 10000):
             logger.warn(f"?? Warning: it may take a long time to train this dataset with {len(labels)} cells and "
                         f"{indata.shape[1]} genes, try to downsample cells and/or restrict genes to a subset "
                         "(e.g., hvgs)")
-        print("SGDlassifier training start...")
+        logger.info("SGDlassifier training start...")
         classifier.fit(indata, labels)
     else:
-        logger.info("?? Training data using mini-batch SGD logistic regression")
+        logger.info("Training data using mini-batch SGD logistic regression")
         no_cells = len(labels)
         if no_cells < 10000:
             logger.warn(f"?? Warning: the number of cells ({no_cells}) is not big enough to conduct a proper "
@@ -817,13 +820,13 @@ def SGDClassifier_celltypist(indata, labels, alpha, max_iter, n_jobs, mini_batch
             mapping = pd.Series(1 / (celltype_freq[1] * len_celltype), index=celltype_freq[0])
             p = mapping[labels].values
         for epoch in range(1, (epochs + 1)):
-            logger.info(f"? Epochs: [{epoch}/{epochs}]")
+            logger.info(f"Epochs: [{epoch}/{epochs}]")
             if not balance_cell_type:
                 sampled_cell_index = np.random.choice(no_cells, no_cells_sample, replace=False)
             else:
                 sampled_cell_index = np.random.choice(no_cells, no_cells_sample, replace=False, p=p)
             for start in starts:
-                print("SGDlassifier training start...")
+                logger.info("SGDlassifier training start...")
                 classifier.partial_fit(indata[sampled_cell_index[start:start + batch_size]],
                                        labels[sampled_cell_index[start:start + batch_size]], classes=np.unique(labels))
     return classifier

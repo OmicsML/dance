@@ -48,8 +48,7 @@ if __name__ == "__main__":
     # Train and evaluate the model
     model = Celltypist()
     model.fit(x_train, y_train, n_jobs=args.n_jobs, max_iter=args.max_iter, use_SGD=not args.not_use_SGD)
-    pred_obj = model.predict(x_test)
-    pred = pred_obj.predicted_labels["predicted_labels"].values
+    pred = model.predict(x_test)
     score = model.score(pred, y_test)
     print(f"{score=:.4f}")
 """To reproduce CellTypist benchmarks, please refer to command lines below:
