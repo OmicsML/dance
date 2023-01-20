@@ -274,17 +274,17 @@ class AnnotationResult():
         if not os.path.isdir(folder):
             raise FileNotFoundError(f" Output folder {folder} does not exist. Please provide a valid folder")
         if 'X_umap' in self.adata.obsm:
-            logger.info(" Detected existing UMAP coordinates, will plot the results accordingly")
+            logger.info("Detected existing UMAP coordinates, will plot the results accordingly")
         elif 'connectivities' in self.adata.obsp:
             logger.info(" Generating UMAP coordinates based on the neighborhood graph")
             sc.tl.umap(self.adata)
         else:
-            logger.info(" Constructing the neighborhood graph and generating UMAP coordinates")
+            logger.info("Constructing the neighborhood graph and generating UMAP coordinates")
             adata = self.adata.copy()
             self.adata.obsm['X_pca'], self.adata.obsp['connectivities'], self.adata.obsp['distances'], self.adata.uns[
                 'neighbors'] = Classifier._construct_neighbor_graph(adata)
             sc.tl.umap(self.adata)
-        logger.info(" Plotting the results")
+        logger.info("Plotting the results")
         sc.settings.set_figure_params(figsize=[6.4, 6.4], format=format)
         self.adata.obs[self.predicted_labels.columns] = self.predicted_labels
         for column in self.predicted_labels:
@@ -464,13 +464,12 @@ class Classifier():
 
         """
         if 'connectivities' not in self.adata.obsp:
-            logger.info(" Can not detect a neighborhood graph, will construct one before the over-clustering")
+            logger.info("Can not detect a neighborhood graph, will construct one before the over-clustering")
             adata = self.adata.copy()
             self.adata.obsm['X_pca'], self.adata.obsp['connectivities'], self.adata.obsp['distances'], self.adata.uns[
                 'neighbors'] = Classifier._construct_neighbor_graph(adata)
         else:
-            logger.info(
-                " Detected a neighborhood graph in the input object, will run over-clustering on the basis of it")
+            logger.info("Detected a neighborhood graph in the input object, will run overclustering on the basis of it")
         if resolution is None:
             if self.adata.n_obs < 5000:
                 resolution = 5
@@ -484,7 +483,7 @@ class Classifier():
                 resolution = 25
             else:
                 resolution = 30
-        logger.info(f" Over-clustering input data with resolution set to {resolution}")
+        logger.info(f"Over-clustering input data with resolution set to {resolution}")
         sc.tl.leiden(self.adata, resolution=resolution, key_added='over_clustering')
         return self.adata.obs.pop('over_clustering')
 
