@@ -125,7 +125,7 @@ class CellTypeDataset:
         ]
 
         for i in check:
-            if not os.path.exists(i):
+            if not osp.exists(i):
                 print(f"file {i} doesn't exist")
                 return False
         return True
@@ -150,7 +150,7 @@ class CellTypeDataset:
         for name in check:
             filename = name[name.find('mouse'):]
             file_i = osp.join(self.data_dir, *name.split("_")[:2], filename)
-            if not os.path.exists(file_i):
+            if not osp.exists(file_i):
                 print(file_i)
                 print(f"file {filename} doesn't exist")
                 return False
@@ -161,7 +161,7 @@ class CellTypeDataset:
             osp.join(self.data_dir, "map", "celltype2subtype.xlsx")
         ]
         for file in map_check:
-            if not os.path.exists(file):
+            if not osp.exists(file):
                 print(f"file {name} doesn't exist")
                 return False
         # TODO: check pretrained data
@@ -294,7 +294,7 @@ class ClusteringDataset():
 
     def is_complete(self):
         # judge data is complete or not
-        return os.path.exists(os.path.join(self.data_dir, f"{self.dataset}.h5"))
+        return osp.exists(osp.join(self.data_dir, f"{self.dataset}.h5"))
 
     def load_data(self):
         # Load data from existing h5ad files, or download files and load data.
@@ -406,15 +406,15 @@ class ImputationDataset():
         }
         self.params.dataset_to_file = dataset_to_file
         if sys.platform != 'win32':
-            if not os.path.exists(self.params.data_dir):
+            if not osp.exists(self.params.data_dir):
                 os.system("mkdir " + self.params.data_dir)
-            if not os.path.exists(self.params.data_dir + "/train"):
+            if not osp.exists(self.params.data_dir + "/train"):
                 os.system("mkdir " + self.params.data_dir + "/train")
 
             for class_name in gene_class:
                 if not any(
                         list(
-                            map(os.path.exists,
+                            map(osp.exists,
                                 glob.glob(self.params.data_dir + "/train/" + class_name + "/" +
                                           dl_files[class_name])))):
                     os.system("mkdir " + self.params.data_dir + "/train/" + class_name)
@@ -424,14 +424,14 @@ class ImputationDataset():
                     os.system("mv " + dl_files[class_name] + " " + self.params.data_dir + "/train/" + class_name + "/")
             os.system("cp -r " + self.params.data_dir + "/train/ " + self.params.data_dir + "/test")
         if sys.platform == 'win32':
-            if not os.path.exists(self.params.data_dir):
+            if not osp.exists(self.params.data_dir):
                 os.system("mkdir " + self.params.data_dir)
-            if not os.path.exists(self.params.data_dir + "/train"):
+            if not osp.exists(self.params.data_dir + "/train"):
                 os.mkdir(self.params.data_dir + "/train")
             for class_name in gene_class:
                 if not any(
                         list(
-                            map(os.path.exists,
+                            map(osp.exists,
                                 glob.glob(self.params.data_dir + "/train/" + class_name + "/" +
                                           dl_files[class_name])))):
                     os.mkdir(self.params.data_dir + "/train/" + class_name)
@@ -450,7 +450,7 @@ class ImputationDataset():
         ]
 
         for i in check:
-            if not os.path.exists(i):
+            if not osp.exists(i):
                 print("file {} doesn't exist".format(i))
                 return False
         return True
