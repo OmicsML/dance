@@ -12,6 +12,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--log_level", type=str, default="INFO", choices=LOGLEVELS)
     parser.add_argument("--max_iter", type=int, help="Max iteration during training", default=200)
+    parser.add_argument("--majority_voting", action="store_true",
+                        help="Whether to refine the predicted labels via majority voting after over-clustering.")
     parser.add_argument("--n_jobs", type=int, help="Number of jobs", default=10)
     parser.add_argument("--species", default="mouse", type=str)
     parser.add_argument("--test_dataset", nargs="+", default=[1759], help="List of testing dataset ids.")
@@ -42,7 +44,7 @@ if __name__ == "__main__":
     # Train and evaluate the model
     model = Celltypist()
     model.fit(x_train, y_train, n_jobs=args.n_jobs, max_iter=args.max_iter, use_SGD=not args.not_use_SGD)
-    pred = model.predict(x_test)
+    pred = model.predict(x_test, majority_voting=args.majority_voting)
     score = model.score(pred, y_test)
     print(f"{score=:.4f}")
 """To reproduce CellTypist benchmarks, please refer to command lines below:
