@@ -19,7 +19,7 @@ jobs:
         python-version: ['3.8']
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Check CUDA
         run: nvcc -V
