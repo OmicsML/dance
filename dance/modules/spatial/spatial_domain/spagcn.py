@@ -34,20 +34,19 @@ def refine(sample_id, pred, dis, shape="hexagon"):
 
     Parameters
     ----------
-    sample_id :
-        sample id
-    pred :
-        initial prediction
-    dis :
-        graph structure
-    shape : str optional
-        by default as "hexagon"
-
+    sample_id
+        Sample id.
+    pred
+        Initial prediction.
+    dis
+        Graph structure.
+    shape : str
+        Shape parameter.
 
     Returns
     -------
-    refined_pred :
-        refined prediction.
+    refined_pred
+        Refined predictions.
 
     """
     refined_pred = []
@@ -102,28 +101,25 @@ class GraphConvolution(nn.Module):
             return output
 
     def __repr__(self):
-        return self.__class__.__name__ + ' (' \
-               + str(self.in_features) + ' -> ' \
-               + str(self.out_features) + ')'
+        return f"{self.__class__.__name__}({self.in_features} -> {self.out_features})"
 
 
 class SimpleGCDEC(nn.Module):
-    """Basic model used in SpaGCN training.
-
-    Parameters
-    ----------
-    nfeat : int
-        input feature dimension
-
-    nhid : int
-        output feature dimension
-
-    alpha : float optional
-        alpha, by default as 0.2
-
-    """
+    """Basic model used in SpaGCN training."""
 
     def __init__(self, nfeat, nhid, alpha=0.2, device="cpu"):
+        """Initialize SimpleGCDEC.
+
+        Parameters
+        ----------
+        nfeat : int
+            Input feature dimension.
+        nhid : int
+            Output feature dimension.
+        alpha : float optional
+            Alphat parameter.
+
+        """
         super().__init__()
         self.gc = GraphConvolution(nfeat, nhid)
         self.nhid = nhid
@@ -132,24 +128,7 @@ class SimpleGCDEC(nn.Module):
         self.device = device
 
     def forward(self, x, adj):
-        """forward function.
-
-        Parameters
-        ----------
-        x :
-            node features.
-        adj :
-            adjacent matrix.
-
-
-        Returns
-        -------
-        x :
-            the output of graph convolution layer.
-        q :
-            the probability of assigning cell i to cluster j.
-
-        """
+        """Forward function."""
         x = self.gc(x, adj)
         q = 1.0 / ((1.0 + torch.sum((x.unsqueeze(1) - self.mu)**2, dim=2) / self.alpha) + 1e-8)
         q = q**(self.alpha + 1.0) / 2.0
@@ -157,22 +136,7 @@ class SimpleGCDEC(nn.Module):
         return x, q
 
     def loss_function(self, p, q):
-        """objective function as a Kullback–Leibler (KL) divergence loss.
-
-        Parameters
-        ----------
-        p :
-            target distribution.
-        q :
-            the probability of assigning cell i to cluster j.
-
-
-        Returns
-        -------
-        loss :
-            Kullback–Leibler (KL) divergence loss.
-
-        """
+        """Objective function as a Kullback–Leibler (KL) divergence loss."""
 
         def kld(target, pred):
             return torch.mean(torch.sum(target * torch.log(target / (pred + 1e-6)), dim=1))
@@ -181,18 +145,18 @@ class SimpleGCDEC(nn.Module):
         return loss
 
     def target_distribution(self, q):
-        """generate an auxiliary target distribution based on q the probability of
+        """Generate an auxiliary target distribution based on q the probability of
         assigning cell i to cluster j.
 
         Parameters
         ----------
-        q :
-            the probability of assigning cell i to cluster j.
+        q
+            The probability of assigning cell i to cluster j.
 
         Returns
         -------
-        p :
-            target distribution.
+        p
+            Target distribution.
 
         """
         p = q**2 / torch.sum(q, dim=0)
@@ -201,42 +165,38 @@ class SimpleGCDEC(nn.Module):
 
     def fit(self, X, adj, lr=0.001, max_epochs=5000, update_interval=3, trajectory_interval=50, weight_decay=5e-4,
             opt="sgd", init="louvain", n_neighbors=10, res=0.4, n_clusters=10, init_spa=True, tol=1e-3):
-        """fit function for model training.
+        """Fit function for model training.
 
         Parameters
         ----------
-        X :
-            node features.
-        adj :
-            adjacent matrix.
-        lr : float optional
-            learning rate.
-        max_epochs : int optional
-            max epochs.
-        update_interval: int optional
-            interval for update
-        trajectory_interval: int optional
-            trajectory interval
-        weight_decay : float optional
-            weight decay.
-        opt : str optional
-            optimization.
-        init : str optional
+        X
+            Node features.
+        adj
+            Adjacent matrix.
+        lr : float
+            Learning rate.
+        max_epochs : int
+            Maximum number of epochs.
+        update_interval : int
+            Interval for update.
+        trajectory_interval: int
+            Trajectory interval.
+        weight_decay : float
+            Weight decay.
+        opt : str
+            Optimizer.
+        init : str
             "louvain" or "kmeans".
-        n_neighbors : int optional
-            the number of neighbors used in louvain.
-        res : float optional
-            used for louvain .
-        n_clusters : int optional
-            the number of clusters usedd in kmeans.
-        init_spa : bool optional
-            initialize spatial.
-        tol : float optional
-            tolerant value for searching l.
-
-        Returns
-        -------
-        None.
+        n_neighbors : int
+            The number of neighbors used in louvain.
+        res : float
+            Used for louvain.
+        n_clusters : int
+            The number of clusters usedd in kmeans.
+        init_spa : bool
+            Initialize spatial.
+        tol : float
+            Tolerant value for searching l.
 
         """
         self.trajectory = []
@@ -497,17 +457,17 @@ class SpaGCN:
         Parameters
         ----------
         p : float
-            percentage.
+            Percentage.
         adj :
-            adjacent matrix.
-        start : float optional
-            starting value for searching l.
-        end : float optional
-            ending value for searching l.
-        tol : float optional
-            tolerant value for searching l.
-        max_run : int optional
-            Max runs.
+            Adjacent matrix.
+        start : float
+            Starting value for searching l.
+        end : float
+            Ending value for searching l.
+        tol : float
+            Tolerant value for searching l.
+        max_run : int
+            Maximum number of runs.
 
         Returns
         -------
@@ -519,27 +479,19 @@ class SpaGCN:
         return l
 
     def set_l(self, l):
-        """set l.
+        """Set l.
 
         Parameters
         ----------
         l : float
-            the parameter to control percentage p.
-
-        Returns
-        -------
-        None.
+            The parameter to control percentage p.
 
         """
         self.l = l
 
     def search_set_res(self, embed, adj, l, target_num, start=0.4, step=0.1, tol=5e-3, lr=0.05, max_epochs=10,
                        r_seed=100, t_seed=100, n_seed=100, max_run=10):
-        """search res.
-
-        res: Resolution in the initial Louvain's Clustering methods.
-
-        """
+        """Search for optimal resolution parameter."""
         random.seed(r_seed)
         torch.manual_seed(t_seed)
         np.random.seed(n_seed)
@@ -643,17 +595,12 @@ class SpaGCN:
         self.adj_exp = adj_exp
 
     def predict(self):
-        """prediction function.
-
-        Parameters
-        ----------
+        """Prediction function.
 
         Returns
         -------
-        y_pred : numpy
-            predicted label.
-        prob : numpy
-            predicted probability.
+        Tuple[np.ndarray, np.ndarray]
+            The predicted labels and the predicted probabilities.
 
         """
         z, q = self.model.predict(self.embed, self.adj_exp)
@@ -664,7 +611,7 @@ class SpaGCN:
         return y_pred, prob
 
     def score(self, y_true):
-        """score function to get score of prediction.
+        """Score function to evaluate the prediction performance.
 
         Parameters
         ----------

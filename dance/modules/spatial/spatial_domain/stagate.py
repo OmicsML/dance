@@ -157,16 +157,17 @@ class GATConv(MessagePassing):
 
 
 class Stagate(torch.nn.Module):
-    """Stagate class.
-
-    Parameters
-    ----------
-    hidden_dims : int
-        hidden dimensions
-
-    """
+    """Stagate class."""
 
     def __init__(self, hidden_dims):
+        """Initialize Stagate.
+
+        Parameters
+        ----------
+        hidden_dims : int
+            Hidden dimensions.
+
+        """
         super().__init__()
 
         [in_dim, num_hidden, out_dim] = hidden_dims
@@ -213,27 +214,27 @@ class Stagate(torch.nn.Module):
             Input data.
         graph :
             Graph structure.
-        n_epochs : int optional
+        n_epochs : int
             Number of epochs.
-        lr : float optional
+        lr : float
             Learning rate.
-        key_added : str optional
+        key_added : str
             Default "STAGATE".
-        gradient_clipping : float optional
+        gradient_clipping : float
             Gradient clipping.
-        pre_resolution : float optional
+        pre_resolution : float
             Pre-resolution.
-        weight_decay : float optional
+        weight_decay : float
             Weight decay.
-        verbose : bool optional
+        verbose : bool
             Verbosity, by default to be True.
-        random_seed : int optional
+        random_seed : int
             Random seed.
-        save_loss : bool optional
+        save_loss : bool
             Whether to save loss or not.
-        save_reconstrction : bool optional
+        save_reconstrction : bool
             Whether to save reconstruction or not.
-        device : str optional
+        device : str
             Computation device.
 
         """

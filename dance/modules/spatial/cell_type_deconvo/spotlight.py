@@ -49,20 +49,21 @@ def cell_topic_profile(x, groups, ct_select, axis=0, method="median"):
 
 
 class NNLS(nn.Module):
-    """NNLS.
-
-    Parameters
-    ----------
-    in_dim : int
-        Input dimension.
-    out_dim : int
-        Output dimension.
-    bias : bool
-        Include bias term, default False.
-
-    """
+    """NNLS."""
 
     def __init__(self, in_dim, out_dim, bias=False, init_bias=None, device="cpu"):
+        """Initialize NNLS.
+
+        Parameters
+        ----------
+        in_dim : int
+            Input dimension.
+        out_dim : int
+            Output dimension.
+        bias : bool
+            Include bias term, default False.
+
+        """
         super().__init__()
         self.device = device
         self.model = nn.Linear(in_features=in_dim, out_features=out_dim, bias=bias)
@@ -116,35 +117,36 @@ class NNLS(nn.Module):
 
 
 class SPOTlight:
-    """SPOTlight class.
-
-    Parameters
-    ----------
-    ref_count : pd.DataFrame
-        Reference single cell RNA-seq counts data (cell x gene).
-    ref_annot : pd.DataFrame
-        Reference cell-type label information.
-    mix_count : pd.DataFrame
-        Target mixed-cell RNA-seq counts data to be deconvoluted.
-    ct_varname : str
-        Name of the cell-types column.
-    ct_select : str
-        Selected cell-types to be considered for deconvolution.
-    rank : int
-        Rank of the matrix factorization.
-    sc_profile: np.ndarray
-        Pre-constructed cell profile matrix.
-    bias : bool
-        Include bias term, default False.
-    init_bias: np.ndarray
-        Initial bias term (background estimate).
-    init : str
-        Initialization method for matrix factorization solver (see NMF from sklearn).
-
-    """
+    """SPOTlight."""
 
     def __init__(self, ref_count, ref_annot, ct_varname, ct_select, rank=2, sc_profile=None, bias=False, init_bias=None,
                  init="random", device="cpu"):
+        """Initialize SPOTlight.
+
+        Parameters
+        ----------
+        ref_count : pd.DataFrame
+            Reference single cell RNA-seq counts data (cell x gene).
+        ref_annot : pd.DataFrame
+            Reference cell-type label information.
+        mix_count : pd.DataFrame
+            Target mixed-cell RNA-seq counts data to be deconvoluted.
+        ct_varname : str
+            Name of the cell-types column.
+        ct_select : str
+            Selected cell-types to be considered for deconvolution.
+        rank : int
+            Rank of the matrix factorization.
+        sc_profile: np.ndarray
+            Pre-constructed cell profile matrix.
+        bias : bool
+            Include bias term, default False.
+        init_bias: np.ndarray
+            Initial bias term (background estimate).
+        init : str
+            Initialization method for matrix factorization solver (see NMF from sklearn).
+
+        """
         super().__init__()
         self.device = device
         self.bias = bias

@@ -175,7 +175,7 @@ def modularity(partition, graph, weight="weight"):
        and values the communities
     graph : networkx.Graph
        the networkx graph which is decomposed
-    weight : str, optional
+    weight : str
         the key in graph to use as weight. Default to "weight"
 
 
@@ -245,20 +245,20 @@ def best_partition(graph, partition=None, weight="weight", resolution=1., random
     ----------
     graph : networkx.Graph
        the networkx graph which is decomposed
-    partition : dict, optional
+    partition : dict
        the algorithm will start using this partition of the nodes.
        It's a dictionary where keys are their nodes and values the communities
-    weight : str, optional
+    weight : str
         the key in graph to use as weight. Default to "weight"
-    resolution :  double, optional
+    resolution :  double
         Will change the size of the communities, default to 1.
         represents the time described in
         "Laplacian Dynamics and Multiscale Modular Structure in Networks",
         R. Lambiotte, J.-C. Delvenne, M. Barahona
-    randomize : boolean, optional
+    randomize : boolean
         Will randomize the node evaluation order and the community evaluation
         order to get different partitions at each call
-    random_state : int, RandomState instance or None, optional (default=None)
+    random_state : int, RandomState instance or None
         If int, random_state is the seed used by the random number generator;
         If RandomState instance, random_state is the random number generator;
         If None, the random number generator is the RandomState instance used
@@ -335,21 +335,21 @@ class Louvain:
         self.resolution = resolution
 
     def fit(self, adj, partition=None, weight="weight", randomize=None, random_state=None):
-        """fit function for model training.
+        """Fit function for model training.
 
         Parameters
         ----------
         adj :
             adjacent matrix.
-        partition : dict optional
+        partition : dict
             a dictionary where keys are graph nodes and values the part the node
             belongs to
-        weight : str, optional
+        weight : str
             the key in graph to use as weight. Default to "weight"
-        randomize : boolean, optional
+        randomize : boolean
             Will randomize the node evaluation order and the community evaluation
             order to get different partitions at each call
-        random_state : int, RandomState instance or None, optional (default=None)
+        random_state : int, RandomState instance or None
             If int, random_state is the seed used by the random number generator;
             If RandomState instance, random_state is the random number generator;
             If None, the random number generator is the RandomState instance used
@@ -368,31 +368,23 @@ class Louvain:
         print("fit over ")
 
     def predict(self):
-        """prediction function.
-        Parameters
-        ----------
-
-        Returns
-        -------
-        self.predict_result :
-            predicted label.
-
-        """
+        """Prediction function."""
         self.predict_result = partition_at_level(self.dendo, len(self.dendo) - 1)
         self.y_pred = self.predict_result
         return self.predict_result
 
     def score(self, y_true):
-        """score function to get score of prediction.
+        """Score function to evaluate the prediction performance.
+
         Parameters
         ----------
-        y_true :
-            ground truth label.
+        y_true
+            Ground truth label.
 
         Returns
         -------
-        score : float
-            metric eval score.
+        float
+            Evaluation score.
 
         """
         pred_val = []
