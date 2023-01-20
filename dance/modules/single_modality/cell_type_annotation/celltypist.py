@@ -1,9 +1,7 @@
 import json
-import logging
 import os
 import pathlib
 import pickle
-import warnings
 from datetime import datetime
 from typing import Optional, Union
 
@@ -13,16 +11,13 @@ import requests
 import scanpy as sc
 from anndata import AnnData
 from matplotlib import pyplot as plt
-from scipy.sparse import spmatrix
 from scipy.special import expit
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 
 from dance import logger
-from dance.transforms.preprocess import (LRClassifier_celltypist, SGDClassifier_celltypist, downsample_adata,
-                                         get_sample_csv_celltypist, get_sample_data_celltypist, prepare_data_celltypist,
-                                         to_array_celltypist, to_vector_celltypist)
+from dance.transforms.preprocess import (LRClassifier_celltypist, SGDClassifier_celltypist, get_sample_data_celltypist,
+                                         prepare_data_celltypist, to_array_celltypist)
 
 celltypist_path = os.getenv('CELLTYPIST_FOLDER', default=os.path.join(str(pathlib.Path.home()), '.celltypist'))
 pathlib.Path(celltypist_path).mkdir(parents=True, exist_ok=True)
