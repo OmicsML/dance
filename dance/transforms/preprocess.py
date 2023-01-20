@@ -518,7 +518,7 @@ def SGDClassifier_celltypist(indata, labels, alpha, max_iter, n_jobs, mini_batch
     Get the SGDClassifier.
 
     """
-    classifier = SGDClassifier(loss='log', alpha=alpha, max_iter=max_iter, n_jobs=n_jobs, **kwargs)
+    classifier = SGDClassifier(loss='log_loss', alpha=alpha, max_iter=max_iter, n_jobs=n_jobs, **kwargs)
     if not mini_batch:
         logger.info(f"??? Training data using SGD logistic regression")
         if (len(labels) > 100000) and (indata.shape[1] > 10000):

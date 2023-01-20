@@ -4,15 +4,18 @@ import zipfile
 
 import tqdm
 
+from dance import logger
 from dance.data.base import Data
+
+__all__ = ["Data"]
 
 
 # delete zip file
 def delete_file(filename):
     if not os.path.exists(filename):
-        print("File does not exist")
+        logger.info("File does not exist")
     else:
-        print("Deleting", filename)
+        logger.info(f"Deleting {filename!r}")
         os.remove(filename)
 
 
@@ -24,7 +27,7 @@ def download_file(url, filename):
         f = open(filename, "wb")
         meta = u.info()
         file_size = int(meta.get("Content-Length"))
-        print(f"Downloading: {filename} Bytes: {file_size:,}")
+        logger.info(f"Downloading: {filename} Bytes: {file_size:,}")
 
         file_size_dl = 0
         block_sz = 8192
@@ -40,16 +43,16 @@ def download_file(url, filename):
         u.close()
         return True
     else:
-        print("File already downloaded")
+        logger.info("File already downloaded")
         return False
 
 
 # unzip zipfile
 def unzip_file(filename, directory_to_extract_to):
     if not os.path.exists(filename):
-        print("File does not exist")
+        logger.info("File does not exist")
     else:
-        print("Unzipping", filename)
+        logger.info("Unzipping", filename)
         with zipfile.ZipFile(filename, "r") as zip_ref:
             zip_ref.extractall(directory_to_extract_to)
         delete_file(filename)

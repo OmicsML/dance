@@ -17,7 +17,7 @@ if __name__ == "__main__":
     parser.add_argument("--check_expression", action="store_true",
                         help="whether to check the normalization of training and test data")
     parser.add_argument("--log_level", type=str, default="INFO", choices=LOGLEVELS)
-    parser.add_argument("--max_iter", type=int, help="Max iteration during training", default=5)
+    parser.add_argument("--max_iter", type=int, help="Max iteration during training", default=200)
     parser.add_argument("--n_jobs", type=int, help="Number of jobs", default=10)
     parser.add_argument("--random_seed", type=int, default=10)
     parser.add_argument("--species", default="mouse", type=str)
@@ -25,8 +25,8 @@ if __name__ == "__main__":
                         help="List testing training dataset ids.")
     parser.add_argument("--tissue", default="Spleen", type=str)
     parser.add_argument("--train_dataset", type=int, nargs="+", default=[1970], help="List of training dataset ids.")
-    parser.add_argument("--use_SGD", action="store_true",
-                        help="Training algorithm -- weather it will be stochastic gradient descent")
+    parser.add_argument("--not_use_SGD", action="store_true",
+                        help="Training algorithm -- weather it will be stochastic gradient descent.")
 
     args = parser.parse_args()
     logger.setLevel(args.log_level)
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     # Train and evaluate the model
     model = Celltypist()
     model.fit(x_train, y_train, check_expression=args.check_expression, n_jobs=args.n_jobs, max_iter=args.max_iter,
-              use_SGD=args.use_SGD)
+              use_SGD=not args.not_use_SGD)
     pred_obj = model.predict(x_test, check_expression=args.check_expression)
     pred = pred_obj.predicted_labels["predicted_labels"].values
     score = model.score(pred, y_test)
