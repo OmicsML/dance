@@ -125,7 +125,7 @@ class Model():
             base += f"\n    cell types: {self.cell_types[0]}, {self.cell_types[1]}, ..., {self.cell_types[-1]}\n    features: {self.features[0]}, {self.features[1]}, ..., {self.features[-1]}"
         return base
 
-    def predict_labels_and_prob(self, indata, mode: str = 'best match', p_thres: float = 0.5) -> tuple:
+    def predict_labels_and_prob(self, indata) -> tuple:
         """Get the decision matrix, probability matrix, and predicted cell types for the
         input data.
 
@@ -133,14 +133,6 @@ class Model():
         ----------
         indata
             The input array-like object used as a query.
-        mode: str
-            The way cell prediction is performed.
-            For each query cell, the default (`'best match'`) is to choose the cell type with the largest score/probability as the final prediction.
-            Setting to `'prob match'` will enable a multi-label classification, which assigns 0 (i.e., unassigned), 1, or >=2 cell type labels to each query cell.
-            (Default: `'best match'`)
-        p_thres: float
-            Probability threshold for the multi-label classification. Ignored if `mode` is `'best match'`.
-            (Default: 0.5)
 
         Returns
         ----------
@@ -152,15 +144,7 @@ class Model():
         if len(self.cell_types) == 2:
             scores = np.column_stack([-scores, scores])
         probs = expit(scores)
-        if mode == 'best match':
-            return scores, probs, self.classifier.classes_[scores.argmax(axis=1)]
-        elif mode == 'prob match':
-            flags = probs > p_thres
-            labs = np.array(['|'.join(self.classifier.classes_[np.where(x)[0]]) for x in flags])
-            labs[labs == ''] = 'Unassigned'
-            return scores, probs, labs
-        else:
-            raise ValueError(f" Unrecognized `mode` value, should be one of `'best match'` or `'prob match'`")
+        return scores, probs, self.classifier.classes_[scores.argmax(axis=1)]
 
     def write(self, file: str) -> None:
         """Write out the model."""
@@ -703,31 +687,18 @@ class AnnotationResult():
 
 
 class Classifier():
-    """
-    Class that wraps the celltyping and majority voting processes.
+    """Class that wraps the celltyping and majority voting processes.
+
     Parameters
     ----------
-    filename: Union[AnnData,str]
-        Path to the input count matrix (supported types are csv, txt, tsv, tab and mtx) or AnnData object (h5ad).
-        If it's the former, a cell-by-gene format is desirable (see `transpose` for more information).
-        Also accepts the input as an :class:`~anndata.AnnData` object already loaded in memory.
-        Genes should be gene symbols. Non-expressed genes are preferred to be provided as well.
+    x: np.ndarray
+        Input expression matrix (cell x gene).
     model: Union[Model,str]
         A :class:`~celltypist.models.Model` object that wraps the logistic Classifier and the StandardScaler, the
         path to the desired model file, or the model name.
-    transpose: bool
-        Whether to transpose the input matrix. Set to `True` if `filename` is provided in a gene-by-cell format.
-        (Default: `False`)
-    gene_file: Optional[str]
-        Path to the file which stores each gene per line corresponding to the genes used in the provided mtx file.
-        Ignored if `filename` is not provided in the mtx format.
-    cell_file: Optional[str]
-        Path to the file which stores each cell per line corresponding to the cells used in the provided mtx file.
-        Ignored if `filename` is not provided in the mtx format.
+
     Attributes
     ----------
-    filename:
-        Path to the input dataset. This attribute exists only when the input is a file path.
     adata:
         An :class:`~anndata.AnnData` object which stores the log1p normalized expression data in `.X` or `.raw.X`.
     indata:
@@ -738,105 +709,24 @@ class Classifier():
         All the cells included in the input data.
     model:
         A :class:`~celltypist.models.Model` object that wraps the logistic Classifier and the StandardScaler.
+
     """
 
-    def __init__(
-        self,
-        filename: Union[AnnData, str] = "",
-        model: Union[Model, str] = "",
-        transpose: bool = False,
-        gene_file: Optional[str] = None,
-        cell_file: Optional[str] = None,
-        check_expression: bool = False,
-    ):
+    def __init__(self, x: np.ndarray, model: Model):
         if isinstance(model, str):
             model = Model.load(model)
         self.model = model
-        if isinstance(filename, str) and filename == "":
-            logger.warn(" No input file provided to the classifier")
-            return
-        if isinstance(filename, str):
-            self.filename = filename
-            logger.info(f" Input file is '{self.filename}'")
-            logger.info(" Loading data")
-        if isinstance(filename, str) and filename.endswith(('.csv', '.txt', '.tsv', '.tab', '.mtx', '.mtx.gz')):
-            self.adata = sc.read(self.filename)
-            if transpose:
-                self.adata = self.adata.transpose()
-            if self.filename.endswith(('.mtx', '.mtx.gz')):
-                if (gene_file is None) or (cell_file is None):
-                    raise FileNotFoundError(
-                        " Missing `gene_file` and/or `cell_file`. Please provide both arguments together with the input mtx file"
-                    )
-                genes_mtx = pd.read_csv(gene_file, header=None)[0].values
-                cells_mtx = pd.read_csv(cell_file, header=None)[0].values
-                if len(genes_mtx) != self.adata.n_vars:
-                    raise ValueError(
-                        f" The number of genes in {gene_file} does not match the number of genes in {self.filename}")
-                if len(cells_mtx) != self.adata.n_obs:
-                    raise ValueError(
-                        f" The number of cells in {cell_file} does not match the number of cells in {self.filename}")
-                self.adata.var_names = genes_mtx
-                self.adata.obs_names = cells_mtx
-            self.adata.var_names_make_unique()
-            if not float(self.adata.X.max()).is_integer():
-                logger.warn(
-                    f" Warning: the input file seems not a raw count matrix. The prediction result may be biased")
-            if (self.adata.n_vars >= 80000) or (len(self.adata.var_names[0]) >= 30) or (len(
-                    self.adata.obs_names.intersection(pd.Index(['GAPDH', 'ACTB', 'CALM1', 'PTPRC']))) >= 1):
-                raise ValueError(
-                    f" The input matrix is detected to be a gene-by-cell matrix. Please provide a cell-by-gene matrix or add the input transpose option"
-                )
-            sc.pp.normalize_total(self.adata, target_sum=1e4)
-            sc.pp.log1p(self.adata)
-            self.indata = self.adata.X
-            self.indata_genes = self.adata.var_names
-            self.indata_names = self.adata.obs_names
-        elif isinstance(filename, (AnnData, np.ndarray, pd.DataFrame)) or (isinstance(filename, str)
-                                                                           and filename.endswith('.h5ad')):
-            if isinstance(filename, (np.ndarray, pd.DataFrame)):
-                self.adata = AnnData(filename)
-            elif isinstance(filename, str):
-                self.adata = sc.read(filename)
-            else:
-                self.adata = filename
-            self.adata.var_names_make_unique()
 
-            if self.adata.X.min() < 0:
-                logger.info(" Detected scaled expression in the input data, will try the `.raw` attribute")
-                try:
-                    self.indata = self.adata.raw.X
-                    self.indata_genes = self.adata.raw.var_names
-                    self.indata_names = self.adata.raw.obs_names
-                except Exception as e:
-                    raise Exception(f" Fail to use the `.raw` attribute in the input object. {e}")
-            else:
-                self.indata = self.adata.X
-                self.indata_genes = self.adata.var_names
-                self.indata_names = self.adata.obs_names
-            if check_expression and np.abs(np.expm1(self.indata[0]).sum() - 10000) > 1:
-                raise ValueError(
-                    " Invalid expression matrix, expect log1p normalized expression to 10000 counts per cell")
-        else:
-            raise ValueError(
-                " Invalid input. Supported types: .csv, .txt, .tsv, .tab, .mtx, .mtx.gz and .h5ad, or AnnData loaded in memory"
-            )
+        self.adata = AnnData(x)
+        self.adata.var_names_make_unique()
 
-        logger.info(f" Input data has {self.indata.shape[0]} cells and {len(self.indata_genes)} genes")
+        self.indata = self.adata.X
+        self.indata_genes = self.adata.var_names
+        self.indata_names = self.adata.obs_names
+        logger.info(f"Input data has {self.indata.shape[0]} cells and {len(self.indata_genes)} genes")
 
-    def celltype(self, mode: str = 'best match', p_thres: float = 0.5) -> AnnotationResult:
+    def celltype(self) -> AnnotationResult:
         """Run celltyping jobs to predict cell types of input data.
-
-        Parameters
-        ----------
-        mode: str optional
-            The way cell prediction is performed.
-            For each query cell, the default (`'best match'`) is to choose the cell type with the largest score/probability as the final prediction.
-            Setting to `'prob match'` will enable a multi-label classification, which assigns 0 (i.e., unassigned), 1, or >=2 cell type labels to each query cell.
-            (Default: `'best match'`)
-        p_thres: float optional
-            Probability threshold for the multi-label classification. Ignored if `mode` is `'best match'`.
-            (Default: 0.5)
 
         Returns
         ----------
@@ -848,35 +738,33 @@ class Classifier():
             4) :attr:`~celltypist.classifier.AnnotationResult.adata`, AnnData object representation of the input data.
 
         """
-        logger.info(f" Matching reference genes in the model")
+        logger.info("Matching reference genes in the model")
         k_x = np.isin(self.indata_genes, self.model.classifier.features)
         if k_x.sum() == 0:
-            raise ValueError(f" No features overlap with the model. Please provide gene symbols")
+            raise ValueError("No features overlap with the model. Please provide gene symbols")
         else:
-            logger.info(f" {k_x.sum()} features used for prediction")
+            logger.info(f"{k_x.sum()} features used for prediction")
         k_x_idx = np.where(k_x)[0]
-        #self.indata = self.indata[:, k_x_idx]
         self.indata_genes = self.indata_genes[k_x_idx]
-        lr_idx = pd.DataFrame(self.model.classifier.features,
-                              columns=['features']).reset_index().set_index('features').loc[self.indata_genes,
-                                                                                            'index'].values
+        lr_idx = np.where(np.isin(self.model.classifier.features, self.indata_genes))[0]
 
-        logger.info(f" Scaling input data")
+        logger.info("Scaling input data")
         means_ = self.model.scaler.mean_[lr_idx]
         sds_ = self.model.scaler.scale_[lr_idx]
         self.indata = (self.indata[:, k_x_idx] - means_) / sds_
         self.indata[self.indata > 10] = 10
 
+        # Temporarily replace with subsetted features, will recover after running the prediction function
         ni, fs, cf = self.model.classifier.n_features_in_, self.model.classifier.features, self.model.classifier.coef_
         self.model.classifier.n_features_in_ = lr_idx.size
         self.model.classifier.features = self.model.classifier.features[lr_idx]
         self.model.classifier.coef_ = self.model.classifier.coef_[:, lr_idx]
 
-        logger.info(" Predicting labels")
-        decision_mat, prob_mat, lab = self.model.predict_labels_and_prob(self.indata, mode=mode, p_thres=p_thres)
-        logger.info(" Prediction done!")
+        logger.info("Predicting labels")
+        decision_mat, prob_mat, lab = self.model.predict_labels_and_prob(self.indata)
+        logger.info("Prediction done")
 
-        #restore model after prediction
+        # Restore model after prediction
         self.model.classifier.n_features_in_, self.model.classifier.features, self.model.classifier.coef_ = ni, fs, cf
 
         cells = self.indata_names
@@ -1102,35 +990,21 @@ class Celltypist:
             An instance of the :class:`~celltypist.models.Model` trained by celltypist.
 
         """
-        #prepare
-        logger.info(" Preparing data before training")
-        indata, labels, genes = prepare_data_celltypist(X, labels, genes, transpose_input)
-        indata = to_array_celltypist(indata)
+        # Prepare
+        logger.info("Preparing data before training")
+        indata, labels, genes = prepare_data_celltypist(X, labels, genes)
+        # indata = to_array_celltypist(indata)
         labels = np.array(labels)
         genes = np.array(genes)
-        #check
-        if check_expression and (np.abs(np.expm1(indata[0]).sum() - 10000) > 1):
-            raise ValueError(" Invalid expression matrix, expect log1p normalized expression to 10000 counts per cell")
-        if len(labels) != indata.shape[0]:
-            raise ValueError(
-                f" Length of training labels ({len(labels)}) does not match the number of input cells ({indata.shape[0]})"
-            )
-        if len(genes) != indata.shape[1]:
-            raise ValueError(
-                f" The number of genes ({len(genes)}) provided does not match the number of genes in the training data ({indata.shape[1]})"
-            )
-        #filter
-        flag = indata.sum(axis=0) == 0
-        if flag.sum() > 0:
-            logger.info(f" {flag.sum()} non-expressed genes are filtered out")
-            #indata = indata[:, ~flag]
-            genes = genes[~flag]
-        #scaler
-        logger.info(f" Scaling input data")
+
+        # Scaler
+        logger.info("Scaling input data")
         scaler = StandardScaler()
-        indata = scaler.fit_transform(indata[:, ~flag] if flag.sum() > 0 else indata)
+        # indata = scaler.fit_transform(indata[:, ~flag] if flag.sum() > 0 else indata)
+        indata = scaler.fit_transform(indata)
         indata[indata > 10] = 10
-        #classifier
+
+        # Classifier
         if use_SGD or feature_selection:
             classifier = SGDClassifier_celltypist(indata=indata, labels=labels, alpha=alpha, max_iter=max_iter,
                                                   n_jobs=n_jobs, mini_batch=mini_batch, batch_number=batch_number,
@@ -1139,19 +1013,19 @@ class Celltypist:
         else:
             classifier = LRClassifier_celltypist(indata=indata, labels=labels, C=C, solver=solver, max_iter=max_iter,
                                                  n_jobs=n_jobs, **kwargs)
-        #feature selection -> new classifier and scaler
+
+        # Feature selection -> new classifier and scaler
         if feature_selection:
-            logger.info(f" Selecting features")
+            logger.info("Selecting features")
             if len(genes) <= top_genes:
-                raise ValueError(
-                    f" The number of genes ({len(genes)}) is fewer than the `top_genes` ({top_genes}). Unable to perform feature selection"
-                )
+                raise ValueError(f" The number of genes ({len(genes)}) is fewer than the `top_genes` ({top_genes}). "
+                                 "Unable to perform feature selection")
             gene_index = np.argpartition(np.abs(classifier.coef_), -top_genes, axis=1)[:, -top_genes:]
             gene_index = np.unique(gene_index)
-            logger.info(f" {len(gene_index)} features are selected")
+            logger.info(f"{len(gene_index)} features are selected")
             genes = genes[gene_index]
-            #indata = indata[:, gene_index]
-            logger.info(f" Starting the second round of training")
+
+            logger.info("Starting the second round of training")
             if use_SGD:
                 classifier = SGDClassifier_celltypist(indata=indata[:, gene_index], labels=labels, alpha=alpha,
                                                       max_iter=max_iter, n_jobs=n_jobs, mini_batch=mini_batch,
@@ -1164,7 +1038,8 @@ class Celltypist:
             scaler.var_ = scaler.var_[gene_index]
             scaler.scale_ = scaler.scale_[gene_index]
             scaler.n_features_in_ = len(gene_index)
-        #model finalization
+
+        # Model finalization
         classifier.features = genes
         if not date:
             date = str(datetime.now())
@@ -1176,50 +1051,23 @@ class Celltypist:
             'version': version,
             'number_celltypes': len(classifier.classes_)
         }
-        logger.info(f" Model training done!")
+        logger.info("Model training done")
 
         self.classifier = classifier
         self.scaler = scaler
         self.description = description
 
-    def predict(self, filename: Union[AnnData, str] = "", check_expression: bool = False, load_model: bool = False,
-                model: Optional[Union[str, Model]] = None, transpose_input: bool = False,
-                gene_file: Optional[str] = None, cell_file: Optional[str] = None, mode: str = 'best match',
-                p_thres: float = 0.5, majority_voting: bool = False,
-                over_clustering: Optional[Union[str, list, tuple, np.ndarray, pd.Series,
-                                                pd.Index]] = None, min_prop: float = 0) -> AnnotationResult:
+    def predict(self, x: np.ndarray, check_expression: bool = False, load_model: bool = False,
+                majority_voting: bool = False, over_clustering: Optional[Union[str, list, tuple, np.ndarray, pd.Series,
+                                                                               pd.Index]] = None,
+                min_prop: float = 0) -> AnnotationResult:
         """Run the prediction and (optional) majority voting to annotate the input
         dataset.
 
         Parameters
         ----------
-        filename: Union[AnnData,str]  optional
-            Path to the input count matrix (supported types are csv, txt, tsv, tab and mtx) or AnnData (h5ad).
-            If it's the former, a cell-by-gene format is desirable (see `transpose_input` for more information).
-            Also accepts the input as an :class:`~anndata.AnnData` object already loaded in memory.
-            Genes should be gene symbols. Non-expressed genes are preferred to be provided as well.
-        model: Union[str, Model] optional
-            Model used to predict the input cells. Default to using the `'Immune_All_Low.pkl'` model.
-            Can be a :class:`~celltypist.models.Model` object that wraps the logistic Classifier and the StandardScaler, the
-            path to the desired model file, or the model name.
-            To see all available models and their descriptions, use :func:`~celltypist.models.models_description`.
-        transpose_input: boolUnion[str, Model]
-            Whether to transpose the input matrix. Set to `True` if `filename` is provided in a gene-by-cell format.
-            (Default: `False`)
-        gene_file: str optional
-            Path to the file which stores each gene per line corresponding to the genes used in the provided mtx file.
-            Ignored if `filename` is not provided in the mtx format.
-        cell_file: str optional
-            Path to the file which stores each cell per line corresponding to the cells used in the provided mtx file.
-            Ignored if `filename` is not provided in the mtx format.
-        mode: str optional
-            The way cell prediction is performed.
-            For each query cell, the default (`'best match'`) is to choose the cell type with the largest score/probability as the final prediction.
-            Setting to `'prob match'` will enable a multi-label classification, which assigns 0 (i.e., unassigned), 1, or >=2 cell type labels to each query cell.
-            (Default: `'best match'`)
-        p_thres: float optional
-            Probability threshold for the multi-label classification. Ignored if `mode` is `'best match'`.
-            (Default: 0.5)
+        x: np.ndarray
+            Input expression matrix (cell x gene).
         majority_voting: bool optional
             Whether to refine the predicted labels by running the majority voting classifier after over-clustering.
             (Default: `False`)
@@ -1246,25 +1094,20 @@ class Celltypist:
             4) :attr:`~celltypist.classifier.AnnotationResult.adata`, AnnData representation of the input data.
 
         """
-        #load model
-        # lr_classifier = Model(self.classifier, self.scaler, self.description) if isinstance(model, Model) else Model.load(model)
-        if load_model:
-            lr_classifier = Model.load(model)
-        else:
-            lr_classifier = Model(self.classifier, self.scaler, self.description)
-        #construct Classifier class
-        clf = Classifier(filename=filename, model=lr_classifier, transpose=transpose_input, gene_file=gene_file,
-                         cell_file=cell_file, check_expression=check_expression)
-        #predict
-        predictions = clf.celltype(mode=mode, p_thres=p_thres)
+        # Construct classifier
+        lr_classifier = Model(self.classifier, self.scaler, self.description)
+        clf = Classifier(x=x, model=lr_classifier)
+
+        # Predict
+        predictions = clf.celltype()
         if not majority_voting:
             return predictions
         if predictions.cell_count <= 50:
-            logger.warn(
-                f" Warning: the input number of cells ({predictions.cell_count}) is too few to conduct proper over-clustering; no majority voting is performed"
-            )
+            logger.warn(f" Warning: the input number of cells ({predictions.cell_count}) is too few to conduct proper "
+                        "over-clustering; no majority voting is performed")
             return predictions
-        #over clustering
+
+        # Over clustering
         if over_clustering is None:
             over_clustering = clf.over_cluster()
             predictions.adata = clf.adata
@@ -1272,19 +1115,18 @@ class Celltypist:
             if over_clustering in clf.adata.obs:
                 over_clustering = clf.adata.obs[over_clustering]
             else:
-                logger.info(
-                    f" Did not identify '{over_clustering}' as a cell metadata column, assume it to be a plain text file"
-                )
+                logger.info(f" Did not identify '{over_clustering}' as a cell metadata column, "
+                            "assume it to be a plain text file")
                 try:
                     with open(over_clustering) as f:
                         over_clustering = [x.strip() for x in f.readlines()]
                 except Exception as e:
                     raise Exception(f" {e}")
         if len(over_clustering) != clf.adata.n_obs:
-            raise ValueError(
-                f" Length of `over_clustering` ({len(over_clustering)}) does not match the number of input cells ({clf.adata.n_obs})"
-            )
-        #majority voting
+            raise ValueError(f" Length of `over_clustering` ({len(over_clustering)}) does not match "
+                             f"the number of input cells ({clf.adata.n_obs})")
+
+        # Majority voting
         print(predictions)
         return Classifier.majority_vote(predictions, over_clustering, min_prop=min_prop)
 

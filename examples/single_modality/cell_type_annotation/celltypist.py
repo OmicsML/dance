@@ -14,8 +14,6 @@ if __name__ == "__main__":
                         default="Cell_type")
     parser.add_argument("--cell_type_train", type=str, help="name for the cell type information for training data",
                         default="Cell_type")
-    parser.add_argument("--check_expression", action="store_true",
-                        help="whether to check the normalization of training and test data")
     parser.add_argument("--log_level", type=str, default="INFO", choices=LOGLEVELS)
     parser.add_argument("--max_iter", type=int, help="Max iteration during training", default=200)
     parser.add_argument("--n_jobs", type=int, help="Number of jobs", default=10)
@@ -49,9 +47,8 @@ if __name__ == "__main__":
 
     # Train and evaluate the model
     model = Celltypist()
-    model.fit(x_train, y_train, check_expression=args.check_expression, n_jobs=args.n_jobs, max_iter=args.max_iter,
-              use_SGD=not args.not_use_SGD)
-    pred_obj = model.predict(x_test, check_expression=args.check_expression)
+    model.fit(x_train, y_train, n_jobs=args.n_jobs, max_iter=args.max_iter, use_SGD=not args.not_use_SGD)
+    pred_obj = model.predict(x_test)
     pred = pred_obj.predicted_labels["predicted_labels"].values
     score = model.score(pred, y_test)
     print(f"{score=:.4f}")

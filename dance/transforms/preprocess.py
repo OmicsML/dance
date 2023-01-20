@@ -423,68 +423,14 @@ def to_array_celltypist(_array_like):
         raise ValueError(f"?? Please provide a valid array-like object as input")
 
 
-def prepare_data_celltypist(X, labels, genes, transpose):
-    if (X is None) or (labels is None):
-        raise Exception("?? Missing training data and/or training labels. Please provide both arguments")
-    if isinstance(X, (AnnData, np.ndarray, pd.DataFrame)) or (isinstance(X, str) and X.endswith('.h5ad')):
-        if isinstance(X, str):
-            adata = sc.read(X)
-        elif isinstance(X, np.ndarray):
-            adata = AnnData(pd.DataFrame(X, columns=list(map(str, range(X.shape[1])))))
-        elif isinstance(X, pd.DataFrame):
-            adata = AnnData(X)
-        else:
-            adata = X
+def prepare_data_celltypist(x, y, genes):
+    adata = AnnData(pd.DataFrame(x, columns=list(map(str, range(x.shape[1])))))
+    adata.var_names_make_unique()
 
-        adata.var_names_make_unique()
-        if adata.X.min() < 0:
-            logger.info("?? Detected scaled expression in the input data, will try the .raw attribute")
-            try:
-                indata = adata.raw.X
-                genes = adata.raw.var_names
-            except Exception as e:
-                raise Exception(f"?? Fail to use the .raw attribute in the input object. {e}")
-        else:
-            indata = adata.X
-            genes = adata.var_names
-        if isinstance(labels, str) and (labels in adata.obs):
-            labels = adata.obs[labels]
-        else:
-            labels = to_vector_celltypist(labels)
-    elif isinstance(X, str) and X.endswith(('.csv', '.txt', '.tsv', '.tab', '.mtx', '.mtx.gz')):
-        adata = sc.read(X)
-        if transpose:
-            adata = adata.transpose()
-        if X.endswith(('.mtx', '.mtx.gz')):
-            if genes is None:
-                raise Exception("?? Missing `genes`. Please provide this argument together with the input mtx file")
-            genes = to_vector_celltypist(genes)
-            if len(genes) != adata.n_vars:
-                raise ValueError(f"?? The number of genes provided does not match the number of genes in {X}")
-            adata.var_names = np.array(genes)
-        adata.var_names_make_unique()
-        if not float(adata.X.max()).is_integer():
-            logger.warn(f"?? Warning: the input file seems not a raw count matrix. The trained model may be biased")
-        sc.pp.normalize_total(adata, target_sum=1e4)
-        sc.pp.log1p(adata)
-        indata = adata.X
-        genes = adata.var_names
-        labels = to_vector_celltypist(labels)
-    elif isinstance(X, str):
-        raise ValueError("?? Invalid input. Supported types: .csv, .txt, .tsv, .tab, .mtx, .mtx.gz and .h5ad")
-    else:
-        logger.info("?? The input training data is processed as an array-like object")
-        indata = X
-        if transpose:
-            indata = indata.transpose()
-        if isinstance(indata, pd.DataFrame):
-            genes = indata.columns
-        else:
-            if genes is None:
-                raise Exception(
-                    "?? Missing `genes`. Please provide this argument together with the input training data")
-            genes = to_vector_celltypist(genes)
-        labels = to_vector_celltypist(labels)
+    indata = adata.X
+    genes = adata.var_names
+    labels = to_vector_celltypist(y)
+
     return indata, labels, genes
 
 
