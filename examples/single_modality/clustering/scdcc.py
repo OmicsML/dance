@@ -115,14 +115,14 @@ if __name__ == "__main__":
         np.savetxt(args.label_cells_files, label_cell_indx, fmt="%i")
 """ Reproduction information
 10X PBMC:
-python scdcc.py --data_file='10X_PBMC' --label_cells_files='label_10X_PBMC.txt' --gamma=1.5
+python scdcc.py --data_file 10X_PBMC --label_cells_files label_10X_PBMC.txt --gamma=1.5
 
 Mouse ES:
-python scdcc.py --data_file='mouse_ES_cell' --label_cells_files='label_mouse_ES_cell.txt' --gamma=1 --ml_weight=0.8 --cl_weight=0.8
+python scdcc.py --data_file mouse_ES_cell --label_cells_files label_mouse_ES_cell.txt --gamma 1 --ml_weight 0.8 --cl_weight 0.8
 
 Worm Neuron:
-python scdcc.py --data_file='worm_neuron_cell' --label_cells_files='label_worm_neuron_cell.txt' --gamma=1 --pretrain_epochs=300
+python scdcc.py --data_file worm_neuron_cell --label_cells_files label_worm_neuron_cell.txt --gamma 1 --pretrain_epochs 300
 
 Mouse Bladder:
-python scdcc.py --data_file='mouse_bladder_cell' --label_cells_files='label_mouse_bladder_cell.txt' --gamma=1.5 --pretrain_epochs=100 --sigma=3
+python scdcc.py --data_file mouse_bladder_cell --label_cells_files label_mouse_bladder_cell.txt --gamma 1.5 --pretrain_epochs 100 --sigma 3
 """
