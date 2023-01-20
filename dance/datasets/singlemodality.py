@@ -3,6 +3,7 @@ import glob
 import os
 import os.path as osp
 import pprint
+import shutil
 import sys
 from dataclasses import dataclass
 
@@ -21,6 +22,32 @@ from dance.typing import Dict, List, Optional, Set, Tuple
 
 class CellTypeDataset:
 
+    all_url_dict: Dict[str, str] = {
+        "train_human_cell_atlas":   "https://www.dropbox.com/s/1itq1pokplbqxhx?dl=1",
+        "test_human_test_data":     "https://www.dropbox.com/s/gpxjnnvwyblv3xb?dl=1",
+        "train_mouse_cell_atlas":   "https://www.dropbox.com/s/ng8d3eujfah9ppl?dl=1",
+        "test_mouse_test_data":     "https://www.dropbox.com/s/pkr28czk5g3al2p?dl=1",
+    }  # yapf: disable
+    bench_url_dict: Dict[str, str] = {
+        # Mouse spleen benchmark
+        "train_mouse_Spleen1970_celltype.csv":  "https://www.dropbox.com/s/3ea64vk546fjxvr?dl=1",
+        "train_mouse_Spleen1970_data.csv":      "https://www.dropbox.com/s/c4te0fr1qicqki8?dl=1",
+        "test_mouse_Spleen1759_celltype.csv":   "https://www.dropbox.com/s/gczehvgai873mhb?dl=1",
+        "test_mouse_Spleen1759_data.csv":       "https://www.dropbox.com/s/fl8t7rbo5dmznvq?dl=1",
+        # Mouse brain benchmark
+        "train_mouse_Brain753_celltype.csv":    "https://www.dropbox.com/s/x2katwk93z06sgw?dl=1",
+        "train_mouse_Brain753_data.csv":        "https://www.dropbox.com/s/3f3wbplgo3xa4ww?dl=1",
+        "train_mouse_Brain3285_celltype.csv":   "https://www.dropbox.com/s/ozsobozk3ihkrqg?dl=1",
+        "train_mouse_Brain3285_data.csv":       "https://www.dropbox.com/s/zjrloejx8iqdqsa?dl=1",
+        "test_mouse_Brain2695_celltype.csv":    "https://www.dropbox.com/s/gh72dk7i0p7fggu?dl=1",
+        "test_mouse_Brain2695_data.csv":        "https://www.dropbox.com/s/ufianih66xjqxdu?dl=1",
+        # Mouse kidney benchmark
+        "train_mouse_Kidney4682_celltype.csv":  "https://www.dropbox.com/s/3plrve7g9v428ec?dl=1",
+        "train_mouse_Kidney4682_data.csv":      "https://www.dropbox.com/s/olf5nirtieu1ikq?dl=1",
+        "test_mouse_Kidney203_celltype.csv":    "https://www.dropbox.com/s/t4eyaig889qdiz2?dl=1",
+        "test_mouse_Kidney203_data.csv":        "https://www.dropbox.com/s/kmos1ceubumgmpj?dl=1",
+    }  # yapf: disable
+
     def __init__(self, download_all=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
                  train_dir="train", test_dir="test", map_path="map", filetype="csv", threshold=None, exclude_rate=None,
                  data_dir="./"):
@@ -38,69 +65,31 @@ class CellTypeDataset:
         self.exclude_rate = exclude_rate
 
     def download_all_data(self):
-        # download data
-        gene_class = ["human_cell_atlas", "human_test_data", "mouse_cell_atlas", "mouse_test_data"]
+        if self.is_complete():
+            return
 
-        url = {
-            "human_cell_atlas": "https://www.dropbox.com/s/1itq1pokplbqxhx/human_cell_atlas.zip?dl=0",
-            "human_test_data": "https://www.dropbox.com/s/gpxjnnvwyblv3xb/human_test_data.zip?dl=0",
-            "mouse_cell_atlas": "https://www.dropbox.com/s/ng8d3eujfah9ppl/mouse_cell_atlas.zip?dl=0",
-            "mouse_test_data": "https://www.dropbox.com/s/pkr28czk5g3al2p/mouse_test_data.zip?dl=0"
-        }
+        # Download and overwrite
+        for name, url in self.all_url_dict.items():
+            download_unzip(url, self.data_dir)
 
-        file_name = {
-            "human_cell_atlas": "human_cell_atlas.zip?dl=0",
-            "human_test_data": "human_test_data.zip?dl=0",
-            "mouse_cell_atlas": "mouse_cell_atlas.zip?dl=0",
-            "mouse_test_data": "mouse_test_data.zip?dl=0"
-        }
+            parts = name.split("_")  # [train|test]_{species}_[cell|test]_atlas
+            download_path = osp.join(self.data_dir, "_".join(parts[1:]))
+            move_path = osp.join(self.data_dir, *parts[:2])
 
-        species = {
-            "human_cell_atlas": "human",
-            "human_test_data": "human",
-            "mouse_cell_atlas": "mouse",
-            "mouse_test_data": "mouse"
-        }
-
-        os.system("mkdir " + self.data_dir + "/train")
-        os.system("mkdir " + self.data_dir + "/train/mouse")
-        os.system("mkdir " + self.data_dir + "/train/human")
-        for class_name in gene_class:
-            os.system("wget " + url[class_name])
-            os.system("unzip " + file_name[class_name])
-            os.system("mv " + class_name + "/* " + self.data_dir + "/train/" + species[class_name] + "/")
-            os.system("rm " + file_name[class_name])
-            os.system("rm -r " + class_name)
-
-        os.system("cp -r " + self.data_dir + "/train/ " + self.data_dir + "/test")
+            os.makedirs(osp.dirname(move_path), exist_ok=True)
+            try:
+                shutil.rmtree(move_path)
+            except FileNotFoundError:
+                pass
+            os.rename(download_path, move_path)
 
     def download_benchmark_data(self, download_map=True, download_pretrained=True):
-
         if self.is_benchmark_complete():
             return
 
-        urls = {
-            # Mouse spleen benchmark
-            "train_mouse_Spleen1970_celltype.csv":  "https://www.dropbox.com/s/3ea64vk546fjxvr?dl=1",
-            "train_mouse_Spleen1970_data.csv":      "https://www.dropbox.com/s/c4te0fr1qicqki8?dl=1",
-            "test_mouse_Spleen1759_celltype.csv":   "https://www.dropbox.com/s/gczehvgai873mhb?dl=1",
-            "test_mouse_Spleen1759_data.csv":       "https://www.dropbox.com/s/fl8t7rbo5dmznvq?dl=1",
-            # Mouse brain benchmark
-            "train_mouse_Brain753_celltype.csv":    "https://www.dropbox.com/s/x2katwk93z06sgw?dl=1",
-            "train_mouse_Brain753_data.csv":        "https://www.dropbox.com/s/3f3wbplgo3xa4ww?dl=1",
-            "train_mouse_Brain3285_celltype.csv":   "https://www.dropbox.com/s/ozsobozk3ihkrqg?dl=1",
-            "train_mouse_Brain3285_data.csv":       "https://www.dropbox.com/s/zjrloejx8iqdqsa?dl=1",
-            "test_mouse_Brain2695_celltype.csv":    "https://www.dropbox.com/s/gh72dk7i0p7fggu?dl=1",
-            "test_mouse_Brain2695_data.csv":        "https://www.dropbox.com/s/ufianih66xjqxdu?dl=1",
-            # Mouse kidney benchmark
-            "train_mouse_Kidney4682_celltype.csv":  "https://www.dropbox.com/s/3plrve7g9v428ec?dl=1",
-            "train_mouse_Kidney4682_data.csv":      "https://www.dropbox.com/s/olf5nirtieu1ikq?dl=1",
-            "test_mouse_Kidney203_celltype.csv":    "https://www.dropbox.com/s/t4eyaig889qdiz2?dl=1",
-            "test_mouse_Kidney203_data.csv":        "https://www.dropbox.com/s/kmos1ceubumgmpj?dl=1",
-        }  # yapf: disable
-
+        # TODO: only download missing files
         # Download training and testing data
-        for name, url in urls.items():
+        for name, url in self.bench_url_dict.items():
             parts = name.split("_")  # [train|test]_{species}_{tissue}{id}_[celltype|data].csv
             filename = "_".join(parts[1:])
             filepath = osp.join(self.data_dir, *parts[:2], filename)
@@ -111,11 +100,6 @@ class CellTypeDataset:
             download_unzip("https://www.dropbox.com/sh/hw1189sgm0kfrts/AAAapYOblLApqygZ-lGo_70-a?dl=1",
                            osp.join(self.data_dir, "map"))
 
-        if download_pretrained:
-            # Download pretrained stats data
-            download_unzip("https://www.dropbox.com/sh/s2cxcrzl2ama9zp/AACKwiYtS8hbOOudQLIMDvXUa?dl=1",
-                           osp.join(self.data_dir, "pretrained"))
-
     def is_complete(self):
         """Check if data is complete."""
         check = [
@@ -123,36 +107,20 @@ class CellTypeDataset:
             osp.join(self.data_dir, "test"),
             osp.join(self.data_dir, "pretrained")
         ]
-
         for i in check:
             if not osp.exists(i):
-                print(f"file {i} doesn't exist")
+                logger.info(f"file {i} doesn't exist")
                 return False
         return True
 
     def is_benchmark_complete(self):
-        check = [
-            "test_mouse_Brain2695_celltype.csv",
-            "test_mouse_Brain2695_data.csv",
-            "test_mouse_Kidney203_celltype.csv",
-            "test_mouse_Kidney203_data.csv",
-            "test_mouse_Spleen1759_celltype.csv",
-            "test_mouse_Spleen1759_data.csv",
-            "train_mouse_Brain3285_celltype.csv",
-            "train_mouse_Brain3285_data.csv",
-            "train_mouse_Brain753_celltype.csv",
-            "train_mouse_Brain753_data.csv",
-            "train_mouse_Kidney4682_celltype.csv",
-            "train_mouse_Kidney4682_data.csv",
-            "train_mouse_Spleen1970_celltype.csv",
-            "train_mouse_Spleen1970_data.csv",
-        ]
-        for name in check:
+        """Check if benchmarking data is complete."""
+        for name in self.bench_url_dict:
             filename = name[name.find('mouse'):]
             file_i = osp.join(self.data_dir, *name.split("_")[:2], filename)
             if not osp.exists(file_i):
-                print(file_i)
-                print(f"file {filename} doesn't exist")
+                logger.info(file_i)
+                logger.info(f"file {filename} doesn't exist")
                 return False
         # check maps
         map_check = [
@@ -162,16 +130,15 @@ class CellTypeDataset:
         ]
         for file in map_check:
             if not osp.exists(file):
-                print(f"file {name} doesn't exist")
+                logger.info(f"file {name} doesn't exist")
                 return False
-        # TODO: check pretrained data
         return True
 
     def load_data(self):
         # Load data from existing files, or download files and load data.
         if self.download_all:
             self.download_all_data()
-        elif not self.is_complete():
+        elif not self.is_benchmark_complete():
             self.download_benchmark_data()
         return self._load_data()
 
@@ -451,7 +418,7 @@ class ImputationDataset():
 
         for i in check:
             if not osp.exists(i):
-                print("file {} doesn't exist".format(i))
+                logger.info("file {} doesn't exist".format(i))
                 return False
         return True
 
