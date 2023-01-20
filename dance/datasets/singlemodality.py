@@ -19,54 +19,23 @@ from dance.transforms.preprocess import load_imputation_data_internal
 from dance.typing import Dict, List, Optional, Set, Tuple
 
 
-@dataclass
-class CellTypeDatasetParams:
-    random_seed = None
-    proj_path = None
-    train_dataset = None
-    test_dataset = None
-    species = None
-    tissue = None
-    train_dir = None
-    test_dir = None
-    statistics_path = None
-    map_path = None
-    filetype = None
-    threshold = None
-    exclude_rate = None
+class CellTypeDataset:
 
-
-class CellTypeDataset():
-
-    def __init__(self, download_all=False, proj_path="./", train_dataset=None, test_dataset=None, species=None,
-                 tissue=None, train_dir="train", test_dir="test", statistics_path=None, map_path="map", filetype="csv",
-                 threshold=None, exclude_rate=None, data_dir="./", train_set=None, train_label=None, test_set=None,
-                 test_label=None, X_celltypist=None, labels_celltypist=None, genes_celltypist=None,
-                 transpose_input_celltypist=False, singlecellnet_type="Lung", svm_settings=None):
+    def __init__(self, download_all=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
+                 train_dir="train", test_dir="test", map_path="map", filetype="csv", threshold=None, exclude_rate=None,
+                 data_dir="./"):
         self.data_dir = data_dir
         self.download_all = download_all
-        self.params = CellTypeDatasetParams()
-        self.params.proj_path = proj_path
-        self.params.train_dataset = train_dataset
-        self.params.test_dataset = test_dataset
-        self.params.species = species
-        self.params.tissue = tissue
-        self.params.train_dir = train_dir
-        self.params.test_dir = test_dir
-        self.params.statistics_path = statistics_path
-        self.params.map_path = map_path
-        self.params.filetype = filetype
-        self.params.threshold = threshold
-        self.params.exclude_rate = exclude_rate
-        self.train_set = train_set
-        self.train_label = train_label
-        self.test_set = test_set
-        self.test_label = test_label
-        self.X_celltypist = X_celltypist
-        self.labels_celltypist = labels_celltypist
-        self.genes_celltypist = genes_celltypist
-        self.transpose_input_celltypist = transpose_input_celltypist
-        self.singlecellnet_type = singlecellnet_type
+        self.train_dataset = train_dataset
+        self.test_dataset = test_dataset
+        self.species = species
+        self.tissue = tissue
+        self.train_dir = train_dir
+        self.test_dir = test_dir
+        self.map_path = map_path
+        self.filetype = filetype
+        self.threshold = threshold
+        self.exclude_rate = exclude_rate
 
     def download_all_data(self):
         # download data
@@ -207,14 +176,14 @@ class CellTypeDataset():
         return self._load_data()
 
     def _load_data(self, ct_col: str = "Cell_type"):
-        species = self.params.species
-        tissue = self.params.tissue
-        train_dataset_ids = self.params.train_dataset
-        test_dataset_ids = self.params.test_dataset
-        proj_path = self.params.proj_path
-        train_dir = osp.join(proj_path, self.params.train_dir)
-        test_dir = osp.join(proj_path, self.params.test_dir)
-        map_path = osp.join(proj_path, self.params.map_path, self.params.species)
+        species = self.species
+        tissue = self.tissue
+        train_dataset_ids = self.train_dataset
+        test_dataset_ids = self.test_dataset
+        data_dir = self.data_dir
+        train_dir = osp.join(data_dir, self.train_dir)
+        test_dir = osp.join(data_dir, self.test_dir)
+        map_path = osp.join(data_dir, self.map_path, self.species)
 
         # Load raw data
         train_feat_paths, train_label_paths = self._get_data_paths(train_dir, species, tissue, train_dataset_ids)
