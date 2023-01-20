@@ -52,7 +52,7 @@ def unzip_file(filename, directory_to_extract_to):
     if not os.path.exists(filename):
         logger.info("File does not exist")
     else:
-        logger.info("Unzipping", filename)
+        logger.info(f"Unzipping {filename!r}")
         with zipfile.ZipFile(filename, "r") as zip_ref:
             zip_ref.extractall(directory_to_extract_to)
         delete_file(filename)

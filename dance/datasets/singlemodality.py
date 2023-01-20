@@ -197,6 +197,7 @@ class CellTypeDataset:
         dfs = []
         for path in paths:
             logger.info(f"Loading data from {path}")
+            # TODO: load feat as csr
             df = pd.read_csv(path, index_col=index_col, **kwargs)
             # Labels: cell x cell-type; Data: feature x cell (need to transpose)
             df = df.T if transpose else df
