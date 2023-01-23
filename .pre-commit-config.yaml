@@ -18,7 +18,7 @@ repos:
       - id: pyupgrade
         args: [--py3-plus]
 
-  - repo: https://github.com/pre-commit/mirrors-yapf
+  - repo: https://github.com/google/yapf
     rev: v0.32.0
     hooks:
       - id: yapf
@@ -33,7 +33,7 @@ repos:
         args: [--line-width, "120"]
 
   - repo: https://github.com/PyCQA/docformatter
-    rev: v1.5.1
+    rev: v1.6.0.rc1
     hooks:
       - id: docformatter
         name: Format docstring
