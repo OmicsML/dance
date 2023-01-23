@@ -65,10 +65,8 @@ class BaseDataset(ABC):
         if (data := self._maybe_load_cache()) is not None:
             return data
 
-        # self._maybe_download()
-
         raw_data = self.load_raw_data()
-        data = self.raw_to_dance(raw_data)
+        data = self._raw_to_dance(raw_data)
 
         if transform is not None:
             if not isinstance(transform, BaseTransform):

@@ -2,12 +2,10 @@ import argparse
 import pprint
 
 from dance import logger
-from dance.data import Data
 from dance.datasets.singlemodality import ScDeepSortDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
-from dance.transforms import SetConfig, WeightedFeaturePCA
+from dance.transforms import Compose, SetConfig, WeightedFeaturePCA
 from dance.typing import LOGLEVELS
-from dance.utils.preprocess import cell_label_to_df
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -24,18 +22,14 @@ if __name__ == "__main__":
     logger.setLevel(args.log_level)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
 
-    # Load raw data
     dataloader = ScDeepSortDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
                                    species=args.species, tissue=args.tissue)
-    adata, cell_labels, idx_to_label, train_size = dataloader.load_raw_data()
-
-    # Combine into dance data object
-    adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)
-    data = Data(adata, train_size=train_size)
-
-    # Data preprocessing
-    WeightedFeaturePCA(n_components=args.dense_dim, split_name="train", log_level="INFO")(data)
-    SetConfig({"feature_channel": "WeightedFeaturePCA", "label_channel": "cell_type"}, log_level="INFO")(data)
+    transform = Compose(WeightedFeaturePCA(n_components=args.dense_dim, split_name="train"),
+                        SetConfig({
+                            "feature_channel": "WeightedFeaturePCA",
+                            "label_channel": "cell_type"
+                        }), log_level="INFO")
+    data = dataloader.load_data(transform=transform)
 
     # Obtain training and testing data
     x_train, y_train = data.get_train_data()
