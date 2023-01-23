@@ -7,7 +7,8 @@ from abc import ABC, abstractmethod
 from dance import logger
 from dance.data import Data
 from dance.transforms.base import BaseTransform
-from dance.typing import Any, Dict, Optional, Union
+from dance.typing import Any, Dict, Optional, Tuple, Union
+from dance.utils import hexdigest
 from dance.utils.wrappers import TimeIt
 
 DANCE_DATASETS: Dict[str, Any] = {}
@@ -26,9 +27,22 @@ def register_dataset(name: str):
 
 class BaseDataset(ABC):
 
+    _DISPLAY_ATTRS: Tuple[str] = ()
+
     def __init__(self, root: str, full_download: bool = False):
         self.root = pathlib.Path(root).resolve()
         self.full_download = full_download
+
+    def hexdigest(self) -> str:
+        hash_components = {i: j for i, j in self.__dict__.items() if isinstance(j, str)}
+        md5_hash = hexdigest(str(hash_components))
+        logger.debug(f"{hash_components=}, {md5_hash=}")
+        return md5_hash
+
+    def __repr__(self) -> str:
+        display_attrs_str_list = [f"{i}={getattr(self, i)!r}" for i in self._DISPLAY_ATTRS]
+        display_attrs_str = ", ".join(display_attrs_str_list)
+        return f"{self.__class__.__name__}({display_attrs_str})"
 
     def download_all(self):
         """Download all raw files of the dataset."""
@@ -66,6 +80,25 @@ class BaseDataset(ABC):
     @TimeIt("load and process data")
     def load_data(self, transform: Optional[BaseTransform] = None, cache: bool = False,
                   redo_cache: bool = False) -> Data:
+        """Load dance data object and perform transformation.
+
+        If `cache` option is set, then try to load the processed data from cache. The `cache` file hash is supposed to
+        distinguish different datasets and different transformations. In particular, it is constructed by MD5 hashing
+        the concatenation of the dataset MD5 hash (see :meth:`~dance.dataset.base.BaseDataset.hexdigest`) and the
+        transformation MD5 hash (:meth:`~dance.transforms.base.BaseTransform.hexdigest`). In the case of no
+        transformation, i.e., `transform=None`, the transformation MD5 hash will be the empty string `""`.
+
+        Parameters
+        ----------
+        transform
+            Transformation to be applied.
+        cache:
+            If set to `True`, then try to read and write cache to `<root>/cache/<hash>.pkl`
+        redo_cache:
+            If set to `True`, then redo the data loading and transformation, and overwrite the previous cache with the
+            newly processed data.
+
+        """
         cache_load = self._maybe_load_cache(transform, cache, redo_cache)
         if not isinstance(cache_load, str):
             return cache_load
@@ -92,12 +125,14 @@ class BaseDataset(ABC):
         cache_dir = osp.join(self.root, "cache")
         os.makedirs(cache_dir, exist_ok=True)
 
-        md5_hash = transform._hexdigest()
+        dataset_md5_hash = self.hexdigest()
+        transform_md5_hash = "" if transform is None else transform.hexdigest()
+        md5_hash = hexdigest(dataset_md5_hash + transform_md5_hash)
+
         cache_file_path = osp.join(cache_dir, f"{md5_hash}.pkl")
         if osp.isfile(cache_file_path) and cache:
-            logger.info(f"Loading cached data at {cache_file_path}\n{'Cache data info':-^100}"
-                        f"\nDataset info:\n{self!r}\nTransformation info:\n{transform!r}\n"
-                        f"{'End of cache data info':-^100}")
+            logger.info(f"Loading cached data at {cache_file_path}\n{'Cache data info':-^100}\n"
+                        f"Dataset: {self!r}\nTransformation: {transform!r}\n{'End of cache data info':-^100}")
             with open(cache_file_path, "rb") as f:
                 data = pickle.load(f)
             return data

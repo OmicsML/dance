@@ -25,6 +25,7 @@ from dance.utils.preprocess import cell_label_to_df
 @register_dataset("scdeepsort")
 class ScDeepSortDataset(BaseDataset):
 
+    _DISPLAY_ATTRS = ("species", "tissue", "train_dataset", "test_dataset")
     all_url_dict: Dict[str, str] = {
         "train_human_cell_atlas":   "https://www.dropbox.com/s/1itq1pokplbqxhx?dl=1",
         "test_human_test_data":     "https://www.dropbox.com/s/gpxjnnvwyblv3xb?dl=1",

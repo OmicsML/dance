@@ -1,8 +1,9 @@
-import hashlib
 from pprint import pformat
 
+from dance import logger
 from dance.transforms.base import BaseTransform
 from dance.typing import Any, Dict, Tuple
+from dance.utils import hexdigest
 
 
 class Compose(BaseTransform):
@@ -52,10 +53,11 @@ class Compose(BaseTransform):
     def __getitem__(self, idx: int, /):
         return self.transforms[idx]
 
-    def _hexdigest(self) -> str:
-        hexdigests = [i._hexdigest() for i in self.transforms]
-        combined_hexdigest = "".join(hexdigests)
-        return hashlib.md5(combined_hexdigest.encode()).hexdigest()
+    def hexdigest(self) -> str:
+        hexdigests = [i.hexdigest() for i in self.transforms]
+        md5_hash = hexdigest("".join(hexdigests))
+        logger.debug(f"{hexdigest=}, {md5_hash=}")
+        return md5_hash
 
     def __call__(self, data):
         self.logger.info(f"Applying composed transformations:\n{self!r}")

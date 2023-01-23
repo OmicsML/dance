@@ -32,7 +32,7 @@ class BaseTransform(ABC):
     def name(self) -> str:
         return self.__class__.__name__
 
-    def _hexdigest(self) -> str:
+    def hexdigest(self) -> str:
         return hashlib.md5(repr(self).encode()).hexdigest()
 
     def __repr__(self) -> str:
