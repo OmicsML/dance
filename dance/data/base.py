@@ -126,14 +126,34 @@ class BaseData(ABC):
     def config(self) -> Dict[str, Any]:
         return self._data.uns["dance_config"]
 
-    def set_config(self, **kwargs):
+    def set_config(self, *, overwrite: bool = False, **kwargs):
+        """Set dance data object configuration.
+
+        See :meth:`~BaseData.set_config_from_dict`.
+
+        """
+        self.set_config_from_dict(kwargs, overwrite=overwrite)
+
+    def set_config_from_dict(self, config_dict: Dict[str, Any], *, overwrite: bool = False):
+        """Set dance data object configuration from a config dict.
+
+        Parameters
+        ----------
+        config_dict
+            Configuration dictionary.
+        overwrite
+            Used to determine the behaviour of resolving config conflicts. In the case of a conflict, where the config
+            dict passed contains a key with value that differs from an existing setting, if `overwrite` is set to
+            `False`, then raise a `KeyError`. Otherwise, overwrite the configuration with the new values.
+
+        """
         # Check config key validity
         all_configs = set(self._FEATURE_CONFIGS + self._LABEL_CONFIGS)
-        if (unknown_options := set(kwargs).difference(all_configs)):
+        if (unknown_options := set(config_dict).difference(all_configs)):
             raise KeyError(f"Unknown config option(s): {unknown_options}, available options are: {all_configs}")
 
-        feature_configs = [j for i, j in kwargs.items() if i in self._FEATURE_CONFIGS]
-        label_configs = [j for i, j in kwargs.items() if i in self._LABEL_CONFIGS]
+        feature_configs = [j for i, j in config_dict.items() if i in self._FEATURE_CONFIGS]
+        label_configs = [j for i, j in config_dict.items() if i in self._LABEL_CONFIGS]
 
         # Check type and length consistencies for feature and label configs
         for i in (feature_configs, label_configs):
@@ -142,7 +162,23 @@ class BaseData(ABC):
             _check_types_and_sizes(types, sizes)
 
         # Finally, update the configs
-        self.config.update(kwargs)
+        for config_key, config_val in config_dict.items():
+            # New config
+            if config_key not in self.config:
+                self.config[config_key] = config_val
+                logger.debug(f"Setting config {config_key!r}t to {config_val!r}")
+                continue
+
+            # Existing config
+            if (old_config_val := self.config[config_key]) == config_val:  # new value is the same as before
+                continue
+            elif overwrite:  # new value differs from before and overwrite setting is turned on
+                self.config[config_key] = config_val
+                logger.debug(f"Overwriting config {config_key!r} to {config_val!r} (previously {old_config_val!r})")
+            else:  # new value differs from before but overwrite setting is not on
+                raise KeyError(f"Config {config_key!r} exit with value {old_config_val!r} but trying to set to a "
+                               f"different value {config_val!r}. If you want to overwrite the config, please specify "
+                               "`overwrite=True` when calling the set config function.")
 
     @property
     def num_cells(self) -> int:
