@@ -1,4 +1,4 @@
-h5py==3.7.0
+h5py==3.8.0
 leidenalg==0.9.1
 mudata==0.2.1
 networkx==3.0
