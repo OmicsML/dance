@@ -48,11 +48,10 @@ class ScDeepSortDataset:
         "test_mouse_Kidney203_data.csv":        "https://www.dropbox.com/s/kmos1ceubumgmpj?dl=1",
     }  # yapf: disable
 
-    def __init__(self, download_all=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
-                 train_dir="train", test_dir="test", map_path="map", filetype="csv", threshold=None, exclude_rate=None,
-                 data_dir="./"):
+    def __init__(self, full_download=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
+                 train_dir="train", test_dir="test", map_path="map", data_dir="./"):
         self.data_dir = data_dir
-        self.download_all = download_all
+        self.full_download = full_download
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
         self.species = species
@@ -60,11 +59,8 @@ class ScDeepSortDataset:
         self.train_dir = train_dir
         self.test_dir = test_dir
         self.map_path = map_path
-        self.filetype = filetype
-        self.threshold = threshold
-        self.exclude_rate = exclude_rate
 
-    def download_all_data(self):
+    def download_all(self):
         if self.is_complete():
             return
 
@@ -83,8 +79,8 @@ class ScDeepSortDataset:
                 pass
             os.rename(download_path, move_path)
 
-    def download_benchmark_data(self, download_map=True, download_pretrained=True):
-        if self.is_benchmark_complete():
+    def download(self, download_map=True):
+        if self.is_complete():
             return
 
         # TODO: only download missing files
@@ -100,7 +96,7 @@ class ScDeepSortDataset:
             download_unzip("https://www.dropbox.com/sh/hw1189sgm0kfrts/AAAapYOblLApqygZ-lGo_70-a?dl=1",
                            osp.join(self.data_dir, "map"))
 
-    def is_complete(self):
+    def is_complete_all(self):
         """Check if data is complete."""
         check = [
             osp.join(self.data_dir, "train"),
@@ -113,7 +109,7 @@ class ScDeepSortDataset:
                 return False
         return True
 
-    def is_benchmark_complete(self):
+    def is_complete(self):
         """Check if benchmarking data is complete."""
         for name in self.bench_url_dict:
             filename = name[name.find('mouse'):]
@@ -136,10 +132,10 @@ class ScDeepSortDataset:
 
     def load_data(self):
         # Load data from existing files, or download files and load data.
-        if self.download_all:
-            self.download_all_data()
-        elif not self.is_benchmark_complete():
-            self.download_benchmark_data()
+        if self.full_download:
+            self.download_all()
+        elif not self.is_complete():
+            self.download()
         return self._load_data()
 
     def _load_data(self, ct_col: str = "Cell_type"):
