@@ -40,7 +40,7 @@ if __name__ == "__main__":
     dataloader = ScDeepSortDataset(species=args.species, tissue=args.tissue, threshold=args.threshold,
                                    exclude_rate=args.exclude_rate, test_dataset=args.test_dataset,
                                    train_dataset=args.train_dataset)
-    adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
+    adata, cell_labels, idx_to_label, train_size = dataloader.load_raw_data()
 
     # Combine into dance data object
     adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)

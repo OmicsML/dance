@@ -15,12 +15,15 @@ import torch
 from torch.utils.data import Dataset
 
 from dance import logger
-from dance.data import download_file, download_unzip
+from dance.data import Data, download_file, download_unzip
+from dance.datasets.base import BaseDataset, register_dataset
 from dance.transforms.preprocess import load_imputation_data_internal
 from dance.typing import Dict, List, Optional, Set, Tuple
+from dance.utils.preprocess import cell_label_to_df
 
 
-class ScDeepSortDataset:
+@register_dataset("scdeepsort")
+class ScDeepSortDataset(BaseDataset):
 
     all_url_dict: Dict[str, str] = {
         "train_human_cell_atlas":   "https://www.dropbox.com/s/1itq1pokplbqxhx?dl=1",
@@ -130,15 +133,7 @@ class ScDeepSortDataset:
                 return False
         return True
 
-    def load_data(self):
-        # Load data from existing files, or download files and load data.
-        if self.full_download:
-            self.download_all()
-        elif not self.is_complete():
-            self.download()
-        return self._load_data()
-
-    def _load_data(self, ct_col: str = "Cell_type"):
+    def _load_raw_data(self, ct_col: str = "Cell_type"):
         species = self.species
         tissue = self.tissue
         train_dataset_ids = self.train_dataset
@@ -178,6 +173,12 @@ class ScDeepSortDataset:
         logger.info(f"Cell-types (n={len(idx_to_label)}):\n{pprint.pformat(idx_to_label)}")
 
         return adata, labels, idx_to_label, train_size
+
+    def _raw_to_dance(self, raw_data):
+        adata, cell_labels, idx_to_label, train_size = raw_data
+        adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)
+        data = Data(adata, train_size=train_size)
+        return data
 
     @staticmethod
     def _get_data_paths(data_dir: str, species: str, tissue: str, dataset_ids: List[str], *, filetype: str = "csv",
