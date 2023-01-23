@@ -3,7 +3,7 @@ import pprint
 
 from dance import logger
 from dance.data import Data
-from dance.datasets.singlemodality import CellTypeDataset
+from dance.datasets.singlemodality import ScDeepSortDataset
 from dance.modules.single_modality.cell_type_annotation.singlecellnet import SingleCellNet
 from dance.typing import LOGLEVELS
 from dance.utils.preprocess import cell_label_to_df
@@ -31,8 +31,8 @@ if __name__ == "__main__":
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
 
     # Load raw data
-    dataloader = CellTypeDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset, species=args.species,
-                                 tissue=args.tissue)
+    dataloader = ScDeepSortDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
+                                   species=args.species, tissue=args.tissue)
     adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
 
     # Combine data into dance data object

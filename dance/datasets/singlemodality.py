@@ -20,7 +20,7 @@ from dance.transforms.preprocess import load_imputation_data_internal
 from dance.typing import Dict, List, Optional, Set, Tuple
 
 
-class CellTypeDataset:
+class ScDeepSortDataset:
 
     all_url_dict: Dict[str, str] = {
         "train_human_cell_atlas":   "https://www.dropbox.com/s/1itq1pokplbqxhx?dl=1",
