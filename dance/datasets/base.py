@@ -8,6 +8,7 @@ from dance import logger
 from dance.data import Data
 from dance.transforms.base import BaseTransform
 from dance.typing import Any, Dict, Optional, Union
+from dance.utils.wrappers import TimeIt
 
 DANCE_DATASETS: Dict[str, Any] = {}
 
@@ -62,6 +63,7 @@ class BaseDataset(ABC):
         raw_data = self._load_raw_data()
         return raw_data
 
+    @TimeIt("load and process data")
     def load_data(self, transform: Optional[BaseTransform] = None, cache: bool = False,
                   redo_cache: bool = False) -> Data:
         cache_load = self._maybe_load_cache(transform, cache, redo_cache)
