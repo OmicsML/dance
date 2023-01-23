@@ -53,8 +53,9 @@ class ScDeepSortDataset(BaseDataset):
 
     def __init__(self, full_download=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
                  train_dir="train", test_dir="test", map_path="map", data_dir="./"):
+        super().__init__(data_dir, full_download)
+
         self.data_dir = data_dir
-        self.full_download = full_download
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
         self.species = species
