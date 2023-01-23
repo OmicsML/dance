@@ -1,3 +1,4 @@
+import hashlib
 from pprint import pformat
 
 from dance.transforms.base import BaseTransform
@@ -8,6 +9,22 @@ class Compose(BaseTransform):
     """Compose transformation by combining several transfomration objects."""
 
     def __init__(self, *transforms: Tuple[BaseTransform, ...], use_master_log_level: bool = True, **kwargs):
+        """Initialize the Compose transform object.
+
+        Parameters
+        ----------
+        transforms
+            Transformation objects.
+        use_master_log_level
+            If set to `True`, then reset all transforms' loggers to use :then reset all transforms' loggers to use
+            `log_level` option passed to this :class:`Compose` object.
+
+        Notes
+        -----
+        The order in which the `transform` object are passed will be exactly the order in which they will be applied
+        to the data object.
+
+        """
         super().__init__(**kwargs)
 
         # Check type
@@ -31,6 +48,14 @@ class Compose(BaseTransform):
     def __repr__(self):
         transform_repr_str = ",\n  ".join(map(repr, self.transforms))
         return f"Compose(\n  {transform_repr_str},\n)"
+
+    def __getitem__(self, idx: int, /):
+        return self.transforms[idx]
+
+    def _hexdigest(self) -> str:
+        hexdigests = [i._hexdigest() for i in self.transforms]
+        combined_hexdigest = "".join(hexdigests)
+        return hashlib.md5(combined_hexdigest.encode()).hexdigest()
 
     def __call__(self, data):
         self.logger.info(f"Applying composed transformations:\n{self!r}")

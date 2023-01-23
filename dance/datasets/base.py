@@ -1,9 +1,13 @@
+import os
+import os.path as osp
+import pathlib
+import pickle
 from abc import ABC, abstractmethod
 
 from dance import logger
 from dance.data import Data
 from dance.transforms.base import BaseTransform
-from dance.typing import Any, Dict, Optional
+from dance.typing import Any, Dict, Optional, Union
 
 DANCE_DATASETS: Dict[str, Any] = {}
 
@@ -21,8 +25,8 @@ def register_dataset(name: str):
 
 class BaseDataset(ABC):
 
-    def __init__(self, root: str, full_download: bool = False, *args, **kwargs):
-        self.root = root
+    def __init__(self, root: str, full_download: bool = False):
+        self.root = pathlib.Path(root).resolve()
         self.full_download = full_download
 
     def download_all(self):
@@ -60,10 +64,9 @@ class BaseDataset(ABC):
 
     def load_data(self, transform: Optional[BaseTransform] = None, cache: bool = False,
                   redo_cache: bool = False) -> Data:
-        # TODO: try to save and load cache if cache=True
-        # TODO: disregard old cache if redo_cache=True
-        if (data := self._maybe_load_cache()) is not None:
-            return data
+        cache_load = self._maybe_load_cache(transform, cache, redo_cache)
+        if not isinstance(cache_load, str):
+            return cache_load
 
         raw_data = self.load_raw_data()
         data = self._raw_to_dance(raw_data)
@@ -75,17 +78,29 @@ class BaseDataset(ABC):
                                 "scanpy.pp.log1p, please consider wrapping it with dance.transforms.AnnDataTransform")
             transform(data)
 
+        if cache:
+            with open(cache_load, "wb") as f:
+                pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
+            logger.info(f"Saved processed data to cache: {cache_load}")
+
         return data
 
-    def _maybe_load_cache(self) -> Optional[Data]:
+    def _maybe_load_cache(self, transform, cache, redo_cache) -> Union[Data, str]:
         """Check and load processed data from cache if available."""
-        # Check if cache dir exist, return directly if not and make one
-        # Hash using the key params of the dataset and transform
-        # Check hash
-        # TODO: hash dataset obj
-        # TODO: hash transform obj
-        # TODO: show loaded cache info, e.g. path to raw, transform repr, date processed
-        pass
+        cache_dir = osp.join(self.root, "cache")
+        os.makedirs(cache_dir, exist_ok=True)
+
+        md5_hash = transform._hexdigest()
+        cache_file_path = osp.join(cache_dir, f"{md5_hash}.pkl")
+        if osp.isfile(cache_file_path) and cache:
+            logger.info(f"Loading cached data at {cache_file_path}\n{'Cache data info':-^100}"
+                        f"\nDataset info:\n{self!r}\nTransformation info:\n{transform!r}\n"
+                        f"{'End of cache data info':-^100}")
+            with open(cache_file_path, "rb") as f:
+                data = pickle.load(f)
+            return data
+        else:
+            return cache_file_path
 
     def _maybe_download(self):
         """Check and download selected raw files if needed."""
