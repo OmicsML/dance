@@ -1,3 +1,4 @@
+import hashlib
 from abc import ABC, abstractmethod
 
 from dance import logger
@@ -30,6 +31,9 @@ class BaseTransform(ABC):
     @property
     def name(self) -> str:
         return self.__class__.__name__
+
+    def hexdigest(self) -> str:
+        return hashlib.md5(repr(self).encode()).hexdigest()
 
     def __repr__(self) -> str:
         display_attrs_str_list = [f"{i}={getattr(self, i)!r}" for i in self._DISPLAY_ATTRS]

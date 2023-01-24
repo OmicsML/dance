@@ -2,16 +2,13 @@ import argparse
 import pprint
 
 from dance import logger
-from dance.data import Data
-from dance.datasets.singlemodality import CellTypeDataset
+from dance.datasets.singlemodality import ScDeepSortDataset
 from dance.modules.single_modality.cell_type_annotation.singlecellnet import SingleCellNet
 from dance.typing import LOGLEVELS
-from dance.utils.preprocess import cell_label_to_df
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--dLevel", type=str, default="cell_type",
-                        help="name for the cell type information for training data")
+    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--limitToHVG", type=bool, default=True)
     parser.add_argument("--log_level", type=str, default="INFO", choices=LOGLEVELS)
     parser.add_argument("--nRand", type=int, default=100)
@@ -30,15 +27,14 @@ if __name__ == "__main__":
     logger.setLevel(args.log_level)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
 
-    # Load raw data
-    dataloader = CellTypeDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset, species=args.species,
-                                 tissue=args.tissue)
-    adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
+    # Initialize model and get model specific preprocessing pipeline
+    model = SingleCellNet()
+    preprocessing_pipeline = model.preprocessing_pipeline()
 
-    # Combine data into dance data object
-    adata.obsm[args.dLevel] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)
-    data = Data(adata, train_size=train_size)
-    data.set_config(label_channel=args.dLevel)
+    # Load data and perform necessary preprocessing
+    dataloader = ScDeepSortDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
+                                   species=args.species, tissue=args.tissue)
+    data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
     # Obtain training and testing data
     # TODO: use get_train_data and get_test data?
@@ -46,9 +42,8 @@ if __name__ == "__main__":
     test_adata = data.data[data.test_idx]
 
     # Train and evaluate the model
-    model = SingleCellNet()
     model.fit(train_adata, nTopGenes=args.nTopGenes, nRand=args.nRand, nTrees=args.nTrees,
-              nTopGenePairs=args.nTopGenePairs, dLevel=args.dLevel, stratify=args.stratify, limitToHVG=args.limitToHVG)
+              nTopGenePairs=args.nTopGenePairs, dLevel="cell_type", stratify=args.stratify, limitToHVG=args.limitToHVG)
     pred = model.predict(test_adata)
     true = data.get_y(split_name="test")
     score = model.score(pred, true)

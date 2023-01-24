@@ -15,13 +15,17 @@ import torch
 from torch.utils.data import Dataset
 
 from dance import logger
-from dance.data import download_file, download_unzip
+from dance.data import Data, download_file, download_unzip
+from dance.datasets.base import BaseDataset, register_dataset
 from dance.transforms.preprocess import load_imputation_data_internal
 from dance.typing import Dict, List, Optional, Set, Tuple
+from dance.utils.preprocess import cell_label_to_df
 
 
-class CellTypeDataset:
+@register_dataset("scdeepsort")
+class ScDeepSortDataset(BaseDataset):
 
+    _DISPLAY_ATTRS = ("species", "tissue", "train_dataset", "test_dataset")
     all_url_dict: Dict[str, str] = {
         "train_human_cell_atlas":   "https://www.dropbox.com/s/1itq1pokplbqxhx?dl=1",
         "test_human_test_data":     "https://www.dropbox.com/s/gpxjnnvwyblv3xb?dl=1",
@@ -48,11 +52,11 @@ class CellTypeDataset:
         "test_mouse_Kidney203_data.csv":        "https://www.dropbox.com/s/kmos1ceubumgmpj?dl=1",
     }  # yapf: disable
 
-    def __init__(self, download_all=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
-                 train_dir="train", test_dir="test", map_path="map", filetype="csv", threshold=None, exclude_rate=None,
-                 data_dir="./"):
+    def __init__(self, full_download=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
+                 train_dir="train", test_dir="test", map_path="map", data_dir="./"):
+        super().__init__(data_dir, full_download)
+
         self.data_dir = data_dir
-        self.download_all = download_all
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
         self.species = species
@@ -60,11 +64,8 @@ class CellTypeDataset:
         self.train_dir = train_dir
         self.test_dir = test_dir
         self.map_path = map_path
-        self.filetype = filetype
-        self.threshold = threshold
-        self.exclude_rate = exclude_rate
 
-    def download_all_data(self):
+    def download_all(self):
         if self.is_complete():
             return
 
@@ -83,8 +84,8 @@ class CellTypeDataset:
                 pass
             os.rename(download_path, move_path)
 
-    def download_benchmark_data(self, download_map=True, download_pretrained=True):
-        if self.is_benchmark_complete():
+    def download(self, download_map=True):
+        if self.is_complete():
             return
 
         # TODO: only download missing files
@@ -100,7 +101,7 @@ class CellTypeDataset:
             download_unzip("https://www.dropbox.com/sh/hw1189sgm0kfrts/AAAapYOblLApqygZ-lGo_70-a?dl=1",
                            osp.join(self.data_dir, "map"))
 
-    def is_complete(self):
+    def is_complete_all(self):
         """Check if data is complete."""
         check = [
             osp.join(self.data_dir, "train"),
@@ -113,7 +114,7 @@ class CellTypeDataset:
                 return False
         return True
 
-    def is_benchmark_complete(self):
+    def is_complete(self):
         """Check if benchmarking data is complete."""
         for name in self.bench_url_dict:
             filename = name[name.find('mouse'):]
@@ -134,15 +135,7 @@ class CellTypeDataset:
                 return False
         return True
 
-    def load_data(self):
-        # Load data from existing files, or download files and load data.
-        if self.download_all:
-            self.download_all_data()
-        elif not self.is_benchmark_complete():
-            self.download_benchmark_data()
-        return self._load_data()
-
-    def _load_data(self, ct_col: str = "Cell_type"):
+    def _load_raw_data(self, ct_col: str = "Cell_type"):
         species = self.species
         tissue = self.tissue
         train_dataset_ids = self.train_dataset
@@ -182,6 +175,12 @@ class CellTypeDataset:
         logger.info(f"Cell-types (n={len(idx_to_label)}):\n{pprint.pformat(idx_to_label)}")
 
         return adata, labels, idx_to_label, train_size
+
+    def _raw_to_dance(self, raw_data):
+        adata, cell_labels, idx_to_label, train_size = raw_data
+        adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)
+        data = Data(adata, train_size=train_size)
+        return data
 
     @staticmethod
     def _get_data_paths(data_dir: str, species: str, tissue: str, dataset_ids: List[str], *, filetype: str = "csv",

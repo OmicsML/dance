@@ -11,7 +11,8 @@ from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 
 from dance import logger
-from dance.typing import Optional, Union
+from dance.transforms import SetConfig
+from dance.typing import LogLevel, Optional, Union
 
 
 class Model():
@@ -537,6 +538,13 @@ class Celltypist:
         self.classifier = clf
         self.scaler = scaler
         self.description = description
+
+    def preprocess(self, data, /, **kwargs):
+        self.preprocessing_pipeline(**kwargs)(data)
+
+    @staticmethod
+    def preprocessing_pipeline(log_level: LogLevel = "INFO"):
+        return SetConfig({"label_channel": "cell_type"}, log_level=log_level)
 
     def fit(self, indata: np.array, labels: Optional[Union[str, list, tuple, np.ndarray, pd.Series, pd.Index]] = None,
             C: float = 1.0, solver: Optional[str] = None, max_iter: int = 1000, n_jobs: Optional[int] = None,

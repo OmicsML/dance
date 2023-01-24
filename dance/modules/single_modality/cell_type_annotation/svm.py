@@ -4,11 +4,12 @@ import pandas as pd
 from sklearn.metrics import accuracy_score
 from sklearn.svm import SVC
 
-from dance.typing import Optional
+from dance.transforms import Compose, SetConfig, WeightedFeaturePCA
+from dance.typing import LogLevel, Optional
 from dance.utils.deprecate import deprecated
 
 
-class SVM():
+class SVM:
     """The SVM cell-type classification model.
 
     Parameters
@@ -24,6 +25,20 @@ class SVM():
         self.args = args
         self.random_state = random_state
         self._mdl = SVC(random_state=random_state, probability=True)
+
+    def preprocess(self, data, /, **kwargs):
+        self.preprocessing_pipeline(**kwargs)(data)
+
+    @staticmethod
+    def preprocessing_pipeline(n_components: int = 400, log_level: LogLevel = "INFO"):
+        return Compose(
+            WeightedFeaturePCA(n_components=n_components, split_name="train"),
+            SetConfig({
+                "feature_channel": "WeightedFeaturePCA",
+                "label_channel": "cell_type"
+            }),
+            log_level=log_level,
+        )
 
     def fit(self, x, y):
         """Train the classifier.

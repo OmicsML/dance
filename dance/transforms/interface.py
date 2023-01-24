@@ -34,8 +34,14 @@ class AnnDataTransform(BaseTransform):
             Keyword arguments for the transformation function.
 
         """
+        super().__init__()
+
         self.func = func
         self.func_kwargs = kwargs
+
+    def __repr__(self):
+        func_name = f"{self.func.__module__}.{self.func.__name__}"
+        return f"{self.name}(func={func_name}, func_kwargs={self.func_kwargs})"
 
     def __call__(self, data):
         self.func(data.data, **self.func_kwargs)

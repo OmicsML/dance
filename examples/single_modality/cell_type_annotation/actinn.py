@@ -2,19 +2,16 @@ import argparse
 import pprint
 
 import numpy as np
-import scanpy as sc
 
 from dance import logger
-from dance.data import Data
-from dance.datasets.singlemodality import CellTypeDataset
+from dance.datasets.singlemodality import ScDeepSortDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
-from dance.transforms import AnnDataTransform, FilterGenesPercentile
 from dance.typing import LOGLEVELS
-from dance.utils.preprocess import cell_label_to_df
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--batch_size", type=int, default=1024, help="Batch size")
+    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--device", default="cpu", help="Computation device.")
     parser.add_argument("--hidden_dims", nargs="+", type=int, default=[2000], help="Hidden dimensions.")
     parser.add_argument("--lambd", type=float, default=0.01, help="Regularization parameter")
@@ -37,37 +34,24 @@ if __name__ == "__main__":
     logger.setLevel(args.log_level)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
 
-    # Load raw data
-    dataloader = CellTypeDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset, tissue=args.tissue,
-                                 species=args.species)
-    adata, cell_labels, idx_to_label, train_size = dataloader.load_data()
+    # Initialize model and get model specific preprocessing pipeline
+    model = ACTINN(hidden_dims=args.hidden_dims, lambd=args.lambd, device=args.device)
+    preprocessing_pipeline = model.preprocessing_pipeline(normalize=args.normalize, filter_genes=not args.nofilter)
 
-    # Combine into dance data object
-    adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)
-    data = Data(adata, train_size=train_size)
-    data.set_config(label_channel="cell_type")
-
-    # Optional data preprocessing
-    if args.normalize:  # disabled by default because data from scDeepSort is already normalized
-        AnnDataTransform(sc.pp.normalize_total, target_sum=1e4)(data)
-        AnnDataTransform(sc.pp.log1p, base=2)(data)
-    if not args.nofilter:
-        AnnDataTransform(sc.pp.filter_genes, min_cells=1)(data)
-        FilterGenesPercentile(min_val=1, max_val=99, mode="sum", log_level="INFO")(data)
-        FilterGenesPercentile(min_val=1, max_val=99, mode="cv", log_level="INFO")(data)
+    # Load data and perform necessary preprocessing
+    dataloader = ScDeepSortDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset, tissue=args.tissue,
+                                   species=args.species)
+    data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
     # Obtain training and testing data
     x_train, y_train = data.get_train_data(return_type="torch")
     x_test, y_test = data.get_test_data(return_type="torch")
 
     # Train and evaluate models for several rounds
-    model = ACTINN(input_dim=data.num_features, output_dim=len(idx_to_label), hidden_dims=args.hidden_dims,
-                   lr=args.learning_rate, device=args.device, num_epochs=args.num_epochs, batch_size=args.batch_size,
-                   print_cost=args.print_cost, lambd=args.lambd)
-
     scores = []
     for k in range(args.runs):
-        model.fit(x_train, y_train, seed=args.seed + k)
+        model.fit(x_train, y_train, seed=args.seed + k, lr=args.learning_rate, num_epochs=args.num_epochs,
+                  batch_size=args.batch_size, print_cost=args.print_cost)
         pred = model.predict(x_test)
         scores.append(score := model.score(pred, y_test))
         print(f"{score=:.4f}")

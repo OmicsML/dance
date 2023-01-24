@@ -7,7 +7,9 @@ import scanpy as sc
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 
+from dance.transforms import Compose, SetConfig
 from dance.transforms.preprocess import findClassyGenes, ptGetTop, query_transform
+from dance.typing import LogLevel
 
 
 class SingleCellNet():
@@ -28,6 +30,13 @@ class SingleCellNet():
         self.cgenesA = cgenesA
         self.xpairs = xpairs
         self.tspRF = tspRF
+
+    def preprocess(self, data, /, **kwargs):
+        self.preprocessing_pipeline(**kwargs)(data)
+
+    @staticmethod
+    def preprocessing_pipeline(log_level: LogLevel = "INFO"):
+        return Compose(SetConfig({"label_channel": "cell_type"}), log_level=log_level)
 
     def randomize(self, expDat, num=50):
         """Randomization sampling.

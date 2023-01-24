@@ -1,3 +1,4 @@
+import hashlib
 import os
 import random
 
@@ -5,6 +6,10 @@ import dgl
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+
+
+def hexdigest(x: str, /) -> str:
+    return hashlib.md5(x.encode()).hexdigest()
 
 
 class SimpleIndexDataset(Dataset):
