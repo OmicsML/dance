@@ -7,22 +7,9 @@ from abc import ABC, abstractmethod
 from dance import logger
 from dance.data import Data
 from dance.transforms.base import BaseTransform
-from dance.typing import Any, Dict, Optional, Tuple, Union
+from dance.typing import Any, Optional, Tuple, Union
 from dance.utils import hexdigest
 from dance.utils.wrappers import TimeIt
-
-DANCE_DATASETS: Dict[str, Any] = {}
-
-
-def register_dataset(name: str):
-
-    def wrapped_obj(obj):
-        if name in DANCE_DATASETS:
-            raise KeyError(f"Dataset {name!r} already registered.")
-        DANCE_DATASETS[name] = obj
-        return obj
-
-    return wrapped_obj
 
 
 class BaseDataset(ABC):

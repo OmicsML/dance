@@ -16,7 +16,8 @@ from torch.utils.data import Dataset
 
 from dance import logger
 from dance.data import Data, download_file, download_unzip
-from dance.datasets.base import BaseDataset, register_dataset
+from dance.datasets.base import BaseDataset
+from dance.registers import register_dataset
 from dance.transforms.preprocess import load_imputation_data_internal
 from dance.typing import Dict, List, Optional, Set, Tuple
 from dance.utils.preprocess import cell_label_to_df
