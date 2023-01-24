@@ -4,12 +4,14 @@ from dance.transforms.filter import FilterGenesPercentile
 from dance.transforms.interface import AnnDataTransform
 from dance.transforms.misc import Compose, SetConfig
 from dance.transforms.spatial_feature import MorphologyFeature, SMEFeature
+from dance.transforms.stats import GeneStats
 
 __all__ = [
     "AnnDataTransform",
     "CellPCA",
     "Compose",
     "FilterGenesPercentile",
+    "GeneStats",
     "MorphologyFeature",
     "SMEFeature",
     "SetConfig",
