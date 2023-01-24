@@ -628,7 +628,7 @@ def cell_gene_graph(data, threshold=0, dense_dim=100, gene_data={}, normalize_we
 
     graph.ndata['order'] = torch.tensor([-1] * num_genes + list(np.arange(len(X))),
                                         dtype=torch.long)  # [gene_num+train_num]
-    graph.ndata['label'] = torch.tensor([-1] * num_genes + list(np.arange(len(X))))  #[np.nan] * len(X))
+    graph.ndata['label'] = torch.tensor([-1] * num_genes + list(np.arange(len(X))))
     nb_edges = graph.num_edges()
 
     if len(gene_data) != 0 and len(gene_data['gene1']) > 0:
