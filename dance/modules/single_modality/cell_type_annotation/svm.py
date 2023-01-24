@@ -37,7 +37,7 @@ class SVM:
                 "feature_channel": "WeightedFeaturePCA",
                 "label_channel": "cell_type"
             }),
-            log_level="INFO",
+            log_level=log_level,
         )
 
     def fit(self, x, y):

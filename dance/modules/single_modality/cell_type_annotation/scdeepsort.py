@@ -216,7 +216,7 @@ class ScDeepSort:
         return Compose(
             PCACellFeatureGraph(n_components=n_components, split_name="train"),
             SetConfig({"label_channel": "cell_type"}),
-            log_level="INFO",
+            log_level=log_level,
         )
 
     def fit(self, graph, labels, epochs=300, lr=1e-3, weight_decay=0, val_ratio=0.2):
