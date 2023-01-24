@@ -6,7 +6,6 @@ Shao, Xin, et al. "scDeepSort: a pre-trained cell-type annotation method for sin
 learning with a weighted graph neural network." Nucleic acids research 49.21 (2021): e122-e122.
 
 """
-import os
 import time
 from copy import deepcopy
 from pathlib import Path
@@ -17,7 +16,10 @@ import torch.nn as nn
 from dgl.dataloading import DataLoader, NeighborSampler
 from sklearn.metrics import accuracy_score
 
-DEBUG = os.environ.get("DANCE_DEBUG")
+from dance import logger
+from dance.transforms import Compose, SetConfig
+from dance.transforms.graph import PCACellFeatureGraph
+from dance.typing import LogLevel
 
 
 class AdaptiveSAGE(nn.Module):
@@ -82,12 +84,10 @@ class AdaptiveSAGE(nn.Module):
         indices = torch.where((src_id >= 0) & (dst_id < 0), src_id, indices)  # gene->cell
         indices = torch.where((dst_id >= 0) & (src_id < 0), dst_id, indices)  # cell->gene
         indices = torch.where((dst_id >= 0) & (src_id >= 0), self.gene_num, indices)  # gene-gene
-        if DEBUG:
-            print(
-                f"{((src_id >= 0) & (dst_id < 0)).sum():>10,} (geen->cell), "
-                f"{((src_id < 0) & (dst_id >= 0)).sum():>10,} (cell->gene), "
-                f"{((src_id >= 0) & (dst_id >= 0)).sum():>10,} (self-gene), "
-                f"{((src_id < 0) & (dst_id < 0)).sum():>10,} (self-cell), ", )
+        logger.debug(f"{((src_id >= 0) & (dst_id < 0)).sum():>10,} (geen->cell), "
+                     f"{((src_id < 0) & (dst_id >= 0)).sum():>10,} (cell->gene), "
+                     f"{((src_id >= 0) & (dst_id >= 0)).sum():>10,} (self-gene), "
+                     f"{((src_id < 0) & (dst_id < 0)).sum():>10,} (self-cell), ")
         h = edges.src["h"] * self.alpha[indices]
         return {"m": h * edges.data["weight"]}
 
@@ -167,16 +167,14 @@ class GNN(nn.Module):
 class ScDeepSort:
     """The ScDeepSort cell-type annotation model."""
 
-    def __init__(self, dim_in: int, dim_out: int, dim_hid: int, num_layers: int, species: str, tissue: str, *,
-                 dropout: int = 0, batch_size: int = 500, device: str = "cpu"):
+    def __init__(self, dim_in: int, dim_hid: int, num_layers: int, species: str, tissue: str, *, dropout: int = 0,
+                 batch_size: int = 500, device: str = "cpu"):
         """Initialize the scDeepSort object.
 
         Parameters
         ----------
         dim_in
             Input dimension, i.e., the number of PCA used for cell and gene features.
-        dim_out
-            Output dimension, i.e., the number of possible cell-types.
         dim_hid
             Hidden dimension.
         num_layers
@@ -210,33 +208,42 @@ class ScDeepSort:
         if not self.save_path.exists():
             self.save_path.mkdir(parents=True)
 
-        self.num_labels = dim_out
+    def preprocess(self, data, /, **kwargs):
+        self.preprocessing_pipeline(**kwargs)(data)
+
+    @staticmethod
+    def preprocessing_pipeline(n_components: int = 400, log_level: LogLevel = "INFO"):
+        return Compose(
+            PCACellFeatureGraph(n_components=n_components, split_name="train"),
+            SetConfig({"label_channel": "cell_type"}),
+            log_level="INFO",
+        )
 
     def fit(self, graph, labels, epochs=300, lr=1e-3, weight_decay=0, val_ratio=0.2):
         """Train scDeepsort model.
 
         Parameters
         ----------
-        num_cells : int
-            The number of cells in the training set.
-        num_genes : int
-            The number of genes in the training set.
-        num_labels : int
-            The number of labels in the training set.
         graph : dgl.DGLGraph
             Training graph.
-        train_ids : Tensor
-            The training ids.
-        test_ids : Tensor
-            The testing ids.
         labels : Tensor
             Node (cell, gene) labels, -1 for genes.
+        epochs
+            Number of epochs to train the model.
+        lr
+            Learning rate.
+        weight_decay
+            Weight decay regularization strength.
+        val_ratio
+            Ratio of the training data to hold out for validation.
 
         """
         gene_mask = graph.ndata["id"] != -1
         cell_mask = graph.ndata["id"] == -1
         num_genes = gene_mask.sum()
         num_cells = cell_mask.sum()
+        # TODO: remove reliance on num_labels in other methods
+        self.num_labels = labels.max().item() + 1
 
         perm = torch.randperm(num_cells) + num_genes
         num_val = int(num_cells * val_ratio)
