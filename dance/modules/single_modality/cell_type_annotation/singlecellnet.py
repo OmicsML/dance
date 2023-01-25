@@ -1,222 +1,116 @@
-import warnings
-
-import anndata as ad
 import numpy as np
-import pandas as pd
 import scanpy as sc
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 
-from dance.transforms import Compose, SetConfig
-from dance.transforms.preprocess import findClassyGenes, ptGetTop, query_transform
-from dance.typing import LogLevel
+from dance.transforms import AnnDataTransform, Compose, SCNFeature, SetConfig
+from dance.typing import LogLevel, Optional
 
 
-class SingleCellNet():
-    """Build the SingleCellNet model.
+class SingleCellNet:
+    """The SingleCellNet model."""
 
-    Parameters
-    ----------
-    cgenesA: np.array
-        All classification genes
-    xpairs: np.array
-        All top gene pairs
-    tspRF: RandomForestClassifier
-        Initialized Random Forest Classifier
+    def __init__(self, num_trees: int = 100):
+        """Initialize the SingleCellNet object.
 
-    """
+        Parameters
+        ----------
+        num_trees
+            Number of trees in the random forest model.
 
-    def __init__(self, cgenesA=None, xpairs=None, tspRF=None):
-        self.cgenesA = cgenesA
-        self.xpairs = xpairs
-        self.tspRF = tspRF
+        """
+        self.num_trees = num_trees
 
     def preprocess(self, data, /, **kwargs):
         self.preprocessing_pipeline(**kwargs)(data)
 
     @staticmethod
-    def preprocessing_pipeline(log_level: LogLevel = "INFO"):
-        return Compose(SetConfig({"label_channel": "cell_type"}), log_level=log_level)
+    def preprocessing_pipeline(normalize: bool = True, num_top_genes: int = 10, num_top_gene_pairs: int = 25,
+                               log_level: LogLevel = "INFO"):
+        transforms = []
 
-    def randomize(self, expDat, num=50):
-        """Randomization sampling.
+        if normalize:
+            transforms.append(AnnDataTransform(sc.pp.normalize_total, target_sum=1e4))
+            transforms.append(AnnDataTransform(sc.pp.log1p))
+
+        transforms.append(SCNFeature(num_top_genes=num_top_genes, num_top_gene_pairs=num_top_gene_pairs))
+        transforms.append(SetConfig({"feature_channel": "SCNFeature", "label_channel": "cell_type"}))
+
+        return Compose(*transforms, log_level=log_level)
+
+    def randomize(self, exp, num: int = 50):
+        """Return randomized features.
 
         Parameters
         ----------
-        expDat:
-            Data to be shuffled
-        num: int optional
-            number of samples selected
-
-        Returns
-        ----------
-        output: pd.DataFrame
-            A DataFrame with "num" random selected of rows
+        exp
+            Data to be shuffled.
+        num
+            Number of samples to return.
 
         """
-        temp = expDat.to_numpy()
-        temp = np.array([np.random.choice(x, len(x), replace=False) for x in temp])
-        temp = temp.T
-        temp = np.array([np.random.choice(x, len(x), replace=False) for x in temp]).T
-        return pd.DataFrame(data=temp, columns=expDat.columns).iloc[0:num, :]
+        rand = np.array([np.random.choice(x, len(x), replace=False) for x in exp]).T
+        rand = np.array([np.random.choice(x, len(x), replace=False) for x in rand]).T
+        return rand[:num]
 
-    def sc_trans_rnaseq(self, aDat, total=10000):
-        """normalization to aDat.
+    def fit(self, x, y, num_rand: int = 100, stratify: bool = True, random_state: Optional[int] = 100):
+        """Train the SingleCellNet random forest model.
 
         Parameters
         ----------
-        expDat: Union[AnnData, ndarray, spmatrix]
-            Data to be shuffled
-        total: float optional
-            If None, after normalization, each cell has a total count equal to the median of the counts_per_cell before
-            normalization.
-
-        Return
-        ----------
-        aDat: AnnData
-            transformer result
+        x
+            Input features.
+        y
+            Labels.
+        stratify
+            Whether we select balanced class weight in the random forest model.
+        random_state
+            Random state.
 
         """
-        sc.pp.normalize_per_cell(aDat, counts_per_cell_after=total)
-        sc.pp.log1p(aDat)
-        sc.pp.scale(aDat, max_value=10)
-        return aDat
+        x_rand = self.randomize(x, num=num_rand)
+        x_comb = np.vstack((x, x_rand))
 
-    def sc_makeClassifier(self, expTrain, genes, groups, nRand=70, ntrees=2000, stratify=False):
-        """Build the random forest classifier.
+        y_rand = np.ones(x_rand.shape[0]) * (y.max() + 1)
+        y_comb = np.concatenate((y, y_rand))
 
-        Parameters
-        ----------
-        expTrain: pd.DataFrame
-            input dataset
-        genes: np.array
-            genes selected to fit the random forest model
-        groups: str
-            cell type labels with respect to the input
-        nRand: int optional
-            the number of samples selected
-        ntrees: int optional
-            Number of decision trees in random forest
-        stratify: bool optional
-            whether we select balanced class weight in the random forest model
+        self.model = RandomForestClassifier(n_estimators=self.num_trees, random_state=random_state,
+                                            class_weight="balanced" if stratify else None)
+        self.model.fit(x_comb, y_comb)
 
-        Returns
-        ----------
-        output:
-            A random forest classifier
-
-        """
-
-        randDat = self.randomize(expTrain, num=nRand)
-        expT = pd.concat([expTrain, randDat])
-        allgenes = expT.columns.values
-        ggenes = np.intersect1d(np.unique(genes), allgenes)
-        if not stratify:
-            clf = RandomForestClassifier(n_estimators=ntrees, random_state=100)
-        else:
-            clf = RandomForestClassifier(n_estimators=ntrees, class_weight="balanced", random_state=100)
-        ggroups = np.append(np.array(groups), np.repeat("rand", nRand)).flatten()
-        clf.fit(expT.loc[:, ggenes].to_numpy(), ggroups)
-        return clf
-
-    def fit(self, aTrain, dLevel, nTopGenes=100, nTopGenePairs=100, nRand=100, nTrees=1000, stratify=False,
-            counts_per_cell_after=1e4, scaleMax=10, limitToHVG=False):
-        """Train the SingleCellNet model(random forest)
+    def predict_proba(self, x):
+        """Calculate predicted probabilities.
 
         Parameters
         ----------
-        aTrain: AnnData object
-            Training set in AnnData object version
-        dLevel: str
-            The column name of the labels
-        nTopGenes: int optional
-            Top n genes selected during training
-        nTopGenePairs: int optional
-            Top n genes pairs selected during training
-        nRand: int optional
-            Samples for each training batch
-        nTrees: int optional
-            Number of decision trees
-        stratify: bool optional
-            whether we select balanced class weight in the random forest model
-        counts_per_cell_after: float optional
-            If None, after normalization, each cell has a total count equal to the median of the counts_per_cell before
-            normalization.
-        scaleMax: int optional
-            Maximum scaling for data normalization
-        limitToHVG: bool optional
-            whether we limit the model on highly variable genes
+        x
+            Input featurex.
 
         Returns
-        ----------
-        There will be no output, but the parameters in the model will be updated
-
-        """
-        warnings.filterwarnings('ignore')
-
-        expRaw = pd.DataFrame(data=aTrain.X, index=aTrain.obs.index.values, columns=aTrain.var.index.values)
-        expRaw = expRaw.loc[aTrain.obs_names]
-
-        adNorm = aTrain.copy()
-        sc.pp.normalize_per_cell(adNorm, counts_per_cell_after=counts_per_cell_after)
-        sc.pp.log1p(adNorm)
-
-        print("HVG")
-        if limitToHVG:
-            sc.pp.highly_variable_genes(adNorm, min_mean=0.0125, max_mean=4, min_disp=0.5)
-            adNorm = adNorm[:, adNorm.var.highly_variable]
-
-        sc.pp.scale(adNorm, max_value=scaleMax)
-        expTnorm = pd.DataFrame(data=adNorm.X, index=adNorm.obs.index.values, columns=adNorm.var.index.values)
-        expTnorm = expTnorm.loc[aTrain.obs_names]
-
-        print("Matrix normalized")
-        cgenesA, grps, cgenes_list = findClassyGenes(expTnorm, aTrain.obsm[dLevel], topX=nTopGenes)
-        print("There are ", len(cgenesA), " classification genes\n")
-        xpairs = ptGetTop(expTnorm.loc[:, cgenesA], grps, cgenes_list, topX=nTopGenePairs, sliceSize=5000)
-
-        print("There are", len(xpairs), "top gene pairs\n")
-        pdTrain = query_transform(expRaw.loc[:, cgenesA], xpairs)
-        print("Finished pair transforming the data\n")
-        tspRF = self.sc_makeClassifier(pdTrain.loc[:, xpairs], genes=xpairs, groups=grps, nRand=nRand, ntrees=nTrees,
-                                       stratify=stratify)
-
-        self.cgenesA = cgenesA
-        self.xpairs = xpairs
-        self.tspRF = tspRF
-
-    def predict_proba(self, adata):
-        """Do prediction with singlecellnet model.
-
-        Parameters
-        ----------
-        adata: Union[AnnData, ndarray, spmatrix]
-            Input data to be predicted.
-
-        Returns
-        ----------
+        -------
         np.ndarray
             Cell-type probability matrix where each row is a cell and each column is a cell-type. The values in the
             matrix indicate the predicted probability that the cell is a particular cell-type. The last column
             corresponds to the probability that the model could not confidently identify the cell type of the cell.
 
         """
-        cgenes = self.cgenesA
-        xpairs = self.xpairs
-        rf_tsp = self.tspRF
-        pred_prob = self.scn_predict(cgenes, xpairs, rf_tsp, adata, nrand=0).values
-        return pred_prob
+        return self.model.predict_proba(x)
 
-    def predict(self, adata):
+    def predict(self, x):
         """Predict cell type label.
 
         Parameters
         ----------
-        adata: Union[AnnData, ndarray, spmatrix]
-            Input data to be predicted.
+        x
+            Input features.
+
+        Returns
+        -------
+        np.ndarray
+            The most likely cell-type label of each sample.
 
         """
-        pred_prob = self.predict_proba(adata)
+        pred_prob = self.predict_proba(x)
         pred = pred_prob.argmax(1)
         return pred
 
@@ -242,58 +136,3 @@ class SingleCellNet():
             return true[mask, pred[mask]].sum() / num_samples
         else:
             return accuracy_score(pred, true)
-
-    def scn_predict(self, cgenes, xpairs, rf_tsp, aDat, nrand=2):
-        """Prediction with random forest.
-
-        Parameters
-        ----------
-        cgenes: np.array
-            Classification genes in the model
-        xpairs: np.array
-            Top gene pairs in the model
-        rf_tsp: RandomForestClassifier
-            Initialized Random Forest Classifier
-        aDat: AnnData
-            input feature
-        nrand: int optional
-            batch size during training
-
-        Return
-        ----------
-        classRes_val: pd.DataFrame
-            prediction result
-
-        """
-        if isinstance(aDat.X, np.ndarray):
-            # in the case of aDat.X is a numpy array
-            aDat.X = ad._core.views.ArrayView(aDat.X)
-
-        expDat = pd.DataFrame(data=aDat.X.toarray(), index=aDat.obs.index.values, columns=aDat.var.index.values)
-        expValTrans = query_transform(expDat.reindex(labels=cgenes, axis='columns', fill_value=0), xpairs)
-        classRes_val = self.rf_classPredict(rf_tsp, expValTrans, numRand=nrand)
-        return classRes_val
-
-    def rf_classPredict(self, rfObj, expQuery, numRand=50):
-        """Prediction with random forest.
-
-        Parameters
-        ----------
-        rfObj:
-            result of running sc_makeClassifier
-        expQuery: np.array
-            input features
-        numRand: int optional
-            batch size during training
-
-        Return
-        ----------
-        xpreds: pd.DataFrame
-            prediction result
-
-        """
-        if numRand > 0:
-            randDat = self.randomize(expQuery, num=numRand)
-            expQuery = pd.concat([expQuery, randDat])
-        xpreds = pd.DataFrame(rfObj.predict_proba(expQuery), columns=rfObj.classes_, index=expQuery.index)
-        return xpreds

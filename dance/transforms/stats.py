@@ -10,11 +10,11 @@ from dance.utils.wrappers import as_1d_array
 
 class GeneStats(BaseTransform):
 
-    _DISPLAY_ATTRS = ("genestats_select", "threshold", "pseudo")
+    _DISPLAY_ATTRS = ("genestats_select", "threshold", "pseudo", "split_name")
 
     def __init__(self, genestats_select: Union[str, List[str]] = "all", *, fill_na: Optional[float] = None,
-                 threshold: float = 0, pseudo: bool = False, channel: Optional[str] = None,
-                 channel_type: Optional[str] = None, **kwargs):
+                 threshold: float = 0, pseudo: bool = False, split_name: Optional[str] = "train",
+                 channel: Optional[str] = None, channel_type: Optional[str] = None, **kwargs):
         """Initialize GeneStats.
 
         Parameters
@@ -29,6 +29,8 @@ class GeneStats(BaseTransform):
         pseudo
             If set to `True`, then add `1` to the numerator and denominator when computing the ratio (`alpha`) for
             which the gene expression values are above the specified `threshold`.
+        split_name
+            Which split to compute the gene stats on.
 
         """
         super().__init__(**kwargs)
@@ -50,6 +52,7 @@ class GeneStats(BaseTransform):
         }
 
         self.fill_na = fill_na
+        self.split_name = split_name
 
         # Check expression layer option
         if (channel is not None) and (channel_type != "layers"):
@@ -59,7 +62,8 @@ class GeneStats(BaseTransform):
         self.channel_type = channel_type
 
     def __call__(self, data):
-        exp = data.get_feature(return_type="default", channel=self.channel, channel_type=self.channel_type)
+        exp = data.get_feature(return_type="numpy", split_name=self.split_name, channel=self.channel,
+                               channel_type=self.channel_type)
         self.logger.info(f"Start computing gene stats: {self.genestats_select}")
 
         stats_dict = {}
