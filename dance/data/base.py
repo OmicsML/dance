@@ -166,7 +166,7 @@ class BaseData(ABC):
             # New config
             if config_key not in self.config:
                 self.config[config_key] = config_val
-                logger.debug(f"Setting config {config_key!r}t to {config_val!r}")
+                logger.info(f"Setting config {config_key!r}t to {config_val!r}")
                 continue
 
             # Existing config
@@ -174,7 +174,7 @@ class BaseData(ABC):
                 continue
             elif overwrite:  # new value differs from before and overwrite setting is turned on
                 self.config[config_key] = config_val
-                logger.debug(f"Overwriting config {config_key!r} to {config_val!r} (previously {old_config_val!r})")
+                logger.warning(f"Overwriting config {config_key!r} to {config_val!r} (previously {old_config_val!r})")
             else:  # new value differs from before but overwrite setting is not on
                 raise KeyError(f"Config {config_key!r} exit with value {old_config_val!r} but trying to set to a "
                                f"different value {config_val!r}. If you want to overwrite the config, please specify "
@@ -235,7 +235,9 @@ class BaseData(ABC):
             If set to True, raise KeyError if the queried split does not exit, otherwise return None.
 
         """
-        if split_name in self._split_idx_dict:
+        if split_name is None:
+            return list(range(self.shape[0]))
+        elif split_name in self._split_idx_dict:
             return self._split_idx_dict[split_name]
         elif error_on_miss:
             raise KeyError(f"Unknown split {split_name!r}. Please set the split inddices via set_split_idx first.")

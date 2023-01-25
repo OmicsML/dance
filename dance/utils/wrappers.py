@@ -2,6 +2,8 @@ import datetime
 import functools
 import time
 
+import numpy as np
+
 from dance import logger
 
 
@@ -30,3 +32,14 @@ class TimeIt:
             return res
 
         return wrapped_func
+
+
+def as_1d_array(func):
+
+    @functools.wraps(func)
+    def wrapped_func(*args, **kwargs):
+        res = func(*args, **kwargs)
+        res_1d_array = np.array(res).ravel()
+        return res_1d_array
+
+    return wrapped_func
