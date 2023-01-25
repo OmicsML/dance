@@ -52,7 +52,7 @@ if __name__ == "__main__":
 """To reproduce SingleCellNet benchmarks, please refer to command lines below:
 
 Mouse Brain
-$ python singlecellnet.py --species mouse --tissue Brain --train_dataset 753 3285 --test_dataset 2695
+$ python singlecellnet.py --species mouse --tissue Brain --train_dataset 753 --test_dataset 2695
 
 Mouse Spleen
 $ python singlecellnet.py --species mouse --tissue Spleen --train_dataset 1970 --test_dataset 1759
