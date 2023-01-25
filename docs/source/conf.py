@@ -33,6 +33,7 @@ extensions = [
 ]
 
 intersphinx_mapping = {
+    'anndata': ('https://anndata.readthedocs.io/en/stable/', None),
     'mudata': ('https://mudata.readthedocs.io/en/stable/', None),
     'scanpy': ('https://scanpy.readthedocs.io/en/stable/', None),
     'sklearn': ('https://scikit-learn.org/stable', None),
