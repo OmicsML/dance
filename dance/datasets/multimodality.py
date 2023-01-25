@@ -6,7 +6,7 @@ import numpy as np
 import scanpy as sc
 import torch
 
-from dance.data import *
+from dance.data import download_file, unzip_file
 from dance.transforms.preprocess import lsiTransformer
 
 
