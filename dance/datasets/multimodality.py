@@ -6,8 +6,8 @@ import numpy as np
 import scanpy as sc
 import torch
 
-from dance.data import *
 from dance.transforms.preprocess import lsiTransformer
+from dance.utils.download import download_file, unzip_file
 
 
 class MultiModalityDataset():

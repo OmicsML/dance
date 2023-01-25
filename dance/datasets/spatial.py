@@ -8,7 +8,7 @@ import pandas as pd
 import scanpy as sc
 
 from dance import logger
-from dance.data import download_file, download_unzip, unzip_file
+from dance.utils.download import download_file, download_unzip, unzip_file
 
 IGNORED_FILES = ["readme.txt"]
 

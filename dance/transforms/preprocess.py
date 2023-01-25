@@ -3,7 +3,6 @@ import os
 import random
 import time
 import warnings
-from itertools import combinations
 
 import anndata
 import dgl
@@ -18,10 +17,8 @@ import sklearn.feature_extraction.text
 import sklearn.neighbors
 import sklearn.preprocessing
 import sklearn.utils.extmath
-import statsmodels.stats.multitest as smt
 import torch
 from dgl.sampling import pack_traces, random_walk
-from scipy import stats
 from scipy.stats import expon
 from sklearn.model_selection import train_test_split
 

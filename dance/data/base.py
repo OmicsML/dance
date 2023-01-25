@@ -43,6 +43,21 @@ class BaseData(ABC):
                  test_size: int = -1):
         """Initialize data object.
 
+        The `dance` data object is a wrapper of the :class:`~anndata.AnnData` object, with several utility methods
+        to help retrieving data in specific splits in specific format (see :meth:`~BaseData.get_split_idx` and
+        :meth:`~BaseData.get_feature`). The `AnnData` objcet is saved in the attribute :attr:`data` and can be
+        accessed directly.
+
+        Warning
+        -------
+        Since the underlying data object is a reference to the input :class:`~anndata.AnnData` object, please be
+        extra cautious ***NOT*** initializing two different dance `data` object using the same `AnnData` object!
+        If you are unsure, we recommend always initialize the dance `data` object using a `copy` of the input
+        `AnnData` object, e.g.,
+
+            >>> adata = anndata.AnnData(...)
+            >>> ddata = dance.data.Data(adata.copy())
+
         Parameters
         ----------
         data
@@ -124,6 +139,14 @@ class BaseData(ABC):
 
     @property
     def config(self) -> Dict[str, Any]:
+        """Return the dance data object configuration dict.
+
+        Notes
+        -----
+        The configuration dictionary is saved in the :attr:`data` attribute, which is an :class:`~anndata.AnnData`
+        object. Inparticular, the config will be saved in the `.uns` attribute with the key `"dance_config"`.
+
+        """
         return self._data.uns["dance_config"]
 
     def set_config(self, *, overwrite: bool = False, **kwargs):
@@ -233,6 +256,10 @@ class BaseData(ABC):
             Name of the split to retrieve.
         error_on_miss
             If set to True, raise KeyError if the queried split does not exit, otherwise return None.
+
+        See Also
+        --------
+        :meth:`~get_split_mask`
 
         """
         if split_name is None:

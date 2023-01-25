@@ -13,44 +13,44 @@ def test_data_basic_properties(subtests):
     adata = AnnData(X=X)
 
     with subtests.test("No training splits"):
-        data = Data(adata)
+        data = Data(adata.copy())
         assert data.num_cells == 3
         assert data.num_features == 2
         assert data.cells == ["0", "1", "2"]
         assert data.train_idx is data.val_idx is data.test_idx is None
 
     with subtests.test("All training"):
-        data = Data(adata, train_size="all")
+        data = Data(adata.copy(), train_size="all")
         assert data.train_idx == [0, 1, 2]
         assert data.val_idx is None
         assert data.test_idx is None
 
     with subtests.test("Training and testing splits"):
-        data = Data(adata, train_size=2)
+        data = Data(adata.copy(), train_size=2)
         assert data.train_idx == [0, 1]
         assert data.val_idx is None
         assert data.test_idx == [2]
 
-        data = Data(adata, train_size=-1, test_size=1)
+        data = Data(adata.copy(), train_size=-1, test_size=1)
         assert data.train_idx == [0, 1]
         assert data.val_idx is None
         assert data.test_idx == [2]
 
     with subtests.test("Training validation and testing splits"):
-        data = Data(adata, train_size=1, val_size=1)
+        data = Data(adata.copy(), train_size=1, val_size=1)
         assert data.train_idx == [0]
         assert data.val_idx == [1]
         assert data.test_idx == [2]
 
     with subtests.test("Error sizes"):
         with pytest.raises(TypeError):
-            Data(adata, train_size="1")
+            Data(adata.copy(), train_size="1")
         with pytest.raises(ValueError):  # cannot have two -1
-            Data(adata, train_size=-1)
+            Data(adata.copy(), train_size=-1)
         with pytest.raises(ValueError):  # train size exceeds data size
-            Data(adata, train_size=5)
+            Data(adata.copy(), train_size=5)
         with pytest.raises(ValueError):  # sum of sizes exceeds data size
-            Data(adata, train_size=2, test_size=2)
+            Data(adata.copy(), train_size=2, test_size=2)
 
 
 def test_get_data(subtests):
@@ -65,7 +65,7 @@ def test_get_data(subtests):
     adata.obsm["label"] = Y
 
     with subtests.test("Single feature"):
-        data = Data(adata, train_size=2)
+        data = Data(adata.copy(), train_size=2)
         data.set_config(label_channel="label")
 
         x_train, y_train = data.get_train_data()
@@ -80,7 +80,7 @@ def test_get_data(subtests):
         pytest.raises(KeyError, data.get_val_data)
 
     with subtests.test("Multi feature"):
-        data = Data(adata, train_size=2)
+        data = Data(adata.copy(), train_size=2)
         data.set_config(feature_channel=[None, "feature1", "feature2"], label_channel="label")
 
         (x1_train, x2_train, x3_train), y_train = data.get_train_data()
@@ -89,7 +89,7 @@ def test_get_data(subtests):
         assert y_train.tolist() == [[0], [1]]
 
     with subtests.test("Multi type feature"):
-        data = Data(adata, train_size=2)
+        data = Data(adata.copy(), train_size=2)
         data.set_config(
             feature_channel=["obsm_feature", "obsp_feature", "varm_feature", "varp_feature", "layer_feature"],
             feature_channel_type=["obsm", "obsp", "varm", "varp", "layers"], label_channel="label")
@@ -103,7 +103,7 @@ def test_get_data(subtests):
         assert y.tolist() == [[0], [1]]
 
     with subtests.test("Single column feature"):
-        data = Data(adata, train_size=2)
+        data = Data(adata.copy(), train_size=2)
         data.set_config(feature_channel=["a", "z"], feature_channel_type=["obs", "var"], label_channel="label")
 
         (x1, x2), _ = data.get_train_data()
