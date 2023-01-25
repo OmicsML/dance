@@ -98,7 +98,7 @@ as well as easily reproducible experiments by providing unified tools for
   [script](examples/single_modality/cell_type_annotation/scdeepsort.py).
   For example, the CLI options for reproducing the `Mouse Brain` experiment is
   ```bash
-  python scdeepsort.py --data_type scdeepsort --tissue Brain --test_data 2695
+  python scdeepsort.py --species mouse --tissue Brain --train_dataset 753 3285 --test_dataset 2695
   ```
 - Step3. Wait for the experiment to finish and check results.
 
