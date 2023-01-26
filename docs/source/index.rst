@@ -55,6 +55,14 @@ some of the experiments from the original papers.
    modules/multi_modality
    modules/spatial
 
+.. toctree::
+   :maxdepth: 1
+   :caption: API Reference
+
+   api/data
+   api/datasets
+   api/transforms
+
 Indices and tables
 ==================
 
