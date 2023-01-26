@@ -99,8 +99,8 @@ class Model():
             Number of markers to extract for a given cell type.
             (Default: 10)
         only_positive: bool optional
-            Whether to extract positive markers only. Set to `False` to include negative markers as well.
-            (Default: `True`)
+            Whether to extract positive markers only. Set to ``False`` to include negative markers as well.
+            (Default: ``True``)
 
         Returns
         ----------
@@ -167,9 +167,9 @@ class AnnotationResult():
         ----------
         by: str
             Column name of :attr:`~celltypist.classifier.AnnotationResult.predicted_labels` specifying the prediction
-            type which the summary is based on. Set to `'majority_voting'` if you want to summarize for the majority
+            type which the summary is based on. Set to ``'majority_voting'`` if you want to summarize for the majority
             voting classifier.
-            (Default: `'predicted_labels'`)
+            (Default: ``'predicted_labels'``)
 
         Returns
         ----------
@@ -190,19 +190,19 @@ class AnnotationResult():
         ----------
         insert_labels: bool optional
             Whether to insert the predicted cell type labels and (if majority voting is done) majority voting-based
-            labels into the AnnData object. (Default: `True`)
+            labels into the AnnData object. (Default: ``True``)
         insert_conf: bool optional
-            Whether to insert the confidence scores into the AnnData object. (Default: `True`)
+            Whether to insert the confidence scores into the AnnData object. (Default: ``True``)
         insert_conf_by: str optional
             Column name of :attr:`~celltypist.classifier.AnnotationResult.predicted_labels` specifying the prediction
-            type which the confidence scores are based on. Setting to `'majority_voting'` will insert the confidence
+            type which the confidence scores are based on. Setting to ``'majority_voting'`` will insert the confidence
             scores corresponding to the majority-voting result.
-            (Default: `'predicted_labels'`)
+            (Default: ``'predicted_labels'``)
         insert_decision: bool optional
-            Whether to insert the decision matrix into the AnnData object. (Default: `False`)
+            Whether to insert the decision matrix into the AnnData object. (Default: ``False``)
         insert_prob: bool optional
             Whether to insert the probability matrix into the AnnData object. This will override the decision matrix
-            even when `insert_decision` is set to `True`. (Default: `False`)
+            even when ``insert_decision`` is set to ``True``. (Default: ``False``)
         prefix:  str optional
             Prefix for the inserted columns in the AnnData object. Default to no prefix used.
 
@@ -210,13 +210,13 @@ class AnnotationResult():
         ----------
         :class:`~anndata.AnnData`
             Depending on whether majority voting is done, an :class:`~anndata.AnnData` object with the following columns
-            (prefixed with `prefix`) added to the observation metadata:
+            (prefixed with ``prefix``) added to the observation metadata:
             1) **predicted_labels**, individual prediction outcome for each cell.
             2) **over_clustering**, over-clustering result for the cells.
             3) **majority_voting**, the cell type label assigned to each cell after the majority voting process.
             4) **conf_score**, the confidence score of each cell.
-            5) **name of each cell type**, which represents the decision scores (or probabilities if `insert_prob` is
-               `True`) of a given cell type across cells.
+            5) **name of each cell type**, which represents the decision scores (or probabilities if ``insert_prob`` is
+               ``True``) of a given cell type across cells.
 
         """
         if insert_labels:
@@ -251,19 +251,19 @@ class AnnotationResult():
             Path to a folder which stores the output figures.
         plot_probability: bool optional
             Whether to also plot the decision score and probability distributions of each cell type across the test
-            cells. If `True`, a number of figures will be generated (may take some time if the input data is large).
-            (Default: `False`)
+            cells. If ``True``, a number of figures will be generated (may take some time if the input data is large).
+            (Default: ``False``)
         format: str optional
             Format of output figures. Default to vector PDF files (note dots are still drawn with png backend).
-            (Default: `'pdf'`)
+            (Default: ``'pdf'``)
         prefix: str optional
             Prefix for the output figures. Default to no prefix used.
 
         Returns
         ----------
         None
-            Depending on whether majority voting is done and `plot_probability`, multiple UMAP plots showing the
-            prediction and majority voting results in the `folder`:
+            Depending on whether majority voting is done and ``plot_probability``, multiple UMAP plots showing the
+            prediction and majority voting results in the ``folder``:
             1) **predicted_labels**, individual prediction outcome for each cell overlaid onto the UMAP.
             2) **over_clustering**, over-clustering result of the cells overlaid onto the UMAP.
             3) **majority_voting**, the cell type label assigned to each cell after the majority voting process overlaid
@@ -312,12 +312,12 @@ class AnnotationResult():
             Prefix for the output table/tables. Default to no prefix used.
         xlsx: bool optional
             Whether to merge output tables into a single Excel (.xlsx).
-            (Default: `False`)
+            (Default: ``False``)
 
         Returns
         ----------
         None
-            Depending on `xlsx`, return table(s) of predicted labels, decision matrix and probability matrix.
+            Depending on ``xlsx``, return table(s) of predicted labels, decision matrix and probability matrix.
 
         """
         if not os.path.isdir(folder):
@@ -358,7 +358,7 @@ class Classifier():
     Attributes
     ----------
     adata:
-        An :class:`~anndata.AnnData` object which stores the log1p normalized expression data in `.X` or `.raw.X`.
+        An :class:`~anndata.AnnData` object which stores the log1p normalized expression data in ``.X`` or ``.raw.X``.
     indata:
         The expression matrix used for predictions stored in the log1p normalized format.
     indata_genes:
@@ -563,54 +563,55 @@ class Celltypist:
         C: float optional
             Inverse of L2 regularization strength for traditional logistic classifier. A smaller value can possibly
             improve model generalization while at the cost of decreased accuracy. This argument is ignored if SGD
-            learning is enabled (`use_SGD = True`). (Default: 1.0)
+            learning is enabled (``use_SGD = True``). (Default: 1.0)
         solver: str optional
             Algorithm to use in the optimization problem for traditional logistic classifier. The default behavior is
             to choose the solver according to the size of the input data. This argument is ignored if SGD learning is
-            enabled (`use_SGD = True`).
+            enabled (``use_SGD = True``).
         max_iter: int optional
             Maximum number of iterations before reaching the minimum of the cost function.
-            Try to decrease `max_iter` if the cost function does not converge for a long time.
+            Try to decrease ``max_iter`` if the cost function does not converge for a long time.
             This argument is for both traditional and SGD logistic classifiers, and will be ignored if mini-batch SGD
-            training is conducted (`use_SGD = True` and `mini_batch = True`). (Default: 1000)
+            training is conducted (``use_SGD = True`` and ``mini_batch = True``). (Default: 1000)
         n_jobs: int optional
-            Number of CPUs used. Default to one CPU. `-1` means all CPUs are used.
+            Number of CPUs used. Default to one CPU. ``-1`` means all CPUs are used.
             This argument is for both traditional and SGD logistic classifiers.
         use_SGD: bool optional
-            Whether to implement SGD learning for the logistic classifier. (Default: `False`)
+            Whether to implement SGD learning for the logistic classifier. (Default: ``False``)
         alpha: float optional
             L2 regularization strength for SGD logistic classifier. A larger value can possibly improve model
             generalization while at the cost of decreased accuracy. This argument is ignored if SGD learning is disabled
-            (`use_SGD = False`). (Default: 0.0001)
+            (``use_SGD = False``). (Default: 0.0001)
         mini_batch: bool optional
             Whether to implement mini-batch training for the SGD logistic classifier.
-            Setting to `True` may improve the training efficiency for large datasets (for example, >100k cells).
-            This argument is ignored if SGD learning is disabled (`use_SGD = False`). (Default: `False`)
+            Setting to ``True`` may improve the training efficiency for large datasets (for example, >100k cells).
+            This argument is ignored if SGD learning is disabled (``use_SGD = False``). (Default: ``False``)
         batch_number: int optional
-            The number of batches used for training in each epoch. Each batch contains `batch_size` cells. For datasets
-            which cannot be binned into `batch_number` batches, all batches will be used. This argument is relevant
-            only if mini-batch SGD training is conducted (`use_SGD = True` and `mini_batch = True`). (Default: 100)
+            The number of batches used for training in each epoch. Each batch contains ``batch_size`` cells. For
+            datasets which cannot be binned into ``batch_number`` batches, all batches will be used. This argument is
+            relevant only if mini-batch SGD training is conducted (``use_SGD = True`` and ``mini_batch = True``).
+            (Default: 100)
         batch_size: int optional
             The number of cells within each batch. This argument is relevant only if mini-batch SGD training is
-            conducted (`use_SGD = True` and `mini_batch = True`). (Default: 1000)
+            conducted (``use_SGD = True`` and ``mini_batch = True``). (Default: 1000)
         epochs: int optional
-            The number of epochs for the mini-batch training procedure. The default values of `batch_number`,
-            `batch_size`, and `epochs` together allow observing ~10^6 training cells. This argument is relevant only if
-            mini-batch SGD training is conducted (`use_SGD = True` and `mini_batch = True`). (Default: 10)
+            The number of epochs for the mini-batch training procedure. The default values of ``batch_number``,
+            ``batch_size``, and ``epochs`` together allow observing ~10^6 training cells. This argument is relevant
+            only if mini-batch SGD training is conducted (``use_SGD = True`` and ``mini_batch = True``). (Default: 10)
         balance_cell_type: bool optional
-            Whether to balance the cell type frequencies in mini-batches during each epoch. Setting to `True` will
+            Whether to balance the cell type frequencies in mini-batches during each epoch. Setting to ``True`` will
             sample rare cell types with a higher probability, ensuring close-to-even cell type distributions in
-            mini-batches. This argument is relevant only if mini-batch SGD training is conducted (`use_SGD = True` and
-            `mini_batch = True`). (Default: `False`)
+            mini-batches. This argument is relevant only if mini-batch SGD training is conducted (``use_SGD = True`` and
+            ``mini_batch = True``). (Default: ``False``)
         feature_selection: bool optional
             Whether to perform two-pass data training where the first round is used for selecting important
-            features/genes using SGD learning. If `True`, the training time will be longer. (Default: `False`)
+            features/genes using SGD learning. If ``True``, the training time will be longer. (Default: ``False``)
         top_genes: int optional
             The number of top genes selected from each class/cell-type based on their absolute regression coefficients.
             The final feature set is combined across all classes (i.e., union). (Default: 300)
         **kwargs
-            Other keyword arguments passed to :class:`~sklearn.linear_model.LogisticRegression` (`use_SGD = False`) or
-            :class:`~sklearn.linear_model.SGDClassifier` (`use_SGD = True`).
+            Other keyword arguments passed to :class:`~sklearn.linear_model.LogisticRegression` (``use_SGD = False``) or
+            :class:`~sklearn.linear_model.SGDClassifier` (``use_SGD = True``).
 
         Returns
         -------
@@ -683,11 +684,11 @@ class Celltypist:
         x: np.ndarray
             Input expression matrix (cell x gene).
         as_obj: bool
-            If set to `True`, then return the prediction results are :class:`~AnnotationResult`. Otherwise, return the
-            predicted cell-label indexes ad 1-d numpy array instead. (Default: `False`)
+            If set to ``True``, then return the prediction results are :class:`~AnnotationResult`. Otherwise, return the
+            predicted cell-label indexes ad 1-d numpy array instead. (Default: ``False``)
         majority_voting: bool optional
             Whether to refine the predicted labels by running the majority voting classifier after over-clustering.
-            (Default: `False`)
+            (Default: ``False``)
         over_clustering: Union[str, list, tuple, np.ndarray, pd.Series, pd.Index] optional
             This argument can be provided in several ways:
             1) an input plain file with the over-clustering result of one cell per line.
@@ -696,11 +697,11 @@ class Celltypist:
                input cells.
             4) if none of the above is provided, will use a heuristic over-clustering approach according to the size of
                input data.
-            Ignored if `majority_voting` is set to `False`.
+            Ignored if ``majority_voting`` is set to ``False``.
         min_prop: float optional
             For the dominant cell type within a subcluster, the minimum proportion of cells required to support naming
-            of the subcluster by this cell type. Ignored if `majority_voting` is set to `False`. Subcluster that fails
-            to pass this proportion threshold will be assigned `'Heterogeneous'`. (Default: 0)
+            of the subcluster by this cell type. Ignored if ``majority_voting`` is set to ``False``. Subcluster that
+            fails to pass this proportion threshold will be assigned ``'Heterogeneous'``. (Default: 0)
 
         """
         # Construct classifier

@@ -119,12 +119,12 @@ class StagateGraph(BaseTransform):
         Parameters
         ----------
         model_name
-            Type of graph to construct. Currently support `radius` and `knn`. See
+            Type of graph to construct. Currently support ``radius`` and ``knn``. See
             :class:`~sklearn.neighbors.NearestNeighbors` for more info.
         radius
-            Radius parameter for `radius_neighbors_graph`.
+            Radius parameter for ``radius_neighbors_graph``.
         n_neighbors
-            Number of neighbors for `kneighbors_graph`.
+            Number of neighbors for ``kneighbors_graph``.
 
         """
         super().__init__(**kwargs)

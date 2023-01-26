@@ -17,12 +17,12 @@ class Compose(BaseTransform):
         transforms
             Transformation objects.
         use_master_log_level
-            If set to `True`, then reset all transforms' loggers to use :then reset all transforms' loggers to use
-            `log_level` option passed to this :class:`Compose` object.
+            If set to ``True``, then reset all transforms' loggers to use :then reset all transforms' loggers to use
+            ``log_level`` option passed to this :class:`Compose` object.
 
         Notes
         -----
-        The order in which the `transform` object are passed will be exactly the order in which they will be applied
+        The order in which the ``transform`` object are passed will be exactly the order in which they will be applied
         to the data object.
 
         """

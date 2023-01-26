@@ -22,13 +22,13 @@ class FilterGenesPercentile(BaseTransform):
         max_val
             Maximum percentile of the summarized expression value above which the genes will be discarded.
         mode
-            Summarization mode. Available options are `[sum|cv]`. `sum` calculates the sum of expression values, `cv`
-            uses the coefficient of variation (std / mean).
+            Summarization mode. Available options are ``[sum|cv]``. ``sum`` calculates the sum of expression values,
+            ``cv`` uses the coefficient of variation (std / mean).
         channel
-            Which channel, more specificailly, `layers`, to use. Use the default `.X` if not set. If `channel` is
-            specified, then need to specify `channel_type` to be `layers` as well.
+            Which channel, more specificailly, ``layers``, to use. Use the default ``.X`` if not set. If ``channel`` is
+            specified, then need to specify ``channel_type`` to be ``layers`` as well.
         channel_type
-            Type of channels specified. Only allow `None` (the default setting) or `layers` (when `channel` is
+            Type of channels specified. Only allow ``None`` (the default setting) or ``layers`` (when ``channel`` is
             specified).
 
         """

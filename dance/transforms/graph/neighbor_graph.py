@@ -7,9 +7,9 @@ from dance.typing import Optional
 class NeighborGraph(BaseTransform):
     """Construct neighborhood graph of observations.
 
-    This is a thin wrapper of the `scanpy.pp.neighbors` class and uses the `connectivities` as the adjacency matrix.
-    If you want full flexibility and support from the :class:`~scanpy.pp.neighbors` class, please consider using the
-    interface :class:`dance.transforms.interface.AnnDataTransform`.
+    This is a thin wrapper of the :func:`scanpy.pp.neighbors` class and uses the ``connectivities`` as the adjacency
+    matrix. If you want full flexibility and support from the :func:`scanpy.pp.neighbors` method, please consider using
+    the interface :class:`~dance.transforms.interface.AnnDataTransform`.
 
     """
 
@@ -27,7 +27,7 @@ class NeighborGraph(BaseTransform):
         n_pcs
             Number of PCs to use.
         knn
-            If `True`, then use a hard threshold to restrict the number of neighbors to `n_neighbors`.
+            If ``True``, then use a hard threshold to restrict the number of neighbors to ``n_neighbors``.
         random_state
             Random seed.
         method

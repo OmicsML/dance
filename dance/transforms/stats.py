@@ -20,15 +20,15 @@ class GeneStats(BaseTransform):
         Parameters
         ----------
         genestats_select
-            List of names of the gene stats functions to use. If set to `"all"` (by default), then use all available
+            List of names of the gene stats functions to use. If set to ``"all"`` (by default), then use all available
             gene stats functions.
         fill_na
             If not set (default), then do not fill nans. Otherwise, fill nans with the specified value.
         threshold
             Threshold value for filtering gene expression when computing stats, e.g., mean expression values.
         pseudo
-            If set to `True`, then add `1` to the numerator and denominator when computing the ratio (`alpha`) for
-            which the gene expression values are above the specified `threshold`.
+            If set to ``True``, then add ``1`` to the numerator and denominator when computing the ratio (``alpha``) for
+            which the gene expression values are above the specified ``threshold``.
         split_name
             Which split to compute the gene stats on.
 

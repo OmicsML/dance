@@ -262,7 +262,7 @@ def best_partition(graph, partition=None, weight="weight", resolution=1., random
         If int, random_state is the seed used by the random number generator;
         If RandomState instance, random_state is the random number generator;
         If None, the random number generator is the RandomState instance used
-        by `np.random`.
+        by :func:`numpy.random`.
 
     Returns
     -------
@@ -353,7 +353,7 @@ class Louvain:
             If int, random_state is the seed used by the random number generator;
             If RandomState instance, random_state is the random number generator;
             If None, the random number generator is the RandomState instance used
-            by `np.random`.
+            by :func:`numpy.random`.
 
         """
         # convert adata,adj into networkx

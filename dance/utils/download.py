@@ -92,7 +92,7 @@ def download_unzip(url, path):
 
     Notes
     -----
-    The downloaded file is assumed to be a `.zip` file.
+    The downloaded file is assumed to be a ``.zip`` file.
 
     """
     zip_filepath = f"{path}.zip"

@@ -27,13 +27,13 @@ class AdaptiveSAGE(nn.Module):
 
     Similar to SAGE convolution with mean aggregation, but with additional flexibility that adaptively assigns
     importance to gene-cell interactions, as well as gene and cell self-loops. In particular, each gene will be
-    associated with an importance score `beta` that are used as aggregation weights by the cell nodes. Additionally,
-    there are two `alpha` parameters indicating how much each cell or gene should retain its previous representations.
+    associated with an importance score ``beta`` that are used as aggregation weights by the cell nodes. Additionally,
+    there are two ``alpha`` parameters indicating how much each cell or gene should retain its previous representations.
 
     Note
     ----
-    In practice, `alpha` and `beta` are stored in a unified tensor called `alpha`. The first #gene elements of this
-    tensor are the `beta` values and the last two elements are the actual `alpha` values.
+    In practice, ``alpha`` and ``beta`` are stored in a unified tensor called ``alpha``. The first #gene elements of
+    this tensor are the ``beta`` values and the last two elements are the actual ``alpha`` values.
 
     """
 
@@ -74,7 +74,7 @@ class AdaptiveSAGE(nn.Module):
 
         Reweight messages based on 1) the shared learnable interaction strengths and 2) the underlying edgeweights of
         the graph. In particular, for 1), gene-cell interaction (undirectional) will be weighted by the gene specific
-        `beta` value, and the cell and gene self-interactions will be weighted based on the corresponding `alpha`
+        ``beta`` value, and the cell and gene self-interactions will be weighted based on the corresponding ``alpha``
         values.
 
         """
