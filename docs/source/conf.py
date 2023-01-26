@@ -30,6 +30,7 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.intersphinx',
     'sphinx.ext.viewcode',
+    'sphinx_autodoc_typehints',
     'sphinxcontrib.napoleon',
 ]
 
@@ -39,6 +40,8 @@ intersphinx_mapping = {
     'scanpy': ('https://scanpy.readthedocs.io/en/stable/', None),
     'sklearn': ('https://scikit-learn.org/stable', None),
 }
+
+autodoc_typehints = "description"
 
 templates_path = ['_templates']
 exclude_patterns = []
