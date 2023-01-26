@@ -52,8 +52,7 @@ if __name__ == "__main__":
     for k in range(args.runs):
         model.fit(x_train, y_train, seed=args.seed + k, lr=args.learning_rate, num_epochs=args.num_epochs,
                   batch_size=args.batch_size, print_cost=args.print_cost)
-        pred = model.predict(x_test)
-        scores.append(score := model.score(pred, y_test))
+        scores.append(score := model.score(x_test, y_test))
         print(f"{score=:.4f}")
     print(f"Score: {np.mean(scores):04.3f} +/- {np.std(scores):04.3f}")
 """To reproduce ACTINN benchmarks, please refer to command lines below:

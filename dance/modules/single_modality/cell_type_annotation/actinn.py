@@ -6,20 +6,19 @@ Ma, Feiyang, and Matteo Pellegrini. "ACTINN: automated identification of cell ty
 Bioinformatics 36.2 (2020): 533-538.
 
 """
-import itertools
-from typing import Tuple
-
 import numpy as np
 import scanpy as sc
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from dance.models.nn import VanillaMLP
+from dance.modules.base import BaseClassificationMethod
 from dance.transforms import AnnDataTransform, Compose, FilterGenesPercentile, SetConfig
-from dance.typing import LogLevel, Optional
+from dance.typing import LogLevel, Optional, Tuple
 
 
-class ACTINN(nn.Module):
+class ACTINN(BaseClassificationMethod):
     """The ACTINN cell-type classification model.
 
     Parameters
@@ -34,34 +33,21 @@ class ACTINN(nn.Module):
     """
 
     def __init__(
-            self,
-            *,
-            hidden_dims: Tuple[int, ...] = (100, 50, 25),
-            lambd: float = 0.01,
-            device: str = "cpu",
+        self,
+        *,
+        hidden_dims: Tuple[int, ...] = (100, 50, 25),
+        lambd: float = 0.01,
+        device: str = "cpu",
+        random_seed: Optional[int] = None,
     ):
         super().__init__()
 
-        # Save attributes
         self.hidden_dims = hidden_dims
-        self.device = device
         self.lambd = lambd
+        self.device = device
+        self.random_seed = random_seed
 
-    def _init_model(self, input_dim: int, output_dim: int):
-        self.model = nn.Sequential(
-            nn.Linear(input_dim, self.hidden_dims[0]),
-            nn.ReLU(),
-            *itertools.chain.from_iterable(
-                zip(
-                    map(nn.Linear, self.hidden_dims[:-1], self.hidden_dims[1:]),
-                    itertools.repeat(nn.ReLU()),
-                )),
-            nn.Linear(self.hidden_dims[-1], output_dim),
-        ).to(self.device)
-        print(self.model)
-
-    def preprocess(self, data, /, **kwargs):
-        self.preprocessing_pipeline(**kwargs)(data)
+        self.model_size = len(hidden_dims) + 2
 
     @staticmethod
     def preprocessing_pipeline(normalize: bool = True, filter_genes: bool = True, log_level: LogLevel = "INFO"):
@@ -79,20 +65,6 @@ class ACTINN(nn.Module):
         transforms.append(SetConfig({"label_channel": "cell_type"}))
 
         return Compose(*transforms, log_level=log_level)
-
-    def forward(self, x):
-        """Forward propagation."""
-        return self.model(x)
-
-    @torch.no_grad()
-    def initialize_parameters(self, seed=None):
-        """Initialize parameters."""
-        if seed is not None:
-            torch.manual_seed(seed)
-
-        for i in range(0, len(self.model), 2):
-            nn.init.xavier_normal_(self.model[i].weight)
-            self.model[i].bias[:] = 0
 
     def compute_loss(self, z, y):
         """Compute loss function.
@@ -112,9 +84,9 @@ class ACTINN(nn.Module):
         """
         log_prob = F.log_softmax(z, dim=-1)
         loss = nn.NLLLoss()(log_prob, y)
-        for i in range(0, len(self.model), 2):  # TODO: replace with weight_decay
-            loss += self.lambd * torch.sum(self.model[i].weight**2) / 2
-
+        for i, p in enumerate(self.model.model):
+            if (i % 2) == 0:  # skip activation layers
+                loss += self.lambd * (p.weight**2).sum() / 2
         return loss
 
     def random_batches(self, x, y, batch_size=32, seed=None):
@@ -174,9 +146,8 @@ class ACTINN(nn.Module):
         y_train = torch.where(y_train)[1].to(self.device)  # cells
 
         # Initialize weights, optimizer, and scheduler
-        self._init_model(input_dim, output_dim)
-        self.initialize_parameters(seed)
-        optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+        self.model = VanillaMLP(input_dim, output_dim, hidden_dims=self.hidden_dims, device=self.device)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.95)
 
         # Start training loop
@@ -186,7 +157,7 @@ class ACTINN(nn.Module):
 
             tot_cost = tot_size = 0
             for batch_x, batch_y in batches:
-                batch_cost = self.compute_loss(self.forward(batch_x), batch_y)
+                batch_cost = self.compute_loss(self.model(batch_x), batch_y)
                 tot_cost += batch_cost.item()
                 tot_size += 1
 
@@ -195,10 +166,8 @@ class ACTINN(nn.Module):
                 optimizer.step()
                 lr_scheduler.step()
 
-            if (epoch % 10 == 0) and print_cost:
+            if print_cost and (epoch % 10 == 0):
                 print(f"Epoch: {epoch:>4d} Loss: {tot_cost / tot_size:6.4f}")
-
-        print("Parameters have been trained!")
 
     @torch.no_grad()
     def predict(self, x):
@@ -216,24 +185,6 @@ class ACTINN(nn.Module):
 
         """
         x = x.clone().detach().to(self.device)
-        z = self.forward(x)
+        z = self.model(x)
         prediction = torch.argmax(z, dim=-1)
         return prediction
-
-    def score(self, pred, true):
-        """Model performance score measured by accuracy.
-
-        Parameters
-        ----------
-        pred : torch.Tensor
-            Gene expression input features (cells by genes).
-        true : torch.Tensor
-            Encoded ground truth cell type labels (cells by cell-types).
-
-        Returns
-        -------
-        float
-            Prediction accuracy.
-
-        """
-        return true[range(pred.shape[0]), pred.squeeze(-1)].detach().mean().item()
