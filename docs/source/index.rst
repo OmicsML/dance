@@ -62,6 +62,7 @@ some of the experiments from the original papers.
    api/data
    api/datasets
    api/transforms
+   api/transforms.graph
 
 Indices and tables
 ==================
