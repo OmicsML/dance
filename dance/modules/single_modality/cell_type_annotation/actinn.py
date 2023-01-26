@@ -11,6 +11,7 @@ import scanpy as sc
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor
 
 from dance.models.nn import VanillaMLP
 from dance.modules.base import BaseClassificationMethod
@@ -23,11 +24,11 @@ class ACTINN(BaseClassificationMethod):
 
     Parameters
     ----------
-    hidden_dims : :obj:`tuple` of int
+    hidden_dims
         Hidden layer dimensions.
-    lambd : float
+    lambd
         Regularization parameter
-    device : str
+    device
         Training device
 
     """
@@ -66,14 +67,14 @@ class ACTINN(BaseClassificationMethod):
 
         return Compose(*transforms, log_level=log_level)
 
-    def compute_loss(self, z, y):
+    def compute_loss(self, z: Tensor, y: Tensor):
         """Compute loss function.
 
         Parameters
         ----------
-        z : torch.Tensor
+        z
             Output of forward propagation (cells by cell-types).
-        y : torch.Tensor
+        y
             Cell labels (cells).
 
         Returns
@@ -89,14 +90,14 @@ class ACTINN(BaseClassificationMethod):
                 loss += self.lambd * (p.weight**2).sum() / 2
         return loss
 
-    def random_batches(self, x, y, batch_size=32, seed=None):
+    def random_batches(self, x: Tensor, y: Tensor, batch_size: int = 32, seed: Optional[int] = None):
         """Shuffle data and split into batches.
 
         Parameters
         ----------
-        x : torch.Tensor
+        x
             Training data (cells by genes).
-        y : torch.Tensor
+        y
             True labels (cells by cell-types).
 
         Yields
@@ -112,8 +113,8 @@ class ACTINN(BaseClassificationMethod):
 
     def fit(
         self,
-        x_train,
-        y_train,
+        x_train: Tensor,
+        y_train: Tensor,
         *,
         batch_size: int = 128,
         lr: float = 0.01,
@@ -125,19 +126,19 @@ class ACTINN(BaseClassificationMethod):
 
         Parameters
         ----------
-        x_train : torch.Tensor
+        x_train
             training data (cells by genes).
-        y_train : torch.Tensor
+        y_train
             training labels (cells by cell-types).
-        batch_size : int
-            Training batch size
-        lr : float
-            Initial learning rate
-        num_epochs : int
-            Number of epochs to run
-        print_cost : bool
-            Print training loss if set to True
-        seed : int, optional
+        batch_size
+            Training batch size.
+        lr
+            Initial learning rate.
+        num_epochs
+            Number of epochs to run.
+        print_cost
+            Print training loss if set to True.
+        seed
             Random seed, if set to None, then random.
 
         """
@@ -170,12 +171,12 @@ class ACTINN(BaseClassificationMethod):
                 print(f"Epoch: {epoch:>4d} Loss: {tot_cost / tot_size:6.4f}")
 
     @torch.no_grad()
-    def predict(self, x):
+    def predict(self, x: Tensor):
         """Predict cell labels.
 
         Parameters
         ----------
-        x : torch.Tensor
+        x
             Gene expression input features (cells by genes).
 
         Returns
