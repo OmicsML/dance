@@ -26,7 +26,7 @@ if __name__ == "__main__":
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
 
     # Initialize model and get model specific preprocessing pipeline
-    model = Celltypist()
+    model = Celltypist(majority_voting=args.majority_voting)
     preprocessing_pipeline = model.preprocessing_pipeline()
 
     # Load data and perform necessary preprocessing
@@ -41,8 +41,7 @@ if __name__ == "__main__":
 
     # Train and evaluate the model
     model.fit(x_train, y_train, n_jobs=args.n_jobs, max_iter=args.max_iter, use_SGD=not args.not_use_SGD)
-    pred = model.predict(x_test, majority_voting=args.majority_voting)
-    score = model.score(pred, y_test)
+    score = model.score(x_test, y_test)
     print(f"{score=:.4f}")
 """To reproduce CellTypist benchmarks, please refer to command lines below:
 

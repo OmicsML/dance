@@ -11,6 +11,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 
 from dance import logger
+from dance.modules.base import BaseClassificationMethod
 from dance.transforms import SetConfig
 from dance.typing import LogLevel, Optional, Union
 
@@ -532,15 +533,21 @@ class Classifier():
         return predictions
 
 
-class Celltypist:
+class Celltypist(BaseClassificationMethod):
+    """The CellTypist cell annotation method.
 
-    def __init__(self, clf=None, scaler=None, description=None):
+    Parameters
+    ----------
+    majority_voting
+        Whether to refine the predicted labels by running the majority voting classifier after over-clustering.
+
+    """
+
+    def __init__(self, majority_voting: bool = False, clf=None, scaler=None, description=None):
+        self.majority_voting = majority_voting
         self.classifier = clf
         self.scaler = scaler
         self.description = description
-
-    def preprocess(self, data, /, **kwargs):
-        self.preprocessing_pipeline(**kwargs)(data)
 
     @staticmethod
     def preprocessing_pipeline(log_level: LogLevel = "INFO"):
@@ -673,8 +680,8 @@ class Celltypist:
         self.scaler = scaler
         self.description = description
 
-    def predict(self, x: np.ndarray, as_obj: bool = False, majority_voting: bool = False,
-                over_clustering: Optional[Union[str, list, tuple, np.ndarray, pd.Series, pd.Index]] = None,
+    def predict(self, x: np.ndarray, as_obj: bool = False, over_clustering: Optional[Union[str, list, tuple, np.ndarray,
+                                                                                           pd.Series, pd.Index]] = None,
                 min_prop: float = 0) -> Union[np.ndarray, AnnotationResult]:
         """Run the prediction and (optional) majority voting to annotate the input
         dataset.
@@ -686,9 +693,6 @@ class Celltypist:
         as_obj: bool
             If set to ``True``, then return the prediction results are :class:`~AnnotationResult`. Otherwise, return the
             predicted cell-label indexes ad 1-d numpy array instead. (Default: ``False``)
-        majority_voting: bool optional
-            Whether to refine the predicted labels by running the majority voting classifier after over-clustering.
-            (Default: ``False``)
         over_clustering: Union[str, list, tuple, np.ndarray, pd.Series, pd.Index] optional
             This argument can be provided in several ways:
             1) an input plain file with the over-clustering result of one cell per line.
@@ -711,7 +715,7 @@ class Celltypist:
         # Predict
         predictions = clf.celltype()
 
-        if majority_voting:
+        if self.majority_voting:
             if predictions.cell_count <= 50:
                 logger.warn("The input number of cells ({predictions.cell_count}) is too few to conduct "
                             "proper over-clustering; no majority voting is performed")
@@ -719,7 +723,7 @@ class Celltypist:
                 predictions = self._majority_voting(predictions, clf, over_clustering, min_prop)
 
         if not as_obj:
-            predictions = predictions.predicted_labels["predicted_labels"].values
+            predictions = np.array(predictions.predicted_labels["predicted_labels"].values)
 
         return predictions
 
@@ -746,31 +750,6 @@ class Celltypist:
 
         # Majority voting
         return Classifier.majority_vote(predictions, over_clustering, min_prop=min_prop)
-
-    def score(self, pred, true):
-        """Model performance score measured by accuracy.
-
-        Parameters
-        ----------
-        pred: np.ndarray
-            Predicted labels.
-        true: np.ndarray
-            True labels. Can be either a maxtrix of size (samples x labels) with ones indicating positives, or a
-            vector of size (sameples x 1) where each element is the index of the corresponding label for the sample.
-            The first option provides flexibility to cases where a sample could be associated with multiple labels
-            at test time while the model was trained as a multi-class classifier.
-
-        Returns
-        -------
-        score: float
-            Accuracy score.
-
-        """
-        if true.max() == 1:
-            num_samples = true.shape[0]
-            return (true[range(num_samples), pred.ravel()]).sum() / num_samples
-        else:
-            return accuracy_score(pred, true)
 
 
 def LRClassifier_celltypist(indata, labels, C, solver, max_iter, n_jobs, **kwargs) -> LogisticRegression:
