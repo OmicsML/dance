@@ -5,6 +5,7 @@ from dance.typing import Any, Dict, Optional
 
 DANCE_DATASETS: Dict[str, Any] = {}
 GENESTATS_FUNCS: Dict[str, Any] = {}
+METRIC_FUNCS: Dict[str, Any] = {}
 
 
 def register_base(name: Optional[str], mapping: Dict[str, Any]):
@@ -27,3 +28,4 @@ def register_base(name: Optional[str], mapping: Dict[str, Any]):
 
 register_dataset = partial(register_base, mapping=DANCE_DATASETS)
 register_genestats_func = partial(register_base, mapping=GENESTATS_FUNCS)
+register_metric_func = partial(register_base, mapping=METRIC_FUNCS)
