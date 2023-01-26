@@ -21,6 +21,7 @@ class BaseDataset(ABC):
         self.full_download = full_download
 
     def hexdigest(self) -> str:
+        """Return MD5 hash using the string valued items in __dict__."""
         hash_components = {i: j for i, j in self.__dict__.items() if isinstance(j, str)}
         md5_hash = hexdigest(str(hash_components))
         logger.debug(f"{hash_components=}, {md5_hash=}")
@@ -69,20 +70,20 @@ class BaseDataset(ABC):
                   redo_cache: bool = False) -> Data:
         """Load dance data object and perform transformation.
 
-        If `cache` option is set, then try to load the processed data from cache. The `cache` file hash is supposed to
-        distinguish different datasets and different transformations. In particular, it is constructed by MD5 hashing
-        the concatenation of the dataset MD5 hash (see :meth:`~dance.dataset.base.BaseDataset.hexdigest`) and the
+        If ``cache`` option is set, then try to load the processed data from cache. The ``cache`` file hash is supposed
+        to distinguish different datasets and different transformations. In particular, it is constructed by MD5 hashing
+        the concatenation of the dataset MD5 hash (see :meth:`~dance.datasets.base.BaseDataset.hexdigest`) and the
         transformation MD5 hash (:meth:`~dance.transforms.base.BaseTransform.hexdigest`). In the case of no
-        transformation, i.e., `transform=None`, the transformation MD5 hash will be the empty string `""`.
+        transformation, i.e., ``transform=None`` the transformation MD5 hash will be the empty string ``""``.
 
         Parameters
         ----------
         transform
             Transformation to be applied.
         cache:
-            If set to `True`, then try to read and write cache to `<root>/cache/<hash>.pkl`
+            If set to ``True``, then try to read and write cache to ``<root>/cache/<hash>.pkl``
         redo_cache:
-            If set to `True`, then redo the data loading and transformation, and overwrite the previous cache with the
+            If set to ``True``, then redo the data loading and transformation, and overwrite the previous cache with the
             newly processed data.
 
         """
