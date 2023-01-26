@@ -11,6 +11,7 @@ from sklearn.neighbors import NearestNeighbors
 from dance import logger
 from dance.registers import METRIC_FUNCS, register_metric_func
 from dance.typing import Any, Mapping, Optional, Union
+from dance.utils.wrappers import torch_to_numpy
 
 
 def resolve_score_func(score_func: Optional[Union[str, Mapping[Any, float]]]) -> Mapping[Any, float]:
@@ -29,9 +30,9 @@ def resolve_score_func(score_func: Optional[Union[str, Mapping[Any, float]]]) ->
 
 
 @register_metric_func("acc")
+@torch_to_numpy
 def acc(true, pred) -> float:
-    # TODO: generalize to other input types
-    return true[torch.arange(pred.shape[0]), pred.squeeze(-1)].detach().mean().item()
+    return true[np.arange(pred.shape[0]), pred.ravel()].mean()
 
 
 def get_bipartite_matching_adjacency_matrix_mk3(raw_logits, threshold_quantile=0.995, copy=False):
