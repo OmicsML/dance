@@ -38,8 +38,7 @@ if __name__ == "__main__":
 
     # Train and evaluate the model
     model.fit(x_train, y_train_converted)
-    pred = model.predict(x_test)
-    score = model.score(pred, y_test)
+    score = model.score(x_test, y_test)
     print(f"{score=:.4f}")
 """To reproduce SVM benchmarks, please refer to command lines below:
 
