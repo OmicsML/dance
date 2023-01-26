@@ -46,8 +46,7 @@ if __name__ == "__main__":
 
     # Train and evaluate the model
     model.fit(x_train, y_train, stratify=args.stratify, num_rand=args.num_rand, random_state=args.random_state)
-    pred = model.predict(x_test)
-    score = model.score(pred, y_test)
+    score = model.score(x_test, y_test)
     print(f"{score=:.4f}")
 """To reproduce SingleCellNet benchmarks, please refer to command lines below:
 
