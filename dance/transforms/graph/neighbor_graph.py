@@ -11,6 +11,23 @@ class NeighborGraph(BaseTransform):
     matrix. If you want full flexibility and support from the :func:`scanpy.pp.neighbors` method, please consider using
     the interface :class:`~dance.transforms.interface.AnnDataTransform`.
 
+    Parameters
+    ----------
+    n_neighbors
+        Number of neighbors.
+    n_pcs
+        Number of PCs to use.
+    knn
+        If ``True``, then use a hard threshold to restrict the number of neighbors to ``n_neighbors``.
+    random_state
+        Random seed.
+    method
+        Method for computing the connectivities.
+    metric
+        Distance metric.
+    channel
+        Name of the PC channel.
+
     """
 
     _DISPLAY_ATTRS = ("n_neighbors", "n_pcs", "knn", "random_state", "method", "metric")
@@ -18,26 +35,6 @@ class NeighborGraph(BaseTransform):
     def __init__(self, n_neighbors: int = 15, *, n_pcs: Optional[int] = None, knn: bool = True, random_state: int = 0,
                  method: Optional[str] = "umap", metric: str = "euclidean", channel: Optional[str] = "CellPCA",
                  **kwargs):
-        """Initialize NeighborGraph.
-
-        Parameters
-        ----------
-        n_neighbors
-            Number of neighbors.
-        n_pcs
-            Number of PCs to use.
-        knn
-            If ``True``, then use a hard threshold to restrict the number of neighbors to ``n_neighbors``.
-        random_state
-            Random seed.
-        method
-            Method for computing the connectivities.
-        metric
-            Distance metric.
-        channel
-            Name of the PC channel.
-
-        """
         super().__init__(**kwargs)
 
         self.n_neighbors = n_neighbors

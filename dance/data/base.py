@@ -33,7 +33,36 @@ def _check_types_and_sizes(types, sizes):
 
 
 class BaseData(ABC):
-    """Base data object."""
+    """Base data object.
+
+    The ``dance`` data object is a wrapper of the :class:`~anndata.AnnData` object, with several utility methods to
+    help retrieving data in specific splits in specific format (see :meth:`~BaseData.get_split_idx` and
+    :meth:`~BaseData.get_feature`). The :class:`~anndata.AnnData` objcet is saved in the attribute ``data`` and can be
+    accessed directly.
+
+    Warning
+    -------
+    Since the underlying data object is a reference to the input :class:`~anndata.AnnData` object, please be extra
+    cautious ***NOT*** initializing two different dance ``data`` object using the same :class:`~anndata.AnnData`
+    object! If you are unsure, we recommend always initialize the dance ``data`` object using a ``copy`` of the input
+    :class:`~anndata.AnnData` object, e.g.,
+
+        >>> adata = anndata.AnnData(...)
+        >>> ddata = dance.data.Data(adata.copy())
+
+    Parameters
+    ----------
+    data
+        Cell data.
+    train_size
+        Number of cells to be used for training. If not specified, not splits will be generated.
+    val_size
+        Number of cells to be used for validation. If set to -1, use what's left from training and testing.
+    test_size
+        Number of cells to be used for testing. If set to -1, used what's left from training and validation.
+
+
+    """
 
     _FEATURE_CONFIGS: List[str] = ["feature_mod", "feature_channel", "feature_channel_type"]
     _LABEL_CONFIGS: List[str] = ["label_mod", "label_channel", "label_channel_type"]
@@ -41,35 +70,6 @@ class BaseData(ABC):
 
     def __init__(self, data: Union[AnnData, MuData], train_size: Optional[int] = None, val_size: int = 0,
                  test_size: int = -1):
-        """Initialize data object.
-
-        The ``dance`` data object is a wrapper of the :class:`~anndata.AnnData` object, with several utility methods
-        to help retrieving data in specific splits in specific format (see :meth:`~BaseData.get_split_idx` and
-        :meth:`~BaseData.get_feature`). The :class:`~anndata.AnnData` objcet is saved in the attribute ``data`` and
-        can be accessed directly.
-
-        Warning
-        -------
-        Since the underlying data object is a reference to the input :class:`~anndata.AnnData` object, please be
-        extra cautious ***NOT*** initializing two different dance ``data`` object using the same
-        :class:`~anndata.AnnData` object! If you are unsure, we recommend always initialize the dance ``data`` object
-        using a ``copy`` of the input :class:`~anndata.AnnData` object, e.g.,
-
-            >>> adata = anndata.AnnData(...)
-            >>> ddata = dance.data.Data(adata.copy())
-
-        Parameters
-        ----------
-        data
-            Cell data.
-        train_size
-            Number of cells to be used for training. If not specified, not splits will be generated.
-        val_size
-            Number of cells to be used for validation. If set to -1, use what's left from training and testing.
-        test_size
-            Number of cells to be used for testing. If set to -1, used what's left from training and validation.
-
-        """
         super().__init__()
 
         self._data = data

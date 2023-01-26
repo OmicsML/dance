@@ -321,17 +321,16 @@ def best_partition(graph, partition=None, weight="weight", resolution=1., random
 
 
 class Louvain:
-    """Louvain class."""
+    """Louvain class.
+
+    Parameters
+    ----------
+    resolution
+        Resolution parameter.
+
+    """
 
     def __init__(self, resolution: float = 1):
-        """Initialize Louvain.
-
-        Parameters
-        ----------
-        resolution
-            Resolution parameter.
-
-        """
         self.resolution = resolution
 
     def fit(self, adj, partition=None, weight="weight", randomize=None, random_state=None):

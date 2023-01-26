@@ -19,23 +19,22 @@ from torch.nn.parameter import Parameter
 
 
 class GraphConvolution(nn.Module):
-    """Simple GCN layer, similar to https://arxiv.org/abs/1609.02907."""
+    """Simple GCN layer, similar to https://arxiv.org/abs/1609.02907.
+
+    Parameters
+    ----------
+    in_features : int
+        Input dimension.
+    out_features : int
+        Output dimension.
+    support :
+        Support for graph convolution.
+    bias : boolean optional
+        Include bias term, default False.
+
+    """
 
     def __init__(self, in_features, out_features, support, bias=False):
-        """GraphConvolution.
-
-        Parameters
-        ----------
-        in_features : int
-            Input dimension.
-        out_features : int
-            Output dimension.
-        support :
-            Support for graph convolution.
-        bias : boolean optional
-            Include bias term, default False.
-
-        """
         super().__init__()
         self.support = support
         self.in_features = in_features
@@ -128,23 +127,22 @@ class GCN(nn.Module):
 
 
 class DSTG:
-    """DSTG cell-type deconvolution model."""
+    """DSTG cell-type deconvolution model.
+
+    Parameters
+    ----------
+    nhid : int
+        Number of units in the hidden layer (graph convolution).
+    bias : boolean optional
+        Include bias term, default False.
+    dropout : float optional
+        Dropout rate, default 0.
+    device : str
+        Computation device.
+
+    """
 
     def __init__(self, nhid=32, bias=False, dropout=0, device="cpu"):
-        """Initialize the DSTG model.
-
-        Parameters
-        ----------
-        nhid : int
-            Number of units in the hidden layer (graph convolution).
-        bias : boolean optional
-            Include bias term, default False.
-        dropout : float optional
-            Dropout rate, default 0.
-        device : str
-            Computation device.
-
-        """
         super().__init__()
         self.nhid = nhid
         self.bias = bias

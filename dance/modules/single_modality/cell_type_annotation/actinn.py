@@ -20,7 +20,18 @@ from dance.typing import LogLevel, Optional
 
 
 class ACTINN(nn.Module):
-    """The ACTINN cell-type classification model."""
+    """The ACTINN cell-type classification model.
+
+    Parameters
+    ----------
+    hidden_dims : :obj:`tuple` of int
+        Hidden layer dimensions.
+    lambd : float
+        Regularization parameter
+    device : str
+        Training device
+
+    """
 
     def __init__(
             self,
@@ -29,18 +40,6 @@ class ACTINN(nn.Module):
             lambd: float = 0.01,
             device: str = "cpu",
     ):
-        """Initialize the ACTINN model.
-
-        Parameters
-        ----------
-        hidden_dims : :obj:`tuple` of int
-            Hidden layer dimensions.
-        lambd : float
-            Regularization parameter
-        device : str
-            Training device
-
-        """
         super().__init__()
 
         # Save attributes

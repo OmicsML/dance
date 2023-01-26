@@ -8,17 +8,16 @@ from dance.typing import LogLevel, Optional
 
 
 class SingleCellNet:
-    """The SingleCellNet model."""
+    """The SingleCellNet model.
+
+    Parameters
+    ----------
+    num_trees
+        Number of trees in the random forest model.
+
+    """
 
     def __init__(self, num_trees: int = 100):
-        """Initialize the SingleCellNet object.
-
-        Parameters
-        ----------
-        num_trees
-            Number of trees in the random forest model.
-
-        """
         self.num_trees = num_trees
 
     def preprocess(self, data, /, **kwargs):

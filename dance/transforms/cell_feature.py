@@ -12,21 +12,18 @@ class WeightedFeaturePCA(BaseTransform):
     Given a gene expression matrix of dimension (cell x gene), the gene PCA is first compured. Then, the representation
     of each cell is computed by taking the weighted sum of the gene PCAs based on that cell's gene expression values.
 
+    Parameters
+    ----------
+    n_components
+        Number of PCs to use.
+    split_name
+        Which split to use to compute the gene PCA. If not set, use all data.
+
     """
 
     _DISPLAY_ATTRS = ("n_components", "split_name")
 
     def __init__(self, n_components: int = 400, split_name: Optional[str] = None, **kwargs):
-        """Initialize WeightedFeaturePCA.
-
-        Parameters
-        ----------
-        n_components
-            Number of PCs to use.
-        split_name
-            Which split to use to compute the gene PCA. If not set, use all data.
-
-        """
         super().__init__(**kwargs)
 
         self.n_components = n_components

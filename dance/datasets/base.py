@@ -13,6 +13,16 @@ from dance.utils.wrappers import TimeIt
 
 
 class BaseDataset(ABC):
+    """BaseDataset abstract object.
+
+    Parameters
+    ----------
+    root
+        Root directory of the dataset.
+    full_download
+        If set to ``True``, then attempt to download all raw files of the dataset.
+
+    """
 
     _DISPLAY_ATTRS: Tuple[str] = ()
 

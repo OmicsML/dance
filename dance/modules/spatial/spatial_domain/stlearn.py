@@ -16,38 +16,37 @@ from dance.modules.spatial.spatial_domain.louvain import Louvain
 
 
 class StKmeans:
-    """StKmeans class."""
+    """StKmeans class.
+
+    Parameters
+    ----------
+    n_clusters : int
+        The number of clusters to form as well as the number of centroids to generate.
+    init : str
+        Method for initialization: {‘k-means++’, ‘random’}.
+    n_init : int
+        Number of time the k-means algorithm will be run with different centroid seeds.
+        The final results will be the best output of n_init consecutive runs in terms of inertia.
+    max_iter : int
+        Maximum number of iterations of the k-means algorithm for a single run.
+    tol : float
+        Relative tolerance with regards to Frobenius norm of the difference in the cluster centers of two
+        consecutive iterations to declare convergence.
+    algorithm : str
+        {“lloyd”, “elkan”, “auto”, “full”}, default is "auto".
+    verbose : bool
+        Verbosity.
+    random_state : int
+        Determines random number generation for centroid initialization.
+    use_data : str
+        Default "X_pca".
+    key_added : str
+        Default "X_pca_kmeans".
+
+    """
 
     def __init__(self, n_clusters=19, init="k-means++", n_init=10, max_iter=300, tol=1e-4, algorithm="auto",
                  verbose=False, random_state=None, use_data="X_pca", key_added="X_pca_kmeans"):
-        """Initialize StKMeans.
-
-        Parameters
-        ----------
-        n_clusters : int
-            The number of clusters to form as well as the number of centroids to generate.
-        init : str
-            Method for initialization: {‘k-means++’, ‘random’}.
-        n_init : int
-            Number of time the k-means algorithm will be run with different centroid seeds.
-            The final results will be the best output of n_init consecutive runs in terms of inertia.
-        max_iter : int
-            Maximum number of iterations of the k-means algorithm for a single run.
-        tol : float
-            Relative tolerance with regards to Frobenius norm of the difference in the cluster centers of two
-            consecutive iterations to declare convergence.
-        algorithm : str
-            {“lloyd”, “elkan”, “auto”, “full”}, default is "auto".
-        verbose : bool
-            Verbosity.
-        random_state : int
-            Determines random number generation for centroid initialization.
-        use_data : str
-            Default "X_pca".
-        key_added : str
-            Default "X_pca_kmeans".
-
-        """
         self.use_data = use_data
         self.key_added = key_added
         self.model = KMeans(n_clusters=n_clusters, init=init, n_init=n_init, max_iter=max_iter, tol=tol,
@@ -89,17 +88,16 @@ class StKmeans:
 
 
 class StLouvain:
-    """StLouvain class."""
+    """StLouvain class.
+
+    Parameters
+    ----------
+    resolution : float
+        Resolution parameter.
+
+    """
 
     def __init__(self, resolution: float = 1):
-        """Initialize StLouvain.
-
-        Parameters
-        ----------
-        resolution : float
-            Resolution parameter.
-
-        """
         self.model = Louvain(resolution)
 
     def fit(self, adj, partition=None, weight="weight", randomize=None, random_state=None):

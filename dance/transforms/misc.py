@@ -7,25 +7,25 @@ from dance.utils import hexdigest
 
 
 class Compose(BaseTransform):
-    """Compose transformation by combining several transfomration objects."""
+    """Compose transformation by combining several transfomration objects.
+
+    Parameters
+    ----------
+    transforms
+        Transformation objects.
+    use_master_log_level
+        If set to ``True``, then reset all transforms' loggers to use :then reset all transforms' loggers to use
+        ``log_level`` option passed to this :class:`Compose` object.
+
+    Notes
+    -----
+    The order in which the ``transform`` object are passed will be exactly the order in which they will be applied to
+    the data object.
+
+
+    """
 
     def __init__(self, *transforms: Tuple[BaseTransform, ...], use_master_log_level: bool = True, **kwargs):
-        """Initialize the Compose transform object.
-
-        Parameters
-        ----------
-        transforms
-            Transformation objects.
-        use_master_log_level
-            If set to ``True``, then reset all transforms' loggers to use :then reset all transforms' loggers to use
-            ``log_level`` option passed to this :class:`Compose` object.
-
-        Notes
-        -----
-        The order in which the ``transform`` object are passed will be exactly the order in which they will be applied
-        to the data object.
-
-        """
         super().__init__(**kwargs)
 
         # Check type
@@ -66,19 +66,18 @@ class Compose(BaseTransform):
 
 
 class SetConfig(BaseTransform):
-    """Set configuration options of a dance data object."""
+    """Set configuration options of a dance data object.
+
+    Parameters
+    ----------
+    config_dict
+        Dance data object configuration dictionary. See :meth:`~dance.data.base.BaseData.set_config_from_dict`.
+
+    """
 
     _DISPLAY_ATTRS = ("config_dict", )
 
     def __init__(self, config_dict: Dict[str, Any], **kwargs):
-        """Initialize SetConfig object.
-
-        Parameters
-        ----------
-        config_dict
-            Dance data object configuration dictionary. See :meth:`~dance.data.base.BaseData.set_config_from_dict`.
-
-        """
         super().__init__(**kwargs)
         self.config_dict = config_dict
 
