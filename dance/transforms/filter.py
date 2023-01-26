@@ -6,32 +6,31 @@ from dance.typing import Literal, Optional
 
 
 class FilterGenesPercentile(BaseTransform):
-    """Filter genes based on percentiles of the summarized gene expressions."""
+    """Filter genes based on percentiles of the summarized gene expressions.
+
+    Parameters
+    ----------
+    min_val
+        Minimum percentile of the summarized expression value below which the genes will be discarded.
+    max_val
+        Maximum percentile of the summarized expression value above which the genes will be discarded.
+    mode
+        Summarization mode. Available options are ``[sum|cv]``. ``sum`` calculates the sum of expression values, ``cv``
+        uses the coefficient of variation (std / mean).
+    channel
+        Which channel, more specificailly, ``layers``, to use. Use the default ``.X`` if not set. If ``channel`` is
+        specified, then need to specify ``channel_type`` to be ``layers`` as well.
+    channel_type
+        Type of channels specified. Only allow ``None`` (the default setting) or ``layers`` (when ``channel`` is
+        specified).
+
+    """
 
     _DISPLAY_ATTRS = ("min_val", "max_val", "mode")
     _MODES = ["sum", "cv"]
 
     def __init__(self, min_val: Optional[float] = 1, max_val: Optional[float] = 99, mode: Literal["sum", "cv"] = "sum",
                  *, channel: Optional[str] = None, channel_type: Optional[str] = None, **kwargs):
-        """Initialize FilterGenesPercentile.
-
-        Parameters
-        ----------
-        min_val
-            Minimum percentile of the summarized expression value below which the genes will be discarded.
-        max_val
-            Maximum percentile of the summarized expression value above which the genes will be discarded.
-        mode
-            Summarization mode. Available options are `[sum|cv]`. `sum` calculates the sum of expression values, `cv`
-            uses the coefficient of variation (std / mean).
-        channel
-            Which channel, more specificailly, `layers`, to use. Use the default `.X` if not set. If `channel` is
-            specified, then need to specify `channel_type` to be `layers` as well.
-        channel_type
-            Type of channels specified. Only allow `None` (the default setting) or `layers` (when `channel` is
-            specified).
-
-        """
         super().__init__(**kwargs)
 
         if (channel is not None) and (channel_type != "layers"):

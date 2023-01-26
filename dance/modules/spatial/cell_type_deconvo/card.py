@@ -111,36 +111,35 @@ def CARDref(Xinput, U, W, phi, max_iter, epsilon, V, b, sigma_e2, Lambda):
 
 
 class Card:
-    """The CARD cell-type deconvolution model."""
+    """The CARD cell-type deconvolution model.
+
+    Parameters
+    ----------
+    sc_count : pd.DataFrame
+        Reference single cell RNA-seq counts data.
+    sc_meta : pd.DataFrame
+        Reference cell-type label information.
+    ct_varname : str, optional
+        Name of the cell-types column.
+    ct_select : str, optional
+        Selected cell-types to be considered for deconvolution.
+    cell_varname : str, optional
+        Name of the cells column.
+    sample_varname : str, optional
+        Name of the samples column.
+    minCountGene : int
+        Minimum number of genes required.
+    minCountSpot : int
+        Minimum number of spots required.
+    basis
+        The basis parameter.
+    markers
+        Markers.
+
+    """
 
     def __init__(self, sc_count, sc_meta, ct_varname=None, ct_select=None, cell_varname=None, sample_varname=None,
                  minCountGene=100, minCountSpot=5, basis=None, markers=None):
-        """Initialize Card.
-
-        Parameters
-        ----------
-        sc_count : pd.DataFrame
-            Reference single cell RNA-seq counts data.
-        sc_meta : pd.DataFrame
-            Reference cell-type label information.
-        ct_varname : str, optional
-            Name of the cell-types column.
-        ct_select : str, optional
-            Selected cell-types to be considered for deconvolution.
-        cell_varname : str, optional
-            Name of the cells column.
-        sample_varname : str, optional
-            Name of the samples column.
-        minCountGene : int
-            Minimum number of genes required.
-        minCountSpot : int
-            Minimum number of spots required.
-        basis
-            The basis parameter.
-        markers
-            Markers.
-
-        """
         self.sc_count = sc_count
         self.sc_meta = sc_meta
         self.ct_varname = ct_varname

@@ -4,18 +4,17 @@ Extended from https://github.com/kimmo1019/JAE
 
 Reference
 ---------
-Liu Q, Chen S, Jiang R, et al. Simultaneous deep generative modelling and clustering of single-cell genomic data[J]. Nature machine intelligence, 2021, 3(6): 536-544.
+Liu Q, Chen S, Jiang R, et al. Simultaneous deep generative modelling and clustering of single-cell genomic data[J].
+Nature machine intelligence, 2021, 3(6): 536-544.
 
 """
 
-import math
 import os
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from dance.utils import SimpleIndexDataset
@@ -34,7 +33,8 @@ class JAEWrapper:
     Parameters
     ----------
     args : argparse.Namespace
-        A Namespace object that contains arguments of JAE. For details of parameters in parser args, please refer to link (parser help document).
+        A Namespace object that contains arguments of JAE. For details of parameters in parser args, please refer to
+        link (parser help document).
     dataset : dance.datasets.multimodality.JointEmbeddingNIPSDataset
         Joint embedding dataset.
 

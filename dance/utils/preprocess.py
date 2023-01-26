@@ -12,8 +12,8 @@ def cell_label_to_df(cell_labels: List[Optional[Union[str, Set[str]]]], idx_to_l
     Parameters
     ----------
     cell_labels
-        List of str or set of str (or `None` if the cell type information is not available or do not match the training
-        cell type data). Each corresponds to the relevant cell type(s) for that cell.
+        List of str or set of str (or ``None`` if the cell type information is not available or do not match the
+        training cell type data). Each corresponds to the relevant cell type(s) for that cell.
     idx_to_label
         List of cell type names, used to define the column orders in the label matrix.
     obs

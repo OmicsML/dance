@@ -77,32 +77,31 @@ def cell_topic_profile(X, groups, ct_select, axis=0, method='median'):
 
 
 class SpatialDecon:
-    """SpatialDecon."""
+    """SpatialDecon.
+
+    Parameters
+    ----------
+    sc_count : pd.DataFrame
+        Reference single cell RNA-seq counts data.
+    sc_annot : pd.DataFrame
+        Reference cell-type label information.
+    mix_count : pd.DataFrame
+        Target mixed-cell RNA-seq counts data to be deconvoluted.
+    ct_varname : str, optional
+        Name of the cell-types column.
+    ct_select : str, optional
+        Selected cell-types to be considered for deconvolution.
+    sc_profile: numpy array optional
+        Pre-constructed cell profile matrix.
+    bias : boolean optional
+        Include bias term, default False.
+    init_bias: numpy array optional
+        Initial bias term (background estimate).
+
+    """
 
     def __init__(self, sc_count, sc_annot, ct_varname, ct_select, sc_profile=None, bias=False, init_bias=None,
                  device="cpu"):
-        """Initialize SpatialDecon.
-
-        Parameters
-        ----------
-        sc_count : pd.DataFrame
-            Reference single cell RNA-seq counts data.
-        sc_annot : pd.DataFrame
-            Reference cell-type label information.
-        mix_count : pd.DataFrame
-            Target mixed-cell RNA-seq counts data to be deconvoluted.
-        ct_varname : str, optional
-            Name of the cell-types column.
-        ct_select : str, optional
-            Selected cell-types to be considered for deconvolution.
-        sc_profile: numpy array optional
-            Pre-constructed cell profile matrix.
-        bias : boolean optional
-            Include bias term, default False.
-        init_bias: numpy array optional
-            Initial bias term (background estimate).
-
-        """
         super().__init__()
 
         self.device = device

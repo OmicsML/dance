@@ -27,36 +27,33 @@ class AdaptiveSAGE(nn.Module):
 
     Similar to SAGE convolution with mean aggregation, but with additional flexibility that adaptively assigns
     importance to gene-cell interactions, as well as gene and cell self-loops. In particular, each gene will be
-    associated with an importance score `beta` that are used as aggregation weights by the cell nodes. Additionally,
-    there are two `alpha` parameters indicating how much each cell or gene should retain its previous representations.
+    associated with an importance score ``beta`` that are used as aggregation weights by the cell nodes. Additionally,
+    there are two ``alpha`` parameters indicating how much each cell or gene should retain its previous representations.
+
+    Parameters
+    ----------
+    dim_in : int
+        Input feature dimensions.
+    dim_out : int
+        output feature dimensions.
+    alpha : Tensor
+        Shared learnable parameters containing gene-cell interaction strengths and those for the cell and gene
+        self-loops.
+    dropout_layer : torch.nn
+        Dropout layer.
+    act_layer : torch.nn
+        Activation layer.
+    norm_layer : torch.nn
+        Normalization layer.
 
     Note
     ----
-    In practice, `alpha` and `beta` are stored in a unified tensor called `alpha`. The first #gene elements of this
-    tensor are the `beta` values and the last two elements are the actual `alpha` values.
+    In practice, ``alpha`` and ``beta`` are stored in a unified tensor called ``alpha``. The first #gene elements of
+    this tensor are the ``beta`` values and the last two elements are the actual ``alpha`` values.
 
     """
 
     def __init__(self, dim_in, dim_out, alpha, dropout_layer, act_layer, norm_layer):
-        """Initialize the AdaptiveSAGE convolution layer.
-
-        Parameters
-        ----------
-        dim_in : int
-            Input feature dimensions.
-        dim_out : int
-            output feature dimensions.
-        alpha : Tensor
-            Shared learnable parameters containing gene-cell interaction strengths and those for the cell and gene
-            self-loops.
-        dropout_layer : torch.nn
-            Dropout layer.
-        act_layer : torch.nn
-            Activation layer.
-        norm_layer : torch.nn
-            Normalization layer.
-
-        """
         super().__init__()
 
         self.alpha = alpha
@@ -74,7 +71,7 @@ class AdaptiveSAGE(nn.Module):
 
         Reweight messages based on 1) the shared learnable interaction strengths and 2) the underlying edgeweights of
         the graph. In particular, for 1), gene-cell interaction (undirectional) will be weighted by the gene specific
-        `beta` value, and the cell and gene self-interactions will be weighted based on the corresponding `alpha`
+        ``beta`` value, and the cell and gene self-interactions will be weighted based on the corresponding ``alpha``
         values.
 
         """
@@ -114,29 +111,26 @@ class GNN(nn.Module):
     samples matrix, and the cell features are computed as the weighted aggregation of the gene features according to
     each cell's gene expressions.
 
+    Parameters
+    ----------
+    dim_in : int
+        Input dimension (PCA embeddings dimension).
+    dim_out : int
+        Output dimension (number of unique cell labels).
+    n_layers : int
+        Number of convolution layers.
+    gene_num : int
+        Number of genes.
+    dropout : float
+        Dropout ratio.
+    activation : torch.nn, optional
+        Activation layer.
+    norm : torch.nn, optional
+        Normalization layer.
+
     """
 
     def __init__(self, dim_in, dim_out, dim_hid, n_layers, gene_num, activation=None, norm=None, dropout=0.):
-        """Initialize the scDeepSort GNN model.
-
-        Parameters
-        ----------
-        dim_in : int
-            Input dimension (PCA embeddings dimension).
-        dim_out : int
-            Output dimension (number of unique cell labels).
-        n_layers : int
-            Number of convolution layers.
-        gene_num : int
-            Number of genes.
-        dropout : float
-            Dropout ratio.
-        activation : torch.nn, optional
-            Activation layer.
-        norm : torch.nn, optional
-            Normalization layer.
-
-        """
         super().__init__()
 
         self.n_layers = n_layers
@@ -165,32 +159,31 @@ class GNN(nn.Module):
 
 
 class ScDeepSort:
-    """The ScDeepSort cell-type annotation model."""
+    """The ScDeepSort cell-type annotation model.
+
+    Parameters
+    ----------
+    dim_in
+        Input dimension, i.e., the number of PCA used for cell and gene features.
+    dim_hid
+        Hidden dimension.
+    num_layers
+        Number of convolution layers.
+    species
+        Species name (only used for determining the read/write path).
+    tissue
+        Tissue name (only used for determining the read/write path).
+    dropout
+        Drop-out rate.
+    batch_size
+        Batch size.
+    device
+        Computation device, e.g., 'cpu', 'cuda'.
+
+    """
 
     def __init__(self, dim_in: int, dim_hid: int, num_layers: int, species: str, tissue: str, *, dropout: int = 0,
                  batch_size: int = 500, device: str = "cpu"):
-        """Initialize the scDeepSort object.
-
-        Parameters
-        ----------
-        dim_in
-            Input dimension, i.e., the number of PCA used for cell and gene features.
-        dim_hid
-            Hidden dimension.
-        num_layers
-            Number of convolution layers.
-        species
-            Species name (only used for determining the read/write path).
-        tissue
-            Tissue name (only used for determining the read/write path).
-        dropout
-            Drop-out rate.
-        batch_size
-            Batch size.
-        device
-            Computation device, e.g., 'cpu', 'cuda'.
-
-        """
         self.dense_dim = dim_in
         self.hidden_dim = dim_hid
         self.n_layers = num_layers

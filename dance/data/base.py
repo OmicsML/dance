@@ -33,7 +33,36 @@ def _check_types_and_sizes(types, sizes):
 
 
 class BaseData(ABC):
-    """Base data object."""
+    """Base data object.
+
+    The ``dance`` data object is a wrapper of the :class:`~anndata.AnnData` object, with several utility methods to
+    help retrieving data in specific splits in specific format (see :meth:`~BaseData.get_split_idx` and
+    :meth:`~BaseData.get_feature`). The :class:`~anndata.AnnData` objcet is saved in the attribute ``data`` and can be
+    accessed directly.
+
+    Warning
+    -------
+    Since the underlying data object is a reference to the input :class:`~anndata.AnnData` object, please be extra
+    cautious ***NOT*** initializing two different dance ``data`` object using the same :class:`~anndata.AnnData`
+    object! If you are unsure, we recommend always initialize the dance ``data`` object using a ``copy`` of the input
+    :class:`~anndata.AnnData` object, e.g.,
+
+        >>> adata = anndata.AnnData(...)
+        >>> ddata = dance.data.Data(adata.copy())
+
+    Parameters
+    ----------
+    data
+        Cell data.
+    train_size
+        Number of cells to be used for training. If not specified, not splits will be generated.
+    val_size
+        Number of cells to be used for validation. If set to -1, use what's left from training and testing.
+    test_size
+        Number of cells to be used for testing. If set to -1, used what's left from training and validation.
+
+
+    """
 
     _FEATURE_CONFIGS: List[str] = ["feature_mod", "feature_channel", "feature_channel_type"]
     _LABEL_CONFIGS: List[str] = ["label_mod", "label_channel", "label_channel_type"]
@@ -41,35 +70,6 @@ class BaseData(ABC):
 
     def __init__(self, data: Union[AnnData, MuData], train_size: Optional[int] = None, val_size: int = 0,
                  test_size: int = -1):
-        """Initialize data object.
-
-        The `dance` data object is a wrapper of the :class:`~anndata.AnnData` object, with several utility methods
-        to help retrieving data in specific splits in specific format (see :meth:`~BaseData.get_split_idx` and
-        :meth:`~BaseData.get_feature`). The `AnnData` objcet is saved in the attribute :attr:`data` and can be
-        accessed directly.
-
-        Warning
-        -------
-        Since the underlying data object is a reference to the input :class:`~anndata.AnnData` object, please be
-        extra cautious ***NOT*** initializing two different dance `data` object using the same `AnnData` object!
-        If you are unsure, we recommend always initialize the dance `data` object using a `copy` of the input
-        `AnnData` object, e.g.,
-
-            >>> adata = anndata.AnnData(...)
-            >>> ddata = dance.data.Data(adata.copy())
-
-        Parameters
-        ----------
-        data
-            Cell data.
-        train_size
-            Number of cells to be used for training. If not specified, not splits will be generated.
-        val_size
-            Number of cells to be used for validation. If set to -1, use what's left from training and testing.
-        test_size
-            Number of cells to be used for testing. If set to -1, used what's left from training and validation.
-
-        """
         super().__init__()
 
         self._data = data
@@ -143,8 +143,8 @@ class BaseData(ABC):
 
         Notes
         -----
-        The configuration dictionary is saved in the :attr:`data` attribute, which is an :class:`~anndata.AnnData`
-        object. Inparticular, the config will be saved in the `.uns` attribute with the key `"dance_config"`.
+        The configuration dictionary is saved in the ``data`` attribute, which is an :class:`~anndata.AnnData`
+        object. Inparticular, the config will be saved in the ``.uns`` attribute with the key ``"dance_config"``.
 
         """
         return self._data.uns["dance_config"]
@@ -166,8 +166,8 @@ class BaseData(ABC):
             Configuration dictionary.
         overwrite
             Used to determine the behaviour of resolving config conflicts. In the case of a conflict, where the config
-            dict passed contains a key with value that differs from an existing setting, if `overwrite` is set to
-            `False`, then raise a `KeyError`. Otherwise, overwrite the configuration with the new values.
+            dict passed contains a key with value that differs from an existing setting, if ``overwrite`` is set to
+            ``False``, then raise a ``KeyError``. Otherwise, overwrite the configuration with the new values.
 
         """
         # Check config key validity
@@ -305,14 +305,14 @@ class BaseData(ABC):
             How should the features be returned. **numpy**: return as a numpy array; **torch**: return as a torch
             tensor; **anndata**: return as an anndata object.
         channel
-            Return a particular channel as features. If `channel_type` is `obs`, then return the column named by
-            `channel`, similarly for `var`. If `channel_type` is `obsm`, `obsp`, `varm`, `varp`, `layers`, or `uns`,
-            then return the value correspond to the `channel` in the dictionary. If `channel` is not specified
-            (default), then return the default layer (`.X`).
+            Return a particular channel as features. If ``channel_type`` is ``obs``, then return the column named by
+            ``channel``, similarly for ``var``. If ``channel_type`` is ``obsm``, ``obsp``, ``varm``, ``varp``,
+            ``layers``, or ``uns``, then return the value correspond to the ``channel`` in the dictionary. If
+            ``channel`` is not specified (default), then return the default layer (``.X``).
         channel_type
-            Channel type to use, default to `obsm`.
+            Channel type to use, default to ``obsm``.
         mod
-            Modality to use, default to `None`. Options other than `None` are only available when the underlying
+            Modality to use, default to ``None``. Options other than ``None`` are only available when the underlying
             data object is :class:`~mudata.Mudata`.
 
         """

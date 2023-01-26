@@ -7,21 +7,22 @@ from dance.typing import LogLevel, Optional, Tuple
 
 
 class BaseTransform(ABC):
+    """BaseTransform abstract object.
+
+    Parameters
+    ----------
+    log_level
+        Logging level.
+    out
+        Name of the obsm channel or layer where the transformed features will be saved. Use the current
+        transformation name if it is not set.
+
+
+    """
 
     _DISPLAY_ATTRS: Tuple[str] = ()
 
     def __init__(self, out: Optional[str] = None, log_level: LogLevel = "WARNING"):
-        """Initialize transformation.
-
-        Parameters
-        ----------
-        log_level
-            Logging level.
-        out
-            Name of the obsm channel or layer where the transformed features will be saved. Use the current
-            transformation name if it is not set.
-
-        """
         self.out = out or self.name
 
         self.logger = logger.getChild(self.name)

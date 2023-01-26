@@ -2,7 +2,8 @@
 
 Reference
 ---------
-Wen, Hongzhi, et al. "Graph Neural Networks for Multimodal Single-Cell Data Integration." arXiv preprint arXiv:2203.01884 (2022).
+Wen, Hongzhi, et al. "Graph Neural Networks for Multimodal Single-Cell Data Integration." arXiv preprint
+arXiv:2203.01884 (2022).
 
 """
 import math
@@ -39,7 +40,8 @@ class ScMoGCNWrapper:
     Parameters
     ----------
     args : argparse.Namespace
-        A Namespace object that contains arguments of ScMoGCN. For details of parameters in parser args, please refer to link (parser help document).
+        A Namespace object that contains arguments of ScMoGCN. For details of parameters in parser args, please refer
+        to link (parser help document).
     layers : list[int]
         Specification of dimensions of hidden layers.
     temp : int optional

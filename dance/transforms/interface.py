@@ -9,13 +9,13 @@ class AnnDataTransform(BaseTransform):
 
     Example
     -------
-    Any one of the `scanpy.pp` functions should be supported. For example, we can use the `scanpy.pp.normalize_total`
-    function on the dance data object as follows
+    Any one of the :mod:`scanpy.pp` functions should be supported. For example, we can use the
+    :func:`scanpy.pp.normalize_total` function on the dance data object as follows
 
     >>> AnnDataTransform(scanpy.pp.normalize_total, target_sum=10000)(data)
 
-    where `data` is a dance data object, e.g., `dance.data.Data`. Calling the above function is effectively equivalent
-    to calling
+    where ``data`` is a dance data object, e.g., :class:`dance.data.Data`. Calling the above function is effectively
+    equivalent to calling
 
     >>> scanpy.pp.normalize_total(data.data, target_sum=10000)
 
@@ -29,7 +29,7 @@ class AnnDataTransform(BaseTransform):
         Parameters
         ----------
         func
-            In-place AnnData transformation function, e.g., any one of the `scanpy.pp` functions.
+            In-place AnnData transformation function, e.g., any one of the :mod:`scanpy.pp` functions.
         **kwargs
             Keyword arguments for the transformation function.
 

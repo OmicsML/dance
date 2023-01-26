@@ -7,9 +7,26 @@ from dance.typing import Optional
 class NeighborGraph(BaseTransform):
     """Construct neighborhood graph of observations.
 
-    This is a thin wrapper of the `scanpy.pp.neighbors` class and uses the `connectivities` as the adjacency matrix.
-    If you want full flexibility and support from the :class:`~scanpy.pp.neighbors` class, please consider using the
-    interface :class:`dance.transforms.interface.AnnDataTransform`.
+    This is a thin wrapper of the :func:`scanpy.pp.neighbors` class and uses the ``connectivities`` as the adjacency
+    matrix. If you want full flexibility and support from the :func:`scanpy.pp.neighbors` method, please consider using
+    the interface :class:`~dance.transforms.interface.AnnDataTransform`.
+
+    Parameters
+    ----------
+    n_neighbors
+        Number of neighbors.
+    n_pcs
+        Number of PCs to use.
+    knn
+        If ``True``, then use a hard threshold to restrict the number of neighbors to ``n_neighbors``.
+    random_state
+        Random seed.
+    method
+        Method for computing the connectivities.
+    metric
+        Distance metric.
+    channel
+        Name of the PC channel.
 
     """
 
@@ -18,26 +35,6 @@ class NeighborGraph(BaseTransform):
     def __init__(self, n_neighbors: int = 15, *, n_pcs: Optional[int] = None, knn: bool = True, random_state: int = 0,
                  method: Optional[str] = "umap", metric: str = "euclidean", channel: Optional[str] = "CellPCA",
                  **kwargs):
-        """Initialize NeighborGraph.
-
-        Parameters
-        ----------
-        n_neighbors
-            Number of neighbors.
-        n_pcs
-            Number of PCs to use.
-        knn
-            If `True`, then use a hard threshold to restrict the number of neighbors to `n_neighbors`.
-        random_state
-            Random seed.
-        method
-            Method for computing the connectivities.
-        metric
-            Distance metric.
-        channel
-            Name of the PC channel.
-
-        """
         super().__init__(**kwargs)
 
         self.n_neighbors = n_neighbors

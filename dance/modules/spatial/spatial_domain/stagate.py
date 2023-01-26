@@ -157,17 +157,16 @@ class GATConv(MessagePassing):
 
 
 class Stagate(torch.nn.Module):
-    """Stagate class."""
+    """Stagate class.
+
+    Parameters
+    ----------
+    hidden_dims : int
+        Hidden dimensions.
+
+    """
 
     def __init__(self, hidden_dims):
-        """Initialize Stagate.
-
-        Parameters
-        ----------
-        hidden_dims : int
-            Hidden dimensions.
-
-        """
         super().__init__()
 
         [in_dim, num_hidden, out_dim] = hidden_dims

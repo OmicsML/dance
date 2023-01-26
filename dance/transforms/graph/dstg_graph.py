@@ -15,25 +15,22 @@ class DSTGraph(BaseTransform):
     reference data with known cell-type portions. The real-spot nodes are from the data. The linkage, i.e., edges
     are derived based on mutual nearest neighbor in the cononical correlation analysis embedding space.
 
+    Parameters
+    ----------
+    k_filter : int
+        Number of k-nearest neighbors to keep in the final graph.
+    num_cc : int
+        Number of dimensions to use in the concanical correlation analysis.
+    ref_split : str
+        Name of the reference data split, i.e., the pseudo-spot data.
+    inf_split : str
+        Name of the inference data split, i.e., the real-spot data.
+
     """
 
     _DISPLAY_ATTRS = ("k_filter", "num_cc", "ref_split", "inf_split")
 
     def __init__(self, k_filter=200, num_cc=30, *, ref_split: str = "train", inf_split: str = "test", **kwargs):
-        """Initialize DSTGraph.
-
-        Parameters
-        ----------
-        k_filter : int
-            Number of k-nearest neighbors to keep in the final graph.
-        num_cc : int
-            Number of dimensions to use in the concanical correlation analysis.
-        ref_split : str
-            Name of the reference data split, i.e., the pseudo-spot data.
-        inf_split : str
-            Name of the inference data split, i.e., the real-spot data.
-
-        """
         super().__init__(**kwargs)
 
         self.k_filter = k_filter

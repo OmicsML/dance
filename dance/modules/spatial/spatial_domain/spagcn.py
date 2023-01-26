@@ -105,21 +105,20 @@ class GraphConvolution(nn.Module):
 
 
 class SimpleGCDEC(nn.Module):
-    """Basic model used in SpaGCN training."""
+    """Basic model used in SpaGCN training.
+
+    Parameters
+    ----------
+    nfeat : int
+        Input feature dimension.
+    nhid : int
+        Output feature dimension.
+    alpha : float optional
+        Alphat parameter.
+
+    """
 
     def __init__(self, nfeat, nhid, alpha=0.2, device="cpu"):
-        """Initialize SimpleGCDEC.
-
-        Parameters
-        ----------
-        nfeat : int
-            Input feature dimension.
-        nhid : int
-            Output feature dimension.
-        alpha : float optional
-            Alphat parameter.
-
-        """
         super().__init__()
         self.gc = GraphConvolution(nfeat, nhid)
         self.nhid = nhid

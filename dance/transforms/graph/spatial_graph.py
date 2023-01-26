@@ -107,26 +107,25 @@ class SMEGraph(BaseTransform):
 
 
 class StagateGraph(BaseTransform):
-    """STAGATE spatial graph."""
+    """STAGATE spatial graph.
+
+    Parameters
+    ----------
+    model_name
+        Type of graph to construct. Currently support ``radius`` and ``knn``. See
+        :class:`~sklearn.neighbors.NearestNeighbors` for more info.
+    radius
+        Radius parameter for ``radius_neighbors_graph``.
+    n_neighbors
+        Number of neighbors for ``kneighbors_graph``.
+
+    """
 
     _MODELS = ("radius", "knn")
     _DISPLAY_ATTRS = ("model_name", "radius", "n_neighbors")
 
     def __init__(self, model_name: str = "radius", *, radius: float = 1, n_neighbors: int = 5,
                  channel: str = "spatial_pixel", channel_type: str = "obsm", **kwargs):
-        """Initialize StagateGraph.
-
-        Parameters
-        ----------
-        model_name
-            Type of graph to construct. Currently support `radius` and `knn`. See
-            :class:`~sklearn.neighbors.NearestNeighbors` for more info.
-        radius
-            Radius parameter for `radius_neighbors_graph`.
-        n_neighbors
-            Number of neighbors for `kneighbors_graph`.
-
-        """
         super().__init__(**kwargs)
 
         if not isinstance(model_name, str) or (model_name.lower() not in self._MODELS):
