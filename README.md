@@ -13,7 +13,7 @@ ______________________________________________________________________
 [![Test Examples](https://github.com/OmicsML/dance/actions/workflows/test_examples.yml/badge.svg)](https://github.com/OmicsML/dance/actions/workflows/test_examples.yml)
 
 [![Slack](https://img.shields.io/badge/slack-OmicsML-brightgreen)](https://omicsml.slack.com)
-![Twitter Follow](https://img.shields.io/twitter/follow/OmicsML?style=social)
+[![Twitter URL](https://img.shields.io/twitter/url?style=social&url=https%3A%2F%2Ftwitter.com%2FOmicsML)](https://twitter.com/OmicsML)
 
 DANCE is a Python toolkit to support deep learning models for analyzing single-cell gene expression at scale. Our goal is to build up a deep learning community and benchmark platform for computational models in single-cell analysis. It includes three modules at present:
 
