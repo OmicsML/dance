@@ -10,97 +10,16 @@ import time
 from copy import deepcopy
 from pathlib import Path
 
-import dgl.function as fn
+import dgl
 import torch
 import torch.nn as nn
 from dgl.dataloading import DataLoader, NeighborSampler
-from sklearn.metrics import accuracy_score
 
-from dance import logger
+from dance.models.nn import AdaptiveSAGE
+from dance.modules.base import BaseClassificationMethod
 from dance.transforms import Compose, SetConfig
 from dance.transforms.graph import PCACellFeatureGraph
-from dance.typing import LogLevel
-
-
-class AdaptiveSAGE(nn.Module):
-    """The AdaptiveSAGE graph convolution layer.
-
-    Similar to SAGE convolution with mean aggregation, but with additional flexibility that adaptively assigns
-    importance to gene-cell interactions, as well as gene and cell self-loops. In particular, each gene will be
-    associated with an importance score ``beta`` that are used as aggregation weights by the cell nodes. Additionally,
-    there are two ``alpha`` parameters indicating how much each cell or gene should retain its previous representations.
-
-    Parameters
-    ----------
-    dim_in : int
-        Input feature dimensions.
-    dim_out : int
-        output feature dimensions.
-    alpha : Tensor
-        Shared learnable parameters containing gene-cell interaction strengths and those for the cell and gene
-        self-loops.
-    dropout_layer : torch.nn
-        Dropout layer.
-    act_layer : torch.nn
-        Activation layer.
-    norm_layer : torch.nn
-        Normalization layer.
-
-    Note
-    ----
-    In practice, ``alpha`` and ``beta`` are stored in a unified tensor called ``alpha``. The first #gene elements of
-    this tensor are the ``beta`` values and the last two elements are the actual ``alpha`` values.
-
-    """
-
-    def __init__(self, dim_in, dim_out, alpha, dropout_layer, act_layer, norm_layer):
-        super().__init__()
-
-        self.alpha = alpha
-        self.gene_num = len(alpha) - 2
-
-        self.layers = nn.ModuleList()
-        self.layers.append(dropout_layer)
-        self.layers.append(nn.Linear(dim_in, dim_out))
-        nn.init.xavier_uniform_(self.layers[-1].weight, gain=nn.init.calculate_gain("relu"))
-        self.layers.append(act_layer)
-        self.layers.append(norm_layer)
-
-    def message_func(self, edges):
-        """Message update function.
-
-        Reweight messages based on 1) the shared learnable interaction strengths and 2) the underlying edgeweights of
-        the graph. In particular, for 1), gene-cell interaction (undirectional) will be weighted by the gene specific
-        ``beta`` value, and the cell and gene self-interactions will be weighted based on the corresponding ``alpha``
-        values.
-
-        """
-        number_of_edges = edges.src["h"].shape[0]
-        src_id, dst_id = edges.src["id"], edges.dst["id"]
-        indices = (self.gene_num + 1) * torch.ones(number_of_edges, dtype=torch.long, device=src_id.device)
-        indices = torch.where((src_id >= 0) & (dst_id < 0), src_id, indices)  # gene->cell
-        indices = torch.where((dst_id >= 0) & (src_id < 0), dst_id, indices)  # cell->gene
-        indices = torch.where((dst_id >= 0) & (src_id >= 0), self.gene_num, indices)  # gene-gene
-        logger.debug(f"{((src_id >= 0) & (dst_id < 0)).sum():>10,} (geen->cell), "
-                     f"{((src_id < 0) & (dst_id >= 0)).sum():>10,} (cell->gene), "
-                     f"{((src_id >= 0) & (dst_id >= 0)).sum():>10,} (self-gene), "
-                     f"{((src_id < 0) & (dst_id < 0)).sum():>10,} (self-cell), ")
-        h = edges.src["h"] * self.alpha[indices]
-        return {"m": h * edges.data["weight"]}
-
-    def forward(self, block, h):
-        with block.local_scope():
-            h_src = h
-            h_dst = h[:block.number_of_dst_nodes()]
-            block.srcdata["h"] = h_src
-            block.dstdata["h"] = h_dst
-            block.update_all(self.message_func, fn.mean("m", "neigh"))
-
-            z = block.dstdata["h"]
-            for layer in self.layers:
-                z = layer(z)
-
-            return z
+from dance.typing import LogLevel, Optional
 
 
 class GNN(nn.Module):
@@ -113,24 +32,34 @@ class GNN(nn.Module):
 
     Parameters
     ----------
-    dim_in : int
+    dim_in
         Input dimension (PCA embeddings dimension).
-    dim_out : int
+    dim_out
         Output dimension (number of unique cell labels).
-    n_layers : int
+    n_layers
         Number of convolution layers.
-    gene_num : int
+    gene_num
         Number of genes.
-    dropout : float
+    dropout
         Dropout ratio.
-    activation : torch.nn, optional
+    activation
         Activation layer.
-    norm : torch.nn, optional
+    norm
         Normalization layer.
 
     """
 
-    def __init__(self, dim_in, dim_out, dim_hid, n_layers, gene_num, activation=None, norm=None, dropout=0.):
+    def __init__(
+        self,
+        dim_in: int,
+        dim_out: int,
+        dim_hid: int,
+        n_layers: int,
+        gene_num: int,
+        activation: Optional[nn.Module] = None,
+        norm: Optional[nn.Module] = None,
+        dropout: Optional[float] = 0.,
+    ):
         super().__init__()
 
         self.n_layers = n_layers
@@ -158,7 +87,7 @@ class GNN(nn.Module):
         return self.linear(x)
 
 
-class ScDeepSort:
+class ScDeepSort(BaseClassificationMethod):
     """The ScDeepSort cell-type annotation model.
 
     Parameters
@@ -201,9 +130,6 @@ class ScDeepSort:
         if not self.save_path.exists():
             self.save_path.mkdir(parents=True)
 
-    def preprocess(self, data, /, **kwargs):
-        self.preprocessing_pipeline(**kwargs)(data)
-
     @staticmethod
     def preprocessing_pipeline(n_components: int = 400, log_level: LogLevel = "INFO"):
         return Compose(
@@ -212,14 +138,15 @@ class ScDeepSort:
             log_level=log_level,
         )
 
-    def fit(self, graph, labels, epochs=300, lr=1e-3, weight_decay=0, val_ratio=0.2):
+    def fit(self, graph: dgl.DGLGraph, labels: torch.Tensor, epochs: int = 300, lr: float = 1e-3,
+            weight_decay: float = 0, val_ratio: float = 0.2):
         """Train scDeepsort model.
 
         Parameters
         ----------
-        graph : dgl.DGLGraph
+        graph
             Training graph.
-        labels : Tensor
+        labels
             Node (cell, gene) labels, -1 for genes.
         epochs
             Number of epochs to train the model.
@@ -282,7 +209,7 @@ class ScDeepSort:
               f"Val Total Num {len(val_idx)}, Val Unsure Num {final_val_unsure_num}, "
               f"Val Acc {final_val_correct_num / len(val_idx):.4f}")
 
-    def cal_loss(self, graph, idx):
+    def cal_loss(self, graph: dgl.DGLGraph, idx: torch.Tensor):
         """Calculate loss.
 
         Parameters
@@ -320,7 +247,7 @@ class ScDeepSort:
         return total_loss / total_size
 
     @torch.no_grad()
-    def evaluate(self, graph, idx, unsure_rate: float = 2.0):
+    def evaluate(self, graph: dgl.DGLGraph, idx: torch.Tensor, unsure_rate: float = 2.0):
         """Evaluate the model on certain cell nodes.
 
         Parameters
@@ -367,7 +294,7 @@ class ScDeepSort:
         self.model.load_state_dict(state["model"])
 
     @torch.no_grad()
-    def predict_proba(self, graph):
+    def predict_proba(self, graph: dgl.DGLGraph):
         """Perform inference on a test dataset.
 
         Parameters
@@ -397,7 +324,7 @@ class ScDeepSort:
         pred_prob = nn.functional.softmax(logits[cell_mask], dim=-1).numpy()
         return pred_prob
 
-    def predict(self, graph, unsure_rate: float = 2.0):
+    def predict(self, graph: dgl.DGLGraph, unsure_rate: float = 2.0, return_unsure: bool = False):
         """Perform prediction on all test datasets.
 
         Parameters
@@ -407,9 +334,8 @@ class ScDeepSort:
         unsure_rate
             Determine the threshold of the maximum predicted probability under which the predictions are considered
             uncertain.
-
-        Returns
-        -------
+        return_unsure
+            If set to ``True``, then return an indicator array that indicates whether a prediction is uncertain.
 
         """
         pred_prob = self.predict_proba(graph)
@@ -417,26 +343,4 @@ class ScDeepSort:
         pred = pred_prob.argmax(1)
         unsure = pred_prob.max(1) < unsure_rate / self.num_labels
 
-        return pred, unsure
-
-    def score(self, pred, true):
-        """Compute model performance on test datasets based on accuracy.
-
-        Parameters
-        ----------
-        pred
-            Predicted cell-labels as a 1-d numpy array.
-        true
-            True cell-labels (could contain multiple cell-type per cell).
-
-        Returns
-        -------
-        float
-            Accuracy score of the prediction
-
-        """
-        if true.max() == 1:
-            num_samples = true.shape[0]
-            return (true[range(num_samples), pred.ravel()]).sum() / num_samples
-        else:
-            return accuracy_score(pred, true)
+        return (pred, unsure) if return_unsure else pred

@@ -59,8 +59,7 @@ if __name__ == "__main__":
     # Train and evaluate the model
     model.fit(g_train, y_train, epochs=args.n_epochs, lr=args.lr, weight_decay=args.weight_decay,
               val_ratio=args.test_rate)
-    pred, unsure = model.predict(g_test)
-    score = model.score(pred, y_test)
+    score = model.score(g_test, y_test)
     print(f"{score=:.4f}")
 """To reproduce the benchmarking results, please run the following command:
 
