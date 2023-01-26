@@ -33,6 +33,7 @@ class BaseTransform(ABC):
         return self.__class__.__name__
 
     def hexdigest(self) -> str:
+        """Return MD5 hash using the representation of the transform object."""
         return hashlib.md5(repr(self).encode()).hexdigest()
 
     def __repr__(self) -> str:
