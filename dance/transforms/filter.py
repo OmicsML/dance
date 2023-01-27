@@ -1,8 +1,56 @@
 import numpy as np
 
+from dance import logger
 from dance.exceptions import DevError
 from dance.transforms.base import BaseTransform
-from dance.typing import Literal, Optional
+from dance.typing import List, Literal, Optional
+
+
+class FilterGenesMatch(BaseTransform):
+    """Filter genes based on prefixes and suffixes.
+
+    Parameters
+    ----------
+    prefixes
+        List of prefixes to remove.
+    suffixes
+        List of suffixes to remove.
+
+    """
+
+    _DISPLAY_ATTRS = ("prefixes", "suffixes")
+
+    def __init__(self, prefixes: Optional[List[str]] = None, suffixes: Optional[List[str]] = None,
+                 case_sensitive: bool = False, **kwargs):
+        super().__init__(**kwargs)
+
+        self.prefixes = prefixes or []
+        self.suffixes = suffixes or []
+        self.case_sensitive = case_sensitive
+
+        if case_sensitive:
+            self.prefixes = [i.upper() for i in self.prefixes]
+            self.suffixes = [i.upper() for i in self.suffixes]
+
+    def __call__(self, data):
+        indicator = np.zeros(data.shape[1], dtype=bool)
+
+        for name, items in zip(["prefix", "suffix"], [self.prefixes, self.suffixes]):
+            for item in items:
+                ids = data.data.var_names.str
+                if self.case_sensitive:
+                    ids = ids.upper().str
+
+                new_indicator = ids.startswith(item) if name == "prefix" else ids.endswith(item)
+                logger.info(f"{new_indicator.sum()} number of genes will be removed due to {name} {item!r}")
+
+                indicator = np.logical_or(indicator, new_indicator)
+
+        logger.info(f"Removing {indicator.sum()} genes in total")
+        logger.debug(f"Removing genes: {data.data.var_names[indicator]}")
+        data.data._inplace_subset_var(data.data.var_names[~indicator])
+
+        return data
 
 
 class FilterGenesPercentile(BaseTransform):
