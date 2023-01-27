@@ -1,18 +1,14 @@
 import argparse
 
 import numpy as np
-import scanpy as sc
 
-from dance.data import Data
-from dance.datasets.spatial import SpotDataset
+from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.stagate import Stagate
-from dance.transforms import AnnDataTransform
-from dance.transforms.graph import StagateGraph
 from dance.transforms.preprocess import set_seed
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
+    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--sample_number", type=str, default="151673",
                         help="12 human dorsolateral prefrontal cortex datasets for the spatial domain task.")
     parser.add_argument("--hidden_dims", type=list, default=[512, 32], help="hidden dimensions")
@@ -24,24 +20,13 @@ if __name__ == "__main__":
 
     set_seed(args.seed)
 
-    # Load raw data
-    dataset = SpotDataset(args.sample_number, data_dir="../../../data/spot")
-    _, adata, _, spatial_pixel, label = dataset.load_data()
+    # Initialize model and get model specific preprocessing pipeline
+    model = Stagate([args.high_variable_genes] + args.hidden_dims)
+    preprocessing_pipeline = model.preprocessing_pipeline(n_top_hvgs=args.high_variable_genes, radius=args.rad_cutoff)
 
-    # Construct dance data object
-    adata.var_names_make_unique()
-    adata.obsm["spatial_pixel"] = spatial_pixel
-    adata.obsm["label"] = label
-    data = Data(adata, train_size="all")
-
-    # Data preprocessing pipeline
-    AnnDataTransform(sc.pp.highly_variable_genes, flavor="seurat_v3", n_top_genes=args.high_variable_genes)(data)
-    AnnDataTransform(sc.pp.normalize_total, target_sum=1e4)(data)
-    AnnDataTransform(sc.pp.log1p)(data)
-
-    # Construct cell graph
-    StagateGraph("radius", radius=args.rad_cutoff)(data)
-    data.set_config(feature_channel="StagateGraph", feature_channel_type="obsp", label_channel="label")
+    # Load data and perform necessary preprocessing
+    dataloader = SpatialLIBDDataset(data_id=args.sample_number)
+    data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
     adj, y = data.get_data(return_type="default")
 
     model = Stagate([args.high_variable_genes] + args.hidden_dims)
