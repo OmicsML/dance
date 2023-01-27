@@ -14,6 +14,11 @@ import warnings
 
 import networkx as nx
 import numpy as np
+import scanpy as sc
+
+from dance.transforms import AnnDataTransform, CellPCA, Compose, FilterGenesMatch, SetConfig
+from dance.transforms.graph import NeighborGraph
+from dance.typing import LogLevel
 
 PASS_MAX = -1
 MIN = 0.0000001
@@ -332,6 +337,23 @@ class Louvain:
 
     def __init__(self, resolution: float = 1):
         self.resolution = resolution
+
+    @staticmethod
+    def preprocessing_pipeline(dim: int = 50, n_neighbors: int = 17, log_level: LogLevel = "INFO"):
+        return Compose(
+            FilterGenesMatch(prefixes=["ERCC", "MT-"]),
+            AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
+            AnnDataTransform(sc.pp.log1p),
+            CellPCA(n_components=dim),
+            NeighborGraph(n_neighbors=n_neighbors),
+            SetConfig({
+                "feature_channel": "NeighborGraph",
+                "feature_channel_type": "obsp",
+                "label_channel": "label",
+                "label_channel_type": "obs"
+            }),
+            log_level=log_level,
+        )
 
     def fit(self, adj, partition=None, weight="weight", randomize=None, random_state=None):
         """Fit function for model training.
