@@ -1,15 +1,16 @@
 import os
 
+import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score
 from sklearn.svm import SVC
 
+from dance.modules.base import BaseClassificationMethod
 from dance.transforms import Compose, SetConfig, WeightedFeaturePCA
 from dance.typing import LogLevel, Optional
 from dance.utils.deprecate import deprecated
 
 
-class SVM:
+class SVM(BaseClassificationMethod):
     """The SVM cell-type classification model.
 
     Parameters
@@ -26,9 +27,6 @@ class SVM:
         self.random_state = random_state
         self._mdl = SVC(random_state=random_state, probability=True)
 
-    def preprocess(self, data, /, **kwargs):
-        self.preprocessing_pipeline(**kwargs)(data)
-
     @staticmethod
     def preprocessing_pipeline(n_components: int = 400, log_level: LogLevel = "INFO"):
         return Compose(
@@ -40,59 +38,34 @@ class SVM:
             log_level=log_level,
         )
 
-    def fit(self, x, y):
+    def fit(self, x: np.ndarray, y: np.ndarray):
         """Train the classifier.
 
         Parameters
         ----------
-        x: np.ndarray
+        x
             Training cell features.
-        y: np.ndarray
+        y
             Training labels.
 
         """
         self._mdl.fit(x, y)
 
-    def predict(self, x):
+    def predict(self, x: np.ndarray):
         """Predict cell labels.
 
         Parameters
         ----------
-        x: np.ndarray
+        x
             Samples to be predicted (samplex x features).
 
         Returns
         -------
-        y: np.ndarray
+        y
             Predicted labels of the input samples.
 
         """
         return self._mdl.predict(x)
-
-    def score(self, pred, true):
-        """Model performance score measured by accuracy.
-
-        Parameters
-        ----------
-        pred: np.ndarray
-            Predicted labels.
-        true: np.ndarray
-            True labels. Can be either a maxtrix of size (samples x labels) with ones indicating positives, or a
-            vector of size (sameples x 1) where each element is the index of the corresponding label for the sample.
-            The first option provides flexibility to cases where a sample could be associated with multiple labels
-            at test time while the model was trained as a multi-class classifier.
-
-        Returns
-        -------
-        score: float
-            Accuracy score.
-
-        """
-        if true.max() == 1:
-            num_samples = true.shape[0]
-            return (true[range(num_samples), pred.ravel()]).sum() / num_samples
-        else:
-            return accuracy_score(pred, true)
 
     @deprecated
     def save(self, num, pred):

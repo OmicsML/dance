@@ -1,13 +1,13 @@
 import numpy as np
 import scanpy as sc
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
 
+from dance.modules.base import BaseClassificationMethod
 from dance.transforms import AnnDataTransform, Compose, SCNFeature, SetConfig
 from dance.typing import LogLevel, Optional
 
 
-class SingleCellNet:
+class SingleCellNet(BaseClassificationMethod):
     """The SingleCellNet model.
 
     Parameters
@@ -19,9 +19,6 @@ class SingleCellNet:
 
     def __init__(self, num_trees: int = 100):
         self.num_trees = num_trees
-
-    def preprocess(self, data, /, **kwargs):
-        self.preprocessing_pipeline(**kwargs)(data)
 
     @staticmethod
     def preprocessing_pipeline(normalize: bool = True, num_top_genes: int = 10, num_top_gene_pairs: int = 25,
@@ -112,26 +109,3 @@ class SingleCellNet:
         pred_prob = self.predict_proba(x)
         pred = pred_prob.argmax(1)
         return pred
-
-    def score(self, pred, true):
-        """Compute model performance on test datasets based on accuracy.
-
-        Parameters
-        ----------
-        pred
-            Predicted cell-labels as a 1-d numpy array.
-        true
-            True cell-labels (could contain multiple cell-type per cell).
-
-        Returns
-        -------
-        float
-            Accuracy score of the prediction
-
-        """
-        if true.max() == 1:
-            num_samples, num_classes = true.shape
-            mask = pred < num_classes  # last column for unsure cells
-            return true[mask, pred[mask]].sum() / num_samples
-        else:
-            return accuracy_score(pred, true)

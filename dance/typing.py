@@ -1,4 +1,4 @@
-from typing import Any, Dict, Iterator, List, Literal, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Dict, Iterator, List, Literal, Mapping, Optional, Sequence, Set, Tuple, Union
 
 import numpy as np
 from anndata import AnnData
@@ -21,6 +21,7 @@ __all__ = [
     "LOGLEVELS",
     "List",
     "LogLevel",
+    "Mapping",
     "NormMode",
     "Optional",
     "ReturnedFeat",

@@ -8,6 +8,54 @@ from sklearn.metrics import adjusted_rand_score
 from sklearn.metrics.cluster import normalized_mutual_info_score
 from sklearn.neighbors import NearestNeighbors
 
+from dance import logger
+from dance.registers import METRIC_FUNCS, register_metric_func
+from dance.typing import Any, Mapping, Optional, Union
+from dance.utils.wrappers import torch_to_numpy
+
+
+def resolve_score_func(score_func: Optional[Union[str, Mapping[Any, float]]]) -> Mapping[Any, float]:
+    logger.debug(f"Resolving scoring function from {score_func!r}")
+    if score_func is None:
+        raise ValueError(f"Scoring function not specified: {score_func=!r}")
+    elif isinstance(score_func, str):
+        if score_func not in METRIC_FUNCS:
+            raise KeyError(f"Failed to obtain scoring function {score_func!r} from the METRI_FUNCS dict, "
+                           f"available options are {sorted(METRIC_FUNCS)}")
+        score_func = METRIC_FUNCS[score_func]
+        logger.debug(f"Scoring function {score_func!r} obtained from the METRIC_FUNCS")
+    else:
+        logger.debug(f"Input {score_func!r} is not string type, assuming it is a valid score function and return")
+    return score_func
+
+
+@register_metric_func("acc")
+@torch_to_numpy
+def acc(true: Union[torch.Tensor, np.ndarray], pred: Union[torch.Tensor, np.ndarray]) -> float:
+    """Accuracy score.
+
+    This specific implementation of accuracy score accounts for the possibility where the true label for an instance
+    may contain multiple positives. This happens because in some cases of cell type annotation tasks, some cells in
+    the test set have slightly more ambiguous cell-type annotations than the training set.
+
+    Parameters
+    ----------
+    pred
+        Predicted labels.
+    true
+        True labels. Can be either a maxtrix of size (samples x labels) with ones indicating positives, or a
+        vector of size (sameples x 1) where each element is the index of the corresponding label for the sample.
+        The first option provides flexibility to cases where a sample could be associated with multiple labels
+        at test time while the model was trained as a multi-class classifier.
+
+    Returns
+    -------
+    float
+        Accuracy score.
+
+    """
+    return true[np.arange(pred.shape[0]), pred.ravel()].mean()
+
 
 def get_bipartite_matching_adjacency_matrix_mk3(raw_logits, threshold_quantile=0.995, copy=False):
     #getting rid of unpromising graph connections
