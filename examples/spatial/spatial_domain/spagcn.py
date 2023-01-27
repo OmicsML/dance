@@ -1,17 +1,13 @@
 import argparse
 
-import scanpy as sc
 from sklearn.metrics import adjusted_mutual_info_score
 
-from dance.data import Data
-from dance.datasets.spatial import SpotDataset
+from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.spagcn import SpaGCN, refine
-from dance.transforms import AnnDataTransform, CellPCA
-from dance.transforms.graph import SpaGCNGraph, SpaGCNGraph2D
-from dance.transforms.preprocess import prefilter_specialgenes
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--sample_number", type=str, default="151673",
                         help="12 human dorsolateral prefrontal cortex datasets for the spatial domain task.")
     parser.add_argument("--beta", type=int, default=49, help="")
@@ -32,34 +28,16 @@ if __name__ == "__main__":
     parser.add_argument("--n_seed", type=int, default=100, help="")
     args = parser.parse_args()
 
-    # Load raw data
-    dataset = SpotDataset(args.sample_number, data_dir="../../../data/spot")
-    image, adata, spatial, spatial_pixel, label = dataset.load_data()
+    # Initialize model and get model specific preprocessing pipeline
+    model = SpaGCN()
+    preprocessing_pipeline = model.preprocessing_pipeline(alpha=args.alpha, beta=args.beta)
 
-    # Construct dance data object
-    adata.var_names_make_unique()
-    adata.obsm["spatial"] = spatial
-    adata.obsm["spatial_pixel"] = spatial_pixel
-    adata.uns["image"] = image
-    adata.obsm["label"] = label
-    data = Data(adata, train_size="all")
-
-    # Data preprocessing pipeline
-    AnnDataTransform(prefilter_specialgenes)(data)
-    AnnDataTransform(sc.pp.normalize_total, target_sum=1e4)(data)
-    AnnDataTransform(sc.pp.log1p)(data)
-
-    # Construct cell feature and spot graphs
-    SpaGCNGraph(alpha=args.alpha, beta=args.beta, log_level="INFO")(data)
-    SpaGCNGraph2D(log_level="INFO")(data)
-    CellPCA(n_components=50, log_level="INFO")(data)
-    data.set_config(feature_channel=["CellPCA", "SpaGCNGraph", "SpaGCNGraph2D"],
-                    feature_channel_type=["obsm", "obsp", "obsp"], label_channel="label")
+    # Load data and perform necessary preprocessing
+    dataloader = SpatialLIBDDataset(data_id=args.sample_number)
+    data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
     (x, adj, adj_2d), y = data.get_train_data()
 
-    # model and pipeline
-    model = SpaGCN()
-
+    # Train and evaluate model
     l = model.search_l(args.p, adj, start=args.start, end=args.end, tol=args.tol, max_run=args.max_run)
     model.set_l(l)
     n_clusters = args.n_clusters

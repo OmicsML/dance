@@ -23,6 +23,9 @@ from sklearn.cluster import KMeans
 from torch.nn.parameter import Parameter
 
 from dance import utils
+from dance.transforms import AnnDataTransform, CellPCA, Compose, FilterGenesMatch, SetConfig
+from dance.transforms.graph import SpaGCNGraph, SpaGCNGraph2D
+from dance.typing import LogLevel
 
 
 def refine(sample_id, pred, dis, shape="hexagon"):
@@ -447,8 +450,26 @@ class SpaGCN:
 
     def __init__(self, l=None):
         super().__init__()
-        self.l = l or None
+        self.l = l
         self.res = None
+
+    @staticmethod
+    def preprocessing_pipeline(alpha: float = 1, beta: int = 49, dim: int = 50, log_level: LogLevel = "INFO"):
+        return Compose(
+            FilterGenesMatch(prefixes=["ERCC", "MT-"]),
+            AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
+            AnnDataTransform(sc.pp.log1p),
+            SpaGCNGraph(alpha=alpha, beta=beta),
+            SpaGCNGraph2D(),
+            CellPCA(n_components=dim),
+            SetConfig({
+                "feature_channel": ["CellPCA", "SpaGCNGraph", "SpaGCNGraph2D"],
+                "feature_channel_type": ["obsm", "obsp", "obsp"],
+                "label_channel": "label",
+                "label_channel_type": "obs"
+            }),
+            log_level=log_level,
+        )
 
     def search_l(self, p, adj, start=0.01, end=1000, tol=0.01, max_run=100):
         """Search best l.
@@ -625,5 +646,4 @@ class SpaGCN:
         """
         from sklearn.metrics.cluster import adjusted_rand_score
         score = adjusted_rand_score(y_true, self.y_pred)
-        print("ARI {}".format(adjusted_rand_score(y_true, self.y_pred)))
         return score
