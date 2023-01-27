@@ -129,10 +129,15 @@ class BaseDataset(ABC):
 
         cache_file_path = osp.join(cache_dir, f"{md5_hash}.pkl")
         if osp.isfile(cache_file_path) and cache:
-            logger.info(f"Loading cached data at {cache_file_path}\n{'Cache data info':-^100}\n"
-                        f"Dataset: {self!r}\nTransformation: {transform!r}\n{'End of cache data info':-^100}")
             with open(cache_file_path, "rb") as f:
                 data = pickle.load(f)
+            terminal_width = os.get_terminal_size().columns
+            logger.info(f"Loading cached data at {cache_file_path}\n"
+                        f"{'Cache data info':=^{terminal_width}}\n"
+                        f"{'Dataset object info':-^{terminal_width}}\n{self!r}\n"
+                        f"{'Transformation info':-^{terminal_width}}\n{transform!r}\n"
+                        f"{'Loaded data info':-^{terminal_width}}\n{data!r}\n"
+                        f"{'End of cache data info':=^{terminal_width}}")
             return data
         else:
             return cache_file_path
