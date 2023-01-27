@@ -81,6 +81,9 @@ class BaseData(ABC):
         if "dance_config" not in self._data.uns:
             self._data.uns["dance_config"] = dict()
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__} object that wraps (.data):\n{self.data}"
+
     def _setup_splits(self, train_size: Optional[Union[int, str]], val_size: int, test_size: int):
         if train_size is None:
             return

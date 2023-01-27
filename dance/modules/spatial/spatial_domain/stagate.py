@@ -25,6 +25,10 @@ from torch_geometric.utils import add_self_loops, remove_self_loops, softmax
 from torch_sparse import SparseTensor, set_diag
 from tqdm import tqdm
 
+from dance.transforms import AnnDataTransform, Compose, SetConfig
+from dance.transforms.graph import StagateGraph
+from dance.typing import LogLevel
+
 
 def transfer_pytorch_data(adata, adj):
     edgeList = adj
@@ -174,6 +178,23 @@ class Stagate(torch.nn.Module):
         self.conv2 = GATConv(num_hidden, out_dim, heads=1, concat=False, dropout=0, add_self_loops=False, bias=False)
         self.conv3 = GATConv(out_dim, num_hidden, heads=1, concat=False, dropout=0, add_self_loops=False, bias=False)
         self.conv4 = GATConv(num_hidden, in_dim, heads=1, concat=False, dropout=0, add_self_loops=False, bias=False)
+
+    @staticmethod
+    def preprocessing_pipeline(hvg_flavor: str = "seurat_v3", n_top_hvgs: int = 3000, model_name: str = "radius",
+                               radius: float = 150, n_neighbors: int = 5, log_level: LogLevel = "INFO"):
+        return Compose(
+            AnnDataTransform(sc.pp.highly_variable_genes, flavor=hvg_flavor, n_top_genes=n_top_hvgs, subset=True),
+            AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
+            AnnDataTransform(sc.pp.log1p),
+            StagateGraph(model_name, radius=radius, n_neighbors=n_neighbors),
+            SetConfig({
+                "feature_channel": "StagateGraph",
+                "feature_channel_type": "obsp",
+                "label_channel": "label",
+                "label_channel_type": "obs"
+            }),
+            log_level=log_level,
+        )
 
     def forward(self, features, edge_index):
         """Forward function for training.

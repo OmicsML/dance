@@ -1,16 +1,12 @@
 import argparse
 
-import scanpy as sc
-
-from dance.data import Data
-from dance.datasets.spatial import SpotDataset
-from dance.modules.spatial.spatial_domain import louvain
-from dance.transforms import AnnDataTransform, CellPCA
-from dance.transforms.graph import NeighborGraph
-from dance.transforms.preprocess import prefilter_specialgenes, set_seed
+from dance.datasets.spatial import SpatialLIBDDataset
+from dance.modules.spatial.spatial_domain.louvain import Louvain
+from dance.transforms.preprocess import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--sample_number", type=str, default="151673",
                         help="12 human dorsolateral prefrontal cortex datasets for the spatial domain task.")
     parser.add_argument("--seed", type=int, default=202, help="Random seed.")
@@ -20,27 +16,17 @@ if __name__ == "__main__":
 
     set_seed(args.seed)
 
-    # Load raw data
-    dataset = SpotDataset(args.sample_number, data_dir="../../../data/spot")
-    _, adata, _, _, label = dataset.load_data()
+    # Initialize model and get model specific preprocessing pipeline
+    model = Louvain(resolution=1)
+    preprocessing_pipeline = model.preprocessing_pipeline(dim=args.n_components, n_neighbors=args.neighbors)
 
-    # Construct dance data object
-    adata.var_names_make_unique()
-    adata.obsm["label"] = label
-    data = Data(adata, train_size="all")
-
-    # Data preprocessing pipeline
-    AnnDataTransform(prefilter_specialgenes)(data)
-    AnnDataTransform(sc.pp.normalize_total, target_sum=1e4)(data)
-    AnnDataTransform(sc.pp.log1p)(data)
-
-    # Construct cell feature and spot graphs
-    CellPCA(n_components=args.n_components, log_level="INFO")(data)
-    NeighborGraph(n_neighbors=args.neighbors)(data)
-    data.set_config(feature_channel="NeighborGraph", feature_channel_type="obsp", label_channel="label")
+    # Load data and perform necessary preprocessing
+    dataloader = SpatialLIBDDataset(data_id=args.sample_number)
+    data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
     adj, y = data.get_data(return_type="default")
 
-    model = louvain.Louvain(resolution=1)
+    # Train and evaluate model
+    model = Louvain(resolution=1)
     model.fit(adj)
     prediction = model.predict()
     print(model.score(y.values.ravel()))
