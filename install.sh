@@ -63,6 +63,9 @@ conda install pytorch==${PYTORCH_VERSION} torchvision==${TORCHVISION_VERSION} ${
 conda install pyg==${PYG_VERSION} -c pyg -y
 conda install ${DGL_OPT} -c dglteam -y
 
+# Install the rest of the dependencies
+pip install -r requirements.txt
+
 # Finally, install the DANCE pckage
 pip install -e .
 
