@@ -16,6 +16,7 @@ import networkx as nx
 import numpy as np
 import scanpy as sc
 
+from dance.modules.base import BaseClusteringMethod
 from dance.transforms import AnnDataTransform, CellPCA, Compose, FilterGenesMatch, SetConfig
 from dance.transforms.graph import NeighborGraph
 from dance.typing import LogLevel
@@ -325,8 +326,8 @@ def best_partition(graph, partition=None, weight="weight", resolution=1., random
     return partition_at_level(dendo, len(dendo) - 1)
 
 
-class Louvain:
-    """Louvain class.
+class Louvain(BaseClusteringMethod):
+    """Louvain classBaseClassificationMethod.
 
     Parameters
     ----------
@@ -388,37 +389,19 @@ class Louvain:
 
         print("fit over ")
 
-    def predict(self):
-        """Prediction function."""
-        self.predict_result = partition_at_level(self.dendo, len(self.dendo) - 1)
-        self.y_pred = self.predict_result
-        return self.predict_result
-
-    def score(self, y_true):
-        """Score function to evaluate the prediction performance.
+    def predict(self, x=None):
+        """Prediction function.
 
         Parameters
         ----------
-        y_true
-            Ground truth label.
-
-        Returns
-        -------
-        float
-            Evaluation score.
+        x
+            Not used. For compatibility with :func:`dance.modules.base.BaseMethod.fit_score`,  which calls :meth:`fit`
+            with ``x``.
 
         """
-        pred_val = []
-        for key in self.y_pred:
-            pred_val.append(self.y_pred[key])
-
-        from sklearn.metrics.cluster import adjusted_rand_score
-        score = adjusted_rand_score(y_true, np.array(pred_val))
-        print("ARI {}".format(adjusted_rand_score(y_true, np.array(pred_val))))
-        return score
-
-
-# add by us
+        pred_dict = partition_at_level(self.dendo, len(self.dendo) - 1)
+        pred = np.array(list(map(pred_dict.get, sorted(pred_dict))))
+        return pred
 
 
 def generate_dendrogram(graph, part_init=None, weight="weight", resolution=1., randomize=None, random_state=None):
