@@ -316,21 +316,18 @@ class ImputationDatasetParams:
     random_seed = None
     min_counts = None
     train_dataset = None
-    test_dataset = None
     gpu = None
     filetype = None
 
 
 class ImputationDataset():
 
-    def __init__(self, random_seed=10, gpu=-1, filetype=None, data_dir="data", train_dataset="human_stemcell",
-                 test_dataset="pbmc", min_counts=1):
+    def __init__(self, random_seed=10, gpu=-1, filetype=None, data_dir="data", train_dataset="human_stemcell", min_counts=1):
         self.params = ImputationDatasetParams
         self.params.data_dir = data_dir
         self.params.random_seed = random_seed
         self.params.min_counts = min_counts
         self.params.train_dataset = train_dataset
-        self.params.test_dataset = test_dataset
         self.params.gpu = gpu
         self.params.filetype = filetype
 

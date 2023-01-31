@@ -36,8 +36,6 @@ if __name__ == '__main__':
     parser.add_argument("--filetype", type=str, default='h5', choices=['csv', 'gz', 'h5'],
                         help='data file type, csv, csv.gz, or h5')
     parser.add_argument("--train_dataset", default='mouse_brain_data', type=str, help="dataset id")
-    parser.add_argument("--test_dataset", default='pbmc_data', type=str, help="dataset id")
-    parser.add_argument("--hiddem_dim", type=float, default=256, help="number of neurons in the dense layer")
     parser.add_argument("--minVMR", type=float, default=0.5, help="Minimum variance to mean ratio.")
     parser.add_argument("--ntop", type=int, default=5, help="Number of predictors.")
     parser.add_argument("--cell_subset", type=int, default=1, help="Cell subset.")
@@ -56,9 +54,8 @@ if __name__ == '__main__':
         gpu=params.gpu,
         # evaluate = params.evaluate,
         data_dir=params.data_dir,
-        train_dataset='pbmc_data',
-        test_dataset=params.test_dataset,
-        filetype='h5')
+        train_dataset=params.train_dataset,
+        filetype=params.filetype)
     dataloader.download_all_data()
     # dataloader.download_pretrained_data()
 
