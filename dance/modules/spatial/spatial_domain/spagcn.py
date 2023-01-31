@@ -10,7 +10,6 @@ spatially variable genes by graph convolutional network." Nature methods 18.11 (
 """
 
 import math
-import random
 
 import numpy as np
 import pandas as pd
@@ -61,7 +60,7 @@ def refine(sample_id, pred, dis, shape="hexagon"):
     elif shape == "square":
         num_nbs = 4
     else:
-        print("Shape not recognized, shape='hexagon' for Visium data, 'square' for ST data.")
+        logger.info("Shape not recognized, shape='hexagon' for Visium data, 'square' for ST data.")
     for i in range(len(sample_id)):
         index = sample_id[i]
         dis_tmp = dis_df.loc[index, :].sort_values()
@@ -87,7 +86,7 @@ class GraphConvolution(nn.Module):
         if bias:
             self.bias = Parameter(torch.FloatTensor(out_features))
         else:
-            self.register_parameter('bias', None)
+            self.register_parameter("bias", None)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -211,7 +210,7 @@ class SimpleGCDEC(nn.Module):
         features = self.gc(torch.FloatTensor(X), torch.FloatTensor(adj))
         # ---------------------------------------------------------------------
         if init == "kmeans":
-            print("Initializing cluster centers with kmeans, n_clusters known")
+            logger.info("Initializing cluster centers with kmeans, n_clusters known")
             self.n_clusters = n_clusters
             kmeans = KMeans(self.n_clusters, n_init=20)
             if init_spa:
@@ -221,16 +220,16 @@ class SimpleGCDEC(nn.Module):
                 # Kmeans using only expression information
                 y_pred = kmeans.fit_predict(X)  # use X as numpy
         elif init == "louvain":
-            print("Initializing cluster centers with louvain, resolution = ", res)
+            logger.info(f"Initializing cluster centers with louvain, resolution = {res}")
             if init_spa:
                 adata = sc.AnnData(features.detach().numpy())
             else:
                 adata = sc.AnnData(X)
             sc.pp.neighbors(adata, n_neighbors=n_neighbors)
             # sc.tl.louvain(adata,resolution=res)
-            sc.tl.leiden(adata, resolution=res, key_added='louvain')
+            sc.tl.leiden(adata, resolution=res, key_added="louvain")
 
-            y_pred = adata.obs['louvain'].astype(int).to_numpy()
+            y_pred = adata.obs["louvain"].astype(int).to_numpy()
             self.n_clusters = len(np.unique(y_pred))
         # ---------------------------------------------------------------------
         y_pred_last = y_pred
@@ -256,7 +255,7 @@ class SimpleGCDEC(nn.Module):
                 _, q = self.forward(X, adj)
                 p = self.target_distribution(q).data
             if epoch % 10 == 0:
-                print("Epoch ", epoch)
+                logger.info(f"Epoch {epoch}")
             optimizer.zero_grad()
             z, q = self(X, adj)
             loss = self.loss_function(p, q)
@@ -270,9 +269,9 @@ class SimpleGCDEC(nn.Module):
             delta_label = np.sum(y_pred != y_pred_last).astype(np.float32) / X.shape[0]
             y_pred_last = y_pred
             if epoch > 0 and (epoch - 1) % update_interval == 0 and delta_label < tol:
-                print('delta_label ', delta_label, '< tol ', tol)
-                print("Reach tolerance threshold. Stopping training.")
-                print("Total epoch:", epoch)
+                logger.info(f"delta_label {delta_label} < tol {tol}")
+                logger.info("Reach tolerance threshold. Stopping training.")
+                logger.info(f"Total epoch: {epoch}")
                 break
 
         # Recover model and data in cpu
@@ -282,7 +281,7 @@ class SimpleGCDEC(nn.Module):
 
     def fit_with_init(self, X, adj, init_y, lr=0.001, max_epochs=5000, update_interval=1, weight_decay=5e-4, opt="sgd"):
         """Initializing cluster centers with kmeans."""
-        print("Initializing cluster centers with kmeans.")
+        logger.info("Initializing cluster centers with kmeans.")
         if opt == "sgd":
             optimizer = optim.SGD(self.parameters(), lr=lr, momentum=0.9)
         elif opt == "admin":
@@ -365,7 +364,7 @@ class GC_DEC(nn.Module):
     def fit(self, X, adj, lr=0.001, max_epochs=10, update_interval=5, weight_decay=5e-4, opt="sgd", init="louvain",
             n_neighbors=10, res=0.4):
         self.trajectory = []
-        print("Initializing cluster centers with kmeans.")
+        logger.info("Initializing cluster centers with kmeans.")
         if opt == "sgd":
             optimizer = optim.SGD(self.parameters(), lr=lr, momentum=0.9)
         elif opt == "admin":
@@ -382,7 +381,7 @@ class GC_DEC(nn.Module):
             adata = sc.AnnData(features.detach().numpy())
             sc.pp.neighbors(adata, n_neighbors=n_neighbors)
             sc.tl.louvain(adata, resolution=res)
-            y_pred = adata.obs['louvain'].astype(int).to_numpy()
+            y_pred = adata.obs["louvain"].astype(int).to_numpy()
         # ---------------------------------------------------------------------
         X = torch.FloatTensor(X)
         adj = torch.FloatTensor(adj)
@@ -399,7 +398,7 @@ class GC_DEC(nn.Module):
                 _, q = self.forward(X, adj)
                 p = self.target_distribution(q).data
             if epoch % 100 == 0:
-                print("Epoch ", epoch)
+                logger.info(f"Epoch {epoch}")
             optimizer.zero_grad()
             z, q = self(X, adj)
             loss = self.loss_function(p, q)
@@ -408,7 +407,7 @@ class GC_DEC(nn.Module):
             self.trajectory.append(torch.argmax(q, dim=1).data.cpu().numpy())
 
     def fit_with_init(self, X, adj, init_y, lr=0.001, max_epochs=10, update_interval=1, weight_decay=5e-4, opt="sgd"):
-        print("Initializing cluster centers with kmeans.")
+        logger.info("Initializing cluster centers with kmeans.")
         if opt == "sgd":
             optimizer = optim.SGD(self.parameters(), lr=lr, momentum=0.9)
         elif opt == "admin":
@@ -512,11 +511,11 @@ class SpaGCN(BaseClusteringMethod):
     def search_set_res(self, x, l, target_num, start=0.4, step=0.1, tol=5e-3, lr=0.05, max_epochs=10, max_run=10):
         """Search for optimal resolution parameter."""
         res = start
-        print("Start at res = ", res, "step = ", step)
+        logger.info(f"Start at {res = :.4f}, {step = :.4f}")
         clf = SpaGCN(l)
         y_pred = clf.fit_predict(x, init_spa=True, init="louvain", res=res, tol=tol, lr=lr, max_epochs=max_epochs)
         old_num = len(set(y_pred))
-        print("Res = ", res, "Num of clusters = ", old_num)
+        logger.info(f"Res = {res:.4f}, Num of clusters = {old_num}")
         run = 0
         while old_num != target_num:
             old_sign = 1 if (old_num < target_num) else -1
@@ -524,25 +523,24 @@ class SpaGCN(BaseClusteringMethod):
             y_pred = clf.fit_predict(x, init_spa=True, init="louvain", res=res + step * old_sign, tol=tol, lr=lr,
                                      max_epochs=max_epochs)
             new_num = len(set(y_pred))
-            print("Res = ", res + step * old_sign, "Num of clusters = ", new_num)
+            logger.info(f"Res = {res + step * old_sign:.3e}, Num of clusters = {new_num}")
             if new_num == target_num:
                 res = res + step * old_sign
-                print("recommended res = ", str(res))
+                logger.info(f"recommended res = {res:.4f}")
                 return res
             new_sign = 1 if (new_num < target_num) else -1
             if new_sign == old_sign:
                 res = res + step * old_sign
-                print("Res changed to", res)
+                logger.info(f"Res changed to {res}")
                 old_num = new_num
             else:
                 step = step / 2
-                print("Step changed to", step)
+                logger.info(f"Step changed to {step:.4f}")
             if run > max_run:
-                print("Exact resolution not found")
-                print("Recommended res = ", str(res))
+                logger.info(f"Exact resolution not found. Recommended res = {res:.4f}")
                 return res
             run += 1
-        print("recommended res = ", str(res))
+        logger.info("Recommended res = {res:.4f}")
         self.res = res
         return res
 
@@ -598,7 +596,7 @@ class SpaGCN(BaseClusteringMethod):
         self.res = res
         self.tol = tol
         if self.l is None:
-            raise ValueError('l should be set before fitting the model!')
+            raise ValueError("l should be set before fitting the model!")
 
         self.model = SimpleGCDEC(embed.shape[1], embed.shape[1])
         adj_exp = self.calc_adj_exp(adj)
