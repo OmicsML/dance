@@ -16,6 +16,7 @@ import networkx as nx
 import numpy as np
 import scanpy as sc
 
+from dance import logger
 from dance.modules.base import BaseClusteringMethod
 from dance.transforms import AnnDataTransform, CellPCA, Compose, FilterGenesMatch, SetConfig
 from dance.transforms.graph import NeighborGraph
@@ -379,15 +380,13 @@ class Louvain(BaseClusteringMethod):
 
         """
         # convert adata,adj into networkx
-        print("adj to networkx graph .... ")
+        logger.info("Converting adjacency matrix to networkx graph...")
         if (adj - adj.T).sum() != 0:
             ValueError("louvain use no direction graph, but the input is not")
         g = nx.from_numpy_array(adj)
-        print("convert over")
-        print("start fit ... ")
+        logger.info("Conversion done. Start fitting...")
         self.dendo = generate_dendrogram(g, partition, weight, self.resolution, randomize, random_state)
-
-        print("fit over ")
+        logger.info("Fitting done.")
 
     def predict(self, x=None):
         """Prediction function.
