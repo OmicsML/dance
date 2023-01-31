@@ -2,6 +2,7 @@ import argparse
 
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.spagcn import SpaGCN, refine
+from dance.utils import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -21,10 +22,10 @@ if __name__ == "__main__":
     parser.add_argument("--n_clusters", type=int, default=7, help="the number of clusters")
     parser.add_argument("--step", type=float, default=0.1, help="")
     parser.add_argument("--lr", type=float, default=0.05, help="learning rate")
-    parser.add_argument("--r_seed", type=int, default=100, help="")
-    parser.add_argument("--t_seed", type=int, default=100, help="")
-    parser.add_argument("--n_seed", type=int, default=100, help="")
+    parser.add_argument("--random_state", type=int, default=100, help="")
     args = parser.parse_args()
+
+    set_seed(args.random_state)
 
     # Initialize model and get model specific preprocessing pipeline
     model = SpaGCN()
@@ -39,8 +40,7 @@ if __name__ == "__main__":
     l = model.search_l(args.p, adj, start=args.start, end=args.end, tol=args.tol, max_run=args.max_run)
     model.set_l(l)
     res = model.search_set_res((x, adj), l=l, target_num=args.n_clusters, start=0.4, step=args.step, tol=args.tol,
-                               lr=args.lr, max_epochs=args.max_epochs, r_seed=args.r_seed, t_seed=args.t_seed,
-                               n_seed=args.n_seed, max_run=args.max_run)
+                               lr=args.lr, max_epochs=args.max_epochs, max_run=args.max_run)
 
     pred = model.fit_predict((x, adj), init_spa=True, init="louvain", tol=args.tol, lr=args.lr,
                              max_epochs=args.max_epochs, res=res)
