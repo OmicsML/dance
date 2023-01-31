@@ -309,20 +309,3 @@ class Stagate(torch.nn.Module):
     def predict(self):
         """Prediction function."""
         return self.adata.obs["mclust"].values
-
-    def score(self, y_true=None):
-        """score function to get score of prediction.
-
-        Parameters
-        ----------
-        y_true :
-            Ground truth label.
-
-        Returns
-        -------
-        float
-            Adjusted rand index score.
-
-        """
-        score = adjusted_rand_score(y_true, self.predict())
-        return score

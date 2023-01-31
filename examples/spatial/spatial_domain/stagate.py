@@ -30,6 +30,8 @@ if __name__ == "__main__":
     adj, y = data.get_data(return_type="default")
 
     model = Stagate([args.high_variable_genes] + args.hidden_dims)
+    # TODO: extract nn model part of stagate and wrap with BaseClusteringMethod
+    # TODO: extract features from adata and directly pass to model.
     model.fit(data.data, np.nonzero(adj), n_epochs=args.n_epochs)
     predict = model.predict()
     score = model.score(y.values.ravel())

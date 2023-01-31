@@ -35,9 +35,7 @@ if __name__ == "__main__":
     x, y = data.get_data(return_type="default")
 
     # Train and evaluate model
-    model.fit(x)
-    prediction = model.predict()
-    score = model.score(y.values.ravel())
+    score = model.fit_score(x, y.values.ravel())
     print(f"ARI: {score:.4f}")
 """ To reproduce stlearn on other samples, please refer to command lines belows:
 NOTE: since the stlearn method is unstable, you have to run multiple times to get
