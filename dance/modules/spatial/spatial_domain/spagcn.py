@@ -517,10 +517,8 @@ class SpaGCN(BaseClusteringMethod):
         np.random.seed(n_seed)
         res = start
         print("Start at res = ", res, "step = ", step)
-        clf = SpaGCN()
-        clf.set_l(l)
-        clf.fit(x, init_spa=True, init="louvain", res=res, tol=tol, lr=lr, max_epochs=max_epochs)
-        y_pred = clf.predict(x)
+        clf = SpaGCN(l)
+        y_pred = clf.fit_predict(x, init_spa=True, init="louvain", res=res, tol=tol, lr=lr, max_epochs=max_epochs)
         old_num = len(set(y_pred))
         print("Res = ", res, "Num of clusters = ", old_num)
         run = 0
@@ -529,10 +527,9 @@ class SpaGCN(BaseClusteringMethod):
             torch.manual_seed(t_seed)
             np.random.seed(n_seed)
             old_sign = 1 if (old_num < target_num) else -1
-            clf = SpaGCN()
-            clf.set_l(l)
-            clf.fit(x, init_spa=True, init="louvain", res=res + step * old_sign, tol=tol, lr=lr, max_epochs=max_epochs)
-            y_pred = clf.predict(x)
+            clf = SpaGCN(l)
+            y_pred = clf.fit_predict(x, init_spa=True, init="louvain", res=res + step * old_sign, tol=tol, lr=lr,
+                                     max_epochs=max_epochs)
             new_num = len(set(y_pred))
             print("Res = ", res + step * old_sign, "Num of clusters = ", new_num)
             if new_num == target_num:
