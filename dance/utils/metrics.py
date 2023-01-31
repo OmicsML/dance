@@ -58,7 +58,11 @@ def acc(true: Union[torch.Tensor, np.ndarray], pred: Union[torch.Tensor, np.ndar
 @register_metric_func("ari")
 @torch_to_numpy
 def ari(true: Union[torch.Tensor, np.ndarray], pred: Union[torch.Tensor, np.ndarray]) -> float:
-    """Adjusted rand index score."""
+    """Adjusted rand index score.
+
+    See :func:`sklearn.metrics.adjusted_rand_score`.
+
+    """
     return adjusted_rand_score(true, pred)
 
 

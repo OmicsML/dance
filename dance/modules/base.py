@@ -42,12 +42,16 @@ class BaseMethod(ABC):
     def predict(self, x):
         ...
 
-    def fit_predict(self, x, y, **fit_kwargs):
+    @property
+    def default_score_func(self) -> Mapping[Any, float]:
+        return resolve_score_func(self._DEFAULT_METRIC)
+
+    def fit_predict(self, x, y=None, **fit_kwargs):
         self.fit(x, y, **fit_kwargs)
         pred = self.predict(x)
         return pred
 
-    def score(self, x, y, score_func: Optional[Union[str, Mapping[Any, float]]] = None,
+    def score(self, x, y, *, score_func: Optional[Union[str, Mapping[Any, float]]] = None,
               return_pred: bool = False) -> Union[float, Tuple[float, Any]]:
         y_pred = self.predict(x)
         func = resolve_score_func(score_func or self._DEFAULT_METRIC)

@@ -23,6 +23,7 @@ from sklearn.cluster import KMeans
 from torch.nn.parameter import Parameter
 
 from dance import utils
+from dance.modules.base import BaseClusteringMethod
 from dance.transforms import AnnDataTransform, CellPCA, Compose, FilterGenesMatch, SetConfig
 from dance.transforms.graph import SpaGCNGraph, SpaGCNGraph2D
 from dance.typing import LogLevel
@@ -438,7 +439,7 @@ class GC_DEC(nn.Module):
         return z, q
 
 
-class SpaGCN:
+class SpaGCN(BaseClusteringMethod):
     """SpaGCN class.
 
     Parameters
@@ -449,7 +450,6 @@ class SpaGCN:
     """
 
     def __init__(self, l=None):
-        super().__init__()
         self.l = l
         self.res = None
 
@@ -509,8 +509,8 @@ class SpaGCN:
         """
         self.l = l
 
-    def search_set_res(self, embed, adj, l, target_num, start=0.4, step=0.1, tol=5e-3, lr=0.05, max_epochs=10,
-                       r_seed=100, t_seed=100, n_seed=100, max_run=10):
+    def search_set_res(self, x, l, target_num, start=0.4, step=0.1, tol=5e-3, lr=0.05, max_epochs=10, r_seed=100,
+                       t_seed=100, n_seed=100, max_run=10):
         """Search for optimal resolution parameter."""
         random.seed(r_seed)
         torch.manual_seed(t_seed)
@@ -519,8 +519,8 @@ class SpaGCN:
         print("Start at res = ", res, "step = ", step)
         clf = SpaGCN()
         clf.set_l(l)
-        clf.fit(embed, adj, init_spa=True, init="louvain", res=res, tol=tol, lr=lr, max_epochs=max_epochs)
-        y_pred, _ = clf.predict()
+        clf.fit(x, init_spa=True, init="louvain", res=res, tol=tol, lr=lr, max_epochs=max_epochs)
+        y_pred = clf.predict(x)
         old_num = len(set(y_pred))
         print("Res = ", res, "Num of clusters = ", old_num)
         run = 0
@@ -531,9 +531,8 @@ class SpaGCN:
             old_sign = 1 if (old_num < target_num) else -1
             clf = SpaGCN()
             clf.set_l(l)
-            clf.fit(embed, adj, init_spa=True, init="louvain", res=res + step * old_sign, tol=tol, lr=lr,
-                    max_epochs=max_epochs)
-            y_pred, _ = clf.predict()
+            clf.fit(x, init_spa=True, init="louvain", res=res + step * old_sign, tol=tol, lr=lr, max_epochs=max_epochs)
+            y_pred = clf.predict(x)
             new_num = len(set(y_pred))
             print("Res = ", res + step * old_sign, "Num of clusters = ", new_num)
             if new_num == target_num:
@@ -557,7 +556,11 @@ class SpaGCN:
         self.res = res
         return res
 
-    def fit(self, embed, adj, num_pcs=50, lr=0.005, max_epochs=2000, weight_decay=0, opt="admin", init_spa=True,
+    def calc_adj_exp(self, adj: np.ndarray) -> np.ndarray:
+        adj_exp = np.exp(-1 * (adj**2) / (2 * (self.l**2)))
+        return adj_exp
+
+    def fit(self, x, y=None, *, num_pcs=50, lr=0.005, max_epochs=2000, weight_decay=0, opt="admin", init_spa=True,
             init="louvain", n_neighbors=10, n_clusters=None, res=0.4, tol=1e-3):
         """Fit function for model training.
 
@@ -591,6 +594,7 @@ class SpaGCN:
             Oolerant value for searching l.
 
         """
+        embed, adj = x
         self.num_pcs = num_pcs
         self.res = res
         self.lr = lr
@@ -605,16 +609,14 @@ class SpaGCN:
         self.tol = tol
         if self.l is None:
             raise ValueError('l should be set before fitting the model!')
-        adj_exp = np.exp(-1 * (adj**2) / (2 * (self.l**2)))
 
         self.model = SimpleGCDEC(embed.shape[1], embed.shape[1])
+        adj_exp = self.calc_adj_exp(adj)
         self.model.fit(embed, adj_exp, lr=self.lr, max_epochs=self.max_epochs, weight_decay=self.weight_decay,
                        opt=self.opt, init_spa=self.init_spa, init=self.init, n_neighbors=self.n_neighbors,
                        n_clusters=self.n_clusters, res=self.res, tol=self.tol)
-        self.embed = embed
-        self.adj_exp = adj_exp
 
-    def predict(self):
+    def predict_proba(self, x):
         """Prediction function.
 
         Returns
@@ -623,27 +625,20 @@ class SpaGCN:
             The predicted labels and the predicted probabilities.
 
         """
-        z, q = self.model.predict(self.embed, self.adj_exp)
-        y_pred = torch.argmax(q, dim=1).data.cpu().numpy()
-        self.y_pred = y_pred
-        # Max probability plot
-        prob = q.detach().numpy()
-        return y_pred, prob
+        embed, adj = x
+        adj_exp = self.calc_adj_exp(adj)
+        _, pred_prob = self.model.predict(embed, adj_exp)
+        return pred_prob
 
-    def score(self, y_true):
-        """Score function to evaluate the prediction performance.
-
-        Parameters
-        ----------
-        y_true :
-            ground truth label.
+    def predict(self, x):
+        """Prediction function.
 
         Returns
         -------
-        score : float
-            metric eval score.
+        Tuple[np.ndarray, np.ndarray]
+            The predicted labels and the predicted probabilities.
 
         """
-        from sklearn.metrics.cluster import adjusted_rand_score
-        score = adjusted_rand_score(y_true, self.y_pred)
-        return score
+        pred_prob = self.predict_proba(x)
+        pred = torch.argmax(pred_prob, dim=1).data.cpu().numpy()
+        return pred
