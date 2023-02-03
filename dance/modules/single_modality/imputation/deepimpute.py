@@ -92,42 +92,10 @@ class DeepImpute():
         imputation policy
     """
 
-    def __init__(self, dl_params, learning_rate=1e-5, batch_size=64, max_epochs=500, patience=5, gpu=-1, loss="wMSE",
-                 output_prefix=tempfile.mkdtemp(), sub_outputdim=512, hidden_dim=None, verbose=1, seed=1234,
-                 architecture=None, imputed_only=False, policy='restore'):
-        self.NN_parameters = {
-            "learning_rate": learning_rate,
-            "batch_size": batch_size,
-            "loss": loss,
-            "architecture": architecture,
-            "max_epochs": max_epochs,
-            "patience": patience
-        }
-        self.gpu = gpu
-        self.sub_outputdim = sub_outputdim
-        self.hidden_dim = hidden_dim
+    def __init__(self, dl_params, output_prefix=tempfile.mkdtemp(), architecture=None):
+        self.architecture = architecture
         self.outputdir = output_prefix
-        self.verbose = verbose
-        self.imputed_only = imputed_only
-        self.policy = policy
-        self.seed = seed
-        self.batch_size = batch_size
-        self.X_train = dl_params.X_train
-        self.Y_train = dl_params.Y_train
-        self.X_test = dl_params.X_test
-        self.Y_test = dl_params.Y_test
-        self.targetgenes = dl_params.targetgenes
-        self.inputgenes = dl_params.inputgenes
-        self.total_counts = dl_params.total_counts
-        self.true_counts = dl_params.true_counts
-        self.genes_to_impute = dl_params.genes_to_impute
-        self.prj_path = Path(
-            __file__).parent.resolve().parent.resolve().parent.resolve().parent.resolve().parent.resolve()
-        self.save_path = self.prj_path / 'example' / 'single_modality' / 'imputation' / 'pretrained' / dl_params.train_dataset / 'models'
-        if not self.save_path.exists():
-            self.save_path.mkdir(parents=True)
         self.dl_params = dl_params
-        self.device = torch.device('cuda' if self.gpu != -1 and torch.cuda.is_available() else 'cpu')
 
     def loadDefaultArchitecture(self):
         """load default model architecture.
@@ -138,7 +106,7 @@ class DeepImpute():
         -------
         None
         """
-
+        
         if (self.hidden_dim is None):
             hidden_dim = self.sub_outputdim // 2
         else:
@@ -191,6 +159,17 @@ class DeepImpute():
             array of subnetworks
         """
 
+        self.NN_parameters = { 
+            "learning_rate": self.dl_params.lr,
+            "batch_size": self.dl_params.batch_size,
+	    "loss": self.dl_params.loss,
+	    "architecture": self.architecture,
+	    "max_epochs": self.dl_params.n_epochs,
+            "patience": self.dl_params.patience
+	}
+        self.sub_outputdim = self.dl_params.sub_outputdim
+        self.hidden_dim = self.dl_params.hidden_dim
+
         if self.NN_parameters['architecture'] is None:
             self.loadDefaultArchitecture()
 
@@ -222,6 +201,9 @@ class DeepImpute():
         -------
         None
         """
+        for attr in ['X_train', 'Y_train', 'X_test', 'Y_test', 'inputgenes', 'batch_size', 'gpu']:
+            setattr(self, attr, getattr(self.dl_params, attr))
+        self.device = torch.device('cuda' if self.gpu != -1 and torch.cuda.is_available() else 'cpu')
 
         if (X_train is None):
             X_train = self.X_train
@@ -291,6 +273,11 @@ class DeepImpute():
         -------
         None
         """
+        self.prj_path = Path(
+            __file__).parent.resolve().parent.resolve().parent.resolve().parent.resolve().parent.resolve()
+        self.save_path = self.prj_path / 'example' / 'single_modality' / 'imputation' / 'pretrained' / self.dl_params.train_dataset / 'models'
+        if not self.save_path.exists():
+            self.save_path.mkdir(parents=True)
 
         model_string = 'model_' + str(i)
         opt_string = 'optimizer_' + str(i)
@@ -329,7 +316,8 @@ class DeepImpute():
         imputed : DataFrame
             imputed gene expression
         """
-
+        for attr in ['targetgenes', 'total_counts', 'policy', 'imputed_only']:
+            setattr(self, attr, getattr(self.dl_params, attr))
         if (targetgenes is None):
             targetgenes = self.targetgenes
 
@@ -339,10 +327,6 @@ class DeepImpute():
 
         # select input data
         X_data = [torch.Tensor(norm_data.loc[:, inputgenes].values).to(device) for inputgenes in self.inputgenes]
-        # inputs = [norm_raw.loc[:, predictors].values.astype(np.float32)
-        #          for predictors in self.inputgenes]
-        # model = self.load_model()
-        # predicted = model.predict(inputs)
 
         # make predictions using each subnetwork
         Y_pred_lst = []
@@ -407,6 +391,7 @@ class DeepImpute():
         MSE_genes :
             mean squared errors averaged across cellss per gene
         """
+        self.true_counts = self.dl_params.true_counts
 
         if (targetgenes == None):  # set target genes
             targetgenes = self.targetgenes

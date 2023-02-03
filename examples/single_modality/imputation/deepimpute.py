@@ -45,22 +45,13 @@ if __name__ == '__main__':
     parser.add_argument("--n_pred", type=float, default=None, help="Number of predictors for covariance.")
     parser.add_argument("--mode", type=str, default='random',
                         help='Mode for setting gene targets: - progressive or random')
-
-    # parser.add_argument("--genes_to_impute", type=)
+    parser.add_argument("--genes_to_impute", type=int, default=None, help="Number of genes to impute")
     params = parser.parse_args()
     print(vars(params))
-    params.genes_to_impute = None
-
-    dataloader = ImputationDataset(
-        random_seed=params.random_seed,
-        gpu=params.gpu,
-        # evaluate = params.evaluate,
-        data_dir=params.data_dir,
-        train_dataset='pbmc_data',
-        test_dataset=params.test_dataset,
-        filetype='h5')
+   
+    dataloader = ImputationDataset(params = params)
     dataloader.download_all_data()
-    # dataloader.download_pretrained_data()
+    
 
     random.seed(params.random_seed)
     np.random.seed(params.random_seed)
@@ -70,21 +61,7 @@ if __name__ == '__main__':
     dataloader.load_data(params, model='DeepImpute')
     dl_params = dataloader.params
 
-    model = DeepImpute(
-        dl_params,
-        learning_rate=params.lr,
-        batch_size=params.batch_size,
-        max_epochs=params.n_epochs,
-        patience=params.patience,
-        gpu=params.gpu,
-        loss=params.loss,
-        # output_prefix=tempfile.mkdtemp(),
-        sub_outputdim=params.sub_outputdim,
-        hidden_dim=params.hidden_dim,
-        verbose=params.verbose,
-        imputed_only=params.imputed_only,
-        policy=params.policy,
-        seed=params.random_seed,
+    model = DeepImpute(dl_params,output_prefix=tempfile.mkdtemp(),
         architecture=[
             {
                 "type": "dense",
@@ -106,9 +83,9 @@ if __name__ == '__main__':
 """To reproduce deepimpute benchmarks, please refer to command lines belows:
 
 Mouse Brain
-$ python deepimpute.py --train_dataset 'mouse_brain_data' --filetype 'h5' --hidden_dim 200 --dropout 0.4
+$ python deepimpute.py --train_dataset mouse_brain_data --filetype h5 --hidden_dim 200 --dropout 0.4
 
 Mouse Embryo
-$ python deepimpute.py --train_dataset 'mouse_embryo_data' --filetype 'gz' --hidden_dim 200 --dropout 0.4
+$ python deepimpute.py --train_dataset mouse_embryo_data --filetype gz --hidden_dim 200 --dropout 0.4
 
 """
