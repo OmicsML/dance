@@ -29,6 +29,7 @@ fi
 # Torch related dependency versions
 PYTORCH_VERSION=1.12.1
 TORCHVISION_VERSION=0.13.1
+TORCHAUDIO_VERSION=0.12.1
 PYG_VERSION=2.1.0
 DGL_VERSION=0.9
 
@@ -59,7 +60,8 @@ conda create -n ${envname} python=3.8 -y
 conda activate ${envname}
 
 # Install CUDA enabled dependencies
-conda install pytorch==${PYTORCH_VERSION} torchvision==${TORCHVISION_VERSION} ${PYTORCH_CUDA_OPT} -c pytorch -y
+conda install pytorch==${PYTORCH_VERSION} torchvision==${TORCHVISION_VERSION} \
+    torchaudio==${TORCHAUDIO_VERSION} ${PYTORCH_CUDA_OPT} -c pytorch -y
 conda install pyg==${PYG_VERSION} -c pyg -y
 conda install ${DGL_OPT} -c dglteam -y
 
