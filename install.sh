@@ -39,15 +39,15 @@ echo "CUDA_VERSION=${CUDA_VERSION}"
 case $CUDA_VERSION in
     cpu)
         PYTORCH_CUDA_OPT="cpuonly"
-        DGL_OPT="dgl"
+        DGL_CHANNEL="dglteam"
         ;;
     cu102)
         PYTORCH_CUDA_OPT="cudatoolkit=10.2"
-        DGL_OPT="dgl-cuda10.2"
+        DGL_CHANNEL="dglteam/label/cu102"
         ;;
     cu113)
         PYTORCH_CUDA_OPT="cudatoolkit=11.3"
-        DGL_OPT="dgl-cuda11.3"
+        DGL_CHANNEL="dglteam/label/cu113"
         ;;
     *)
         echo "ERROR: Unrecognized CUDA_VERSION=${CUDA_VERSION}"
@@ -63,7 +63,7 @@ conda activate ${envname}
 conda install pytorch==${PYTORCH_VERSION} torchvision==${TORCHVISION_VERSION} \
     torchaudio==${TORCHAUDIO_VERSION} ${PYTORCH_CUDA_OPT} -c pytorch -y
 conda install pyg==${PYG_VERSION} -c pyg -y
-conda install ${DGL_OPT} -c dglteam -y
+conda install -c ${DGL_CHANNEL} dgl -y
 
 # Install the rest of the dependencies
 pip install -r requirements.txt
