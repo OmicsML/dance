@@ -3,11 +3,14 @@ import os
 import random
 
 import numpy as np
+import scanpy as sc
 import torch
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.sctag import SCTAG
+from dance.transforms import AnnDataTransform, CellPCA
+from dance.transforms.graph import NeighborGraph
 from dance.transforms.graph_construct import get_adj
 from dance.transforms.preprocess import filter_data, normalize_adata
 
@@ -51,21 +54,38 @@ if __name__ == "__main__":
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
 
-    filter_data(data, highly_genes=args.highly_genes)
-    normalize_adata(data, size_factors=True, normalize_input=True, logtrans_input=True)
-    get_adj(data, k=args.k_neighbor, pca_dim=args.pca_dim)
+    # Filter data
+    AnnDataTransform(sc.pp.filter_genes, min_counts=3)(data)
+    AnnDataTransform(sc.pp.filter_cells, min_counts=1)(data)
+    AnnDataTransform(sc.pp.normalize_per_cell)(data)
+    AnnDataTransform(sc.pp.log1p)(data)
+    AnnDataTransform(sc.pp.highly_variable_genes, min_mean=0.0125, max_mean=4, flavor="cell_ranger", min_disp=0.5,
+                     n_top_genes=args.highly_genes, subset=True)(data)
+
+    # Normalize data
+    sc.pp.filter_genes(data.data, min_counts=1)
+    sc.pp.filter_cells(data.data, min_counts=1)
+    data.data.raw = data.data.copy()
+    sc.pp.normalize_per_cell(data.data)
+    data.data.obs["size_factors"] = data.data.obs.n_counts / np.median(data.data.obs.n_counts)
+    AnnDataTransform(sc.pp.log1p)(data)
+    AnnDataTransform(sc.pp.scale)(data)
+
+    # Construct k-neighbors graphs
+    CellPCA(n_components=args.pca_dim)(data)
+    NeighborGraph(n_neighbors=args.k_neighbor, n_pcs=args.pca_dim)(data)
+
     data.set_config(
-        feature_channel=[None, None, "size_factors", "adj", "adj_n"],
-        feature_channel_type=["X", "raw_X", "obs", "obsp", "obsp"],
+        feature_channel=[None, None, "size_factors", "NeighborGraph"],
+        feature_channel_type=["X", "raw_X", "obs", "obsp"],
         label_channel="Group",
     )
-    (x, x_raw, scale_factor, adj, adj_n), y = data.get_train_data()
+    (x, x_raw, scale_factor, adj), y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
     # Build model & training
-    model = SCTAG(x, adj=adj, adj_n=adj_n, n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim,
-                  latent_dim=args.latent_dim, dec_dim=args.dec_dim, adj_dim=adj_n.shape[0], dropout=args.dropout,
-                  device=args.device, alpha=args.alpha)
+    model = SCTAG(x, adj=adj, n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
+                  dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha)
 
     if not os.path.exists(args.pretrain_file):
         model.pre_train(x, x_raw, args.pretrain_file, scale_factor, epochs=args.pretrain_epochs,
