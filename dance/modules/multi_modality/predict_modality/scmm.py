@@ -493,13 +493,19 @@ class MMVAE(nn.Module):
                 lats = [qz_x._sample() for qz_x in qz_xs]
         return lats
 
-    def fit(self, dataset):
+    def fit(self, x_train, y_train, val_ratio=0.15):
         """fit function for training.
 
         Parameters
         ----------
-        dataset : dance.datasets.multimodality.ModalityPredictionDataset
-            Dataset for modality prediction.
+        x_train : torch.Tensor
+            Input modality for training.
+
+        y_train : torch.Tensor
+            Target modality for training.
+
+        val_ratio : float
+            Ratio for automatic train-validation split.
 
         Returns
         -------
@@ -509,9 +515,9 @@ class MMVAE(nn.Module):
 
         start_early_stop = self.params.deterministic_warmup
 
-        idx = np.random.permutation(dataset.modalities[0].shape[0])
-        train_idx = idx[:int(idx.shape[0] * 0.85)]
-        val_idx = idx[int(idx.shape[0] * 0.85):]
+        idx = np.random.permutation(x_train.shape[0])
+        train_idx = idx[:int(idx.shape[0] * (1-val_ratio))]
+        val_idx = idx[int(idx.shape[0] * (1-val_ratio)):]
 
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.params.lr, amsgrad=True)
         assert (self.params.obj in ['m_elbo_naive', 'm_elbo_naive_warmup'])
@@ -525,8 +531,8 @@ class MMVAE(nn.Module):
             drop_last=True,
         )
 
-        train_mod1 = torch.from_numpy(dataset.numpy_features(0, True)).float().to(self.params.device)
-        train_mod2 = torch.from_numpy(dataset.numpy_features(1, True)).float().to(self.params.device)
+        train_mod1 = x_train.float().to(self.params.device)
+        train_mod2 = y_train.float().to(self.params.device)
         self.ratio = train_mod2.sum() / train_mod1.sum()
         vals = []
         tr = []

@@ -339,6 +339,8 @@ class CMAE(nn.Module):
             Features of modality 1.
         mod2 : torch.Tensor
             Features of modality 2.
+        labels: torch.Tensor
+            Ground truth mapping of modality 2.
 
         Returns
         -------
@@ -349,7 +351,7 @@ class CMAE(nn.Module):
 
         with torch.no_grad():
             pred = self.predict(mod1, mod2)
-            return ((pred * labels).sum() / mod1.shape[0]).item()
+            return (pred[torch.arange(pred.shape[0]).long(), labels.long()].mean()).item()
 
     def forward(self, mod1, mod2):
         """Forward function for torch.nn.Module.
@@ -378,8 +380,6 @@ class CMAE(nn.Module):
         return x_ab, x_ba
 
     def _gen_update(self, x_a, x_b, super_a, super_b, hyperparameters, a_labels=None, b_labels=None, variational=True):
-        true_samples = Variable(torch.randn(200, hyperparameters['gen']['latent']), requires_grad=False).cuda()
-
         self.gen_opt.zero_grad()
         # encode
         h_a, n_a = self.gen_a.encode(x_a)
@@ -391,17 +391,6 @@ class CMAE(nn.Module):
 
         x_a_recon = self.gen_a.decode(h_a)
         x_b_recon = self.gen_b.decode(h_b)
-
-        # decode (cross domain)
-        x_ba = self.gen_a.decode(h_b)
-        x_ab = self.gen_b.decode(h_a)
-        # encode again
-        h_b_recon, n_b_recon = self.gen_a.encode(x_ba)
-        h_a_recon, n_a_recon = self.gen_b.encode(x_ab)
-        # decode again (if needed)
-        if variational:
-            h_a_recon = h_a_recon + n_a_recon
-            h_b_recon = h_b_recon + n_b_recon
 
         classes_a = self.classifier.forward(h_a)
         classes_b = self.classifier.forward(h_b)
@@ -541,7 +530,7 @@ class CMAE(nn.Module):
         torch.save({'latent': self.dis_latent.state_dict()}, dis_name)
         torch.save({'gen': self.gen_opt.state_dict(), 'dis': self.dis_opt.state_dict()}, opt_name)
 
-    def fit(self, train_mod1, train_mod2, aux_labels=None, checkpoint_directory='./checkpoint'):
+    def fit(self, train_mod1, train_mod2, aux_labels=None, checkpoint_directory='./checkpoint', val_ratio=0.15):
         """Train CMAE.
 
         Parameters
@@ -554,6 +543,8 @@ class CMAE(nn.Module):
             Auxiliary labels for extra supervision during training.
         checkpoint_directory : str optional
             Path to the checkpoint file, by default to be './checkpoint'.
+        val_ratio : float
+            Ratio for automatic train-validation split.
 
         Returns
         -------
@@ -562,8 +553,8 @@ class CMAE(nn.Module):
         """
         hyperparameters = self.hyperparameters
         idx = torch.randperm(train_mod1.shape[0])
-        train_idx = idx[:-4096]
-        val_idx = idx[-4096:]
+        train_idx = idx[:int(idx.shape[0] * (1 - val_ratio))]
+        val_idx = idx[int(idx.shape[0] * (1 - val_ratio)):]
 
         train_dataset = SimpleIndexDataset(train_idx)
         train_loader = DataLoader(
@@ -585,7 +576,6 @@ class CMAE(nn.Module):
             for it, batch_idx in enumerate(train_loader):
                 self._update_learning_rate()
                 mod1, mod2 = train_mod1[batch_idx], train_mod2[batch_idx]
-
                 for _ in range(num_disc):
                     self._dis_update(mod1, mod2, hyperparameters)
                 for _ in range(num_gen):
@@ -594,8 +584,7 @@ class CMAE(nn.Module):
                                          aux_labels[batch_idx], variational=False)
                     else:
                         self._gen_update(mod1, mod2, mod1, mod2, hyperparameters, variational=False)
-
-            print('Matching score:', self.score(train_mod1[val_idx], train_mod2[val_idx], torch.eye(val_idx.shape[0])))
+            print('Matching score:', self.score(train_mod1[val_idx], train_mod2[val_idx], torch.arange(val_idx.shape[0])))
             # print('Matching score:',
             #       self.evaluate(test_mod1, test_mod2, labels))
 

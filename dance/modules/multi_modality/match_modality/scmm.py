@@ -495,13 +495,19 @@ class MMVAE(nn.Module):
                 lats = [qz_x._sample() for qz_x in qz_xs]
         return lats
 
-    def fit(self, dataset):
+    def fit(self, x_train, y_train, val_ratio=0.15):
         """fit function for training.
 
         Parameters
         ----------
-        dataset : dance.datasets.multimodality.ModalityMatchingDataset
-            Dataset for modality matching.
+        x_train : torch.Tensor
+            Input modality for training.
+
+        y_train : torch.Tensor
+            Target modality for training.
+
+        val_ratio : float
+            Ratio for automatic train-validation split.
 
         Returns
         -------
@@ -511,9 +517,9 @@ class MMVAE(nn.Module):
 
         start_early_stop = self.params.deterministic_warmup
 
-        idx = np.random.permutation(dataset.modalities[0].shape[0])
-        train_idx = idx[:int(idx.shape[0] * 0.85)]
-        val_idx = idx[int(idx.shape[0] * 0.85):]
+        idx = np.random.permutation(x_train.shape[0])
+        train_idx = idx[:int(idx.shape[0] * val_ratio)]
+        val_idx = idx[int(idx.shape[0] * val_ratio):]
 
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.params.lr, amsgrad=True)
         assert (self.params.obj in ['m_elbo_naive', 'm_elbo_naive_warmup'])
@@ -527,11 +533,12 @@ class MMVAE(nn.Module):
             drop_last=True,
         )
 
-        train_mod1 = torch.from_numpy(dataset.numpy_features(0, True)).float().to(self.params.device)
-        train_mod2 = torch.from_numpy(dataset.numpy_features(1, True)).float().to(self.params.device)
-        test_mod1 = torch.from_numpy(dataset.numpy_features(2, True)).float().to(self.params.device)
-        test_mod2 = torch.from_numpy(dataset.numpy_features(3, True)).float().to(self.params.device)
-        labels = torch.from_numpy(dataset.test_sol.X.toarray())
+        train_mod1 = x_train.float().to(self.params.device)
+        train_mod2 = y_train.float().to(self.params.device)
+        # test_mod1 = x_test.float().to(self.params.device)
+        # test_mod2 = y_test.float().to(self.params.device)
+        # labels = labels.float().to(self.params.device)
+
         vals = []
         tr = []
 
@@ -569,7 +576,7 @@ class MMVAE(nn.Module):
             if epoch % 10 == 0:
                 print('Valid Matching score:',
                       self.score(train_mod1[val_idx], train_mod2[val_idx], torch.eye(val_idx.shape[0])))
-                print('Test Matching score:', self.score(test_mod1, test_mod2, labels))
+                # print('Test Matching score:', self.score(test_mod1, test_mod2, labels))
 
             if epoch > start_early_stop and min(vals) != min(vals[-10:]):
                 print('Early stopped.')
@@ -597,6 +604,8 @@ class MMVAE(nn.Module):
 
         """
         self.eval()
+        mod1 = mod1.float().to(self.params.device)
+        mod2 = mod2.float().to(self.params.device)
         if labels is None:
             assert metric == 'loss', 'Unable to evaluate without labels.'
         if metric == 'loss':
@@ -617,16 +626,18 @@ class MMVAE(nn.Module):
                     b_loss += loss
             return b_loss / mod1.shape[0]
         else:
-            pred = self.predict([mod1, mod2], metric=metric)
-        return ((pred * labels).sum() / mod1.shape[0]).item()
+            pred = self.predict(mod1, mod2, metric=metric)
+        return (pred[torch.arange(pred.shape[0]).long(), labels.long()].mean()).item()
 
-    def predict(self, feats, metric='minkowski'):
+    def predict(self, mod1, mod2, metric='minkowski'):
         """Predict function to get score of prediction.
 
         Parameters
         ----------
-        feats : list[torch.Tensor]
-            Features of two modalities.
+        mod1 : torch.Tensor
+            Features of the first modality.
+        mod2 : torch.Tensor
+            Features of the second modality.
         metric : str optional
             Metric of the matching function, by default to be 'minkowski'.
 
@@ -637,7 +648,9 @@ class MMVAE(nn.Module):
 
         """
         self.eval()
-        idx = np.arange(feats[0].shape[0])
+        idx = np.arange(mod1.shape[0])
+        mod1 = mod1.float().to(self.params.device)
+        mod2 = mod2.float().to(self.params.device)
         dataset = SimpleIndexDataset(idx)
         data_loader = DataLoader(
             dataset=dataset,
@@ -649,7 +662,7 @@ class MMVAE(nn.Module):
         pred = []
         with torch.no_grad():
             for i, batch_idx in enumerate(data_loader):
-                dataT = [feats[0][batch_idx], feats[1][batch_idx]]
+                dataT = [mod1[batch_idx].float().to(), mod2[batch_idx].float().to()]
                 lats = self._get_latents(dataT, sampling=False)
                 if i == 0:
                     pred = lats

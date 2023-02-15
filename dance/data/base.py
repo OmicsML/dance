@@ -264,7 +264,7 @@ class BaseData(ABC):
         if split_name is not None:
             if channel_type.startswith("obs") or channel_type == "layers":
                 idx = self.get_split_idx(split_name, error_on_miss=True)
-                feature = feature[idx] if channel_type == "obsm" else feature[idx][:, idx]
+                feature = feature[idx] if channel_type in ["obsm", "layers"] else feature[idx][:, idx]
             elif channel_type.startswith("var"):
                 logger.warning(f"Indexing option for {channel_type} not implemented yet.")
 

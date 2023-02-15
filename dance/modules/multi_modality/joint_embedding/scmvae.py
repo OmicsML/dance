@@ -795,7 +795,7 @@ class scMVAE(nn.Module):
                 # output.append(self.get_gamma(z)[0].cpu().detach())
                 return None
 
-    def score(self, X1, X2, adata_sol):
+    def score(self, X1, X2, labels):
         """score function to get score of prediction.
 
         Parameters
@@ -804,7 +804,7 @@ class scMVAE(nn.Module):
             Features of modality 1.
         X2 : torch.Tensor
             Features of modality 2.
-        adata_sol : anndata.Anndata
+        labels : torch.Tensor
             The ground truth labels for evaluation.
 
         Returns
@@ -822,8 +822,7 @@ class scMVAE(nn.Module):
 
         # adata.obs['batch'] = adata_sol.obs['batch'][adata.obs_names]
         # adata.obs['cell_type'] = adata_sol.obs['cell_type'][adata.obs_names]
-        true_labels = adata_sol.obs['cell_type'].to_numpy()
-
+        true_labels = labels.numpy()
         pred_labels = kmeans.fit_predict(emb)
         NMI_score = round(normalized_mutual_info_score(true_labels, pred_labels, average_method='max'), 3)
         ARI_score = round(adjusted_rand_score(true_labels, pred_labels), 3)

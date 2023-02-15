@@ -399,17 +399,6 @@ class CMAE(nn.Module):
         x_a_recon = self.gen_a.decode(h_a)
         x_b_recon = self.gen_b.decode(h_b)
 
-        # decode (cross domain)
-        x_ba = self.gen_a.decode(h_b)
-        x_ab = self.gen_b.decode(h_a)
-        # encode again
-        h_b_recon, n_b_recon = self.gen_a.encode(x_ba)
-        h_a_recon, n_a_recon = self.gen_b.encode(x_ab)
-        # decode again (if needed)
-        if variational:
-            h_a_recon = h_a_recon + n_a_recon
-            h_b_recon = h_b_recon + n_b_recon
-
         classes_a = self.classifier.forward(h_a)
         classes_b = self.classifier.forward(h_b)
 
@@ -549,7 +538,7 @@ class CMAE(nn.Module):
         torch.save({'latent': self.dis_latent.state_dict()}, dis_name)
         torch.save({'gen': self.gen_opt.state_dict(), 'dis': self.dis_opt.state_dict()}, opt_name)
 
-    def fit(self, train_mod1, train_mod2, aux_labels=None, checkpoint_directory='./checkpoint'):
+    def fit(self, train_mod1, train_mod2, aux_labels=None, checkpoint_directory='./checkpoint', val_ratio=0.15):
         """Train CMAE.
 
         Parameters
@@ -562,6 +551,8 @@ class CMAE(nn.Module):
             Auxiliary labels for extra supervision during training.
         checkpoint_directory : str optional
             Path to the checkpoint file, by default to be './checkpoint'.
+        val_ratio : float
+            Ratio for automatic train-validation split.
 
         Returns
         -------
@@ -571,8 +562,8 @@ class CMAE(nn.Module):
 
         hyperparameters = self.hyperparameters
         idx = torch.randperm(train_mod1.shape[0])
-        train_idx = idx[:int(idx.shape[0] * 0.85)]
-        val_idx = idx[int(idx.shape[0] * 0.85):]
+        train_idx = idx[:int(idx.shape[0] * (1 - val_ratio))]
+        val_idx = idx[int(idx.shape[0] * (1 - val_ratio)):]
 
         train_dataset = SimpleIndexDataset(train_idx)
         train_loader = DataLoader(
