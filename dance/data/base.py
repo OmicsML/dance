@@ -85,6 +85,7 @@ class BaseData(ABC):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__} object that wraps (.data):\n{self.data}"
 
+    # WARNING: need to be careful about subsampling cells as the index are not automatically updated!!
     def _setup_splits(self, train_size: Optional[Union[int, str]], val_size: int, test_size: int):
         if train_size is None:
             return
@@ -309,12 +310,13 @@ class BaseData(ABC):
             How should the features be returned. **numpy**: return as a numpy array; **torch**: return as a torch
             tensor; **anndata**: return as an anndata object.
         channel
-            Return a particular channel as features. If ``channel_type`` is ``obs``, then return the column named by
-            ``channel``, similarly for ``var``. If ``channel_type`` is ``obsm``, ``obsp``, ``varm``, ``varp``,
-            ``layers``, or ``uns``, then return the value correspond to the ``channel`` in the dictionary. If
-            ``channel`` is not specified (default), then return the default layer (``.X``).
+            Return a particular channel as features. If ``channel_type`` is ``X`` or ``raw_X``, then return ``.X`` or
+            the ``.raw.X`` attribute from the :class:`~anndata.AnnData` directly. If ``channel_type`` is ``obs``, return
+            the column named by ``channel``, similarly for ``var``. Finally, if ``channel_type`` is ``obsm``, ``obsp``,
+            ``varm``, ``varp``, ``layers``, or ``uns``, then return the value correspond to the ``channel`` in the
+            dictionary.
         channel_type
-            Channel type to use, default to ``obsm``.
+            Channel type to use, default to ``obsm`` (will be changed to ``X`` in the near future).
         mod
             Modality to use, default to ``None``. Options other than ``None`` are only available when the underlying
             data object is :class:`~mudata.Mudata`.
