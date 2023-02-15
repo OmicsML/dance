@@ -26,43 +26,45 @@ if __name__ == "__main__":
     Balance_para = [1, 0.01, 0.1, 0.1, 1]
 
     parser.add_argument(
-        '--name', type=str,
-        default='worm_neuron_cell')  # choice=['10X_PBMC', 'mouse_bladder_cell', 'mouse_ES_cell', 'worm_neuron_cell']
-    parser.add_argument('--pretrain_path', type=str, default='worm_neuron_cell')
-    parser.add_argument('--graph_path', type=str, default='worm_neuron_cell')
-    parser.add_argument('--method', type=str, default='p')  # choice=['heat', 'cos', 'ncos', 'p']
-    parser.add_argument('--batch_size', default=256, type=int)
-    parser.add_argument('--n_enc_1', default=model_para[0], type=int)
-    parser.add_argument('--n_enc_2', default=model_para[1], type=int)
-    parser.add_argument('--n_enc_3', default=model_para[2], type=int)
-    parser.add_argument('--n_dec_1', default=model_para[2], type=int)
-    parser.add_argument('--n_dec_2', default=model_para[1], type=int)
-    parser.add_argument('--n_dec_3', default=model_para[0], type=int)
-    parser.add_argument('--topk', type=int, default=50)
-    parser.add_argument('--lr', type=float, default=1e-2)
-    parser.add_argument('--pretrain_epochs', type=int, default=200)
-    parser.add_argument('--n_epochs', type=int, default=500)
-    parser.add_argument('--n_z1', default=Cluster_para[0], type=int)
-    parser.add_argument('--n_z2', default=Cluster_para[1], type=int)
-    parser.add_argument('--n_z3', default=Cluster_para[2], type=int)
-    parser.add_argument('--n_input', type=int, default=Cluster_para[4])
-    parser.add_argument('--n_clusters', type=int, default=Cluster_para[5])
-    parser.add_argument('--device', type=str, default='cuda')
-    parser.add_argument('--v', type=int, default=1)
-    parser.add_argument('--nb_genes', type=int, default=2000)
-    parser.add_argument('--binary_crossentropy_loss', type=float, default=Balance_para[0])
-    parser.add_argument('--ce_loss', type=float, default=Balance_para[1])
-    parser.add_argument('--re_loss', type=float, default=Balance_para[2])
-    parser.add_argument('--zinb_loss', type=float, default=Balance_para[3])
-    parser.add_argument('--sigma', type=float, default=Balance_para[4])
+        "--name", type=str,
+        default="worm_neuron_cell")  # choice=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"]
+    parser.add_argument("--pretrain_path", type=str, default="worm_neuron_cell")
+    parser.add_argument("--graph_path", type=str, default="worm_neuron_cell")
+    parser.add_argument("--method", type=str, default="p")  # choice=["heat", "cos", "ncos", "p"]
+    parser.add_argument("--batch_size", default=256, type=int)
+    parser.add_argument("--n_enc_1", default=model_para[0], type=int)
+    parser.add_argument("--n_enc_2", default=model_para[1], type=int)
+    parser.add_argument("--n_enc_3", default=model_para[2], type=int)
+    parser.add_argument("--n_dec_1", default=model_para[2], type=int)
+    parser.add_argument("--n_dec_2", default=model_para[1], type=int)
+    parser.add_argument("--n_dec_3", default=model_para[0], type=int)
+    parser.add_argument("--topk", type=int, default=50)
+    parser.add_argument("--lr", type=float, default=1e-2)
+    parser.add_argument("--pretrain_epochs", type=int, default=200)
+    parser.add_argument("--n_epochs", type=int, default=500)
+    parser.add_argument("--n_z1", default=Cluster_para[0], type=int)
+    parser.add_argument("--n_z2", default=Cluster_para[1], type=int)
+    parser.add_argument("--n_z3", default=Cluster_para[2], type=int)
+    parser.add_argument("--n_input", type=int, default=Cluster_para[4])
+    parser.add_argument("--n_clusters", type=int, default=Cluster_para[5])
+    parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--v", type=int, default=1)
+    parser.add_argument("--nb_genes", type=int, default=2000)
+    parser.add_argument("--binary_crossentropy_loss", type=float, default=Balance_para[0])
+    parser.add_argument("--ce_loss", type=float, default=Balance_para[1])
+    parser.add_argument("--re_loss", type=float, default=Balance_para[2])
+    parser.add_argument("--zinb_loss", type=float, default=Balance_para[3])
+    parser.add_argument("--sigma", type=float, default=Balance_para[4])
 
     args = parser.parse_args()
     args.n_input = args.nb_genes
-    args.graph_path = args.name + '_' + f'{args.topk}'
+    args.graph_path = f"{args.name}_{args.topk}"
     # File = [gene_expresion data file, Graph file, h5 file, pretrain_path]
     File = [
-        './data/' + args.name, "./graph/" + args.graph_path + "_graph.txt", "./data/" + args.name + ".h5",
-        "./model/" + args.name + "_pre.pkl"
+        os.path.join("data", args.name),
+        os.path.join("graph", f"{args.graph_path}_graph.txt"),
+        os.path.join("data", f"{args.name}.h5"),
+        os.path.join("model", f"{args.name}_pre.pkl"),
     ]
     args.graph_path = File[1]
     args.pretrain_path = File[3]
@@ -71,7 +73,7 @@ if __name__ == "__main__":
     if not os.path.exists("./model/"):
         os.makedirs("./model/")
 
-    adata, labels = ClusteringDataset('./data', args.name).load_data()
+    adata, labels = ClusteringDataset("./data", args.name).load_data()
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
     data.set_config(label_channel="Group")
@@ -85,12 +87,12 @@ if __name__ == "__main__":
     # pretrain AE
     model = SCDSCWrapper(Namespace(**vars(args)))
     if not os.path.exists(args.pretrain_path):
-        print('Pretrain:')
+        print("Pretrain:")
         dataset_pre = PretrainDataset(X)
         model.pretrain_ae(dataset_pre, args.batch_size, args.pretrain_epochs, args.pretrain_path)
 
     # train scDSC
-    print('Train:')
+    print("Train:")
     dataset = TrainingDataset(X, Y)
     X_raw = adata.raw.X
     sf = adata.obs.size_factors
@@ -99,7 +101,7 @@ if __name__ == "__main__":
     print("Running Time：%d seconds", get_time() - time_start)
 
     y_pred = model.predict()
-    #    print(f'Prediction: {y_pred}')
+    #    print(f"Prediction: {y_pred}")
     acc, nmi, ari = model.score(Y)
     print("ACC: {:.4f}, NMI: {:.4f}, ARI: {:.4f}".format(acc, nmi, ari))
 """Reproduction information
