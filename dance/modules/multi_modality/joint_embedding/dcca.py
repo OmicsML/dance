@@ -687,8 +687,8 @@ class DCCA(nn.Module):
     """
 
     def __init__(self, layer_e_1, hidden1_1, Zdim_1, layer_d_1, hidden2_1, layer_e_2, hidden1_2, Zdim_2, layer_d_2,
-                 hidden2_2, args, ground_truth1, Type_1='NB', Type_2='Bernoulli', cycle=1,
-                 attention_loss='Eucli', droprate=0.1):
+                 hidden2_2, args, ground_truth1, Type_1='NB', Type_2='Bernoulli', cycle=1, attention_loss='Eucli',
+                 droprate=0.1):
 
         super().__init__()
         # cycle indicates the mutual learning, 0 for initiation of model1 with scRNA-seq data,
