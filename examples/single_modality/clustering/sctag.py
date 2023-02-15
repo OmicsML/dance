@@ -9,7 +9,7 @@ import torch
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.sctag import SCTAG
-from dance.transforms import AnnDataTransform, CellPCA
+from dance.transforms import AnnDataTransform, CellPCA, SaveRaw
 from dance.transforms.graph import NeighborGraph
 from dance.transforms.graph_construct import get_adj
 from dance.transforms.preprocess import filter_data, normalize_adata
@@ -63,11 +63,10 @@ if __name__ == "__main__":
                      n_top_genes=args.highly_genes, subset=True)(data)
 
     # Normalize data
-    sc.pp.filter_genes(data.data, min_counts=1)
-    sc.pp.filter_cells(data.data, min_counts=1)
-    data.data.raw = data.data.copy()
-    sc.pp.normalize_per_cell(data.data)
-    data.data.obs["size_factors"] = data.data.obs.n_counts / np.median(data.data.obs.n_counts)
+    AnnDataTransform(sc.pp.filter_genes, min_counts=1)(data)
+    AnnDataTransform(sc.pp.filter_cells, min_counts=1)(data)
+    SaveRaw()(data)
+    AnnDataTransform(sc.pp.normalize_total)(data)
     AnnDataTransform(sc.pp.log1p)(data)
     AnnDataTransform(sc.pp.scale)(data)
 
