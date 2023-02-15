@@ -3,13 +3,14 @@ import os
 import random
 
 import numpy as np
+import scanpy as sc
 import torch
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.sctag import SCTAG
-from dance.transforms.graph_construct import get_adj
-from dance.transforms.preprocess import filter_data, normalize_adata
+from dance.transforms import AnnDataTransform, CellPCA, SaveRaw
+from dance.transforms.graph import NeighborGraph
 
 # for repeatability
 random.seed(42)
@@ -51,32 +52,47 @@ if __name__ == "__main__":
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
 
-    filter_data(data, highly_genes=args.highly_genes)
-    normalize_adata(data, size_factors=True, normalize_input=True, logtrans_input=True)
-    get_adj(data, k=args.k_neighbor, pca_dim=args.pca_dim)
-    data.set_config(feature_channel=["adj", "adj_n"], feature_channel_type=["obsp", "obsp"], label_channel="Group")
-    (adj, adj_n), y = data.get_train_data()
-    adata = data.data
-    x = adata.X
-    x_raw = adata.raw.X
-    scale_factor = adata.obs.size_factors
+    # Filter data
+    AnnDataTransform(sc.pp.filter_genes, min_counts=3)(data)
+    AnnDataTransform(sc.pp.filter_cells, min_counts=1)(data)
+    AnnDataTransform(sc.pp.normalize_per_cell)(data)
+    AnnDataTransform(sc.pp.log1p)(data)
+    AnnDataTransform(sc.pp.highly_variable_genes, min_mean=0.0125, max_mean=4, flavor="cell_ranger", min_disp=0.5,
+                     n_top_genes=args.highly_genes, subset=True)(data)
+
+    # Normalize data
+    AnnDataTransform(sc.pp.filter_genes, min_counts=1)(data)
+    AnnDataTransform(sc.pp.filter_cells, min_counts=1)(data)
+    SaveRaw()(data)
+    AnnDataTransform(sc.pp.normalize_total)(data)
+    AnnDataTransform(sc.pp.log1p)(data)
+    AnnDataTransform(sc.pp.scale)(data)
+
+    # Construct k-neighbors graph
+    CellPCA(n_components=args.pca_dim)(data)
+    NeighborGraph(n_neighbors=args.k_neighbor, n_pcs=args.pca_dim)(data)
+
+    data.set_config(
+        feature_channel=[None, None, "n_counts", "NeighborGraph"],
+        feature_channel_type=["X", "raw_X", "obs", "obsp"],
+        label_channel="Group",
+    )
+    (x, x_raw, n_counts, adj), y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
     # Build model & training
-    model = SCTAG(x, adj=adj, adj_n=adj_n, n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim,
-                  latent_dim=args.latent_dim, dec_dim=args.dec_dim, adj_dim=adj_n.shape[0], dropout=args.dropout,
-                  device=args.device, alpha=args.alpha)
+    model = SCTAG(x, adj=adj, n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
+                  dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha)
 
     if not os.path.exists(args.pretrain_file):
-        model.pre_train(x, x_raw, args.pretrain_file, scale_factor, epochs=args.pretrain_epochs,
-                        info_step=args.info_step, W_a=args.W_a, W_x=args.W_x, W_d=args.W_d, min_dist=args.min_dist,
-                        max_dist=args.max_dist)
+        model.pre_train(x, x_raw, args.pretrain_file, n_counts, epochs=args.pretrain_epochs, info_step=args.info_step,
+                        W_a=args.W_a, W_x=args.W_x, W_d=args.W_d, min_dist=args.min_dist, max_dist=args.max_dist)
     else:
         print(f"==> loading checkpoint {args.pretrain_file}")
         checkpoint = torch.load(args.pretrain_file)
         model.load_state_dict(checkpoint)
 
-    model.fit(x, x_raw, y, scale_factor, epochs=args.epochs, lr=args.lr, W_a=args.W_a, W_x=args.W_x, W_c=args.W_c,
+    model.fit(x, x_raw, y, n_counts, epochs=args.epochs, lr=args.lr, W_a=args.W_a, W_x=args.W_x, W_c=args.W_c,
               info_step=args.info_step)
 
     y_pred = model.predict()

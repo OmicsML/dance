@@ -20,7 +20,6 @@ from dgl.nn import TAGConv
 from sklearn import metrics
 from sklearn.cluster import KMeans
 from torch.nn import Parameter
-from tqdm import tqdm
 
 from dance.utils.loss import ZINBLoss, dist_loss
 from dance.utils.metrics import cluster_acc
@@ -35,8 +34,6 @@ class SCTAG(nn.Module):
         input features.
     adj :
         adjacency matrix.
-    adj_n :
-        normalized adjacency matrix.
     n_clusters : int
         number of clusters.
     k : int optional
@@ -47,8 +44,6 @@ class SCTAG(nn.Module):
         dimension of latent embedding.
     dec_dim : list optional
         dimensions of decoder layers.
-    adj_dim : int optional
-        dimension of adjacency matrix.
     dropout : float optional
         dropout rate.
     device : str optional
@@ -58,15 +53,14 @@ class SCTAG(nn.Module):
 
     """
 
-    def __init__(self, X, adj, adj_n, n_clusters, k=3, hidden_dim=128, latent_dim=15, dec_dim=None, adj_dim=32,
-                 dropout=0.2, device="cuda", alpha=1.0):
+    def __init__(self, X, adj, n_clusters, k=3, hidden_dim=128, latent_dim=15, dec_dim=None, dropout=0.2, device="cuda",
+                 alpha=1.0):
         super().__init__()
         if dec_dim is None:
             dec_dim = [128, 256, 512]
         self.latent_dim = latent_dim
         self.hidden_dim = hidden_dim
         self.adj = adj
-        self.adj_n = adj_n
         self.n_sample = X.shape[0]
         self.in_dim = X.shape[1]
         self.device = device
@@ -74,18 +68,22 @@ class SCTAG(nn.Module):
         self.n_clusters = n_clusters
         self.alpha = alpha
         self.k = k
-        self.adj_dim = adj_dim
         self.mu = Parameter(torch.Tensor(self.n_clusters, self.latent_dim).to(self.device))
 
         src, dist = np.nonzero(adj)
         self.G = dgl.graph((src, dist)).to(device)
 
+        deg = adj.sum(1, keepdims=True)
+        deg[deg == 0] = 1
+        normalized_deg = deg**-0.5
+        adj_n = adj * normalized_deg * normalized_deg.T
         src_n, dist_n = np.nonzero(adj_n)
+
         self.G_n = dgl.graph((src_n, dist_n)).to(device)
 
         self.encoder1 = TAGConv(self.in_dim, self.hidden_dim, k=k)
         self.encoder2 = TAGConv(self.hidden_dim, self.latent_dim, k=k)
-        self.decoderA = DecoderA(latent_dim=self.latent_dim, adj_dim=self.adj_dim, activation=torch.sigmoid,
+        self.decoderA = DecoderA(latent_dim=self.latent_dim, adj_dim=adj.shape[0], activation=torch.sigmoid,
                                  dropout=self.dropout)
         self.decoderX = DecoderX(self.in_dim, self.latent_dim, n_dec_1=dec_dim[0], n_dec_2=dec_dim[1],
                                  n_dec_3=dec_dim[2])
@@ -126,7 +124,7 @@ class SCTAG(nn.Module):
 
         return A_out, z, q, _mean, _disp, _pi
 
-    def pre_train(self, x, x_raw, fname, scale_factor, epochs=1000, info_step=10, lr=5e-4, W_a=0.3, W_x=1, W_d=0,
+    def pre_train(self, x, x_raw, fname, n_counts, epochs=1000, info_step=10, lr=5e-4, W_a=0.3, W_x=1, W_d=0,
                   min_dist=0.5, max_dist=20.):
         """Pretrain autoencoder.
 
@@ -138,8 +136,8 @@ class SCTAG(nn.Module):
             raw input features.
         fname : str
             path to save autoencoder weights.
-        scale_factor : list
-            scale factor of input features and raw input features.
+        n_counts : list
+            total counts for each cell.
         epochs : int optional
             number of epochs.
         info_step : int optional
@@ -164,7 +162,7 @@ class SCTAG(nn.Module):
         """
         x = torch.Tensor(x).to(self.device)
         x_raw = torch.Tensor(x_raw).to(self.device)
-        scale_factor = torch.tensor(scale_factor).to(self.device)
+        scale_factor = torch.tensor(n_counts / np.median(n_counts)).to(self.device)
 
         self.train()
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, amsgrad=True)
@@ -195,7 +193,7 @@ class SCTAG(nn.Module):
         torch.save(self.state_dict(), fname)
         print("Pre_train Finish!")
 
-    def fit(self, x, x_raw, y, scale_factor, epochs=300, lr=5e-4, W_a=0.3, W_x=1, W_c=1.5, info_step=1):
+    def fit(self, x, x_raw, y, n_counts, epochs=300, lr=5e-4, W_a=0.3, W_x=1, W_c=1.5, info_step=1):
         """Pretrain autoencoder.
 
         Parameters
@@ -206,8 +204,8 @@ class SCTAG(nn.Module):
             raw input features.
         y : list
             true label.
-        scale_factor : list
-            scale factor of input features and raw input features.
+        n_counts : list
+            total counts for each cell.
         epochs : int optional
             number of epochs.
         lr : float optional
@@ -228,7 +226,7 @@ class SCTAG(nn.Module):
         """
         x = torch.Tensor(x).to(self.device)
         x_raw = torch.Tensor(x_raw).to(self.device)
-        scale_factor = torch.tensor(scale_factor).to(self.device)
+        scale_factor = torch.tensor(n_counts / np.median(n_counts)).to(self.device)
 
         # Initializing cluster centers with kmeans
         kmeans = KMeans(self.n_clusters, n_init=20)

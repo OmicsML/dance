@@ -20,10 +20,9 @@ from torch.nn import Linear
 from torch.nn.parameter import Parameter
 from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
-from torch.utils.data import DataLoader
-from tqdm import tqdm
+from torch.utils.data import DataLoader, TensorDataset
 
-from dance.transforms.preprocess import load_graph
+from dance.transforms.preprocess import sparse_mx_to_torch_sparse_tensor
 from dance.utils.loss import ZINBLoss
 from dance.utils.metrics import cluster_acc
 
@@ -64,13 +63,13 @@ class SCDSCWrapper:
         p = q**2 / q.sum(0)
         return (p.t() / p.sum(1)).t()
 
-    def pretrain_ae(self, dataset, batch_size, n_epochs, fname, lr=1e-3):
+    def pretrain_ae(self, x, batch_size, n_epochs, fname, lr=1e-3):
         """Pretrain autoencoder.
 
         Parameters
         ----------
-        dataset :
-            input dataset.
+        x : np.ndarray
+            input features.
         batch_size : int
             size of batch.
         n_epochs : int
@@ -85,43 +84,47 @@ class SCDSCWrapper:
         None.
 
         """
+        print("Pretrain:")
         device = self.device
-        train_loader = DataLoader(dataset, batch_size, shuffle=True)
+        x_tensor = torch.from_numpy(x)
+        train_loader = DataLoader(TensorDataset(x_tensor), batch_size, shuffle=True)
         model = self.model_pre
         optimizer = Adam(model.parameters(), lr=lr)
         for epoch in range(n_epochs):
-            for batch_idx, (x, _) in enumerate(train_loader):
-                x = x.to(device)
-                x_bar, _, _, _, _, _, _, _ = model(x)
 
-                x_bar = x_bar.cpu()
-                x = x.cpu()
-                loss = F.mse_loss(x_bar, x)
+            total_loss = total_size = 0
+            for batch_idx, (x_batch, ) in enumerate(train_loader):
+                x_batch = x_batch.to(device)
+                x_bar, _, _, _, _, _, _, _ = model(x_batch)
+
+                loss = F.mse_loss(x_bar, x_batch)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
 
-            with torch.no_grad():
-                x = torch.Tensor(dataset.x).to(device).float()
-                x_bar, _, _, _, z3, _, _, _ = model(x)
-                loss = F.mse_loss(x_bar, x)
-                print('Pretrain epoch %3d, MSE loss: %.8f' % (epoch + 1, loss))
+                size = x_batch.shape[0]
+                total_size += size
+                total_loss += loss.item() * size
+
+            print(f"Pretrain epoch {epoch + 1:4d}, MSE loss:{total_loss / total_size:.8f}")
 
         torch.save(model.state_dict(), fname)
 
-    def fit(self, dataset, X_raw, sf, graph_path, lr=1e-03, n_epochs=300, bcl=0.1, cl=0.01, rl=1, zl=0.1):
+    def fit(self, x, y, X_raw, n_counts, adj, lr=1e-03, n_epochs=300, bcl=0.1, cl=0.01, rl=1, zl=0.1):
         """Train model.
 
         Parameters
         ----------
-        dataset :
-            input dataset.
+        x : np.ndarray
+            input features.
+        y : np.ndarray
+            labels.
         X_raw :
             raw input features.
-        sf : list
-            scale factor of ZINB loss.
-        graph_path : str
-            path of graph file.
+        n_counts : list
+            total counts for each cell.
+        adj :
+            adjacency matrix as a sicpy sparse matrix.
         lr : float optional
             learning rate.
         n_epochs : int optional
@@ -140,19 +143,19 @@ class SCDSCWrapper:
         None.
 
         """
+        print("Train:")
         device = self.device
         model = self.model
         optimizer = Adam(model.parameters(), lr=lr)
         # optimizer = RAdam(model.parameters(), lr=lr)
 
-        adj = load_graph(graph_path, dataset.x)
-        adj = adj.to(device)
+        adj = sparse_mx_to_torch_sparse_tensor(adj).to(device)
         X_raw = torch.tensor(X_raw).to(device)
-        sf = torch.tensor(sf).to(device)
-        data = torch.Tensor(dataset.x).to(device)
-        y = dataset.y
+        sf = torch.tensor(n_counts / np.median(n_counts)).to(device)
+        data = torch.from_numpy(x).to(device)
 
         aris = []
+        keys = []
         P = {}
         Q = {}
 
@@ -171,12 +174,11 @@ class SCDSCWrapper:
                     # calculate ari score for model selection
                     _, _, ari = self.score(y)
                     aris.append(ari)
+                    keys.append(key := f"epoch{epoch}")
                     print("Epoch %3d, ARI: %.4f, Best ARI: %.4f" % (epoch + 1, ari, max(aris)))
 
-                    p_ = {f'epoch{epoch}': p}
-                    q_ = {f'epoch{epoch}': tmp_q}
-                    P = {**P, **p_}
-                    Q = {**Q, **q_}
+                    P[key] = p
+                    Q[key] = tmp_q
 
             model.train()
             x_bar, q, pred, z, meanbatch, dispbatch, pibatch, zinb_loss = model(data, adj)
@@ -192,7 +194,7 @@ class SCDSCWrapper:
             optimizer.step()
 
         index = np.argmax(aris)
-        self.q = Q[f'epoch{index}']
+        self.q = Q[keys[index]]
 
     def predict(self):
         """Get predictions from the trained model.
