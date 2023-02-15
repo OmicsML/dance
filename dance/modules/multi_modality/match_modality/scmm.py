@@ -4,20 +4,19 @@ Extended from https://github.com/kodaim1115/scMM
 
 Reference
 ---------
-Minoura, Kodai, et al. "A mixture-of-experts deep generative model for integrated analysis of single-cell multiomics data." Cell reports methods 1.5 (2021): 100071.
+Minoura, Kodai, et al. A mixture-of-experts deep generative model for integrated analysis of single-cell multiomics
+data. Cell reports methods 1.5 (2021): 100071.
 
 """
 import math
 import os
 
 import numpy as np
-import pandas as pd
-import scipy.sparse as sp
 import torch
 import torch.distributions as dist
 import torch.nn as nn
 import torch.nn.functional as F
-from numpy import prod, sqrt
+from numpy import prod
 from pyro.distributions.zero_inflated import ZeroInflatedNegativeBinomial
 from sklearn.cluster import DBSCAN, KMeans
 from sklearn.neighbors import NearestNeighbors
@@ -131,7 +130,7 @@ class VAE(nn.Module):
     @property
     def qz_x_params(self):
         if self._qz_x_params is None:
-            raise NameError("qz_x params not initalised yet!")
+            raise NameError("qz_x params not initialized yet!")
         return self._qz_x_params
 
     @staticmethod
@@ -365,9 +364,11 @@ class MMVAE(nn.Module):
     Parameters
     ----------
     subtask : str
-        Name of the subtask which is composed of the name of two modality. This parameter will indicate some modality-specific features in the model.
+        Name of the subtask which is composed of the name of two modality. This parameter will indicate some
+        modality-specific features in the model.
     params : argparse.Namespace
-        A Namespace object that contains arguments of MMVAE. For details of parameters in parser args, please refer to link (parser help document).
+        A Namespace object that contains arguments of MMVAE. For details of parameters in parser args, please refer to
+        link (parser help document).
 
     """
 
@@ -502,16 +503,10 @@ class MMVAE(nn.Module):
         ----------
         x_train : torch.Tensor
             Input modality for training.
-
         y_train : torch.Tensor
             Target modality for training.
-
         val_ratio : float
             Ratio for automatic train-validation split.
-
-        Returns
-        -------
-        None.
 
         """
 
@@ -535,13 +530,8 @@ class MMVAE(nn.Module):
 
         train_mod1 = x_train.float().to(self.params.device)
         train_mod2 = y_train.float().to(self.params.device)
-        # test_mod1 = x_test.float().to(self.params.device)
-        # test_mod2 = y_test.float().to(self.params.device)
-        # labels = labels.float().to(self.params.device)
 
-        vals = []
-        tr = []
-
+        tr, vals = [], []
         for epoch in range(1, self.params.epochs + 1):
             self.train()
             b_loss = 0
@@ -576,7 +566,6 @@ class MMVAE(nn.Module):
             if epoch % 10 == 0:
                 print('Valid Matching score:',
                       self.score(train_mod1[val_idx], train_mod2[val_idx], torch.eye(val_idx.shape[0])))
-                # print('Test Matching score:', self.score(test_mod1, test_mod2, labels))
 
             if epoch > start_early_stop and min(vals) != min(vals[-10:]):
                 print('Early stopped.')
@@ -593,7 +582,8 @@ class MMVAE(nn.Module):
         mod2 : torch.Tensor
             Features of modality 2.
         labels : torch.Tensor optional
-            Labels of matching modality, i.e. cell correspondence between two modalities. Required when metric is not 'loss'.
+            Labels of matching modality, i.e. cell correspondence between two modalities. Required when metric is not
+            'loss'.
         metric : str optional
             Metric of the score function, by default to be 'minkowski'.
 
@@ -662,7 +652,7 @@ class MMVAE(nn.Module):
         pred = []
         with torch.no_grad():
             for i, batch_idx in enumerate(data_loader):
-                dataT = [mod1[batch_idx].float().to(), mod2[batch_idx].float().to()]
+                dataT = [mod1[batch_idx], mod2[batch_idx]]
                 lats = self._get_latents(dataT, sampling=False)
                 if i == 0:
                     pred = lats
