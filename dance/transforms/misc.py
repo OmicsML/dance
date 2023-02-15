@@ -84,3 +84,31 @@ class SetConfig(BaseTransform):
     def __call__(self, data):
         self.logger.info(f"Updating the dance data object config options:\n{pformat(self.config_dict)}")
         data.set_config_from_dict(self.config_dict)
+
+
+class SaveRaw(BaseTransform):
+    """Save raw data.
+
+    See :meth:`anndata.AnnData.raw` for more information.
+
+    Parameters
+    ----------
+    exist_ok
+        If set to False, then raise an exception if the :obj:`raw` attribute is already set.
+
+    """
+
+    def __init__(self, exist_ok: bool = False, **kwargs):
+        super().__init__(**kwargs)
+
+        self.exist_ok = exist_ok
+
+    def __call__(self, data):
+        self.logger.info("Saving data to ``.raw``")
+        if data.data.raw is not None:
+            if self.exist_ok:
+                self.logger.warning("Overwriting raw content...")
+            else:
+                raise AttributeError(f"Raw data attribute already exist and cannot be overwritten.\n{data}"
+                                     f"If you wish to overwrite, set 'exist_ok' to True.")
+        data.data.raw = data.data
