@@ -1,4 +1,5 @@
 import itertools
+import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
 
@@ -329,14 +330,27 @@ class BaseData(ABC):
         else:
             data = self.data.mod[mod]
 
-        # Pick channels - obsm or varm
-        channel_type = channel_type or "obsm"  # default to obsm
-        if channel_type not in self._DATA_CHANNELS:
-            raise ValueError(f"Unknown channel type {channel_type!r}. Available options are {self._DATA_CHANNELS}")
-        channels = getattr(data, channel_type)
+        if channel_type == "X":
+            feature = data.X
+        elif channel_type == "raw_X":
+            feature = data.raw.X
+        else:
+            # Pick channels (obsm, varm, ...)
+            channel_type = channel_type or "obsm"  # default to obsm
+            if channel_type not in self._DATA_CHANNELS:
+                raise ValueError(f"Unknown channel type {channel_type!r}. Available options are {self._DATA_CHANNELS}")
+            channels = getattr(data, channel_type)
 
-        # Pick feature from a specific channel
-        feature = data.X if channel is None else channels[channel]
+            # Pick feature from a specific channel
+            if channel is None:
+                # FIX: channel default change to "X".
+                warnings.warn(
+                    "The `None` option for channel when channel_type is no longer supported "
+                    "and will raise an exception in the near future version. Please change "
+                    "channel_type to 'X' to preserve the current behavior", DeprecationWarning, stacklevel=2)
+                feature = data.X
+            else:
+                feature = channels[channel]
 
         if return_type == "default":
             if split_name is not None:
