@@ -54,12 +54,12 @@ if __name__ == "__main__":
     filter_data(data, highly_genes=args.highly_genes)
     normalize_adata(data, size_factors=True, normalize_input=True, logtrans_input=True)
     get_adj(data, k=args.k_neighbor, pca_dim=args.pca_dim)
-    data.set_config(feature_channel=["adj", "adj_n"], feature_channel_type=["obsp", "obsp"], label_channel="Group")
-    (adj, adj_n), y = data.get_train_data()
-    adata = data.data
-    x = adata.X
-    x_raw = adata.raw.X
-    scale_factor = adata.obs.size_factors
+    data.set_config(
+        feature_channel=[None, None, "size_factors", "adj", "adj_n"],
+        feature_channel_type=["X", "raw_X", "obs", "obsp", "obsp"],
+        label_channel="Group",
+    )
+    (x, x_raw, scale_factor, adj, adj_n), y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
     # Build model & training
