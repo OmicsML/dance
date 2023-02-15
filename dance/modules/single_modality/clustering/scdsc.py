@@ -21,9 +21,8 @@ from torch.nn.parameter import Parameter
 from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 
-from dance.transforms.preprocess import load_graph
+from dance.transforms.preprocess import sparse_mx_to_torch_sparse_tensor
 from dance.utils.loss import ZINBLoss
 from dance.utils.metrics import cluster_acc
 
@@ -109,7 +108,7 @@ class SCDSCWrapper:
 
         torch.save(model.state_dict(), fname)
 
-    def fit(self, dataset, X_raw, sf, graph_path, lr=1e-03, n_epochs=300, bcl=0.1, cl=0.01, rl=1, zl=0.1):
+    def fit(self, dataset, X_raw, n_counts, adj, lr=1e-03, n_epochs=300, bcl=0.1, cl=0.01, rl=1, zl=0.1):
         """Train model.
 
         Parameters
@@ -118,10 +117,10 @@ class SCDSCWrapper:
             input dataset.
         X_raw :
             raw input features.
-        sf : list
-            scale factor of ZINB loss.
-        graph_path : str
-            path of graph file.
+        n_counts : list
+            total counts for each cell.
+        adj :
+            adjacency matrix as a sicpy sparse matrix.
         lr : float optional
             learning rate.
         n_epochs : int optional
@@ -145,14 +144,14 @@ class SCDSCWrapper:
         optimizer = Adam(model.parameters(), lr=lr)
         # optimizer = RAdam(model.parameters(), lr=lr)
 
-        adj = load_graph(graph_path, dataset.x)
-        adj = adj.to(device)
+        adj = sparse_mx_to_torch_sparse_tensor(adj).to(device)
         X_raw = torch.tensor(X_raw).to(device)
-        sf = torch.tensor(sf).to(device)
+        sf = torch.tensor(n_counts / np.median(n_counts)).to(device)
         data = torch.Tensor(dataset.x).to(device)
         y = dataset.y
 
         aris = []
+        keys = []
         P = {}
         Q = {}
 
@@ -171,12 +170,11 @@ class SCDSCWrapper:
                     # calculate ari score for model selection
                     _, _, ari = self.score(y)
                     aris.append(ari)
+                    keys.append(key := f"epoch{epoch}")
                     print("Epoch %3d, ARI: %.4f, Best ARI: %.4f" % (epoch + 1, ari, max(aris)))
 
-                    p_ = {f'epoch{epoch}': p}
-                    q_ = {f'epoch{epoch}': tmp_q}
-                    P = {**P, **p_}
-                    Q = {**Q, **q_}
+                    P[key] = p
+                    Q[key] = tmp_q
 
             model.train()
             x_bar, q, pred, z, meanbatch, dispbatch, pibatch, zinb_loss = model(data, adj)
@@ -192,7 +190,7 @@ class SCDSCWrapper:
             optimizer.step()
 
         index = np.argmax(aris)
-        self.q = Q[f'epoch{index}']
+        self.q = Q[keys[index]]
 
     def predict(self):
         """Get predictions from the trained model.

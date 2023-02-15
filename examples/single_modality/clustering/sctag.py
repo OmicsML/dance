@@ -68,7 +68,7 @@ if __name__ == "__main__":
     AnnDataTransform(sc.pp.log1p)(data)
     AnnDataTransform(sc.pp.scale)(data)
 
-    # Construct k-neighbors graphs
+    # Construct k-neighbors graph
     CellPCA(n_components=args.pca_dim)(data)
     NeighborGraph(n_neighbors=args.k_neighbor, n_pcs=args.pca_dim)(data)
 
