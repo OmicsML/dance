@@ -7,10 +7,11 @@ import argparse
 import os
 import random
 
-import torch
-from sklearn import preprocessing
 import anndata
 import mudata
+import torch
+from sklearn import preprocessing
+
 from dance.data import Data
 from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.cmae import CMAE

@@ -1,16 +1,18 @@
 import argparse
 
+import mudata
 import numpy as np
 import torch
 import torch.utils.data as data_utils
-import mudata
+from sklearn import preprocessing
+
 from dance.data import Data
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 # from scMVAE.utilities import read_dataset, normalize, calculate_log_library_size, parameter_setting, save_checkpoint, \
 #     load_checkpoint, adjust_learning_rate
 from dance.modules.multi_modality.joint_embedding.scmvae import scMVAE
 from dance.transforms.preprocess import calculate_log_library_size
-from sklearn import preprocessing
+
 
 def parameter_setting():
     parser = argparse.ArgumentParser(description='Single cell Multi-omics data analysis')
@@ -73,9 +75,8 @@ if __name__ == "__main__":
     mdata.var_names_make_unique()
     train_size = int(mod1.shape[0] * 0.85)
     data = Data(mdata, train_size=train_size)
-    data.set_config(feature_mod=["mod1", "mod2"], label_mod="mod1",
-                    feature_channel_type=['layers', "layers"], feature_channel=['counts', 'counts'],
-                    label_channel='labels')
+    data.set_config(feature_mod=["mod1", "mod2"], label_mod="mod1", feature_channel_type=['layers', "layers"],
+                    feature_channel=['counts', 'counts'], label_channel='labels')
 
     (x_train, y_train), _ = data.get_train_data(return_type="torch")
     (x_test, y_test), labels = data.get_test_data(return_type="torch")
@@ -85,7 +86,7 @@ if __name__ == "__main__":
     lib_mean1 = torch.from_numpy(lib_mean1)
     lib_var1 = torch.from_numpy(lib_var1)
     lib_mean2 = torch.from_numpy(lib_mean2)
-    lib_var2 =  torch.from_numpy(lib_var2)
+    lib_var2 = torch.from_numpy(lib_var2)
 
     Nfeature1 = x_train.shape[1]
     Nfeature2 = y_train.shape[1]
@@ -121,15 +122,11 @@ if __name__ == "__main__":
     args.anneal_epoch = 200
 
     model.to(device)
-    train = data_utils.TensorDataset(x_train,
-                                     lib_mean1[:train_size], lib_var1[:train_size],
-                                     lib_mean2[:train_size], lib_var2[:train_size],
-                                     y_train)
+    train = data_utils.TensorDataset(x_train, lib_mean1[:train_size], lib_var1[:train_size], lib_mean2[:train_size],
+                                     lib_var2[:train_size], y_train)
 
-    valid = data_utils.TensorDataset(x_test,
-                                     lib_mean1[train_size:], lib_var1[train_size:],
-                                     lib_mean2[train_size:], lib_var2[train_size:],
-                                     y_test)
+    valid = data_utils.TensorDataset(x_test, lib_mean1[train_size:], lib_var1[train_size:], lib_mean2[train_size:],
+                                     lib_var2[train_size:], y_test)
 
     total = data_utils.TensorDataset(torch.cat([x_train, x_test]), torch.cat([y_train, y_test]))
 

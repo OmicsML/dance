@@ -1,12 +1,14 @@
 import argparse
+
 import anndata as ad
+import mudata
 import numpy as np
 import torch
 import torch.utils.data as data_utils
-import mudata
-from dance.data import Data
 from sklearn import preprocessing
+
 import dance.utils.metrics as metrics
+from dance.data import Data
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.dcca import DCCA
 # from scMVAE.utilities import read_dataset, normalize, calculate_log_library_size, parameter_setting, save_checkpoint, \
@@ -99,10 +101,12 @@ if __name__ == "__main__":
     data = Data(mdata, train_size=train_size)
     data.set_config(feature_mod=["mod1", "mod2", "mod1", "mod2", "mod1", "mod2"], label_mod="mod1",
                     feature_channel_type=['layers', "layers", None, None, "obsm", "obsm"],
-                    feature_channel=['counts', 'counts', None, None, "size_factors", "size_factors"],
-                    label_channel='labels')
-    (x_train, y_train, x_train_raw, y_train_raw, x_train_size, y_train_size), train_labels = data.get_train_data(return_type="torch")
-    (x_test, y_test, x_test_raw, y_test_raw, x_test_size, y_test_size), test_labels = data.get_test_data(return_type="torch")
+                    feature_channel=['counts', 'counts', None, None, "size_factors",
+                                     "size_factors"], label_channel='labels')
+    (x_train, y_train, x_train_raw, y_train_raw, x_train_size,
+     y_train_size), train_labels = data.get_train_data(return_type="torch")
+    (x_test, y_test, x_test_raw, y_test_raw, x_test_size,
+     y_test_size), test_labels = data.get_test_data(return_type="torch")
 
     Nfeature1 = x_train.shape[1]
     Nfeature2 = y_train.shape[1]
@@ -110,35 +114,27 @@ if __name__ == "__main__":
     device = torch.device(args.device)
 
     model = DCCA(layer_e_1=[Nfeature1, 128], hidden1_1=128, Zdim_1=4, layer_d_1=[4, 128], hidden2_1=128,
-                 layer_e_2=[Nfeature2, 1500, 128], hidden1_2=128, Zdim_2=4, layer_d_2=[4], hidden2_2=4, args=args,
-                 Type_1="NB", Type_2="Bernoulli", ground_truth1=torch.cat([train_labels, test_labels]),
-                 cycle=1, attention_loss="Eucli").to(device)
+                 layer_e_2=[Nfeature2, 1500,
+                            128], hidden1_2=128, Zdim_2=4, layer_d_2=[4], hidden2_2=4, args=args, Type_1="NB",
+                 Type_2="Bernoulli", ground_truth1=torch.cat([train_labels,
+                                                              test_labels]), cycle=1, attention_loss="Eucli").to(device)
 
     model.to(device)
-    train = data_utils.TensorDataset(x_train.float(),
-                                     x_train_raw,
-                                     x_train_size.float(),
-                                     y_train.float(),
-                                     y_train_raw,
+    train = data_utils.TensorDataset(x_train.float(), x_train_raw, x_train_size.float(), y_train.float(), y_train_raw,
                                      y_train_size.float())
 
     train_loader = data_utils.DataLoader(train, batch_size=args.batch_size, shuffle=True)
 
-    test = data_utils.TensorDataset(x_test.float(),
-                                    x_test_raw,
-                                    x_test_size.float(),
-                                    y_test.float(),
-                                    y_test_raw,
+    test = data_utils.TensorDataset(x_test.float(), x_test_raw, x_test_size.float(), y_test.float(), y_test_raw,
                                     y_test_size.float())
 
     test_loader = data_utils.DataLoader(test, batch_size=args.batch_size, shuffle=False)
 
-    total = data_utils.TensorDataset(torch.cat([x_train, x_test]).float(),
-                                     torch.cat([x_train_raw, x_test_raw]),
-                                     torch.cat([x_train_size, x_test_size]).float(),
-                                     torch.cat([y_train, y_test]).float(),
-                                     torch.cat([y_train_raw, y_test_raw]),
-                                     torch.cat([y_train_size, y_test_size]).float())
+    total = data_utils.TensorDataset(
+        torch.cat([x_train, x_test]).float(), torch.cat([x_train_raw, x_test_raw]),
+        torch.cat([x_train_size, x_test_size]).float(),
+        torch.cat([y_train, y_test]).float(), torch.cat([y_train_raw, y_test_raw]),
+        torch.cat([y_train_size, y_test_size]).float())
 
     total_loader = data_utils.DataLoader(total, batch_size=args.batch_size, shuffle=False)
 

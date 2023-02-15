@@ -1,14 +1,15 @@
 import argparse
 import random
 
-import numpy as np
-import torch
 import anndata
 import mudata
+import numpy as np
+import torch
+
+from dance.data import Data
 from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.scmm import MMVAE
 from dance.utils import set_seed
-from dance.data import Data
 
 if __name__ == '__main__':
     rndseed = random.randint(0, 2147483647)

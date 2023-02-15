@@ -1,12 +1,12 @@
 import argparse
 import random
 
+import anndata
+import mudata
 import numpy as np
 import torch
-import anndata
-from dance.data import Data
-import mudata
 
+from dance.data import Data
 from dance.datasets.multimodality import ModalityMatchingDataset
 from dance.modules.multi_modality.match_modality.scmm import MMVAE
 from dance.utils import set_seed

@@ -6,12 +6,13 @@ This code is based on https://github.com/NVlabs/MUNIT.
 import argparse
 import os
 import random
-import numpy as np
 
-import torch
-from sklearn import preprocessing
 import anndata
 import mudata
+import numpy as np
+import torch
+from sklearn import preprocessing
+
 from dance.data import Data
 from dance.datasets.multimodality import ModalityMatchingDataset
 from dance.modules.multi_modality.match_modality.cmae import CMAE
@@ -91,8 +92,8 @@ if __name__ == '__main__':
     mdata = mudata.MuData({"mod1": mod1, "mod2": mod2})
     mdata.var_names_make_unique()
     data = Data(mdata, train_size=train_size)
-    data.set_config(feature_mod=["mod1", "mod2", "mod1"], label_mod="mod1",
-                    feature_channel=[None, None, "batch"], label_channel='labels')
+    data.set_config(feature_mod=["mod1", "mod2", "mod1"], label_mod="mod1", feature_channel=[None, None, "batch"],
+                    label_channel='labels')
 
     # Obtain training and testing data
     (x_train, y_train, batch), _ = data.get_train_data(return_type="torch")
