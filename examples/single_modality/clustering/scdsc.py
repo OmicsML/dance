@@ -1,7 +1,7 @@
 import argparse
 import os
 from argparse import Namespace
-from time import time as get_time
+from time import time
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset, PretrainDataset, TrainingDataset
@@ -14,8 +14,7 @@ from dance.utils import set_seed
 set_seed(42)
 
 if __name__ == "__main__":
-
-    time_start = get_time()
+    time_start = time()
     parser = argparse.ArgumentParser()
 
     # model_para = [n_enc_1(n_dec_3), n_enc_2(n_dec_2), n_enc_3(n_dec_1)]
@@ -25,12 +24,11 @@ if __name__ == "__main__":
     # Balance_para = [binary_crossentropy_loss, ce_loss, re_loss, zinb_loss, sigma]
     Balance_para = [1, 0.01, 0.1, 0.1, 1]
 
-    parser.add_argument(
-        "--name", type=str,
-        default="worm_neuron_cell")  # choice=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"]
+    parser.add_argument("--name", type=str, default="worm_neuron_cell",
+                        choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
     parser.add_argument("--pretrain_path", type=str, default="worm_neuron_cell")
     parser.add_argument("--graph_path", type=str, default="worm_neuron_cell")
-    parser.add_argument("--method", type=str, default="p")  # choice=["heat", "cos", "ncos", "p"]
+    parser.add_argument("--method", type=str, default="p", choices=["heat", "cos", "ncos", "p"])
     parser.add_argument("--batch_size", default=256, type=int)
     parser.add_argument("--n_enc_1", default=model_para[0], type=int)
     parser.add_argument("--n_enc_2", default=model_para[1], type=int)
@@ -55,10 +53,10 @@ if __name__ == "__main__":
     parser.add_argument("--re_loss", type=float, default=Balance_para[2])
     parser.add_argument("--zinb_loss", type=float, default=Balance_para[3])
     parser.add_argument("--sigma", type=float, default=Balance_para[4])
-
     args = parser.parse_args()
     args.n_input = args.nb_genes
     args.graph_path = f"{args.name}_{args.topk}"
+
     # File = [gene_expresion data file, Graph file, h5 file, pretrain_path]
     File = [
         os.path.join("data", args.name),
@@ -98,7 +96,7 @@ if __name__ == "__main__":
     sf = adata.obs.size_factors
     model.fit(dataset, X_raw, sf, args.graph_path, lr=args.lr, n_epochs=args.n_epochs,
               bcl=args.binary_crossentropy_loss, cl=args.ce_loss, rl=args.re_loss, zl=args.zinb_loss)
-    print("Running Time：%d seconds", get_time() - time_start)
+    print(f"Running Time：{int(time() - time_start)} seconds")
 
     y_pred = model.predict()
     #    print(f"Prediction: {y_pred}")

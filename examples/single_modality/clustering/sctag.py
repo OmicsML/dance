@@ -18,12 +18,10 @@ torch.manual_seed(42)
 torch.cuda.manual_seed(42)
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(description="train", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
     parser.add_argument("--data_dir", default="./data", type=str)
-    parser.add_argument("--data_file", default="mouse_bladder_cell",
-                        type=str)  # choice=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"]
+    parser.add_argument("--data_file", default="mouse_bladder_cell", type=str,
+                        choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
     parser.add_argument("--pretrain_file", type=str, default="./sctag_mouse_bladder_cell_pre.pkl")
     parser.add_argument("--k_neighbor", default=15, type=int)
     parser.add_argument("--highly_genes", default=3000, type=int)
@@ -46,8 +44,8 @@ if __name__ == "__main__":
     parser.add_argument("--max_dist", default=20.0, type=float)
     parser.add_argument("--info_step", default=50, type=int)
     args = parser.parse_args()
-
     args.pretrain_file = f"sctag_{args.data_file}_pre.pkl"
+
     # Load data
     adata, labels = ClusteringDataset(args.data_dir, args.data_file).load_data()
     adata.obsm["Group"] = labels

@@ -15,8 +15,6 @@ from dance.utils import set_seed
 set_seed(42)
 
 if __name__ == "__main__":
-
-    # setting the hyper parameters
     parser = argparse.ArgumentParser(description="train", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--label_cells", default=0.1, type=float)
     parser.add_argument("--label_cells_files", default="label_mouse_ES_cell.txt")
@@ -24,8 +22,8 @@ if __name__ == "__main__":
     parser.add_argument("--n_pairwise_error", default=0, type=float)
     parser.add_argument("--batch_size", default=256, type=int)
     parser.add_argument("--data_dir", default="./data")
-    parser.add_argument("--data_file", default="mouse_ES_cell",
-                        type=str)  # choice=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"]
+    parser.add_argument("--data_file", default="mouse_ES_cell", type=str,
+                        choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
     parser.add_argument("--maxiter", default=500, type=int)
     parser.add_argument("--pretrain_epochs", default=50, type=int)
     parser.add_argument("--lr", default=0.01, type=float)
@@ -38,7 +36,6 @@ if __name__ == "__main__":
     parser.add_argument("--ae_weights", default=None)
     parser.add_argument("--save_dir", default="results/scdcc/")
     parser.add_argument("--ae_weight_file", default="AE_weights.pth.tar")
-
     args = parser.parse_args()
     args.ae_weight_file = f"scdcc_{args.data_file}_{args.ae_weight_file}"
 

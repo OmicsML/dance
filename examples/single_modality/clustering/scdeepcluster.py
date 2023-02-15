@@ -1,3 +1,4 @@
+import argparse
 import os
 from time import time
 
@@ -14,10 +15,6 @@ from dance.utils import set_seed
 set_seed(42)
 
 if __name__ == "__main__":
-
-    # setting the hyper parameters
-    import argparse
-
     parser = argparse.ArgumentParser(description="train", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--knn", default=20, type=int,
                         help="number of nearest neighbors, used by the Louvain algorithm")
@@ -27,8 +24,8 @@ if __name__ == "__main__":
     parser.add_argument("--select_genes", default=0, type=int, help="number of selected genes, 0 means using all genes")
     parser.add_argument("--batch_size", default=256, type=int)
     parser.add_argument("--data_dir", default="./data")
-    parser.add_argument("--data_file", default="mouse_bladder_cell",
-                        type=str)  # choice=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"]
+    parser.add_argument("--data_file", default="mouse_bladder_cell", type=str,
+                        choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
     parser.add_argument("--maxiter", default=500, type=int)
     parser.add_argument("--pretrain_epochs", default=50, type=int)
     parser.add_argument("--lr", default=0.1, type=float)
@@ -43,7 +40,6 @@ if __name__ == "__main__":
     parser.add_argument("--ae_weight_file", default="AE_weights.pth.tar",
                         help="file name to save model weights after the pretraining stage")
     parser.add_argument("--device", default="cuda")
-
     args = parser.parse_args()
     args.ae_weight_file = f"scdeepcluster_{args.data_file}_{args.ae_weight_file}"
 
