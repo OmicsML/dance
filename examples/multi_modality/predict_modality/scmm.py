@@ -1,9 +1,12 @@
 import argparse
 import random
 
+import anndata
+import mudata
 import numpy as np
 import torch
 
+from dance.data import Data
 from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.scmm import MMVAE
 from dance.utils import set_seed
@@ -47,18 +50,30 @@ if __name__ == '__main__':
     dataset = ModalityPredictionDataset(args.subtask).load_data().preprocess('feature_selection')
     device = args.device
     subtask = args.subtask
+    mod1 = anndata.concat((dataset.modalities[0], dataset.modalities[2]))
+    mod2 = anndata.concat((dataset.modalities[1], dataset.modalities[3]))
+    mod1.var_names_make_unique()
+    mod2.var_names_make_unique()
+    mdata = mudata.MuData({"mod1": mod1, "mod2": mod2})
+    mdata.var_names_make_unique()
+    train_size = dataset.modalities[0].shape[0]
+    data = Data(mdata, train_size=train_size)
+    data.set_config(feature_mod="mod1", label_mod="mod2", feature_channel_type='layers', feature_channel='counts',
+                    label_channel_type='layers', label_channel='counts')
 
-    args.r_dim = dataset.modalities[0].shape[1]
-    args.p_dim = dataset.modalities[1].shape[1]
+    # Obtain training and testing data
+    x_train, y_train = data.get_train_data(return_type="torch")
+    x_test, y_test = data.get_test_data(return_type="torch")
+
+    args.r_dim = x_train.shape[1]
+    args.p_dim = y_train.shape[1]
 
     model_class = 'rna-protein' if subtask == 'openproblems_bmmc_cite_phase2_rna' else 'rna-dna'
     model = MMVAE(model_class, args).to(device)
 
-    model.fit(dataset)
-    test_X = torch.from_numpy(dataset.numpy_features(2, True)).to(device).float()
-    test_Y = torch.from_numpy(dataset.numpy_features(3, True)).to(device).float()
-    print(model.predict(test_X))
-    print(model.score(test_X, test_Y))
+    model.fit(x_train, y_train)
+    print(model.predict(x_test))
+    print(model.score(x_test, y_test))
 """ To reproduce scMM on other samples, please refer to command lines belows:
 GEX to ADT:
 python scmm.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda

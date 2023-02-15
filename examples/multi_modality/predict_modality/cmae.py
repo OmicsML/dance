@@ -7,9 +7,12 @@ import argparse
 import os
 import random
 
+import anndata
+import mudata
 import torch
 from sklearn import preprocessing
 
+from dance.data import Data
 from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.cmae import CMAE
 from dance.utils import set_seed
@@ -71,18 +74,32 @@ if __name__ == '__main__':
     checkpoint_directory, image_directory = prepare_sub_folder(output_directory)
 
     le = preprocessing.LabelEncoder()
-    train_batch = dataset.modalities[0].obs['batch']
-    batch = le.fit_transform(train_batch)
-    train_batch = torch.from_numpy(batch).long().to(device)
-    train_mod1 = torch.from_numpy(dataset.numpy_features(0)).float().to(device)
-    train_mod2 = torch.from_numpy(dataset.numpy_features(1)).float().to(device)
-    test_mod1 = torch.from_numpy(dataset.numpy_features(2)).float().to(device)
-    test_mod2 = torch.from_numpy(dataset.numpy_features(3)).float().to(device)
+    mod1 = anndata.concat((dataset.modalities[0], dataset.modalities[2]))
+    mod2 = anndata.concat((dataset.modalities[1], dataset.modalities[3]))
+    batch = le.fit_transform(mod1.obs['batch'])
+    mod1.var_names_make_unique()
+    mod2.var_names_make_unique()
+    mod1.obsm['batch'] = batch
+    mdata = mudata.MuData({"mod1": mod1, "mod2": mod2})
+    mdata.var_names_make_unique()
+    train_size = dataset.modalities[0].shape[0]
+    data = Data(mdata, train_size=train_size)
+    data.set_config(feature_mod=["mod1", "mod1"], label_mod="mod2", feature_channel_type=[None, 'obsm'],
+                    feature_channel=[None, 'batch'])
+
+    # Obtain training and testing data
+    (x_train, batch), y_train = data.get_train_data(return_type="torch")
+    (x_test, _), y_test = data.get_test_data(return_type="torch")
+    batch = batch.long().to(device)
+    x_train = x_train.float().to(device)
+    y_train = y_train.float().to(device)
+    x_test = x_test.float().to(device)
+    y_test = y_test.float().to(device)
 
     config = vars(opts)
     # Some Fixed Settings
-    config['input_dim_a'] = dataset.modalities[0].shape[1]
-    config['input_dim_b'] = dataset.modalities[1].shape[1]
+    config['input_dim_a'] = x_train.shape[1]
+    config['input_dim_b'] = y_train.shape[1]
     config['resume'] = opts.resume
     config['num_of_classes'] = max(batch) + 1
     config['shared_layer'] = True
@@ -101,9 +118,9 @@ if __name__ == '__main__':
     model = CMAE(config)
     model.to(device)
 
-    model.fit(train_mod1, train_mod2, train_batch, checkpoint_directory)
-    print(model.predict(test_mod1))
-    print(model.score(test_mod1, test_mod2))
+    model.fit(x_train, y_train, batch, checkpoint_directory)
+    print(model.predict(x_test))
+    print(model.score(x_test, y_test))
 """ To reproduce CMAE on other samples, please refer to command lines belows:
 GEX to ADT:
 python cmae.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda

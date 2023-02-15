@@ -1,16 +1,14 @@
 import argparse
-import math
-import os
 
 import anndata as ad
+import mudata
 import numpy as np
-import pandas as pd
-import scanpy as sc
 import torch
 import torch.utils.data as data_utils
-from sklearn.model_selection import train_test_split
+from sklearn import preprocessing
 
 import dance.utils.metrics as metrics
+from dance.data import Data
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.dcca import DCCA
 # from scMVAE.utilities import read_dataset, normalize, calculate_log_library_size, parameter_setting, save_checkpoint, \
@@ -56,9 +54,9 @@ def parameter_setting():
 
     parser.add_argument('--batch_size', '-b', type=int, default=64, help='Batch size')
 
-    parser.add_argument('--seed', type=int, default=200, help='Random seed for repeat results')
+    parser.add_argument('--seed', type=int, default=1, help='Random seed for repeat results')
     parser.add_argument('--latent', '-l', type=int, default=10, help='latent layer dim')
-    parser.add_argument('--max_epoch', '-me', type=int, default=100, help='Max epoches')
+    parser.add_argument('--max_epoch', '-me', type=int, default=10, help='Max epoches')
     parser.add_argument('--max_iteration', '-mi', type=int, default=3000, help='Max iteration')
     parser.add_argument('--anneal_epoch', '-ae', type=int, default=200, help='Anneal epoch')
     parser.add_argument('--epoch_per_test', '-ept', type=int, default=5, help='Epoch per test')
@@ -86,48 +84,58 @@ if __name__ == "__main__":
     dataset = JointEmbeddingNIPSDataset(args.subtask, data_dir='./data/joint_embedding').load_data() \
         .load_metadata().load_sol().preprocess('feature_selection')
 
-    adata = dataset.modalities[0]
-    adata1 = dataset.modalities[1]
-    idx = np.random.permutation(adata.shape[0])
-    train_index = idx[:int(len(idx) * 0.85)]
-    test_index = idx[int(len(idx) * 0.85):]
-    label_ground_truth = adata.obs['batch']
+    mod1 = dataset.modalities[0]
+    mod2 = dataset.modalities[1]
+    mod1.var_names_make_unique()
+    mod2.var_names_make_unique()
+    mod1.obs_names_make_unique()
+    mod2.obs_names = mod1.obs_names
+    le = preprocessing.LabelEncoder()
+    labels = le.fit_transform(dataset.test_sol.obs['cell_type'])
+    mod2.obsm['size_factors'] = np.sum(mod2.X.todense(), 1) / 100
+    mod1.obsm['size_factors'] = mod1.obs['size_factors']
+    mod1.obsm['labels'] = labels
+    mdata = mudata.MuData({"mod1": mod1, "mod2": mod2})
+    mdata.var_names_make_unique()
+    train_size = int(mod1.shape[0] * 0.85)
+    data = Data(mdata, train_size=train_size)
+    data.set_config(feature_mod=["mod1", "mod2", "mod1", "mod2", "mod1", "mod2"], label_mod="mod1",
+                    feature_channel_type=['layers', "layers", None, None, "obsm", "obsm"],
+                    feature_channel=['counts', 'counts', None, None, "size_factors",
+                                     "size_factors"], label_channel='labels')
+    (x_train, y_train, x_train_raw, y_train_raw, x_train_size,
+     y_train_size), train_labels = data.get_train_data(return_type="torch")
+    (x_test, y_test, x_test_raw, y_test_raw, x_test_size,
+     y_test_size), test_labels = data.get_test_data(return_type="torch")
 
-    Nfeature1 = np.shape(adata.X)[1]
-    Nfeature2 = np.shape(adata1.X)[1]
+    Nfeature1 = x_train.shape[1]
+    Nfeature2 = y_train.shape[1]
 
     device = torch.device(args.device)
 
     model = DCCA(layer_e_1=[Nfeature1, 128], hidden1_1=128, Zdim_1=4, layer_d_1=[4, 128], hidden2_1=128,
-                 layer_e_2=[Nfeature2, 1500, 128], hidden1_2=128, Zdim_2=4, layer_d_2=[4], hidden2_2=4, args=args,
-                 ground_truth1=label_ground_truth, ground_truth2=label_ground_truth, Type_1="NB", Type_2="Bernoulli",
-                 cycle=1, attention_loss="Eucli").to(device)
+                 layer_e_2=[Nfeature2, 1500,
+                            128], hidden1_2=128, Zdim_2=4, layer_d_2=[4], hidden2_2=4, args=args, Type_1="NB",
+                 Type_2="Bernoulli", ground_truth1=torch.cat([train_labels,
+                                                              test_labels]), cycle=1, attention_loss="Eucli").to(device)
 
     model.to(device)
-    train = data_utils.TensorDataset(torch.from_numpy(adata[train_index].X.todense()),
-                                     torch.from_numpy(adata.layers['counts'][train_index].todense()),
-                                     torch.from_numpy(adata.obs['size_factors'][train_index].values),
-                                     torch.from_numpy(adata1[train_index].X.todense()),
-                                     torch.from_numpy(adata1.layers['counts'][train_index].todense()),
-                                     torch.from_numpy(adata.obs['size_factors'][train_index].values))
+    train = data_utils.TensorDataset(x_train.float(), x_train_raw, x_train_size.float(), y_train.float(), y_train_raw,
+                                     y_train_size.float())
 
     train_loader = data_utils.DataLoader(train, batch_size=args.batch_size, shuffle=True)
 
-    test = data_utils.TensorDataset(torch.from_numpy(adata[test_index].X.todense()),
-                                    torch.from_numpy(adata.layers['counts'][test_index].todense()),
-                                    torch.from_numpy(adata.obs['size_factors'][test_index].values),
-                                    torch.from_numpy(adata1[test_index].X.todense()),
-                                    torch.from_numpy(adata1.layers['counts'][test_index].todense()),
-                                    torch.from_numpy(adata.obs['size_factors'][test_index].values))
+    test = data_utils.TensorDataset(x_test.float(), x_test_raw, x_test_size.float(), y_test.float(), y_test_raw,
+                                    y_test_size.float())
 
     test_loader = data_utils.DataLoader(test, batch_size=args.batch_size, shuffle=False)
 
-    total = data_utils.TensorDataset(torch.from_numpy(adata.X.todense()),
-                                     torch.from_numpy(adata.layers['counts'].todense()),
-                                     torch.from_numpy(adata.obs['size_factors'].values),
-                                     torch.from_numpy(adata1.X.todense()),
-                                     torch.from_numpy(adata1.layers['counts'].todense()),
-                                     torch.from_numpy(adata.obs['size_factors'].values))
+    total = data_utils.TensorDataset(
+        torch.cat([x_train, x_test]).float(), torch.cat([x_train_raw, x_test_raw]),
+        torch.cat([x_train_size, x_test_size]).float(),
+        torch.cat([y_train, y_test]).float(), torch.cat([y_train_raw, y_test_raw]),
+        torch.cat([y_train_size, y_test_size]).float())
+
     total_loader = data_utils.DataLoader(total, batch_size=args.batch_size, shuffle=False)
 
     model.fit(train_loader, test_loader, total_loader, "RNA")

@@ -1,16 +1,12 @@
 import argparse
-import math
-import os
 
-import anndata as ad
+import mudata
 import numpy as np
-import pandas as pd
-import scanpy as sc
 import torch
 import torch.utils.data as data_utils
-from sklearn.model_selection import train_test_split
+from sklearn import preprocessing
 
-import dance.utils.metrics as metrics
+from dance.data import Data
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 # from scMVAE.utilities import read_dataset, normalize, calculate_log_library_size, parameter_setting, save_checkpoint, \
 #     load_checkpoint, adjust_learning_rate
@@ -66,21 +62,34 @@ if __name__ == "__main__":
 
     dataset = JointEmbeddingNIPSDataset(args.subtask, data_dir='./data/joint_embedding').load_data() \
         .load_metadata().load_sol().preprocess(kind='feature_selection')
+    mod1 = dataset.modalities[0]
+    mod2 = dataset.modalities[1]
+    mod1.var_names_make_unique()
+    mod2.var_names_make_unique()
+    mod1.obs_names_make_unique()
+    mod2.obs_names = mod1.obs_names
+    le = preprocessing.LabelEncoder()
+    labels = le.fit_transform(dataset.test_sol.obs['cell_type'])
+    mod1.obsm['labels'] = labels
+    mdata = mudata.MuData({"mod1": mod1, "mod2": mod2})
+    mdata.var_names_make_unique()
+    train_size = int(mod1.shape[0] * 0.85)
+    data = Data(mdata, train_size=train_size)
+    data.set_config(feature_mod=["mod1", "mod2"], label_mod="mod1", feature_channel_type=['layers', "layers"],
+                    feature_channel=['counts', 'counts'], label_channel='labels')
 
-    adata1 = dataset.modalities[0]
-    adata2 = dataset.modalities[1]
-    adata1.X = adata1.layers['counts']
-    adata2.X = adata2.layers['counts']
+    (x_train, y_train), _ = data.get_train_data(return_type="torch")
+    (x_test, y_test), labels = data.get_test_data(return_type="torch")
 
-    idx = np.random.permutation(adata1.shape[0])
-    train_index = idx[:int(len(idx) * 0.85)]
-    valid_index = idx[int(len(idx) * 0.85):]
+    lib_mean1, lib_var1 = calculate_log_library_size(np.concatenate([x_train.numpy(), x_test.numpy()]))
+    lib_mean2, lib_var2 = calculate_log_library_size(np.concatenate([y_train.numpy(), y_test.numpy()]))
+    lib_mean1 = torch.from_numpy(lib_mean1)
+    lib_var1 = torch.from_numpy(lib_var1)
+    lib_mean2 = torch.from_numpy(lib_mean2)
+    lib_var2 = torch.from_numpy(lib_var2)
 
-    lib_mean1, lib_var1 = calculate_log_library_size(adata1.X)
-    lib_mean2, lib_var2 = calculate_log_library_size(adata2.X)
-
-    Nfeature1 = np.shape(adata1.X)[1]
-    Nfeature2 = np.shape(adata2.X)[1]
+    Nfeature1 = x_train.shape[1]
+    Nfeature2 = y_train.shape[1]
 
     device = torch.device(args.device)
 
@@ -113,17 +122,13 @@ if __name__ == "__main__":
     args.anneal_epoch = 200
 
     model.to(device)
-    train = data_utils.TensorDataset(torch.from_numpy(adata1.X[train_index].todense()),
-                                     torch.from_numpy(lib_mean1[train_index]), torch.from_numpy(lib_var1[train_index]),
-                                     torch.from_numpy(lib_mean2[train_index]), torch.from_numpy(lib_var2[train_index]),
-                                     torch.from_numpy(adata2.X[train_index].todense()))
+    train = data_utils.TensorDataset(x_train, lib_mean1[:train_size], lib_var1[:train_size], lib_mean2[:train_size],
+                                     lib_var2[:train_size], y_train)
 
-    valid = data_utils.TensorDataset(torch.from_numpy(adata1.X[valid_index].todense()),
-                                     torch.from_numpy(lib_mean1[valid_index]), torch.from_numpy(lib_var1[valid_index]),
-                                     torch.from_numpy(lib_mean2[valid_index]), torch.from_numpy(lib_var2[valid_index]),
-                                     torch.from_numpy(adata2.X[valid_index].todense()))
+    valid = data_utils.TensorDataset(x_test, lib_mean1[train_size:], lib_var1[train_size:], lib_mean2[train_size:],
+                                     lib_var2[train_size:], y_test)
 
-    total = data_utils.TensorDataset(torch.from_numpy(adata1.X.todense()), torch.from_numpy(adata2.X.todense()))
+    total = data_utils.TensorDataset(torch.cat([x_train, x_test]), torch.cat([y_train, y_test]))
 
     total_loader = data_utils.DataLoader(total, batch_size=args.batch_size, shuffle=False)
     model.init_gmm_params(total_loader)
@@ -131,11 +136,9 @@ if __name__ == "__main__":
 
     # model.load_state_dict(torch.load('./saved_model/model_best.pth.tar') )
 
-    test_mod1 = dataset.tensor_features(0).to(device)
-    test_mod2 = dataset.tensor_features(1).to(device)
-    embeds = model.predict(test_mod1, test_mod2).cpu().numpy()
+    embeds = model.predict(x_test, y_test).cpu().numpy()
     print(embeds)
-    print(model.score(test_mod1, test_mod2, dataset.test_sol))
+    print(model.score(x_test, y_test, labels))
 
     # mod1_obs = dataset.modalities[0].obs
     # mod1_uns = dataset.modalities[0].uns

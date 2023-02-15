@@ -1,9 +1,12 @@
 import argparse
 import random
 
+import anndata
+import mudata
 import numpy as np
 import torch
 
+from dance.data import Data
 from dance.datasets.multimodality import ModalityMatchingDataset
 from dance.modules.multi_modality.match_modality.scmm import MMVAE
 from dance.utils import set_seed
@@ -49,19 +52,32 @@ if __name__ == '__main__':
     dataset = ModalityMatchingDataset(
         subtask, data_dir=args.data_folder).load_data().load_sol().preprocess(kind='feature_selection')
     device = args.device
+    mod1 = anndata.concat((dataset.modalities[0], dataset.modalities[2]))
+    mod2 = anndata.concat((dataset.modalities[1], dataset.modalities[3]))
+    train_size = dataset.modalities[0].shape[0]
+    mod1.obsm['labels'] = np.concatenate([np.zeros(train_size), np.argmax(dataset.test_sol.X.toarray(), 1)])
+    mod1.var_names_make_unique()
+    mod2.var_names_make_unique()
+    mod1.obs_names_make_unique()
+    mod2.obs_names = mod1.obs_names
+    mdata = mudata.MuData({"mod1": mod1, "mod2": mod2})
+    mdata.var_names_make_unique()
+    data = Data(mdata, train_size=train_size)
+    data.set_config(feature_mod=["mod1", "mod2"], label_mod="mod1", feature_channel_type=["layers", "layers"],
+                    feature_channel=["counts", "counts"], label_channel='labels')
 
-    args.r_dim = dataset.modalities[0].shape[1]
-    args.p_dim = dataset.modalities[1].shape[1]
+    (x_train, y_train), _ = data.get_train_data(return_type="torch")
+    (x_test, y_test), labels = data.get_test_data(return_type="torch")
+
+    args.r_dim = x_train.shape[1]
+    args.p_dim = y_train.shape[1]
 
     model_class = 'rna-protein' if subtask == 'openproblems_bmmc_cite_phase2_rna' else 'rna-dna'
     model = MMVAE(model_class, args).to(device)
 
-    test_X = torch.from_numpy(dataset.numpy_features(2, True)).to(device).float()
-    test_Y = torch.from_numpy(dataset.numpy_features(3, True)).to(device).float()
-    labels = torch.from_numpy(dataset.test_sol.X.toarray())
-    model.fit(dataset)
-    print(model.predict([test_X, test_Y]))
-    print(model.score(test_X, test_Y, labels))
+    model.fit(x_train, y_train)
+    print(model.predict(x_test, y_test))
+    print(model.score(x_test, y_test, labels))
 """ To reproduce scMM on other samples, please refer to command lines belows:
 GEX-ADT:
 python scmm.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda

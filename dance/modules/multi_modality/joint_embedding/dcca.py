@@ -671,10 +671,8 @@ class DCCA(nn.Module):
         Hidden dimension for decoder2. It should be consistent with the last layer in layer_d_1.
     args : argparse.Namespace
         A Namespace object that contains arguments of DCCA. For details of parameters in parser args, please refer to link (parser help document).
-    ground_truth1 : pandas.Series
+    ground_truth1 : torch.Tensor
         Extra labels for VAE1.
-    ground_truth2 :
-        Extra labels for VAE2.
     Type_1 : str optional
         Loss type for VAE1. Default: 'NB'. By default to be 'NB'.
     Type_2 : str optional
@@ -689,8 +687,8 @@ class DCCA(nn.Module):
     """
 
     def __init__(self, layer_e_1, hidden1_1, Zdim_1, layer_d_1, hidden2_1, layer_e_2, hidden1_2, Zdim_2, layer_d_2,
-                 hidden2_2, args, ground_truth1, ground_truth2, Type_1='NB', Type_2='Bernoulli', cycle=1,
-                 attention_loss='Eucli', droprate=0.1):
+                 hidden2_2, args, ground_truth1, Type_1='NB', Type_2='Bernoulli', cycle=1, attention_loss='Eucli',
+                 droprate=0.1):
 
         super().__init__()
         # cycle indicates the mutual learning, 0 for initiation of model1 with scRNA-seq data,
@@ -727,8 +725,7 @@ class DCCA(nn.Module):
 
         self.cycle = cycle
         self.args = args
-        self.ground_truth1 = ground_truth1
-        self.ground_truth2 = ground_truth2
+        self.ground_truth1 = ground_truth1.numpy()
         self.attention_loss = attention_loss
 
     def fit(self, train_loader, test_loader, total_loader, first="RNA"):
@@ -857,9 +854,6 @@ class DCCA(nn.Module):
 
             latent_code_rna = []
             latent_code_atac = []
-
-            ARI_score1, NMI_score1 = -100, -100
-            ARI_score2, NMI_score2 = -100, -100
 
             for batch_idx, (X1, _, size_factor1, X2, _, size_factor2) in enumerate(dataloader):
 
