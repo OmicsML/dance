@@ -64,16 +64,16 @@ def pipeline(transductive=True, verbose=2, logger=None, **kwargs):
             g.nodes['cell'].data['bf'] = batch_features
 
     # data loader
-    y = torch.from_numpy(input_train_mod2.toarray())
+    y_train = torch.from_numpy(input_train_mod2.toarray())
     if transductive:
         y_test = torch.from_numpy(true_test_mod2.toarray())
 
     model = ScMoGCNWrapper(Namespace(**kwargs))
 
     if kwargs['sampling']:
-        model.fit_with_sampling(g, y, split, transductive, verbose, y_test, logger)
+        model.fit_with_sampling(g, y_train, split, transductive, verbose, y_test, logger)
     else:
-        model.fit(g, y, split, transductive, verbose, y_test, logger)
+        model.fit(g, y_train, split, transductive, verbose, y_test, logger)
 
     print(model.predict(g, np.arange(TRAIN_SIZE, CELL_SIZE), device="cpu"))
     print(model.score(g, np.arange(TRAIN_SIZE, CELL_SIZE), y_test, device="cpu"))
@@ -127,12 +127,13 @@ if __name__ == '__main__':
     parser.add_argument('-samp', '--sampling', action='store_true')
     parser.add_argument('-ns', '--node_sampling_rate', type=float, default=0.5)
     parser.add_argument('-prep', '--preprocessing', default='none', choices=['none', 'feature_selection', 'pca'])
+    parser.add_argument('-lm', '--low_memory', type=bool, default=True)
 
     args = parser.parse_args()
 
-    # For test only (low gpu memory setting; to reproduce competition result need >20G memory - v100)
-    if True:
-        print("WARNING: Runing in testing mode, some cli settings maybe overwritten!")
+    # For test only (low gpu memory setting; to reproduce competition result need >20G GPU memory - v100)
+    if args.low_memory:
+        print("WARNING: Running in low memory mode, some cli settings maybe overwritten!")
         args.preprocessing = 'feature_selection'
         args.no_pathway = True
         args.sampling = True
