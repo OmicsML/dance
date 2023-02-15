@@ -3,8 +3,6 @@ import os
 import random
 
 import numpy as np
-import pandas as pd
-import scanpy as sc
 import torch
 
 from dance.data import Data
@@ -20,13 +18,11 @@ torch.manual_seed(42)
 torch.cuda.manual_seed(42)
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(description="train", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
-    parser.add_argument('--data_dir', default='./data', type=str)
-    parser.add_argument('--data_file', default='mouse_bladder_cell',
-                        type=str)  # choice=['10X_PBMC', 'mouse_bladder_cell', 'mouse_ES_cell', 'worm_neuron_cell']
-    parser.add_argument('--pretrain_file', type=str, default="./sctag_mouse_bladder_cell_pre.pkl")
+    parser.add_argument("--data_dir", default="./data", type=str)
+    parser.add_argument("--data_file", default="mouse_bladder_cell", type=str,
+                        choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
+    parser.add_argument("--pretrain_file", type=str, default="./sctag_mouse_bladder_cell_pre.pkl")
     parser.add_argument("--k_neighbor", default=15, type=int)
     parser.add_argument("--highly_genes", default=3000, type=int)
     parser.add_argument("--pca_dim", default=50, type=int)
@@ -48,8 +44,8 @@ if __name__ == "__main__":
     parser.add_argument("--max_dist", default=20.0, type=float)
     parser.add_argument("--info_step", default=50, type=int)
     args = parser.parse_args()
+    args.pretrain_file = f"sctag_{args.data_file}_pre.pkl"
 
-    args.pretrain_file = "./sctag_" + args.data_file + "_pre.pkl"
     # Load data
     adata, labels = ClusteringDataset(args.data_dir, args.data_file).load_data()
     adata.obsm["Group"] = labels
@@ -76,7 +72,7 @@ if __name__ == "__main__":
                         info_step=args.info_step, W_a=args.W_a, W_x=args.W_x, W_d=args.W_d, min_dist=args.min_dist,
                         max_dist=args.max_dist)
     else:
-        print("==> loading checkpoint '{}'".format(args.pretrain_file))
+        print(f"==> loading checkpoint {args.pretrain_file}")
         checkpoint = torch.load(args.pretrain_file)
         model.load_state_dict(checkpoint)
 
@@ -84,7 +80,7 @@ if __name__ == "__main__":
               info_step=args.info_step)
 
     y_pred = model.predict()
-    #    print(f'Prediction: {y_pred}')
+    #    print(f"Prediction: {y_pred}")
 
     acc, nmi, ari = model.score(y)
     print("ACC: {:.4f}, NMI: {:.4f}, ARI: {:.4f}".format(acc, nmi, ari))
