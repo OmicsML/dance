@@ -76,11 +76,11 @@ if __name__ == "__main__":
     NeighborGraph(n_neighbors=args.k_neighbor, n_pcs=args.pca_dim)(data)
 
     data.set_config(
-        feature_channel=[None, None, "size_factors", "NeighborGraph"],
+        feature_channel=[None, None, "n_counts", "NeighborGraph"],
         feature_channel_type=["X", "raw_X", "obs", "obsp"],
         label_channel="Group",
     )
-    (x, x_raw, scale_factor, adj), y = data.get_train_data()
+    (x, x_raw, n_counts, adj), y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
     # Build model & training
@@ -88,15 +88,14 @@ if __name__ == "__main__":
                   dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha)
 
     if not os.path.exists(args.pretrain_file):
-        model.pre_train(x, x_raw, args.pretrain_file, scale_factor, epochs=args.pretrain_epochs,
-                        info_step=args.info_step, W_a=args.W_a, W_x=args.W_x, W_d=args.W_d, min_dist=args.min_dist,
-                        max_dist=args.max_dist)
+        model.pre_train(x, x_raw, args.pretrain_file, n_counts, epochs=args.pretrain_epochs, info_step=args.info_step,
+                        W_a=args.W_a, W_x=args.W_x, W_d=args.W_d, min_dist=args.min_dist, max_dist=args.max_dist)
     else:
         print(f"==> loading checkpoint {args.pretrain_file}")
         checkpoint = torch.load(args.pretrain_file)
         model.load_state_dict(checkpoint)
 
-    model.fit(x, x_raw, y, scale_factor, epochs=args.epochs, lr=args.lr, W_a=args.W_a, W_x=args.W_x, W_c=args.W_c,
+    model.fit(x, x_raw, y, n_counts, epochs=args.epochs, lr=args.lr, W_a=args.W_a, W_x=args.W_x, W_c=args.W_c,
               info_step=args.info_step)
 
     y_pred = model.predict()

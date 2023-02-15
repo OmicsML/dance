@@ -124,7 +124,7 @@ class SCTAG(nn.Module):
 
         return A_out, z, q, _mean, _disp, _pi
 
-    def pre_train(self, x, x_raw, fname, scale_factor, epochs=1000, info_step=10, lr=5e-4, W_a=0.3, W_x=1, W_d=0,
+    def pre_train(self, x, x_raw, fname, n_counts, epochs=1000, info_step=10, lr=5e-4, W_a=0.3, W_x=1, W_d=0,
                   min_dist=0.5, max_dist=20.):
         """Pretrain autoencoder.
 
@@ -136,8 +136,8 @@ class SCTAG(nn.Module):
             raw input features.
         fname : str
             path to save autoencoder weights.
-        scale_factor : list
-            scale factor of input features and raw input features.
+        n_counts : list
+            total counts for each cell.
         epochs : int optional
             number of epochs.
         info_step : int optional
@@ -162,7 +162,7 @@ class SCTAG(nn.Module):
         """
         x = torch.Tensor(x).to(self.device)
         x_raw = torch.Tensor(x_raw).to(self.device)
-        scale_factor = torch.tensor(scale_factor).to(self.device)
+        scale_factor = torch.tensor(n_counts / np.median(n_counts)).to(self.device)
 
         self.train()
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, amsgrad=True)
@@ -193,7 +193,7 @@ class SCTAG(nn.Module):
         torch.save(self.state_dict(), fname)
         print("Pre_train Finish!")
 
-    def fit(self, x, x_raw, y, scale_factor, epochs=300, lr=5e-4, W_a=0.3, W_x=1, W_c=1.5, info_step=1):
+    def fit(self, x, x_raw, y, n_counts, epochs=300, lr=5e-4, W_a=0.3, W_x=1, W_c=1.5, info_step=1):
         """Pretrain autoencoder.
 
         Parameters
@@ -204,8 +204,8 @@ class SCTAG(nn.Module):
             raw input features.
         y : list
             true label.
-        scale_factor : list
-            scale factor of input features and raw input features.
+        n_counts : list
+            total counts for each cell.
         epochs : int optional
             number of epochs.
         lr : float optional
@@ -226,7 +226,7 @@ class SCTAG(nn.Module):
         """
         x = torch.Tensor(x).to(self.device)
         x_raw = torch.Tensor(x_raw).to(self.device)
-        scale_factor = torch.tensor(scale_factor).to(self.device)
+        scale_factor = torch.tensor(n_counts / np.median(n_counts)).to(self.device)
 
         # Initializing cluster centers with kmeans
         kmeans = KMeans(self.n_clusters, n_init=20)
