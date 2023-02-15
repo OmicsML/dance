@@ -584,7 +584,8 @@ class CMAE(nn.Module):
                                          aux_labels[batch_idx], variational=False)
                     else:
                         self._gen_update(mod1, mod2, mod1, mod2, hyperparameters, variational=False)
-            print('Matching score:', self.score(train_mod1[val_idx], train_mod2[val_idx], torch.arange(val_idx.shape[0])))
+            print('Matching score:', self.score(train_mod1[val_idx], train_mod2[val_idx],
+                                                torch.arange(val_idx.shape[0])))
             # print('Matching score:',
             #       self.evaluate(test_mod1, test_mod2, labels))
 

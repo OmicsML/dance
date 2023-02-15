@@ -516,8 +516,8 @@ class MMVAE(nn.Module):
         start_early_stop = self.params.deterministic_warmup
 
         idx = np.random.permutation(x_train.shape[0])
-        train_idx = idx[:int(idx.shape[0] * (1-val_ratio))]
-        val_idx = idx[int(idx.shape[0] * (1-val_ratio)):]
+        train_idx = idx[:int(idx.shape[0] * (1 - val_ratio))]
+        val_idx = idx[int(idx.shape[0] * (1 - val_ratio)):]
 
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.params.lr, amsgrad=True)
         assert (self.params.obj in ['m_elbo_naive', 'm_elbo_naive_warmup'])
