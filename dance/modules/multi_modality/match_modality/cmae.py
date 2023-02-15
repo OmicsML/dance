@@ -4,12 +4,12 @@ Extended from https://github.com/uhlerlab/cross-modal-autoencoders
 
 Reference
 ---------
-Yang, Karren Dai, et al. "Multi-domain translation between single-cell imaging and sequencing data using autoencoders." Nature communications 12.1 (2021): 1-10.
+Yang, Karren Dai, et al. "Multi-domain translation between single-cell imaging and sequencing data using autoencoders."
+Nature communications 12.1 (2021): 1-10.
 
 """
 import math
 import os
-import sys
 
 import torch
 import torch.nn as nn
@@ -159,9 +159,10 @@ class VAEGen(nn.Module):
         self.dec = nn.Sequential(*decoder_layers)
 
     def forward(self, images):
-        # This is a reduced VAE implementation where we assume the outputs are multivariate Gaussian distribution with mean = hiddens and std_dev = all ones.
+        # This is a reduced VAE implementation where we assume the outputs are multivariate Gaussian distribution
+        # with mean = hiddens and std_dev = all ones.
         hiddens = self.encode(images)
-        if self.training == True:
+        if self.training:
             noise = Variable(torch.randn(hiddens.size()).cuda(hiddens.data.get_device()))
             images_recon = self.decode(hiddens + noise)
         else:
@@ -259,7 +260,8 @@ class CMAE(nn.Module):
     Parameters
     ----------
     hyperparameters : dictionary
-        A dictionary that contains arguments of CMAE. For details of parameters in parser args, please refer to link (parser help document).
+        A dictionary that contains arguments of CMAE. For details of parameters in parser args, please refer to link
+        (parser help document).
 
     """
 
@@ -319,7 +321,6 @@ class CMAE(nn.Module):
             Joint embedding of input modalities.
 
         """
-
         with torch.no_grad():
             emb1, _ = self.gen_a.encode(mod1)
             emb2, _ = self.gen_b.encode(mod2)
@@ -348,7 +349,6 @@ class CMAE(nn.Module):
             Matching accuracy.
 
         """
-
         with torch.no_grad():
             pred = self.predict(mod1, mod2)
             return (pred[torch.arange(pred.shape[0]).long(), labels.long()].mean()).item()
@@ -419,17 +419,21 @@ class CMAE(nn.Module):
         class_weight = hyperparameters['gan_w'] if "class_w" not in hyperparameters else hyperparameters["class_w"]
 
         # total loss
-        self.loss_gen_total = hyperparameters['gan_w'] * self.loss_latent_a + \
-                              hyperparameters['gan_w'] * self.loss_latent_b + \
-                              class_weight * self.loss_class_a + \
-                              class_weight * self.loss_class_b + \
-                              hyperparameters['recon_x_w'] * self.loss_gen_recon_x_a + \
-                              hyperparameters['recon_x_w'] * self.loss_gen_recon_x_b + \
-                              hyperparameters['super_w'] * self.loss_supervision
+        self.loss_gen_total = (
+            hyperparameters['gan_w'] * self.loss_latent_a
+            + hyperparameters['gan_w'] * self.loss_latent_b
+            + class_weight * self.loss_class_a
+            + class_weight * self.loss_class_b
+            + hyperparameters['recon_x_w'] * self.loss_gen_recon_x_a
+            + hyperparameters['recon_x_w'] * self.loss_gen_recon_x_b
+            + hyperparameters['super_w'] * self.loss_supervision
+        )  # yapf: disable
 
         if variational:
-            self.loss_gen_total += hyperparameters['recon_kl_w'] * self.loss_gen_recon_kl_a + \
-                                   hyperparameters['recon_kl_w'] * self.loss_gen_recon_kl_b
+            self.loss_gen_total += (
+                hyperparameters['recon_kl_w'] * self.loss_gen_recon_kl_a
+                + hyperparameters['recon_kl_w'] * self.loss_gen_recon_kl_b
+            )  # yapf: disable
 
         self.loss_gen_total.backward()
         self.gen_opt.step()
@@ -496,7 +500,7 @@ class CMAE(nn.Module):
         state_dict = torch.load(os.path.join(checkpoint_dir, 'optimizer.pt'))
         self.dis_opt.load_state_dict(state_dict['dis'])
         self.gen_opt.load_state_dict(state_dict['gen'])
-        # Reinitilize schedulers
+        # Reinitialize schedulers
         self.dis_scheduler = get_scheduler(self.dis_opt, hyperparameters, iterations)
         self.gen_scheduler = get_scheduler(self.gen_opt, hyperparameters, iterations)
         print('Resume from iteration %d' % iterations)
@@ -511,10 +515,6 @@ class CMAE(nn.Module):
             Path to the checkpoint file.
         iterations : int
             Current number of training iterations.
-
-        Returns
-        -------
-        None.
 
         """
         # Save generators, discriminators, and optimizers
@@ -545,10 +545,6 @@ class CMAE(nn.Module):
             Path to the checkpoint file, by default to be './checkpoint'.
         val_ratio : float
             Ratio for automatic train-validation split.
-
-        Returns
-        -------
-        None.
 
         """
         hyperparameters = self.hyperparameters
@@ -586,8 +582,6 @@ class CMAE(nn.Module):
                         self._gen_update(mod1, mod2, mod1, mod2, hyperparameters, variational=False)
             print('Matching score:', self.score(train_mod1[val_idx], train_mod2[val_idx],
                                                 torch.arange(val_idx.shape[0])))
-            # print('Matching score:',
-            #       self.evaluate(test_mod1, test_mod2, labels))
 
             iterations += 1
             if iterations >= hyperparameters['max_epochs']:
