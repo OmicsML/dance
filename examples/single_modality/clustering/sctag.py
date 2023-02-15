@@ -11,8 +11,6 @@ from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.sctag import SCTAG
 from dance.transforms import AnnDataTransform, CellPCA, SaveRaw
 from dance.transforms.graph import NeighborGraph
-from dance.transforms.graph_construct import get_adj
-from dance.transforms.preprocess import filter_data, normalize_adata
 
 # for repeatability
 random.seed(42)
