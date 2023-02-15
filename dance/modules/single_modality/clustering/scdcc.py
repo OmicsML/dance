@@ -296,7 +296,7 @@ class ScDCC(nn.Module):
             loss = self.cl_weight * cl_loss
             return loss
 
-    def pretrain_autoencoder(self, x, X_raw, size_factor, batch_size=256, lr=0.001, epochs=400, ae_save=True,
+    def pretrain_autoencoder(self, x, X_raw, n_counts, batch_size=256, lr=0.001, epochs=400, ae_save=True,
                              ae_weights='AE_weights.pth.tar'):
         """Pretrain autoencoder.
 
@@ -306,8 +306,8 @@ class ScDCC(nn.Module):
             input features.
         X_raw :
             raw input features.
-        size_factor : list
-            size factor of input features and raw input features.
+        n_counts : list
+            total counts for each cell.
         batch_size : int optional
             size of batch.
         lr : float optional
@@ -330,6 +330,7 @@ class ScDCC(nn.Module):
         else:
             device = 'cpu'
         self.to(device)
+        size_factor = torch.tensor(n_counts / np.median(n_counts))
         dataset = TensorDataset(torch.Tensor(x), torch.Tensor(X_raw), torch.Tensor(size_factor))
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
         print("Pretraining stage")
@@ -370,8 +371,9 @@ class ScDCC(nn.Module):
         newfilename = os.path.join(filename, 'FTcheckpoint_%d.pth.tar' % index)
         torch.save(state, newfilename)
 
-    def fit(self, X, X_raw, sf, ml_ind1=np.array([]), ml_ind2=np.array([]), cl_ind1=np.array([]), cl_ind2=np.array([]),
-            ml_p=1., cl_p=1., y=None, lr=1., batch_size=256, num_epochs=10, update_interval=1, tol=1e-3, save_dir=""):
+    def fit(self, X, X_raw, n_counts, ml_ind1=np.array([]), ml_ind2=np.array([]), cl_ind1=np.array([]),
+            cl_ind2=np.array([]), ml_p=1., cl_p=1., y=None, lr=1., batch_size=256, num_epochs=10, update_interval=1,
+            tol=1e-3, save_dir=""):
         """Train model.
 
         Parameters
@@ -380,8 +382,8 @@ class ScDCC(nn.Module):
             input features.
         X_raw :
             raw input features.
-        sf : float
-            size factor of input features and raw input features.
+        n_counts : float
+            total counts for each cell.
         ml_ind1 : np.array optional
             index 1 of must-link pairs.
         ml_ind2 : np.array optional
@@ -424,7 +426,7 @@ class ScDCC(nn.Module):
         self.to(device)
         X = torch.tensor(X).to(device)
         X_raw = torch.tensor(X_raw).to(device)
-        sf = torch.tensor(sf).to(device)
+        sf = torch.tensor(n_counts / np.median(n_counts)).to(device)
         optimizer = optim.Adadelta(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, rho=.95)
 
         # Initializing cluster centers with kmeans
