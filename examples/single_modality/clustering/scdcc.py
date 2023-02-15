@@ -3,12 +3,14 @@ import os
 from time import time
 
 import numpy as np
+import scanpy as sc
 import torch
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdcc import ScDCC
-from dance.transforms.preprocess import generate_random_pair, normalize_adata
+from dance.transforms import AnnDataTransform, SaveRaw
+from dance.transforms.preprocess import generate_random_pair
 from dance.utils import set_seed
 
 # for repeatability
@@ -42,13 +44,21 @@ if __name__ == "__main__":
     adata, labels = ClusteringDataset(args.data_dir, args.data_file).load_data()
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
-    data.set_config(label_channel="Group")
 
-    # Preprocess scRNA-seq counts matrix
-    normalize_adata(data, size_factors=True, normalize_input=True, logtrans_input=True)
-    adata = data.data
-    y = data.get_y("train")
-    input_size = adata.n_vars
+    # Normalize data
+    AnnDataTransform(sc.pp.filter_genes, min_counts=1)(data)
+    AnnDataTransform(sc.pp.filter_cells, min_counts=1)(data)
+    SaveRaw()(data)
+    AnnDataTransform(sc.pp.normalize_total)(data)
+    AnnDataTransform(sc.pp.log1p)(data)
+    AnnDataTransform(sc.pp.scale)(data)
+
+    data.set_config(
+        feature_channel=[None, None, "n_counts"],
+        feature_channel_type=["X", "raw_X", "obs"],
+        label_channel="Group",
+    )
+    (x, x_raw, n_counts), y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
     # Generate random pairs
@@ -75,15 +85,14 @@ if __name__ == "__main__":
         device = "cuda"
     else:
         device = "cpu"
-    model = ScDCC(input_dim=adata.n_vars, z_dim=32, n_clusters=n_clusters, encodeLayer=[256, 64], decodeLayer=[64, 256],
+    model = ScDCC(input_dim=x.shape[1], z_dim=32, n_clusters=n_clusters, encodeLayer=[256, 64], decodeLayer=[64, 256],
                   sigma=args.sigma, gamma=args.gamma, ml_weight=args.ml_weight, cl_weight=args.ml_weight).to(device)
 
     # Pretrain model
     t0 = time()
     if args.ae_weights is None:
-        model.pretrain_autoencoder(x=adata.X, X_raw=adata.raw.X, size_factor=adata.obs.size_factors,
-                                   batch_size=args.batch_size, epochs=args.pretrain_epochs,
-                                   ae_weights=args.ae_weight_file)
+        model.pretrain_autoencoder(x=x, X_raw=x_raw, n_counts=n_counts, batch_size=args.batch_size,
+                                   epochs=args.pretrain_epochs, ae_weights=args.ae_weight_file)
     else:
         if os.path.isfile(args.ae_weights):
             print(f"==> loading checkpoint {args.ae_weights}")
@@ -97,13 +106,13 @@ if __name__ == "__main__":
     # Train model
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
-    model.fit(X=adata.X, X_raw=adata.raw.X, sf=adata.obs.size_factors, y=y, lr=args.lr, batch_size=args.batch_size,
-              num_epochs=args.maxiter, ml_ind1=ml_ind1, ml_ind2=ml_ind2, cl_ind1=cl_ind1, cl_ind2=cl_ind2,
-              update_interval=args.update_interval, tol=args.tol, save_dir=args.save_dir)
+    model.fit(X=x, X_raw=x_raw, n_counts=n_counts, y=y, lr=args.lr, batch_size=args.batch_size, num_epochs=args.maxiter,
+              ml_ind1=ml_ind1, ml_ind2=ml_ind2, cl_ind1=cl_ind1, cl_ind2=cl_ind2, update_interval=args.update_interval,
+              tol=args.tol, save_dir=args.save_dir)
     print(f"Total time: {int(time() - t0)} seconds.")
 
     y_pred = model.predict()
-    #    print(f"Prediction: {y_pred}")
+    print(f"Prediction (first ten): {y_pred[:10]}")
     acc, nmi, ari = model.score(y)
     print("ACC: {:.4f}, NMI: {:.4f}, ARI: {:.4f}".format(acc, nmi, ari))
     if not os.path.exists(args.label_cells_files):
