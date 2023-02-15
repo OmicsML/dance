@@ -1,15 +1,13 @@
 import os
-import random
 from time import time
 
 import numpy as np
-import scanpy as sc
 import torch
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdeepcluster import ScDeepCluster
-from dance.transforms.preprocess import geneSelection, normalize_adata
+from dance.transforms.preprocess import normalize_adata
 from dance.utils import set_seed
 
 # for repeatability

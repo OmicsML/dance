@@ -1,14 +1,12 @@
 import argparse
-import random
 from argparse import Namespace
 
 import dgl
 import numpy as np
-import torch
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
-from dance.modules.single_modality.clustering.graphsc import *
+from dance.modules.single_modality.clustering.graphsc import GraphSC
 from dance.transforms.graph_construct import cell_gene_graph
 from dance.transforms.preprocess import filter_data
 from dance.utils import set_seed
@@ -37,7 +35,7 @@ def pipeline(**args):
         model = GraphSC(Namespace(**args))
         model.fit(args['epochs'], dataloader, n_clusters, args['learning_rate'], cluster=["KMeans", "Leiden"])
         pred = model.predict(n_clusters, cluster=["KMeans", "Leiden"])
-        #        print(f'kmeans_pred: {pred.get("kmeans_pred")}\n leiden_pred: {pred.get("leiden_pred")}')
+        print(f'kmeans_pred: {pred.get("kmeans_pred")}\n leiden_pred: {pred.get("leiden_pred")}')
         score = model.score(Y, n_clusters, plot=False, cluster=["KMeans", "Leiden"])
         print(f'kmeans_ari: {score.get("kmeans_ari")}, leiden_ari: {score.get("leiden_ari")}')
 

@@ -1,10 +1,8 @@
 import argparse
 import os
-import random
 from time import time
 
 import numpy as np
-import scanpy as sc
 import torch
 
 from dance.data import Data

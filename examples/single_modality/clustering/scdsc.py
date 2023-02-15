@@ -1,15 +1,11 @@
 import argparse
+import os
 from argparse import Namespace
 from time import time as get_time
 
-import numpy as np
-import pandas as pd
-import scanpy as sc
-import scipy as sp
-
 from dance.data import Data
-from dance.datasets.singlemodality import *
-from dance.modules.single_modality.clustering.scdsc import *
+from dance.datasets.singlemodality import ClusteringDataset, PretrainDataset, TrainingDataset
+from dance.modules.single_modality.clustering.scdsc import SCDSCWrapper
 from dance.transforms.graph_construct import construct_graph_scdsc
 from dance.transforms.preprocess import filter_data, normalize_adata
 from dance.utils import set_seed
