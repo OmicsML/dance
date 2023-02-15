@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 
 import numpy as np
+import pandas as pd
+import scipy.sparse as sp
 import torch
 from anndata import AnnData
 from mudata import MuData
@@ -297,6 +299,47 @@ class BaseData(ABC):
         mask[split_idx] = True
         return mask
 
+    @staticmethod
+    def _get_feature(
+        in_data: Union[AnnData, MuData],
+        channel: Optional[str],
+        channel_type: Optional[str],
+        mod: Optional[str],
+    ) -> Union[np.ndarray, sp.spmatrix, pd.DataFrame]:
+        # Pick modality
+        if mod is None:
+            data = in_data
+        elif not isinstance(in_data, MuData):
+            raise AttributeError("`mod` option is only available when using multimodality data.")
+        elif mod not in in_data.mod:
+            raise KeyError(f"Unknown modality {mod!r}, available options are {sorted(data.mod)}")
+        else:
+            data = in_data.mod[mod]
+
+        if channel_type == "X":
+            feature = data.X
+        elif channel_type == "raw_X":
+            feature = data.raw.X
+        else:
+            # Pick channels (obsm, varm, ...)
+            channel_type = channel_type or "obsm"  # default to obsm
+            if channel_type not in (options := BaseData._DATA_CHANNELS):
+                raise ValueError(f"Unknown channel type {channel_type!r}. Available options are {options}")
+            channel_obj = getattr(data, channel_type)
+
+            # Pick feature from a specific channel
+            if channel is None:
+                # FIX: channel default change to "X".
+                warnings.warn(
+                    "The `None` option for channel when channel_type is no longer supported "
+                    "and will raise an exception in the near future version. Please change "
+                    "channel_type to 'X' to preserve the current behavior", DeprecationWarning, stacklevel=2)
+                feature = data.X
+            else:
+                feature = channel_obj[channel]
+
+        return feature
+
     def get_feature(self, *, split_name: Optional[str] = None, return_type: FeatType = "numpy",
                     channel: Optional[str] = None, channel_type: Optional[str] = "obsm",
                     mod: Optional[str] = None):  # yapf: disable
@@ -322,37 +365,10 @@ class BaseData(ABC):
             data object is :class:`~mudata.Mudata`.
 
         """
-        # Pick modality
-        if mod is None:
-            data = self.data
-        elif not isinstance(self.data, MuData):
-            raise AttributeError("`mod` option is only available when using multimodality data.")
-        elif mod not in self.data.mod:
-            raise KeyError(f"Unknown modality {mod!r}, available options are {sorted(self.mod)}")
-        else:
-            data = self.data.mod[mod]
+        feature = self._get_feature(self.data, channel, channel_type, mod)
 
-        if channel_type == "X":
-            feature = data.X
-        elif channel_type == "raw_X":
-            feature = data.raw.X
-        else:
-            # Pick channels (obsm, varm, ...)
-            channel_type = channel_type or "obsm"  # default to obsm
-            if channel_type not in self._DATA_CHANNELS:
-                raise ValueError(f"Unknown channel type {channel_type!r}. Available options are {self._DATA_CHANNELS}")
-            channels = getattr(data, channel_type)
-
-            # Pick feature from a specific channel
-            if channel is None:
-                # FIX: channel default change to "X".
-                warnings.warn(
-                    "The `None` option for channel when channel_type is no longer supported "
-                    "and will raise an exception in the near future version. Please change "
-                    "channel_type to 'X' to preserve the current behavior", DeprecationWarning, stacklevel=2)
-                feature = data.X
-            else:
-                feature = channels[channel]
+        # FIX: no longer allow channel_type=None, use channel_type='X' or 'raw_X' instead
+        channel_type = channel_type or "obsm"
 
         if return_type == "default":
             if split_name is not None:
@@ -370,7 +386,7 @@ class BaseData(ABC):
             if channel_type in ["obsm", "obsp", "layers"]:
                 idx = self.get_split_idx(split_name, error_on_miss=True)
                 feature = feature[idx] if channel_type in ["obsm", "layers"] else feature[idx][:, idx]
-            elif channel_type.startswith("var"):
+            elif isinstance(channel_type, str) and channel_type.startswith("var"):
                 logger.warning(f"Indexing option for {channel_type} not implemented yet.")
 
         # Convert to other data types if needed
