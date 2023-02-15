@@ -280,36 +280,6 @@ class ClusteringDataset():
         return adata, Y
 
 
-class PretrainDataset(Dataset):
-    """Dataset object for scDSC pretraining."""
-
-    def __init__(self, data):
-        self.x = data
-
-    def __len__(self):
-        return self.x.shape[0]
-
-    def __getitem__(self, idx):
-        return torch.from_numpy(np.array(self.x[idx])).float(), \
-               torch.from_numpy(np.array(idx))
-
-
-class TrainingDataset(Dataset):
-    """Dataset object for scDSC training."""
-
-    def __init__(self, X, Y):
-        self.x = X
-        self.y = Y
-
-    def __len__(self):
-        return self.x.shape[0]
-
-    def __getitem__(self, idx):
-        return torch.from_numpy(np.array(self.x[idx])), \
-               torch.from_numpy(np.array(self.y[idx])), \
-               torch.from_numpy(np.array(idx))
-
-
 @dataclass
 class ImputationDatasetParams:
     data_dir = None

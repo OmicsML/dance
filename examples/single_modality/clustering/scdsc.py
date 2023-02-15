@@ -6,7 +6,7 @@ from time import time
 import scanpy as sc
 
 from dance.data import Data
-from dance.datasets.singlemodality import ClusteringDataset, PretrainDataset, TrainingDataset
+from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdsc import SCDSCWrapper
 from dance.transforms import AnnDataTransform, SaveRaw
 from dance.transforms.graph import NeighborGraph
@@ -73,7 +73,6 @@ if __name__ == "__main__":
     adata, labels = ClusteringDataset("./data", args.name).load_data()
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
-    data.set_config(label_channel="Group")
 
     # Filter data
     AnnDataTransform(sc.pp.filter_genes, min_counts=3)(data)
@@ -102,17 +101,13 @@ if __name__ == "__main__":
     (x, x_raw, n_counts, adj), y = data.get_data(return_type="default")
     args.n_input = x.shape[1]
 
-    # pretrain AE
+    # Pretrain AE
     model = SCDSCWrapper(Namespace(**vars(args)))
     if not os.path.exists(args.pretrain_path):
-        print("Pretrain:")
-        dataset_pre = PretrainDataset(x)
-        model.pretrain_ae(dataset_pre, args.batch_size, args.pretrain_epochs, args.pretrain_path)
+        model.pretrain_ae(x, args.batch_size, args.pretrain_epochs, args.pretrain_path)
 
-    # train scDSC
-    print("Train:")
-    dataset = TrainingDataset(x, y)
-    model.fit(dataset, x_raw, n_counts, adj, lr=args.lr, n_epochs=args.n_epochs, bcl=args.binary_crossentropy_loss,
+    # Train scDSC
+    model.fit(x, y, x_raw, n_counts, adj, lr=args.lr, n_epochs=args.n_epochs, bcl=args.binary_crossentropy_loss,
               cl=args.ce_loss, rl=args.re_loss, zl=args.zinb_loss)
     print(f"Running Time：{int(time() - time_start)} seconds")
 
