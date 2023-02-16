@@ -196,7 +196,7 @@ class BaseData(ABC):
             # New config
             if config_key not in self.config:
                 self.config[config_key] = config_val
-                logger.info(f"Setting config {config_key!r}t to {config_val!r}")
+                logger.info(f"Setting config {config_key!r} to {config_val!r}")
                 continue
 
             # Existing config
