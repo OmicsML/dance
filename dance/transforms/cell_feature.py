@@ -21,16 +21,23 @@ class WeightedFeaturePCA(BaseTransform):
 
     """
 
-    _DISPLAY_ATTRS = ("n_components", "split_name")
+    _DISPLAY_ATTRS = ("n_components", "split_name", "feat_norm_mode", "feat_norm_axis")
 
-    def __init__(self, n_components: int = 400, split_name: Optional[str] = None, **kwargs):
+    def __init__(self, n_components: int = 400, split_name: Optional[str] = None, feat_norm_mode: Optional[str] = None,
+                 feat_norm_axis: int = 0, **kwargs):
         super().__init__(**kwargs)
 
         self.n_components = n_components
         self.split_name = split_name
+        self.feat_norm_mode = feat_norm_mode
+        self.feat_norm_axis = feat_norm_axis
 
     def __call__(self, data):
         feat = data.get_x(self.split_name)  # cell x genes
+        if self.feat_norm_mode is not None:
+            self.logger.info(f"Normalizing feature before PCA decomposition with mode={self.feat_norm_mode} "
+                             f"and axis={self.feat_norm_axis}")
+            feat = normalize(feat, mode=self.feat_norm_mode, axis=self.feat_norm_axis)
         gene_pca = PCA(n_components=self.n_components)
 
         self.logger.info(f"Start decomposing {self.split_name} features {feat.shape} (k={self.n_components})")
