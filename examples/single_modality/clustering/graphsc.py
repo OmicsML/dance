@@ -72,16 +72,10 @@ if __name__ == "__main__":
     graph, y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
-    labels = graph.ndata["label"]
-    train_ids = np.where(labels != -1)[0]
-    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(args.n_layers)
-    dataloader = dgl.dataloading.NodeDataLoader(graph, train_ids, sampler, batch_size=args.batch_size, shuffle=True,
-                                                drop_last=False, num_workers=args.num_workers)
-
     for run in range(args.num_run):
         set_seed(run)
         model = GraphSC(args)
-        model.fit(args.epochs, dataloader, n_clusters, args.learning_rate, cluster=["KMeans", "Leiden"])
+        model.fit(graph, args.epochs, n_clusters, args.learning_rate, cluster=["KMeans", "Leiden"])
         pred = model.predict(n_clusters, cluster=["KMeans", "Leiden"])
         print(f"kmeans_pred (first 10): {pred.get('kmeans_pred')[:10]}")
         print(f"leiden_pred (first 10): {pred.get('leiden_pred')[:10]}")

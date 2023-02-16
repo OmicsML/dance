@@ -11,6 +11,7 @@ Ciortan, Madalina, and Matthieu Defrance. "GNN-based embedding for clustering sc
 
 import time
 
+import dgl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -46,15 +47,15 @@ class GraphSC:
         self.device = get_device(args.use_cpu)
         self.model = GCNAE(args).to(self.device)
 
-    def fit(self, n_epochs, dataloader, n_clusters, lr, cluster=["KMeans"]):
+    def fit(self, g, n_epochs, n_clusters, lr, cluster=["KMeans"]):
         """Train graph-sc.
 
         Parameters
         ----------
+        g : dgl.DGLGraph
+            input cell-gene graph.
         n_epochs : int
             number of epochs.
-        dataloader :
-            dataloader for training.
         n_clusters : int
             number of clusters.
         lr : float
@@ -62,11 +63,12 @@ class GraphSC:
         cluster : list optional
             clustering method.
 
-        Returns
-        -------
-        None.
-
         """
+        train_ids = np.where(g.ndata["label"] != -1)[0]
+        sampler = dgl.dataloading.MultiLayerFullNeighborSampler(self.args.n_layers)
+        dataloader = dgl.dataloading.NodeDataLoader(g, train_ids, sampler, batch_size=self.args.batch_size,
+                                                    shuffle=True, drop_last=False, num_workers=self.args.num_workers)
+
         device = get_device(self.args.use_cpu)
         optim = torch.optim.Adam(self.model.parameters(), lr=lr)
         losses = []
