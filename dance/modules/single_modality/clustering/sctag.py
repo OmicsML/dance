@@ -75,7 +75,7 @@ class ScTAG(nn.Module):
         self.mu = Parameter(torch.Tensor(self.n_clusters, self.latent_dim).to(self.device))
 
         src, dist = np.nonzero(adj)
-        self.G = dgl.graph((src, dist)).to(device)
+        self.g = dgl.graph((src, dist)).to(device)
 
         deg = adj.sum(1, keepdims=True)
         deg[deg == 0] = 1
@@ -83,14 +83,14 @@ class ScTAG(nn.Module):
         adj_n = adj * normalized_deg * normalized_deg.T
         src_n, dist_n = np.nonzero(adj_n)
 
-        self.G_n = dgl.graph((src_n, dist_n)).to(device)
+        self.g_n = dgl.graph((src_n, dist_n)).to(device)
 
         self.encoder1 = TAGConv(self.in_dim, self.hidden_dim, k=k)
         self.encoder2 = TAGConv(self.hidden_dim, self.latent_dim, k=k)
-        self.decoderA = DecoderA(latent_dim=self.latent_dim, adj_dim=adj.shape[0], activation=torch.sigmoid,
-                                 dropout=self.dropout)
-        self.decoderX = DecoderX(self.in_dim, self.latent_dim, n_dec_1=dec_dim[0], n_dec_2=dec_dim[1],
-                                 n_dec_3=dec_dim[2])
+        self.decoder_adj = DecoderAdj(latent_dim=self.latent_dim, adj_dim=adj.shape[0], activation=torch.sigmoid,
+                                      dropout=self.dropout)
+        self.decoder_x = DecoderX(self.in_dim, self.latent_dim, n_dec_1=dec_dim[0], n_dec_2=dec_dim[1],
+                                  n_dec_3=dec_dim[2])
         self.zinb_loss = ZINBLoss().to(self.device)
         self.to(self.device)
 
@@ -123,19 +123,19 @@ class ScTAG(nn.Module):
             log_level=log_level,
         )
 
-    def forward(self, A_in, X_input):
+    def forward(self, adj_in, x_input):
         """Forward propagation.
 
         Parameters
         ----------
-        A_in
+        adj_in
             Input adjacency matrix.
-        X_input
+        x_input
             Input features.
 
         Returns
         -------
-        A_out
+        adj_out
             Reconstructed adjacency matrix.
         z
             Embedding.
@@ -149,13 +149,13 @@ class ScTAG(nn.Module):
             Data dropout probability from ZINB.
 
         """
-        enc_h = self.encoder1(A_in, X_input)
-        z = self.encoder2(A_in, enc_h)
-        A_out = self.decoderA(z)
-        _mean, _disp, _pi = self.decoderX(z)
+        enc_h = self.encoder1(adj_in, x_input)
+        z = self.encoder2(adj_in, enc_h)
+        adj_out = self.decoder_adj(z)
+        _mean, _disp, _pi = self.decoder_x(z)
         q = self.soft_assign(z)
 
-        return A_out, z, q, _mean, _disp, _pi
+        return adj_out, z, q, _mean, _disp, _pi
 
     def pre_train(self, x, x_raw, fname, n_counts, epochs=1000, info_step=10, lr=5e-4, W_a=0.3, W_x=1, W_d=0,
                   min_dist=0.5, max_dist=20.):
@@ -197,23 +197,23 @@ class ScTAG(nn.Module):
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, amsgrad=True)
         print("Pretraining stage")
         for epoch in range(epochs):
-            A_out, z, _, mean, disp, pi = self.forward(self.G_n, x)
+            adj_out, z, _, mean, disp, pi = self.forward(self.g_n, x)
 
             if W_d:
                 Dist_loss = torch.mean(dist_loss(z, min_dist, max_dist=max_dist))
-            A_rec_loss = torch.mean(F.mse_loss(A_out, torch.Tensor(self.adj).to(self.device)))
+            adj_rec_loss = torch.mean(F.mse_loss(adj_out, torch.Tensor(self.adj).to(self.device)))
             Zinb_loss = self.zinb_loss(x_raw, mean, disp, pi, scale_factor)
-            loss = W_a * A_rec_loss + W_x * Zinb_loss
+            loss = W_a * adj_rec_loss + W_x * Zinb_loss
             if W_d:
                 loss += W_d * Dist_loss
 
             if epoch % info_step == 0:
                 if W_d:
                     print("Epoch %3d: ZINB Loss: %.8f, MSE Loss: %.8f, Dist Loss: %.8f" %
-                          (epoch + 1, Zinb_loss.item(), A_rec_loss.item(), Dist_loss.item()))
+                          (epoch + 1, Zinb_loss.item(), adj_rec_loss.item(), Dist_loss.item()))
                 else:
                     print("Epoch %3d: ZINB Loss: %.8f, MSE Loss: %.8f" %
-                          (epoch + 1, Zinb_loss.item(), A_rec_loss.item()))
+                          (epoch + 1, Zinb_loss.item(), adj_rec_loss.item()))
 
             optimizer.zero_grad()
             loss.backward()
@@ -255,8 +255,8 @@ class ScTAG(nn.Module):
 
         # Initializing cluster centers with kmeans
         kmeans = KMeans(self.n_clusters, n_init=20)
-        enc_h = self.encoder1(self.G_n, x)
-        z = self.encoder2(self.G_n, enc_h)
+        enc_h = self.encoder1(self.g_n, x)
+        z = self.encoder2(self.g_n, enc_h)
         kmeans.fit_predict(z.detach().cpu().numpy())
         self.mu.data.copy_(torch.tensor(kmeans.cluster_centers_, dtype=torch.float32).to(self.device))
 
@@ -268,7 +268,7 @@ class ScTAG(nn.Module):
         Q = {}
 
         for epoch in range(epochs):
-            A_out, _, q, mean, disp, pi = self.forward(self.G_n, x)
+            adj_out, _, q, mean, disp, pi = self.forward(self.g_n, x)
             self.q = q
             p = self.target_distribution(q)
             self.y_pred = self.predict()
@@ -283,13 +283,13 @@ class ScTAG(nn.Module):
             if epoch % info_step == 0:
                 print("Epoch %3d, ARI: %.4f, Best ARI: %.4f" % (epoch + 1, ari, max(aris)))
 
-            A_rec_loss = torch.mean(F.mse_loss(A_out, torch.Tensor(self.adj).to(self.device)))
+            adj_rec_loss = torch.mean(F.mse_loss(adj_out, torch.Tensor(self.adj).to(self.device)))
             Zinb_loss = self.zinb_loss(x_raw, mean, disp, pi, scale_factor)
             Cluster_loss = torch.mean(
                 F.kl_div(
                     torch.Tensor(self.y_pred).to(self.device),
                     torch.Tensor(y).to(self.device), reduction='batchmean'))
-            loss = W_a * A_rec_loss + W_x * Zinb_loss + W_c * Cluster_loss
+            loss = W_a * adj_rec_loss + W_x * Zinb_loss + W_c * Cluster_loss
 
             optimizer.zero_grad()
             loss.backward()
@@ -371,7 +371,7 @@ class ScTAG(nn.Module):
         return (p.t() / p.sum(1)).t()
 
 
-class DecoderA(nn.Module):
+class DecoderAdj(nn.Module):
     """Decoder for adjacency matrix.
 
     Parameters
