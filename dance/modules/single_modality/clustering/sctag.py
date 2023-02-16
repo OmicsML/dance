@@ -12,6 +12,7 @@ doi:10.1609/aaai.v36i4.20392.
 
 import dgl
 import numpy as np
+import scanpy as sc
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,6 +22,9 @@ from sklearn import metrics
 from sklearn.cluster import KMeans
 from torch.nn import Parameter
 
+from dance.transforms import AnnDataTransform, CellPCA, Compose, SaveRaw, SetConfig
+from dance.transforms.graph import NeighborGraph
+from dance.typing import LogLevel
 from dance.utils.loss import ZINBLoss, dist_loss
 from dance.utils.metrics import cluster_acc
 
@@ -89,6 +93,35 @@ class SCTAG(nn.Module):
                                  n_dec_3=dec_dim[2])
         self.zinb_loss = ZINBLoss().to(self.device)
         self.to(self.device)
+
+    @staticmethod
+    def preprocessing_pipeline(n_top_genes: int = 3000, n_components: int = 50, n_neighbors: int = 15,
+                               log_level: LogLevel = "INFO"):
+        return Compose(
+            # Filter data
+            AnnDataTransform(sc.pp.filter_genes, min_counts=3),
+            AnnDataTransform(sc.pp.filter_cells, min_counts=1),
+            AnnDataTransform(sc.pp.normalize_per_cell),
+            AnnDataTransform(sc.pp.log1p),
+            AnnDataTransform(sc.pp.highly_variable_genes, min_mean=0.0125, max_mean=4, flavor="cell_ranger",
+                             min_disp=0.5, n_top_genes=n_top_genes, subset=True),
+            # Normalize data
+            AnnDataTransform(sc.pp.filter_genes, min_counts=1),
+            AnnDataTransform(sc.pp.filter_cells, min_counts=1),
+            SaveRaw(),
+            AnnDataTransform(sc.pp.normalize_total),
+            AnnDataTransform(sc.pp.log1p),
+            AnnDataTransform(sc.pp.scale),
+            # Construct k-neighbors graph
+            CellPCA(n_components=n_components),
+            NeighborGraph(n_neighbors=n_neighbors, n_pcs=n_components),
+            SetConfig({
+                "feature_channel": [None, None, "n_counts", "NeighborGraph"],
+                "feature_channel_type": ["X", "raw_X", "obs", "obsp"],
+                "label_channel": "Group",
+            }),
+            log_level=log_level,
+        )
 
     def forward(self, A_in, X_input):
         """Forward propagation.
