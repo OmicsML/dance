@@ -12,6 +12,7 @@ neural network." Briefings in Bioinformatics 23.2 (2022): bbac018.
 import math
 
 import numpy as np
+import scanpy as sc
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -22,7 +23,10 @@ from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, TensorDataset
 
+from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
+from dance.transforms.graph import NeighborGraph
 from dance.transforms.preprocess import sparse_mx_to_torch_sparse_tensor
+from dance.typing import LogLevel
 from dance.utils.loss import ZINBLoss
 from dance.utils.metrics import cluster_acc
 
@@ -45,6 +49,33 @@ class SCDSCWrapper:
         self.model_pre = AE(n_enc_1=args.n_enc_1, n_enc_2=args.n_enc_2, n_enc_3=args.n_enc_3, n_dec_1=args.n_dec_1,
                             n_dec_2=args.n_dec_2, n_dec_3=args.n_dec_3, n_input=args.n_input, n_z1=args.n_z1,
                             n_z2=args.n_z2, n_z3=args.n_z3).to(self.device)
+
+    @staticmethod
+    def preprocessing_pipeline(n_top_genes: int = 2000, n_neighbors: int = 50, log_level: LogLevel = "INFO"):
+        return Compose(
+            # Filter data
+            AnnDataTransform(sc.pp.filter_genes, min_counts=3),
+            AnnDataTransform(sc.pp.filter_cells, min_counts=1),
+            AnnDataTransform(sc.pp.normalize_per_cell),
+            AnnDataTransform(sc.pp.log1p),
+            AnnDataTransform(sc.pp.highly_variable_genes, min_mean=0.0125, max_mean=4, flavor="cell_ranger",
+                             min_disp=0.5, n_top_genes=n_top_genes, subset=True),
+            # Normalize data
+            AnnDataTransform(sc.pp.filter_genes, min_counts=1),
+            AnnDataTransform(sc.pp.filter_cells, min_counts=1),
+            SaveRaw(),
+            AnnDataTransform(sc.pp.normalize_total),
+            AnnDataTransform(sc.pp.log1p),
+            AnnDataTransform(sc.pp.scale),
+            # Construct k-neighbors graph using the noramlized feature matrix
+            NeighborGraph(n_neighbors=n_neighbors, metric="correlation", channel="X"),
+            SetConfig({
+                "feature_channel": [None, None, "n_counts", "NeighborGraph"],
+                "feature_channel_type": ["X", "raw_X", "obs", "obsp"],
+                "label_channel": "Group"
+            }),
+            log_level=log_level,
+        )
 
     def target_distribution(self, q):
         """Calculate auxiliary target distribution p with q.
