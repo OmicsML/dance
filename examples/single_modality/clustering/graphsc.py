@@ -1,13 +1,10 @@
 import argparse
 
 import numpy as np
-import scanpy as sc
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.graphsc import GraphSC
-from dance.transforms import AnnDataTransform
-from dance.transforms.graph import PCACellFeatureGraph
 from dance.utils import set_seed
 
 if __name__ == "__main__":
@@ -46,27 +43,14 @@ if __name__ == "__main__":
     adata.obsm["labels"] = labels
     data = Data(adata, train_size="all")
 
-    # Filter data
-    AnnDataTransform(sc.pp.filter_genes, min_counts=3)(data)
-    AnnDataTransform(sc.pp.filter_cells, min_counts=1)(data)
-    AnnDataTransform(sc.pp.normalize_total)(data)
-    AnnDataTransform(sc.pp.log1p)(data)
-    AnnDataTransform(sc.pp.highly_variable_genes, min_mean=0.0125, max_mean=4, flavor="cell_ranger", min_disp=0.5,
-                     n_top_genes=args.nb_genes, subset=True)(data)
+    preprocessing_pipeline = GraphSC.preprocessing_pipeline(
+        n_top_genes=args.nb_genes,
+        normalize_weights=args.normalize_weights,
+        n_components=args.in_feats,
+        normalize_edges=args.edge_norm,
+    )
+    preprocessing_pipeline(data)
 
-    # Normalize
-    if args.normalize_weights == "log_per_cell":
-        AnnDataTransform(sc.pp.log1p)(data)
-        AnnDataTransform(sc.pp.normalize_total, target_sum=1)(data)
-    elif args.normalize_weights == "per_cell":
-        AnnDataTransform(sc.pp.normalize_total, target_sum=1)(data)
-    elif args.normalize_weights != "none":
-        raise ValueError(f"Unknown normalization option {args.normalize_weights!r}."
-                         "Available options are: 'none', 'log_per_cell', 'per_cell'")
-
-    # Construct cell-gene graph
-    PCACellFeatureGraph(n_components=args.in_feats, normalize_edges=args.edge_norm, feat_norm_mode="standardize")(data)
-    data.set_config(feature_channel="CellFeatureGraph", feature_channel_type="uns", label_channel="labels")
     graph, y = data.get_train_data()
     n_clusters = len(np.unique(y))
 

@@ -29,6 +29,10 @@ from sklearn.metrics import adjusted_rand_score, calinski_harabasz_score, normal
 from torch.nn.functional import binary_cross_entropy_with_logits as BCELoss
 from tqdm import tqdm
 
+from dance.transforms import AnnDataTransform, Compose, SetConfig
+from dance.transforms.graph import PCACellFeatureGraph
+from dance.typing import LogLevel
+
 
 class GraphSC:
     """GraphSC class.
@@ -46,6 +50,45 @@ class GraphSC:
         self.args = args
         self.device = get_device(args.use_cpu)
         self.model = GCNAE(args).to(self.device)
+
+    @staticmethod
+    def preprocessing_pipeline(n_top_genes: int = 3000, normalize_weights: str = "log_per_cell", n_components: int = 50,
+                               normalize_edges: bool = False, log_level: LogLevel = "INFO"):
+        transforms = [
+            AnnDataTransform(sc.pp.filter_genes, min_counts=3),
+            AnnDataTransform(sc.pp.filter_cells, min_counts=1),
+            AnnDataTransform(sc.pp.normalize_total),
+            AnnDataTransform(sc.pp.log1p),
+            AnnDataTransform(sc.pp.highly_variable_genes, min_mean=0.0125, max_mean=4, flavor="cell_ranger",
+                             min_disp=0.5, n_top_genes=n_top_genes, subset=True),
+        ]
+
+        if normalize_weights == "log_per_cell":
+            transforms.extend([
+                AnnDataTransform(sc.pp.log1p),
+                AnnDataTransform(sc.pp.normalize_total, target_sum=1),
+            ])
+        elif normalize_weights == "per_cell":
+            transforms.append(AnnDataTransform(sc.pp.normalize_total, target_sum=1))
+        elif normalize_weights != "none":
+            raise ValueError(f"Unknown normalization option {normalize_weights!r}."
+                             "Available options are: 'none', 'log_per_cell', 'per_cell'")
+
+        # Cell-gene graph construction
+        transforms.extend([
+            PCACellFeatureGraph(
+                n_components=n_components,
+                normalize_edges=normalize_edges,
+                feat_norm_mode="standardize",
+            ),
+            SetConfig({
+                "feature_channel": "CellFeatureGraph",
+                "feature_channel_type": "uns",
+                "label_channel": "labels",
+            }),
+        ])
+
+        return Compose(*transforms, log_level=log_level)
 
     def fit(self, g, n_epochs, n_clusters, lr, cluster=["KMeans"]):
         """Train graph-sc.
