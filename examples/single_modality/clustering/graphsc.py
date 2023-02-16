@@ -1,6 +1,5 @@
 import argparse
 
-import dgl
 import numpy as np
 import scanpy as sc
 
@@ -8,7 +7,7 @@ from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.graphsc import GraphSC
 from dance.transforms import AnnDataTransform
-from dance.transforms.graph_construct import cell_gene_graph
+from dance.transforms.graph import PCACellFeatureGraph
 from dance.utils import set_seed
 
 if __name__ == "__main__":
@@ -66,9 +65,8 @@ if __name__ == "__main__":
                          "Available options are: 'none', 'log_per_cell', 'per_cell'")
 
     # Construct cell-gene graph
-    cell_gene_graph(data, dense_dim=args.in_feats, node_features=args.node_features,
-                    same_edge_values=args.same_edge_values, edge_norm=args.edge_norm)
-    data.set_config(feature_channel="graph", feature_channel_type="uns", label_channel="labels")
+    PCACellFeatureGraph(n_components=args.in_feats, normalize_edges=args.edge_norm, feat_norm_mode="standardize")(data)
+    data.set_config(feature_channel="CellFeatureGraph", feature_channel_type="uns", label_channel="labels")
     graph, y = data.get_train_data()
     n_clusters = len(np.unique(y))
 

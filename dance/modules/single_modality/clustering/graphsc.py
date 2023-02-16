@@ -64,6 +64,7 @@ class GraphSC:
             clustering method.
 
         """
+        g.ndata["order"] = g.ndata["label"] = g.ndata["feat_id"]
         train_ids = np.where(g.ndata["label"] != -1)[0]
         sampler = dgl.dataloading.MultiLayerFullNeighborSampler(self.args.n_layers)
         dataloader = dgl.dataloading.NodeDataLoader(g, train_ids, sampler, batch_size=self.args.batch_size,
