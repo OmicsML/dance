@@ -3,13 +3,11 @@ import os
 from time import time
 
 import numpy as np
-import scanpy as sc
 import torch
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdeepcluster import ScDeepCluster
-from dance.transforms import AnnDataTransform, SaveRaw
 from dance.utils import set_seed
 
 # for repeatability
@@ -48,19 +46,9 @@ if __name__ == "__main__":
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
 
-    # Normalize data
-    AnnDataTransform(sc.pp.filter_genes, min_counts=1)(data)
-    AnnDataTransform(sc.pp.filter_cells, min_counts=1)(data)
-    SaveRaw()(data)
-    AnnDataTransform(sc.pp.normalize_total)(data)
-    AnnDataTransform(sc.pp.log1p)(data)
-    AnnDataTransform(sc.pp.scale)(data)
+    preprocessing_pipeline = ScDeepCluster.preprocessing_pipeline()
+    preprocessing_pipeline(data)
 
-    data.set_config(
-        feature_channel=[None, None, "n_counts"],
-        feature_channel_type=["X", "raw_X", "obs"],
-        label_channel="Group",
-    )
     (x, x_raw, n_counts), y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
