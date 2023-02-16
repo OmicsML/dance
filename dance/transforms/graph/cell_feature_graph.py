@@ -40,8 +40,8 @@ class CellFeatureGraph(BaseTransform):
         g = dgl.graph((row, col))
         g.edata["weight"] = edata
         # FIX: change to feat_id
-        g.ndata["id"] = torch.concat((torch.arange(num_feats, dtype=torch.int32),
-                                      -torch.ones(num_cells, dtype=torch.int32)))  # yapf: disable
+        g.ndata["cell_id"] = torch.concat((torch.arange(num_feats, dtype=torch.int32),
+                                           -torch.ones(num_cells, dtype=torch.int32)))  # yapf: disable
         g.ndata["feat_id"] = torch.concat((-torch.ones(num_feats, dtype=torch.int32),
                                            torch.arange(num_cells, dtype=torch.int32)))  # yapf: disable
 
