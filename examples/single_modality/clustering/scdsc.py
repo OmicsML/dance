@@ -3,13 +3,9 @@ import os
 from argparse import Namespace
 from time import time
 
-import scanpy as sc
-
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdsc import SCDSCWrapper
-from dance.transforms import AnnDataTransform, SaveRaw
-from dance.transforms.graph import NeighborGraph
 from dance.utils import set_seed
 
 # for repeatability
@@ -74,30 +70,9 @@ if __name__ == "__main__":
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
 
-    # Filter data
-    AnnDataTransform(sc.pp.filter_genes, min_counts=3)(data)
-    AnnDataTransform(sc.pp.filter_cells, min_counts=1)(data)
-    AnnDataTransform(sc.pp.normalize_per_cell)(data)
-    AnnDataTransform(sc.pp.log1p)(data)
-    AnnDataTransform(sc.pp.highly_variable_genes, min_mean=0.0125, max_mean=4, flavor="cell_ranger", min_disp=0.5,
-                     n_top_genes=args.nb_genes, subset=True)(data)
+    preprocessing_pipeline = SCDSCWrapper.preprocessing_pipeline(n_top_genes=args.nb_genes, n_neighbors=args.topk)
+    preprocessing_pipeline(data)
 
-    # Normalize data
-    AnnDataTransform(sc.pp.filter_genes, min_counts=1)(data)
-    AnnDataTransform(sc.pp.filter_cells, min_counts=1)(data)
-    SaveRaw()(data)
-    AnnDataTransform(sc.pp.normalize_total)(data)
-    AnnDataTransform(sc.pp.log1p)(data)
-    AnnDataTransform(sc.pp.scale)(data)
-
-    # Construct k-neighbors graph using the noramlized feature matrix
-    NeighborGraph(n_neighbors=args.topk, metric="correlation", channel="X")(data)
-
-    data.set_config(
-        feature_channel=[None, None, "n_counts", "NeighborGraph"],
-        feature_channel_type=["X", "raw_X", "obs", "obsp"],
-        label_channel="Group",
-    )
     (x, x_raw, n_counts, adj), y = data.get_data(return_type="default")
     args.n_input = x.shape[1]
 

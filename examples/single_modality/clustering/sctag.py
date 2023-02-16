@@ -3,14 +3,11 @@ import os
 import random
 
 import numpy as np
-import scanpy as sc
 import torch
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
-from dance.modules.single_modality.clustering.sctag import SCTAG
-from dance.transforms import AnnDataTransform, CellPCA, SaveRaw
-from dance.transforms.graph import NeighborGraph
+from dance.modules.single_modality.clustering.sctag import ScTAG
 
 # for repeatability
 random.seed(42)
@@ -52,36 +49,15 @@ if __name__ == "__main__":
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
 
-    # Filter data
-    AnnDataTransform(sc.pp.filter_genes, min_counts=3)(data)
-    AnnDataTransform(sc.pp.filter_cells, min_counts=1)(data)
-    AnnDataTransform(sc.pp.normalize_per_cell)(data)
-    AnnDataTransform(sc.pp.log1p)(data)
-    AnnDataTransform(sc.pp.highly_variable_genes, min_mean=0.0125, max_mean=4, flavor="cell_ranger", min_disp=0.5,
-                     n_top_genes=args.highly_genes, subset=True)(data)
+    preprocessing_pipeline = ScTAG.preprocessing_pipeline(n_top_genes=args.highly_genes, n_components=args.pca_dim,
+                                                          n_neighbors=args.k_neighbor)
+    preprocessing_pipeline(data)
 
-    # Normalize data
-    AnnDataTransform(sc.pp.filter_genes, min_counts=1)(data)
-    AnnDataTransform(sc.pp.filter_cells, min_counts=1)(data)
-    SaveRaw()(data)
-    AnnDataTransform(sc.pp.normalize_total)(data)
-    AnnDataTransform(sc.pp.log1p)(data)
-    AnnDataTransform(sc.pp.scale)(data)
-
-    # Construct k-neighbors graph
-    CellPCA(n_components=args.pca_dim)(data)
-    NeighborGraph(n_neighbors=args.k_neighbor, n_pcs=args.pca_dim)(data)
-
-    data.set_config(
-        feature_channel=[None, None, "n_counts", "NeighborGraph"],
-        feature_channel_type=["X", "raw_X", "obs", "obsp"],
-        label_channel="Group",
-    )
     (x, x_raw, n_counts, adj), y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
     # Build model & training
-    model = SCTAG(x, adj=adj, n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
+    model = ScTAG(x, adj=adj, n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
                   dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha)
 
     if not os.path.exists(args.pretrain_file):
@@ -96,7 +72,7 @@ if __name__ == "__main__":
               info_step=args.info_step)
 
     y_pred = model.predict()
-    #    print(f"Prediction: {y_pred}")
+    print(f"Prediction (first ten): {y_pred[:10]}")
 
     acc, nmi, ari = model.score(y)
     print("ACC: {:.4f}, NMI: {:.4f}, ARI: {:.4f}".format(acc, nmi, ari))
