@@ -70,16 +70,29 @@ class PCACellFeatureGraph(BaseTransform):
 
     _DISPLAY_ATTRS = ("n_components", "split_name")
 
-    def __init__(self, n_components: int = 400, split_name: Optional[str] = None, *, mod: Optional[str] = None,
-                 log_level: LogLevel = "WARNING"):
+    def __init__(
+        self,
+        n_components: int = 400,
+        split_name: Optional[str] = None,
+        *,
+        normalize_edges: bool = True,
+        feat_norm_mode: Optional[str] = None,
+        feat_norm_axis: int = 0,
+        mod: Optional[str] = None,
+        log_level: LogLevel = "WARNING",
+    ):
         super().__init__(log_level=log_level)
 
         self.n_components = n_components
         self.split_name = split_name
-
+        self.normalize_edges = normalize_edges
+        self.feat_norm_mode = feat_norm_mode
+        self.feat_norm_axis = feat_norm_axis
         self.mod = mod
 
     def __call__(self, data):
-        WeightedFeaturePCA(self.n_components, self.split_name, log_level=self.log_level)(data)
-        CellFeatureGraph(cell_feature_channel="WeightedFeaturePCA", mod=self.mod, log_level=self.log_level)(data)
+        WeightedFeaturePCA(self.n_components, self.split_name, feat_norm_mode=self.feat_norm_mode,
+                           feat_norm_axis=self.feat_norm_axis, log_level=self.log_level)(data)
+        CellFeatureGraph(cell_feature_channel="WeightedFeaturePCA", mod=self.mod, normalize_edges=self.normalize_edges,
+                         log_level=self.log_level)(data)
         return data
