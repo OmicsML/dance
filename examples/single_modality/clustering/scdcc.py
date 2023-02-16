@@ -3,18 +3,18 @@ import os
 from time import time
 
 import numpy as np
-import scanpy as sc
 import torch
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdcc import ScDCC
-from dance.transforms import AnnDataTransform, SaveRaw
 from dance.transforms.preprocess import generate_random_pair
 from dance.utils import set_seed
 
 # for repeatability
 set_seed(42)
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="train", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -45,19 +45,9 @@ if __name__ == "__main__":
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
 
-    # Normalize data
-    AnnDataTransform(sc.pp.filter_genes, min_counts=1)(data)
-    AnnDataTransform(sc.pp.filter_cells, min_counts=1)(data)
-    SaveRaw()(data)
-    AnnDataTransform(sc.pp.normalize_total)(data)
-    AnnDataTransform(sc.pp.log1p)(data)
-    AnnDataTransform(sc.pp.scale)(data)
+    preprocessing_pipeline = ScDCC.preprocessing_pipeline()
+    preprocessing_pipeline(data)
 
-    data.set_config(
-        feature_channel=[None, None, "n_counts"],
-        feature_channel_type=["X", "raw_X", "obs"],
-        label_channel="Group",
-    )
     (x, x_raw, n_counts), y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
@@ -80,11 +70,6 @@ if __name__ == "__main__":
 
     # Construct moodel
     sigma = 2.75
-    use_cuda = torch.cuda.is_available()
-    if use_cuda:
-        device = "cuda"
-    else:
-        device = "cpu"
     model = ScDCC(input_dim=x.shape[1], z_dim=32, n_clusters=n_clusters, encodeLayer=[256, 64], decodeLayer=[64, 256],
                   sigma=args.sigma, gamma=args.gamma, ml_weight=args.ml_weight, cl_weight=args.ml_weight).to(device)
 

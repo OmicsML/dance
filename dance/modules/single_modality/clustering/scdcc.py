@@ -13,6 +13,7 @@ import math
 import os
 
 import numpy as np
+import scanpy as sc
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -23,6 +24,8 @@ from torch.autograd import Variable
 from torch.nn import Parameter
 from torch.utils.data import DataLoader, TensorDataset
 
+from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
+from dance.typing import LogLevel
 from dance.utils.loss import ZINBLoss
 from dance.utils.metrics import cluster_acc
 
@@ -105,6 +108,23 @@ class ScDCC(nn.Module):
         self._dec_pi = nn.Sequential(nn.Linear(decodeLayer[-1], input_dim), nn.Sigmoid())
         self.mu = Parameter(torch.Tensor(n_clusters, z_dim))
         self.zinb_loss = ZINBLoss().cpu()
+
+    @staticmethod
+    def preprocessing_pipeline(log_level: LogLevel = "INFO"):
+        return Compose(
+            AnnDataTransform(sc.pp.filter_genes, min_counts=1),
+            AnnDataTransform(sc.pp.filter_cells, min_counts=1),
+            SaveRaw(),
+            AnnDataTransform(sc.pp.normalize_total),
+            AnnDataTransform(sc.pp.log1p),
+            AnnDataTransform(sc.pp.scale),
+            SetConfig({
+                "feature_channel": [None, None, "n_counts"],
+                "feature_channel_type": ["X", "raw_X", "obs"],
+                "label_channel": "Group"
+            }),
+            log_level=log_level,
+        )
 
     def save_model(self, path):
         """Save model to path.
