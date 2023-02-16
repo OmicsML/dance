@@ -29,7 +29,7 @@ from dance.utils.loss import ZINBLoss, dist_loss
 from dance.utils.metrics import cluster_acc
 
 
-class SCTAG(nn.Module):
+class ScTAG(nn.Module):
     """scTAG class.
 
     Parameters

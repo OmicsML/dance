@@ -7,7 +7,7 @@ import torch
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
-from dance.modules.single_modality.clustering.sctag import SCTAG
+from dance.modules.single_modality.clustering.sctag import ScTAG
 
 # for repeatability
 random.seed(42)
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
 
-    preprocessing_pipeline = SCTAG.preprocessing_pipeline(n_top_genes=args.highly_genes, n_components=args.pca_dim,
+    preprocessing_pipeline = ScTAG.preprocessing_pipeline(n_top_genes=args.highly_genes, n_components=args.pca_dim,
                                                           n_neighbors=args.k_neighbor)
     preprocessing_pipeline(data)
 
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     n_clusters = len(np.unique(y))
 
     # Build model & training
-    model = SCTAG(x, adj=adj, n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
+    model = ScTAG(x, adj=adj, n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
                   dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha)
 
     if not os.path.exists(args.pretrain_file):
