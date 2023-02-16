@@ -18,7 +18,7 @@ import scanpy as sc
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl import DGLError, DGLGraph
+from dgl import DGLError
 from dgl import function as fn
 from dgl.nn.pytorch import GraphConv
 from dgl.utils import expand_as_pair
@@ -35,7 +35,8 @@ class GraphSC:
     Parameters
     ----------
     args : argparse.Namespace
-        a Namespace contains arguments of GCNAE. For details of parameters in parser args, please refer to link (parser help document).
+        a Namespace contains arguments of GCNAE. For details of parameters in parser args, please refer to link
+        (parser help document).
 
     """
 
@@ -71,58 +72,59 @@ class GraphSC:
         losses = []
         aris_kmeans = []
         Z = {}
-        for epoch in tqdm(range(n_epochs)):
-            self.model.train()
-            z = []
-            y = []
-            order = []
 
-            for input_nodes, output_nodes, blocks in dataloader:
-                blocks = [b.to(device) for b in blocks]
-                input_features = blocks[0].srcdata['features']
-                g = blocks[-1]
-                degs = g.in_degrees().float()
+        with dataloader.enable_cpu_affinity():
+            for epoch in tqdm(range(n_epochs)):
+                self.model.train()
+                z = []
+                y = []
+                order = []
 
-                adj_logits, emb = self.model.forward(blocks, input_features)
-                z.extend(emb.detach().cpu().numpy())
-                if "label" in blocks[-1].dstdata:
-                    y.extend(blocks[-1].dstdata["label"].cpu().numpy())
-                order.extend(blocks[-1].dstdata["order"].cpu().numpy())
+                for input_nodes, output_nodes, blocks in dataloader:
+                    blocks = [b.to(device) for b in blocks]
+                    input_features = blocks[0].srcdata['features']
+                    g = blocks[-1]
 
-                adj = g.adjacency_matrix().to_dense().to(device)
-                adj = adj[g.dstnodes()]
-                pos_weight = torch.Tensor([float(adj.shape[0] * adj.shape[0] - adj.sum()) / adj.sum()])
-                factor = float((adj.shape[0] * adj.shape[0] - adj.sum()) * 2)
-                if factor == 0:
-                    factor = 1
-                norm = adj.shape[0] * adj.shape[0] / factor
-                adj_logits, _ = self.model.forward(blocks, input_features)
-                loss = norm * BCELoss(adj_logits, adj.to(device), pos_weight=pos_weight.to(device))
-                optim.zero_grad()
-                loss.backward()
-                optim.step()
-                losses.append(loss.item())
+                    adj_logits, emb = self.model.forward(blocks, input_features)
+                    z.extend(emb.detach().cpu().numpy())
+                    if "label" in blocks[-1].dstdata:
+                        y.extend(blocks[-1].dstdata["label"].cpu().numpy())
+                    order.extend(blocks[-1].dstdata["order"].cpu().numpy())
 
-            z = np.array(z)
-            y = np.array(y)
-            order = np.array(order)
-            order = np.argsort(order)
-            z = z[order]
-            y = y[order]
-            if pd.isnull(y[0]):
-                y = None
-            self.z = z
+                    adj = g.adjacency_matrix().to_dense().to(device)
+                    adj = adj[g.dstnodes()]
+                    pos_weight = torch.Tensor([float(adj.shape[0] * adj.shape[0] - adj.sum()) / adj.sum()])
+                    factor = float((adj.shape[0] * adj.shape[0] - adj.sum()) * 2)
+                    if factor == 0:
+                        factor = 1
+                    norm = adj.shape[0] * adj.shape[0] / factor
+                    adj_logits, _ = self.model.forward(blocks, input_features)
+                    loss = norm * BCELoss(adj_logits, adj.to(device), pos_weight=pos_weight.to(device))
+                    optim.zero_grad()
+                    loss.backward()
+                    optim.step()
+                    losses.append(loss.item())
 
-            if self.args.eval_epoch:
-                score = self.score(y, n_clusters, cluster=cluster)
-                aris_kmeans.append(score["kmeans_ari"])
-                if self.args.show_epoch_ari:
-                    print(f'epoch {epoch}, ARI {score.get("kmeans_ari")}')
-                z_ = {f'epoch{epoch}': z}
-                Z = {**Z, **z_}
-
-            elif epoch == n_epochs - 1:
+                z = np.array(z)
+                y = np.array(y)
+                order = np.array(order)
+                order = np.argsort(order)
+                z = z[order]
+                y = y[order]
+                if pd.isnull(y[0]):
+                    y = None
                 self.z = z
+
+                if self.args.eval_epoch:
+                    score = self.score(y, n_clusters, cluster=cluster)
+                    aris_kmeans.append(score["kmeans_ari"])
+                    if self.args.show_epoch_ari:
+                        print(f'epoch {epoch}, ARI {score.get("kmeans_ari")}')
+                    z_ = {f'epoch{epoch}': z}
+                    Z = {**Z, **z_}
+
+                elif epoch == n_epochs - 1:
+                    self.z = z
 
         if self.args.eval_epoch:
             index = np.argmax(aris_kmeans)
@@ -145,11 +147,10 @@ class GraphSC:
 
         """
         z = self.z
-        device = get_device(self.args.use_cpu)
         pred = {}
 
         if "KMeans" in cluster:
-            kmeans = KMeans(n_clusters=n_clusters, init="k-means++", random_state=5)
+            kmeans = KMeans(n_clusters=n_clusters, init="k-means++", random_state=5, n_init=10)
             kmeans_pred = {"kmeans_pred": kmeans.fit_predict(z)}
             pred = {**pred, **kmeans_pred}
 
@@ -180,14 +181,13 @@ class GraphSC:
 
         """
         z = self.z
-        device = get_device(self.args.use_cpu)
         self.model.eval()
 
         k_start = time.time()
         scores = {"ae_end": k_start}
 
         if "KMeans" in cluster:
-            kmeans = KMeans(n_clusters=n_clusters, init="k-means++", random_state=5)
+            kmeans = KMeans(n_clusters=n_clusters, init="k-means++", random_state=5, n_init=10)
             kmeans_pred = kmeans.fit_predict(z)
             ari_k = None
             nmi_k = None
@@ -252,7 +252,8 @@ class GCNAE(nn.Module):
     Parameters
     ----------
     args : argparse.Namespace
-        a Namespace contains arguments of scDSC. For details of parameters in parser args, please refer to link (parser help document).
+        a Namespace contains arguments of scDSC. For details of parameters in parser args, please refer to link
+        (parser help document).
     agg : str
         aggregation layer.
     activation :str
@@ -568,7 +569,7 @@ def get_device(use_cpu=False):
         torch device.
 
     """
-    if torch.cuda.is_available() and use_cpu == False:
+    if torch.cuda.is_available() and not use_cpu:
         device = torch.device('cuda')
     else:
         device = torch.device('cpu')
