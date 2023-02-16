@@ -10,12 +10,13 @@ from dance.typing import LogLevel, Optional
 class CellFeatureGraph(BaseTransform):
 
     def __init__(self, cell_feature_channel: str, gene_feature_channel: Optional[str] = None, *,
-                 mod: Optional[str] = None, **kwargs):
+                 mod: Optional[str] = None, normalize_edges: bool = True, **kwargs):
         super().__init__(**kwargs)
 
         self.cell_feature_channel = cell_feature_channel
         self.gene_feature_channel = gene_feature_channel or cell_feature_channel
         self.mod = mod
+        self.normalize_edges = normalize_edges
 
     def __call__(self, data):
         feat = data.get_feature(return_type="default", mod=self.mod)
@@ -38,16 +39,20 @@ class CellFeatureGraph(BaseTransform):
         # Initialize cell-gene graph
         g = dgl.graph((row, col))
         g.edata["weight"] = edata
-        g.ndata["id"] = torch.hstack((torch.arange(num_feats, dtype=torch.int32),
+        # FIX: change to feat_id
+        g.ndata["id"] = torch.concat((torch.arange(num_feats, dtype=torch.int32),
                                       -torch.ones(num_cells, dtype=torch.int32)))  # yapf: disable
+        g.ndata["feat_id"] = torch.concat((-torch.ones(num_feats, dtype=torch.int32),
+                                           torch.arange(num_cells, dtype=torch.int32)))  # yapf: disable
 
         # Normalize edges and add self-loop
-        in_deg = g.in_degrees()
-        for i in range(g.number_of_nodes()):
-            src, dst, eidx = g.in_edges(i, form="all")
-            if src.shape[0] > 0:
-                edge_w = g.edata["weight"][eidx]
-                g.edata["weight"][eidx] = in_deg[i] * edge_w / edge_w.sum()
+        if self.normalize_edges:
+            in_deg = g.in_degrees()
+            for i in range(g.number_of_nodes()):
+                src, dst, eidx = g.in_edges(i, form="all")
+                if src.shape[0] > 0:
+                    edge_w = g.edata["weight"][eidx]
+                    g.edata["weight"][eidx] = in_deg[i] * edge_w / edge_w.sum()
         g.add_edges(g.nodes(), g.nodes(), {"weight": torch.ones(g.number_of_nodes())[:, None]})
 
         gene_feature = data.get_feature(return_type="torch", channel=self.gene_feature_channel, mod=self.mod,
