@@ -158,8 +158,8 @@ class ScDeepSort(BaseClassificationMethod):
             Ratio of the training data to hold out for validation.
 
         """
-        gene_mask = graph.ndata["id"] != -1
-        cell_mask = graph.ndata["id"] == -1
+        gene_mask = graph.ndata["cell_id"] != -1
+        cell_mask = graph.ndata["cell_id"] == -1
         num_genes = gene_mask.sum()
         num_cells = cell_mask.sum()
         # TODO: remove reliance on num_labels in other methods
@@ -310,7 +310,7 @@ class ScDeepSort(BaseClassificationMethod):
         """
         self.model.eval()
 
-        cell_mask = graph.ndata["id"] == -1
+        cell_mask = graph.ndata["cell_id"] == -1
         idx = torch.where(cell_mask)[0].to(self.device)
         graph = graph.to(self.device)
 

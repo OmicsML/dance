@@ -1,13 +1,13 @@
 import argparse
 
-import dgl
 import numpy as np
+import scanpy as sc
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.graphsc import GraphSC
-from dance.transforms.graph_construct import cell_gene_graph
-from dance.transforms.preprocess import filter_data
+from dance.transforms import AnnDataTransform
+from dance.transforms.graph import PCACellFeatureGraph
 from dance.utils import set_seed
 
 if __name__ == "__main__":
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     parser.add_argument("-h2", "--hidden_2", type=int, default=0)
     parser.add_argument("-ng", "--nb_genes", type=int, default=3000)
     parser.add_argument("-nr", "--num_run", type=int, default=1)
-    parser.add_argument("-nbw", "--num_workers", type=int, default=0)
+    parser.add_argument("-nbw", "--num_workers", type=int, default=1)
     parser.add_argument("-eve", "--eval_epoch", default=True, action="store_true")
     parser.add_argument("-show", "--show_epoch_ari", default=False, action="store_true")
     parser.add_argument("-plot", "--plot", default=False, action="store_true")
@@ -46,27 +46,38 @@ if __name__ == "__main__":
     adata.obsm["labels"] = labels
     data = Data(adata, train_size="all")
 
-    filter_data(data, highly_genes=args.nb_genes)
-    cell_gene_graph(data, dense_dim=args.in_feats, node_features=args.node_features,
-                    normalize_weights=args.normalize_weights, same_edge_values=args.same_edge_values,
-                    edge_norm=args.edge_norm)
-    data.set_config(feature_channel="graph", feature_channel_type="uns", label_channel="labels")
-    graph, Y = data.get_train_data()
-    n_clusters = len(np.unique(Y))
-    labels = graph.ndata["label"]
-    train_ids = np.where(labels != -1)[0]
-    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(args.n_layers)
-    dataloader = dgl.dataloading.NodeDataLoader(graph, train_ids, sampler, batch_size=args.batch_size, shuffle=True,
-                                                drop_last=False, num_workers=args.num_workers)
+    # Filter data
+    AnnDataTransform(sc.pp.filter_genes, min_counts=3)(data)
+    AnnDataTransform(sc.pp.filter_cells, min_counts=1)(data)
+    AnnDataTransform(sc.pp.normalize_total)(data)
+    AnnDataTransform(sc.pp.log1p)(data)
+    AnnDataTransform(sc.pp.highly_variable_genes, min_mean=0.0125, max_mean=4, flavor="cell_ranger", min_disp=0.5,
+                     n_top_genes=args.nb_genes, subset=True)(data)
+
+    # Normalize
+    if args.normalize_weights == "log_per_cell":
+        AnnDataTransform(sc.pp.log1p)(data)
+        AnnDataTransform(sc.pp.normalize_total, target_sum=1)(data)
+    elif args.normalize_weights == "per_cell":
+        AnnDataTransform(sc.pp.normalize_total, target_sum=1)(data)
+    elif args.normalize_weights != "none":
+        raise ValueError(f"Unknown normalization option {args.normalize_weights!r}."
+                         "Available options are: 'none', 'log_per_cell', 'per_cell'")
+
+    # Construct cell-gene graph
+    PCACellFeatureGraph(n_components=args.in_feats, normalize_edges=args.edge_norm, feat_norm_mode="standardize")(data)
+    data.set_config(feature_channel="CellFeatureGraph", feature_channel_type="uns", label_channel="labels")
+    graph, y = data.get_train_data()
+    n_clusters = len(np.unique(y))
 
     for run in range(args.num_run):
         set_seed(run)
         model = GraphSC(args)
-        model.fit(args.epochs, dataloader, n_clusters, args.learning_rate, cluster=["KMeans", "Leiden"])
+        model.fit(graph, args.epochs, n_clusters, args.learning_rate, cluster=["KMeans", "Leiden"])
         pred = model.predict(n_clusters, cluster=["KMeans", "Leiden"])
         print(f"kmeans_pred (first 10): {pred.get('kmeans_pred')[:10]}")
         print(f"leiden_pred (first 10): {pred.get('leiden_pred')[:10]}")
-        score = model.score(Y, n_clusters, plot=False, cluster=["KMeans", "Leiden"])
+        score = model.score(y, n_clusters, plot=False, cluster=["KMeans", "Leiden"])
         print(f"kmeans_ari: {score.get('kmeans_ari')}, leiden_ari: {score.get('leiden_ari')}")
 """ Reproduction information
 10X PBMC:

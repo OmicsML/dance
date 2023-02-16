@@ -69,7 +69,7 @@ class AdaptiveSAGE(nn.Module):
 
         """
         number_of_edges = edges.src["h"].shape[0]
-        src_id, dst_id = edges.src["id"], edges.dst["id"]
+        src_id, dst_id = edges.src["cell_id"], edges.dst["cell_id"]
         indices = (self.gene_num + 1) * torch.ones(number_of_edges, dtype=torch.long, device=src_id.device)
         indices = torch.where((src_id >= 0) & (dst_id < 0), src_id, indices)  # gene->cell
         indices = torch.where((dst_id >= 0) & (src_id < 0), dst_id, indices)  # cell->gene
