@@ -30,34 +30,34 @@ from dance.utils.metrics import cluster_acc
 
 
 class ScTAG(nn.Module):
-    """scTAG class.
+    """The scTAG clustering model.
 
     Parameters
     ----------
-    X :
-        input features.
-    adj :
-        adjacency matrix.
-    n_clusters : int
-        number of clusters.
-    k : int optional
-        number of hops of TAG convolutional layer.
-    hidden_dim : int optional
-        dimension of hidden layer.
-    latent_dim : int optional
-        dimension of latent embedding.
-    dec_dim : list optional
-        dimensions of decoder layers.
-    dropout : float optional
-        dropout rate.
-    device : str optional
-        computing device.
-    alpha : float optional
-        parameter of soft assign.
+    x
+        Input features.
+    adj
+        Adjacency matrix.
+    n_clusters
+        Number of clusters.
+    k
+        Number of hops of TAG convolutional layer.
+    hidden_dim
+        Dimension of hidden layer.
+    latent_dim
+        Dimension of latent embedding.
+    dec_dim
+        Dimensions of decoder layers.
+    dropout
+        Dropout rate.
+    device
+        Computing device.
+    alpha
+        Parameter of soft assign.
 
     """
 
-    def __init__(self, X, adj, n_clusters, k=3, hidden_dim=128, latent_dim=15, dec_dim=None, dropout=0.2, device="cuda",
+    def __init__(self, x, adj, n_clusters, k=3, hidden_dim=128, latent_dim=15, dec_dim=None, dropout=0.2, device="cuda",
                  alpha=1.0):
         super().__init__()
         if dec_dim is None:
@@ -65,8 +65,8 @@ class ScTAG(nn.Module):
         self.latent_dim = latent_dim
         self.hidden_dim = hidden_dim
         self.adj = adj
-        self.n_sample = X.shape[0]
-        self.in_dim = X.shape[1]
+        self.n_sample = x.shape[0]
+        self.in_dim = x.shape[1]
         self.device = device
         self.dropout = dropout
         self.n_clusters = n_clusters
@@ -128,25 +128,25 @@ class ScTAG(nn.Module):
 
         Parameters
         ----------
-        A_in :
-            input adjacency matrix.
-        X_input :
-            input features.
+        A_in
+            Input adjacency matrix.
+        X_input
+            Input features.
 
         Returns
         -------
-        A_out :
-            reconstructed adjacency matrix.
-        z :
-            embedding.
-        q :
-            soft label.
-        _mean :
-            data mean from ZINB.
-        _disp :
-            data dispersion from ZINB.
-        _pi :
-            data dropout probability from ZINB.
+        A_out
+            Reconstructed adjacency matrix.
+        z
+            Embedding.
+        q
+            Soft label.
+        _mean
+            Data mean from ZINB.
+        _disp
+            Data dispersion from ZINB.
+        _pi
+            Data dropout probability from ZINB.
 
         """
         enc_h = self.encoder1(A_in, X_input)
@@ -163,34 +163,30 @@ class ScTAG(nn.Module):
 
         Parameters
         ----------
-        x :
-            input features.
-        x_raw :
-            raw input features.
-        fname : str
-            path to save autoencoder weights.
-        n_counts : list
-            total counts for each cell.
-        epochs : int optional
-            number of epochs.
-        info_step : int optional
-            interval of showing pretraining loss.
-        lr : float optional
-            learning rate.
-        W_a : float optional
-            parameter of reconstruction loss.
-        W_x : float optional
-            parameter of ZINB loss.
-        W_d : float optional
-            parameter of pairwise distance loss.
-        min_dist : float optional
-            minimum distance of pairwise distance loss.
-        max_dist : float optional
-            maximum distance of pairwise distance loss.
-
-        Returns
-        -------
-        None.
+        x
+            Input features.
+        x_raw
+            Raw input features.
+        fname
+            Path to save autoencoder weights.
+        n_counts
+            Total counts for each cell.
+        epochs
+            Number of epochs.
+        info_step
+            Interval of showing pretraining loss.
+        lr
+            Learning rate.
+        W_a
+            Parameter of reconstruction loss.
+        W_x
+            Parameter of ZINB loss.
+        W_d
+            Parameter of pairwise distance loss.
+        min_dist
+            Minimum distance of pairwise distance loss.
+        max_dist
+            Maximum distance of pairwise distance loss.
 
         """
         x = torch.Tensor(x).to(self.device)
@@ -231,30 +227,26 @@ class ScTAG(nn.Module):
 
         Parameters
         ----------
-        x :
-            input features.
-        x_raw :
-            raw input features.
-        y : list
-            true label.
-        n_counts : list
-            total counts for each cell.
-        epochs : int optional
-            number of epochs.
-        lr : float optional
-            learning rate.
-        W_a : float optional
-            parameter of reconstruction loss.
-        W_x : float optional
-            parameter of ZINB loss.
-        W_c : float optional
-            parameter of clustering loss.
-        info_step : int optional
-            interval of showing pretraining loss.
-
-        Returns
-        -------
-        None.
+        x
+            Input features.
+        x_raw
+            Raw input features.
+        y
+            True label.
+        n_counts
+            Total counts for each cell.
+        epochs
+            Number of epochs.
+        lr
+            Learning rate.
+        W_a
+            Parameter of reconstruction loss.
+        W_x
+            Parameter of ZINB loss.
+        W_c
+            Parameter of clustering loss.
+        info_step
+            Interval of showing pretraining loss.
 
         """
         x = torch.Tensor(x).to(self.device)
@@ -309,14 +301,10 @@ class ScTAG(nn.Module):
     def predict(self):
         """Get predictions from the trained model.
 
-        Parameters
-        ----------
-        None.
-
         Returns
         -------
-        y_pred : np.array
-            prediction of given clustering method.
+        y_pred
+            Prediction of given clustering method.
 
         """
         y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
@@ -327,17 +315,17 @@ class ScTAG(nn.Module):
 
         Parameters
         ----------
-        y : list
-            true labels.
+        y
+            True labels.
 
         Returns
         -------
-        acc : float
-            accuracy.
-        nmi : float
-            normalized mutual information.
-        ari : float
-            adjusted Rand index.
+        acc
+            Accuracy.
+        nmi
+            Normalized mutual information.
+        ari
+            Adjusted Rand index.
 
         """
         y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
@@ -351,13 +339,13 @@ class ScTAG(nn.Module):
 
         Parameters
         ----------
-        z :
-            embedding.
+        z
+            Embedding.
 
         Returns
         -------
-        q :
-            soft label.
+        q
+            Soft label.
 
         """
         q = 1.0 / (1.0 + torch.sum((z.unsqueeze(1) - self.mu)**2, dim=2) / self.alpha)
@@ -370,13 +358,13 @@ class ScTAG(nn.Module):
 
         Parameters
         ----------
-        q :
-            soft label.
+        q
+            Soft label.
 
         Returns
         -------
-        p :
-            target distribution.
+        p
+            Target distribution.
 
         """
         p = q**2 / q.sum(0)
@@ -384,18 +372,18 @@ class ScTAG(nn.Module):
 
 
 class DecoderA(nn.Module):
-    """Decoder class for adjacency matrix reconstruction.
+    """Decoder for adjacency matrix.
 
     Parameters
     ----------
-    latent_dim : int optional
-        dimension of latent embedding.
-    adj_dim : int optional
-        dimension of adjacency matrix.
-    activation : optional
-        activation function.
-    dropout : float optional
-        dropout rate.
+    latent_dim
+        Dimension of latent embedding.
+    adj_dim
+        Dimension of adjacency matrix.
+    activation
+        Activation function.
+    dropout
+        Dropout rate.
 
     """
 
@@ -410,13 +398,13 @@ class DecoderA(nn.Module):
 
         Parameters
         ----------
-        z :
-            embedding.
+        z
+            Embedding.
 
         Returns
         -------
-        adj :
-            reconstructed adjacency matrix.
+        adj
+            Reconstructed adjacency matrix.
 
         """
         dec_h = self.dec_1(z)
@@ -426,20 +414,20 @@ class DecoderA(nn.Module):
 
 
 class DecoderX(nn.Module):
-    """scTAG class.
+    """Decoder for feature.
 
     Parameters
     ----------
-    input_dim : int
-        dimension of input feature.
-    n_z : int
-        dimension of latent embedding.
-    n_dec_1 : int optional
-        number of nodes of decoder layer 1.
-    n_dec_2 : int optional
-        number of nodes of decoder layer 2.
-    n_dec_3 : int optional
-        number of nodes of decoder layer 3.
+    input_dim
+        Dimension of input feature.
+    n_z
+        Dimension of latent embedding.
+    n_dec_1
+        Number of nodes of decoder layer 1.
+    n_dec_2
+        Number of nodes of decoder layer 2.
+    n_dec_3
+        Number of nodes of decoder layer 3.
 
     """
 
@@ -459,17 +447,17 @@ class DecoderX(nn.Module):
 
         Parameters
         ----------
-        z :
-            embedding.
+        z
+            Embedding.
 
         Returns
         -------
-        _mean :
-            data mean from ZINB.
-        _disp :
-            data dispersion from ZINB.
-        _pi :
-            data dropout probability from ZINB.
+        _mean
+            Eata mean from ZINB.
+        _disp
+            Eata dispersion from ZINB.
+        _pi
+            Eata dropout probability from ZINB.
 
         """
         dec_h1 = F.relu(self.dec_1(z))
