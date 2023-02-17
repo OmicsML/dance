@@ -1,5 +1,4 @@
 import argparse
-import os
 import random
 
 import numpy as np
@@ -58,16 +57,8 @@ if __name__ == "__main__":
 
     # Build model & training
     model = ScTAG(x, adj=adj, n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
-                  dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha)
-
-    if not os.path.exists(args.pretrain_file):
-        model.pre_train(x, x_raw, args.pretrain_file, n_counts, epochs=args.pretrain_epochs, info_step=args.info_step,
-                        W_a=args.W_a, W_x=args.W_x, W_d=args.W_d, min_dist=args.min_dist, max_dist=args.max_dist)
-    else:
-        print(f"==> loading checkpoint {args.pretrain_file}")
-        checkpoint = torch.load(args.pretrain_file)
-        model.load_state_dict(checkpoint)
-
+                  dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha,
+                  pretrain_save_path=args.pretrain_file)
     model.fit(x, x_raw, y, n_counts, epochs=args.epochs, lr=args.lr, W_a=args.W_a, W_x=args.W_x, W_c=args.W_c,
               info_step=args.info_step)
 

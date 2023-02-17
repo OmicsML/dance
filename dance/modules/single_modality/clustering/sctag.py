@@ -9,6 +9,7 @@ Interpretations”. Proceedings of the AAAI Conference on Artificial Intelligenc
 doi:10.1609/aaai.v36i4.20392.
 
 """
+import os
 
 import dgl
 import numpy as np
@@ -25,7 +26,7 @@ from torch.nn import Parameter
 from dance import logger
 from dance.transforms import AnnDataTransform, CellPCA, Compose, SaveRaw, SetConfig
 from dance.transforms.graph import NeighborGraph
-from dance.typing import LogLevel
+from dance.typing import LogLevel, Optional
 from dance.utils.loss import ZINBLoss, dist_loss
 from dance.utils.metrics import cluster_acc
 
@@ -55,12 +56,30 @@ class ScTAG(nn.Module):
         Computing device.
     alpha
         Parameter of soft assign.
+    pretrain_save_path
+        Path to save the pretrained autoencoder. If not specified, then do not save/load.
 
     """
 
-    def __init__(self, x, adj, n_clusters, k=3, hidden_dim=128, latent_dim=15, dec_dim=None, dropout=0.2, device="cuda",
-                 alpha=1.0):
+    def __init__(
+        self,
+        x,
+        adj,
+        *,
+        n_clusters,
+        k=3,
+        hidden_dim=128,
+        latent_dim=15,
+        dec_dim=None,
+        dropout=0.2,
+        device="cuda",
+        alpha=1.0,
+        pretrain_save_path: Optional[str] = None,
+    ):
         super().__init__()
+        self._is_pretrained = False
+        self.pretrain_save_path = pretrain_save_path
+
         if dec_dim is None:
             dec_dim = [128, 256, 512]
         self.latent_dim = latent_dim
@@ -94,6 +113,10 @@ class ScTAG(nn.Module):
                                   n_dec_3=dec_dim[2])
         self.zinb_loss = ZINBLoss().to(self.device)
         self.to(self.device)
+
+    @property
+    def is_pretrained(self) -> bool:
+        return self._is_pretrained
 
     @staticmethod
     def preprocessing_pipeline(n_top_genes: int = 3000, n_components: int = 50, n_neighbors: int = 15,
@@ -158,8 +181,22 @@ class ScTAG(nn.Module):
 
         return adj_out, z, q, _mean, _disp, _pi
 
-    def pre_train(self, x, x_raw, fname, n_counts, epochs=1000, info_step=10, lr=5e-4, W_a=0.3, W_x=1, W_d=0,
-                  min_dist=0.5, max_dist=20.):
+    def pre_train(
+        self,
+        x,
+        x_raw,
+        n_counts,
+        *,
+        epochs: int = 1000,
+        info_step: int = 10,
+        lr: float = 5e-4,
+        W_a: float = 0.3,
+        W_x: float = 1,
+        W_d: float = 0,
+        min_dist: float = 0.5,
+        max_dist: float = 20,
+        force_pretrain: bool = False,
+    ):
         """Pretrain autoencoder.
 
         Parameters
@@ -168,8 +205,6 @@ class ScTAG(nn.Module):
             Input features.
         x_raw
             Raw input features.
-        fname
-            Path to save autoencoder weights.
         n_counts
             Total counts for each cell.
         epochs
@@ -188,8 +223,26 @@ class ScTAG(nn.Module):
             Minimum distance of pairwise distance loss.
         max_dist
             Maximum distance of pairwise distance loss.
+        force_pretrain
+            If set to True, then pre-train the model even if the pre-training has been done already,
+            or even the pre-trained model file is available to load.
 
         """
+        pt_path = self.pretrain_save_path
+        if not force_pretrain:
+            if self.is_pretrained:
+                logger.info("Skipping pre_train as the model appears to be pretrained already. "
+                            "If you wish to force pre-training, please set 'force_pretrain' to True.")
+
+            if pt_path is not None and os.path.isfile(pt_path):
+                logger.info(f"Loading pre-trained model from {pt_path}")
+                checkpoint = torch.load(pt_path)
+                # TODO: change device?
+                self.load_state_dict(checkpoint)
+                self._is_pretrained = True
+
+            return
+
         x = torch.Tensor(x).to(self.device)
         x_raw = torch.Tensor(x_raw).to(self.device)
         scale_factor = torch.tensor(n_counts / np.median(n_counts)).to(self.device)
@@ -201,17 +254,17 @@ class ScTAG(nn.Module):
             adj_out, z, _, mean, disp, pi = self.forward(self.g_n, x)
 
             if W_d:
-                Dist_loss = torch.mean(dist_loss(z, min_dist, max_dist=max_dist))
+                dl = torch.mean(dist_loss(z, min_dist, max_dist=max_dist))
             adj_rec_loss = torch.mean(F.mse_loss(adj_out, torch.Tensor(self.adj).to(self.device)))
             Zinb_loss = self.zinb_loss(x_raw, mean, disp, pi, scale_factor)
             loss = W_a * adj_rec_loss + W_x * Zinb_loss
             if W_d:
-                loss += W_d * Dist_loss
+                loss += W_d * dl
 
             if epoch % info_step == 0:
                 if W_d:
                     logger.info("Epoch %3d: ZINB Loss: %.8f, MSE Loss: %.8f, Dist Loss: %.8f", epoch + 1,
-                                Zinb_loss.item(), adj_rec_loss.item(), Dist_loss.item())
+                                Zinb_loss.item(), adj_rec_loss.item(), dl.item())
                 else:
                     logger.info("Epoch %3d: ZINB Loss: %.8f, MSE Loss: %.8f", epoch + 1, Zinb_loss.item(),
                                 adj_rec_loss.item())
@@ -220,7 +273,10 @@ class ScTAG(nn.Module):
             loss.backward()
             optimizer.step()
 
-        torch.save(self.state_dict(), fname)
+        if pt_path is not None:
+            logger.info(f"Saving pre-trained model to {pt_path}")
+            torch.save(self.state_dict(), pt_path)
+
         logger.info("Pre-training done")
         self._is_pretrained = True
 
@@ -241,9 +297,8 @@ class ScTAG(nn.Module):
         info_step: int = 1,
         max_dist: float = 20,
         min_dist: float = 0.5,
+        force_pretrain: bool = False,
     ):
-        # FIX:  update docstirng
-        # FIX: add pretrain save/load file option, with path
         """Pretrain autoencoder.
 
         Parameters
@@ -266,10 +321,22 @@ class ScTAG(nn.Module):
             Parameter of ZINB loss.
         W_c
             Parameter of clustering loss.
+        W_d
+            Parameter of pairwise distance loss.
         info_step
             Interval of showing pretraining loss.
+        min_dist
+            Minimum distance of pairwise distance loss.
+        max_dist
+            Maximum distance of pairwise distance loss.
+        force_pretrain
+            If set to True, then pre-train the model even if the pre-training has been done already,
+            or even the pre-trained model file is available to load.
 
         """
+        self.pre_train(x, x_raw, n_counts, epochs=pretrain_epochs, info_step=info_step, lr=lr, W_a=W_a, W_x=W_x,
+                       W_d=W_d, min_dist=min_dist, max_dist=max_dist, force_pretrain=force_pretrain)
+
         x = torch.Tensor(x).to(self.device)
         x_raw = torch.Tensor(x_raw).to(self.device)
         scale_factor = torch.tensor(n_counts / np.median(n_counts)).to(self.device)
