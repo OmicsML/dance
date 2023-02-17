@@ -19,19 +19,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from dgl.nn import TAGConv
-from sklearn import metrics
 from sklearn.cluster import KMeans
 from torch.nn import Parameter
 
 from dance import logger
+from dance.modules.base import BaseClusteringMethod
 from dance.transforms import AnnDataTransform, CellPCA, Compose, SaveRaw, SetConfig
 from dance.transforms.graph import NeighborGraph
-from dance.typing import LogLevel, Optional
+from dance.typing import Any, LogLevel, Optional, Tuple
 from dance.utils.loss import ZINBLoss, dist_loss
-from dance.utils.metrics import cluster_acc
 
 
-class ScTAG(nn.Module):
+class ScTAG(nn.Module, BaseClusteringMethod):
     """The scTAG clustering model.
 
     Parameters
@@ -284,11 +283,8 @@ class ScTAG(nn.Module):
 
     def fit(
         self,
-        adj,
-        x,
-        x_raw,
-        n_counts,
-        y,
+        inputs: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        y: np.ndarray,
         *,
         epochs: int = 300,
         pretrain_epochs: int = 200,
@@ -306,16 +302,9 @@ class ScTAG(nn.Module):
 
         Parameters
         ----------
-        adj
-            Adjacency matrix.
-        x
-            Input features.
-        x_raw
-            Raw input features.
-        y
-            True label.
-        n_counts
-            Total counts for each cell.
+        inputs
+            A tuple containing the adjacency matrix, the input feature, the raw input feature, and the total counts per
+            cell array.
         epochs
             Number of epochs.
         lr
@@ -339,8 +328,8 @@ class ScTAG(nn.Module):
             or even the pre-trained model file is available to load.
 
         """
+        adj, x, x_raw, n_counts = inputs
         self.init_model(adj, x)
-
         self.pre_train(x, x_raw, n_counts, epochs=pretrain_epochs, info_step=info_step, lr=lr, w_a=w_a, w_x=w_x,
                        w_d=w_d, min_dist=min_dist, max_dist=max_dist, force_pretrain=force_pretrain)
 
@@ -393,41 +382,39 @@ class ScTAG(nn.Module):
         index = np.argmax(aris)
         self.q = Q[f"epoch{index}"]
 
-    def predict(self):
-        """Get predictions from the trained model.
-
-        Returns
-        -------
-        y_pred
-            Prediction of given clustering method.
-
-        """
-        y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
-        return y_pred
-
-    def score(self, y):
-        """Evaluate the trained model.
+    def predict_proba(self, x: Optional[Any] = None) -> np.ndarray:
+        """Get predicted probabilities for each cell.
 
         Parameters
         ----------
-        y
-            True labels.
+        x
+            Not used, for compatibility with the base module class.
 
         Returns
         -------
-        acc
-            Accuracy.
-        nmi
-            Normalized mutual information.
-        ari
-            Adjusted Rand index.
+        pred_prob
+            Predicted probabilities for each cell.
 
         """
-        y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
-        acc = np.round(cluster_acc(y, y_pred), 5)
-        nmi = np.round(metrics.normalized_mutual_info_score(y, y_pred), 5)
-        ari = np.round(metrics.adjusted_rand_score(y, y_pred), 5)
-        return acc, nmi, ari
+        pred_prob = self.q.detach().clone().cpu().numpy()
+        return pred_prob
+
+    def predict(self, x: Optional[Any] = None) -> np.ndarray:
+        """Get predictions from the trained model.
+
+        Parameters
+        ----------
+        x
+            Not used, for compatibility with the base module class.
+
+        Returns
+        -------
+        pred
+            Prediction of given clustering method.
+
+        """
+        pred = self.predict_proba().argmax(1)
+        return pred
 
     def soft_assign(self, z):
         """Soft assign q with z.

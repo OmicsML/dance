@@ -52,23 +52,21 @@ if __name__ == "__main__":
                                                           n_neighbors=args.k_neighbor)
     preprocessing_pipeline(data)
 
-    (adj, x, x_raw, n_counts), y = data.get_train_data()
+    # inputs: adj, x, x_raw, n_counts
+    inputs, y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
     # Build model & training
     model = ScTAG(n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
                   dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha,
                   pretrain_save_path=args.pretrain_file)
-    model.fit(adj, x, x_raw, n_counts, y, epochs=args.epochs, pretrain_epochs=args.pretrain_epochs, lr=args.lr,
-              w_a=args.w_a, w_x=args.w_x, w_c=args.w_c, w_d=args.w_d, info_step=args.info_step, max_dist=args.max_dist,
+    model.fit(inputs, y, epochs=args.epochs, pretrain_epochs=args.pretrain_epochs, lr=args.lr, w_a=args.w_a,
+              w_x=args.w_x, w_c=args.w_c, w_d=args.w_d, info_step=args.info_step, max_dist=args.max_dist,
               min_dist=args.min_dist)
 
-    y_pred = model.predict()
-    print(f"Prediction (first ten): {y_pred[:10]}")
-
-    acc, nmi, ari = model.score(y)
-    print("ACC: {:.4f}, NMI: {:.4f}, ARI: {:.4f}".format(acc, nmi, ari))
-    print(args)
+    # Evaluate model predictions
+    score = model.score(None, y)
+    print(f"{score=:.4f}")
 """Reproduction information
 10X PBMC:
 python sctag.py --pretrain_epochs 100 --data_file 10X_PBMC --w_a 0.01 --w_x 3 --w_c 0.1 --dropout 0.5
