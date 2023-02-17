@@ -96,7 +96,7 @@ class ScTAG(nn.Module, BaseClusteringMethod):
 
         self.g = dgl.graph((src, dist)).to(self.device)
         self.g_n = dgl.graph((src_n, dist_n)).to(self.device)
-        self.g_n.edata["weight"] = adj_n[src_n, dist_n]
+        self.g_n.edata["weight"] = torch.FloatTensor(adj_n[src_n, dist_n]).to(self.device)
 
         self.mu = Parameter(torch.Tensor(self.n_clusters, self.latent_dim).to(self.device))
         self.encoder1 = TAGConv(self.in_dim, self.hidden_dim, k=self.k)
