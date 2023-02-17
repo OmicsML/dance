@@ -1,5 +1,4 @@
 import argparse
-import os
 import random
 
 import numpy as np
@@ -33,10 +32,10 @@ if __name__ == "__main__":
     parser.add_argument("--pretrain_epochs", default=200, type=int)
     parser.add_argument("--epochs", default=500, type=int)
     parser.add_argument("--device", default="cuda")
-    parser.add_argument("--W_a", default=1, type=float)
-    parser.add_argument("--W_x", default=1, type=float)
-    parser.add_argument("--W_d", default=0, type=float)
-    parser.add_argument("--W_c", default=1, type=float)
+    parser.add_argument("--w_a", default=1, type=float)
+    parser.add_argument("--w_x", default=1, type=float)
+    parser.add_argument("--w_d", default=0, type=float)
+    parser.add_argument("--w_c", default=1, type=float)
     parser.add_argument("--lr", default=1e-3, type=float)
     parser.add_argument("--min_dist", default=0.5, type=float)
     parser.add_argument("--max_dist", default=20.0, type=float)
@@ -53,40 +52,31 @@ if __name__ == "__main__":
                                                           n_neighbors=args.k_neighbor)
     preprocessing_pipeline(data)
 
-    (x, x_raw, n_counts, adj), y = data.get_train_data()
+    # inputs: adj, x, x_raw, n_counts
+    inputs, y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
     # Build model & training
-    model = ScTAG(x, adj=adj, n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
-                  dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha)
+    model = ScTAG(n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
+                  dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha,
+                  pretrain_save_path=args.pretrain_file)
+    model.fit(inputs, y, epochs=args.epochs, pretrain_epochs=args.pretrain_epochs, lr=args.lr, w_a=args.w_a,
+              w_x=args.w_x, w_c=args.w_c, w_d=args.w_d, info_step=args.info_step, max_dist=args.max_dist,
+              min_dist=args.min_dist)
 
-    if not os.path.exists(args.pretrain_file):
-        model.pre_train(x, x_raw, args.pretrain_file, n_counts, epochs=args.pretrain_epochs, info_step=args.info_step,
-                        W_a=args.W_a, W_x=args.W_x, W_d=args.W_d, min_dist=args.min_dist, max_dist=args.max_dist)
-    else:
-        print(f"==> loading checkpoint {args.pretrain_file}")
-        checkpoint = torch.load(args.pretrain_file)
-        model.load_state_dict(checkpoint)
-
-    model.fit(x, x_raw, y, n_counts, epochs=args.epochs, lr=args.lr, W_a=args.W_a, W_x=args.W_x, W_c=args.W_c,
-              info_step=args.info_step)
-
-    y_pred = model.predict()
-    print(f"Prediction (first ten): {y_pred[:10]}")
-
-    acc, nmi, ari = model.score(y)
-    print("ACC: {:.4f}, NMI: {:.4f}, ARI: {:.4f}".format(acc, nmi, ari))
-    print(args)
+    # Evaluate model predictions
+    score = model.score(None, y)
+    print(f"{score=:.4f}")
 """Reproduction information
 10X PBMC:
-python sctag.py --pretrain_epochs 100 --data_file 10X_PBMC --W_a 0.01 --W_x 3 --W_c 0.1 --dropout 0.5
+python sctag.py --pretrain_epochs 100 --data_file 10X_PBMC --w_a 0.01 --w_x 3 --w_c 0.1 --dropout 0.5
 
 Mouse ES:
-python sctag.py --pretrain_epochs 100 --data_file mouse_ES_cell --W_a 0.01 --W_x 0.75 --W_c 1
+python sctag.py --pretrain_epochs 100 --data_file mouse_ES_cell --w_a 0.01 --w_x 0.75 --w_c 1
 
 Worm Neuron:
-python sctag.py --data_file worm_neuron_cell --W_a 0.01 --W_x 2 --W_c 0.25 --k 1
+python sctag.py --data_file worm_neuron_cell --w_a 0.01 --w_x 2 --w_c 0.25 --k 1
 
 Mouse Bladder:
-python sctag.py --pretrain_epochs 100 --data_file mouse_bladder_cell --W_a 0.1 --W_x 2.5 --W_c 3
+python sctag.py --pretrain_epochs 100 --data_file mouse_bladder_cell --w_a 0.1 --w_x 2.5 --w_c 3
 """

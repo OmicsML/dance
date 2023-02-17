@@ -9,6 +9,7 @@ Interpretations”. Proceedings of the AAAI Conference on Artificial Intelligenc
 doi:10.1609/aaai.v36i4.20392.
 
 """
+import os
 
 import dgl
 import numpy as np
@@ -18,81 +19,106 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from dgl.nn import TAGConv
-from sklearn import metrics
 from sklearn.cluster import KMeans
 from torch.nn import Parameter
 
+from dance import logger
+from dance.modules.base import BaseClusteringMethod
 from dance.transforms import AnnDataTransform, CellPCA, Compose, SaveRaw, SetConfig
 from dance.transforms.graph import NeighborGraph
-from dance.typing import LogLevel
+from dance.typing import Any, LogLevel, Optional, Tuple
 from dance.utils.loss import ZINBLoss, dist_loss
-from dance.utils.metrics import cluster_acc
 
 
-class ScTAG(nn.Module):
-    """scTAG class.
+class ScTAG(nn.Module, BaseClusteringMethod):
+    """The scTAG clustering model.
 
     Parameters
     ----------
-    X :
-        input features.
-    adj :
-        adjacency matrix.
-    n_clusters : int
-        number of clusters.
-    k : int optional
-        number of hops of TAG convolutional layer.
-    hidden_dim : int optional
-        dimension of hidden layer.
-    latent_dim : int optional
-        dimension of latent embedding.
-    dec_dim : list optional
-        dimensions of decoder layers.
-    dropout : float optional
-        dropout rate.
-    device : str optional
-        computing device.
-    alpha : float optional
-        parameter of soft assign.
+    n_clusters
+        Number of clusters.
+    k
+        Number of hops of TAG convolutional layer.
+    hidden_dim
+        Dimension of hidden layer.
+    latent_dim
+        Dimension of latent embedding.
+    dec_dim
+        Dimensions of decoder layers.
+    dropout
+        Dropout rate.
+    device
+        Computing device.
+    alpha
+        Parameter of soft assign.
+    pretrain_save_path
+        Path to save the pretrained autoencoder. If not specified, then do not save/load.
 
     """
 
-    def __init__(self, X, adj, n_clusters, k=3, hidden_dim=128, latent_dim=15, dec_dim=None, dropout=0.2, device="cuda",
-                 alpha=1.0):
+    def __init__(
+        self,
+        n_clusters: int,
+        k: int = 3,
+        hidden_dim: int = 128,
+        latent_dim: int = 15,
+        dec_dim: Optional[int] = None,
+        dropout: float = 0.2,
+        device: str = "cuda",
+        alpha: float = 1.0,
+        pretrain_save_path: Optional[str] = None,
+    ):
         super().__init__()
-        if dec_dim is None:
-            dec_dim = [128, 256, 512]
+        self._is_pretrained = False
+        self._in_dim = None
+        self.pretrain_save_path = pretrain_save_path
+
+        self.dec_dim = dec_dim or [128, 256, 512]
         self.latent_dim = latent_dim
         self.hidden_dim = hidden_dim
-        self.adj = adj
-        self.n_sample = X.shape[0]
-        self.in_dim = X.shape[1]
         self.device = device
         self.dropout = dropout
         self.n_clusters = n_clusters
         self.alpha = alpha
         self.k = k
-        self.mu = Parameter(torch.Tensor(self.n_clusters, self.latent_dim).to(self.device))
+
+    def init_model(self, adj: np.ndarray, x: np.ndarray):
+        """Initialize model."""
+        self._in_dim = x.shape[1]
 
         src, dist = np.nonzero(adj)
-        self.G = dgl.graph((src, dist)).to(device)
-
+        # TODO: make util function for normalizing adj
         deg = adj.sum(1, keepdims=True)
         deg[deg == 0] = 1
         normalized_deg = deg**-0.5
         adj_n = adj * normalized_deg * normalized_deg.T
         src_n, dist_n = np.nonzero(adj_n)
 
-        self.G_n = dgl.graph((src_n, dist_n)).to(device)
+        self.g = dgl.graph((src, dist)).to(self.device)
+        # FIX: set edge weight?...
+        self.g_n = dgl.graph((src_n, dist_n)).to(self.device)
 
-        self.encoder1 = TAGConv(self.in_dim, self.hidden_dim, k=k)
-        self.encoder2 = TAGConv(self.hidden_dim, self.latent_dim, k=k)
-        self.decoderA = DecoderA(latent_dim=self.latent_dim, adj_dim=adj.shape[0], activation=torch.sigmoid,
-                                 dropout=self.dropout)
-        self.decoderX = DecoderX(self.in_dim, self.latent_dim, n_dec_1=dec_dim[0], n_dec_2=dec_dim[1],
-                                 n_dec_3=dec_dim[2])
+        self.mu = Parameter(torch.Tensor(self.n_clusters, self.latent_dim).to(self.device))
+        self.encoder1 = TAGConv(self.in_dim, self.hidden_dim, k=self.k)
+        self.encoder2 = TAGConv(self.hidden_dim, self.latent_dim, k=self.k)
+        self.decoder_adj = DecoderAdj(latent_dim=self.latent_dim, adj_dim=adj.shape[0], activation=torch.sigmoid,
+                                      dropout=self.dropout)
+        self.decoder_x = DecoderX(self.in_dim, self.latent_dim, n_dec_1=self.dec_dim[0], n_dec_2=self.dec_dim[1],
+                                  n_dec_3=self.dec_dim[2])
         self.zinb_loss = ZINBLoss().to(self.device)
         self.to(self.device)
+
+    @property
+    def is_pretrained(self) -> bool:
+        return self._is_pretrained
+
+    @property
+    def in_dim(self) -> int:
+        if self._in_dim is None:
+            raise ValueError("in_dim is unavailable since the model has not been initialized yet. Please call the "
+                             "`fit` function first to fit the model, or the `init_model` function "
+                             "if you just want to initialize the model.")
+        return self._in_dim
 
     @staticmethod
     def preprocessing_pipeline(n_top_genes: int = 3000, n_components: int = 50, n_neighbors: int = 15,
@@ -116,155 +142,209 @@ class ScTAG(nn.Module):
             CellPCA(n_components=n_components),
             NeighborGraph(n_neighbors=n_neighbors, n_pcs=n_components),
             SetConfig({
-                "feature_channel": [None, None, "n_counts", "NeighborGraph"],
-                "feature_channel_type": ["X", "raw_X", "obs", "obsp"],
+                "feature_channel": ["NeighborGraph", None, None, "n_counts"],
+                "feature_channel_type": ["obsp", "X", "raw_X", "obs"],
                 "label_channel": "Group",
             }),
             log_level=log_level,
         )
 
-    def forward(self, A_in, X_input):
+    def forward(self, adj_in, x_input):
         """Forward propagation.
 
         Parameters
         ----------
-        A_in :
-            input adjacency matrix.
-        X_input :
-            input features.
+        adj_in
+            Input adjacency matrix.
+        x_input
+            Input features.
 
         Returns
         -------
-        A_out :
-            reconstructed adjacency matrix.
-        z :
-            embedding.
-        q :
-            soft label.
-        _mean :
-            data mean from ZINB.
-        _disp :
-            data dispersion from ZINB.
-        _pi :
-            data dropout probability from ZINB.
+        adj_out
+            Reconstructed adjacency matrix.
+        z
+            Embedding.
+        q
+            Soft label.
+        _mean
+            Data mean from ZINB.
+        _disp
+            Data dispersion from ZINB.
+        _pi
+            Data dropout probability from ZINB.
 
         """
-        enc_h = self.encoder1(A_in, X_input)
-        z = self.encoder2(A_in, enc_h)
-        A_out = self.decoderA(z)
-        _mean, _disp, _pi = self.decoderX(z)
+        enc_h = self.encoder1(adj_in, x_input)
+        z = self.encoder2(adj_in, enc_h)
+        adj_out = self.decoder_adj(z)
+        _mean, _disp, _pi = self.decoder_x(z)
         q = self.soft_assign(z)
 
-        return A_out, z, q, _mean, _disp, _pi
+        return adj_out, z, q, _mean, _disp, _pi
 
-    def pre_train(self, x, x_raw, fname, n_counts, epochs=1000, info_step=10, lr=5e-4, W_a=0.3, W_x=1, W_d=0,
-                  min_dist=0.5, max_dist=20.):
+    def pre_train(
+        self,
+        adj,
+        x,
+        x_raw,
+        n_counts,
+        *,
+        epochs: int = 1000,
+        info_step: int = 10,
+        lr: float = 5e-4,
+        w_a: float = 0.3,
+        w_x: float = 1,
+        w_d: float = 0,
+        min_dist: float = 0.5,
+        max_dist: float = 20,
+        force_pretrain: bool = False,
+    ):
         """Pretrain autoencoder.
 
         Parameters
         ----------
-        x :
-            input features.
-        x_raw :
-            raw input features.
-        fname : str
-            path to save autoencoder weights.
-        n_counts : list
-            total counts for each cell.
-        epochs : int optional
-            number of epochs.
-        info_step : int optional
-            interval of showing pretraining loss.
-        lr : float optional
-            learning rate.
-        W_a : float optional
-            parameter of reconstruction loss.
-        W_x : float optional
-            parameter of ZINB loss.
-        W_d : float optional
-            parameter of pairwise distance loss.
-        min_dist : float optional
-            minimum distance of pairwise distance loss.
-        max_dist : float optional
-            maximum distance of pairwise distance loss.
-
-        Returns
-        -------
-        None.
+        adj
+            Adjacency matrix.
+        x
+            Input features.
+        x_raw
+            Raw input features.
+        n_counts
+            Total counts for each cell.
+        epochs
+            Number of epochs.
+        info_step
+            Interval of showing pretraining loss.
+        lr
+            Learning rate.
+        w_a
+            Parameter of reconstruction loss.
+        w_x
+            Parameter of ZINB loss.
+        w_d
+            Parameter of pairwise distance loss.
+        min_dist
+            Minimum distance of pairwise distance loss.
+        max_dist
+            Maximum distance of pairwise distance loss.
+        force_pretrain
+            If set to True, then pre-train the model even if the pre-training has been done already,
+            or even the pre-trained model file is available to load.
 
         """
+        pt_path = self.pretrain_save_path
+        if not force_pretrain:
+            if self.is_pretrained:
+                logger.info("Skipping pre_train as the model appears to be pretrained already. "
+                            "If you wish to force pre-training, please set 'force_pretrain' to True.")
+                return
+
+            if pt_path is not None and os.path.isfile(pt_path):
+                logger.info(f"Loading pre-trained model from {pt_path}")
+                checkpoint = torch.load(pt_path)
+                # TODO: change device?
+                self.load_state_dict(checkpoint)
+                self._is_pretrained = True
+                return
+
         x = torch.Tensor(x).to(self.device)
         x_raw = torch.Tensor(x_raw).to(self.device)
         scale_factor = torch.tensor(n_counts / np.median(n_counts)).to(self.device)
 
         self.train()
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, amsgrad=True)
-        print("Pretraining stage")
+        logger.info("Pre-training start")
         for epoch in range(epochs):
-            A_out, z, _, mean, disp, pi = self.forward(self.G_n, x)
+            adj_out, z, _, mean, disp, pi = self.forward(self.g_n, x)
 
-            if W_d:
-                Dist_loss = torch.mean(dist_loss(z, min_dist, max_dist=max_dist))
-            A_rec_loss = torch.mean(F.mse_loss(A_out, torch.Tensor(self.adj).to(self.device)))
+            if w_d:
+                dl = torch.mean(dist_loss(z, min_dist, max_dist=max_dist))
+            adj_rec_loss = torch.mean(F.mse_loss(adj_out, torch.Tensor(adj).to(self.device)))
             Zinb_loss = self.zinb_loss(x_raw, mean, disp, pi, scale_factor)
-            loss = W_a * A_rec_loss + W_x * Zinb_loss
-            if W_d:
-                loss += W_d * Dist_loss
+            loss = w_a * adj_rec_loss + w_x * Zinb_loss
+            if w_d:
+                loss += w_d * dl
 
             if epoch % info_step == 0:
-                if W_d:
-                    print("Epoch %3d: ZINB Loss: %.8f, MSE Loss: %.8f, Dist Loss: %.8f" %
-                          (epoch + 1, Zinb_loss.item(), A_rec_loss.item(), Dist_loss.item()))
+                if w_d:
+                    logger.info("Epoch %3d: ZINB Loss: %.8f, MSE Loss: %.8f, Dist Loss: %.8f", epoch + 1,
+                                Zinb_loss.item(), adj_rec_loss.item(), dl.item())
                 else:
-                    print("Epoch %3d: ZINB Loss: %.8f, MSE Loss: %.8f" %
-                          (epoch + 1, Zinb_loss.item(), A_rec_loss.item()))
+                    logger.info("Epoch %3d: ZINB Loss: %.8f, MSE Loss: %.8f", epoch + 1, Zinb_loss.item(),
+                                adj_rec_loss.item())
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-        torch.save(self.state_dict(), fname)
-        print("Pre_train Finish!")
+        if pt_path is not None:
+            logger.info(f"Saving pre-trained model to {pt_path}")
+            torch.save(self.state_dict(), pt_path)
 
-    def fit(self, x, x_raw, y, n_counts, epochs=300, lr=5e-4, W_a=0.3, W_x=1, W_c=1.5, info_step=1):
+        logger.info("Pre-training done")
+        self._is_pretrained = True
+
+    def fit(
+        self,
+        inputs: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        y: np.ndarray,
+        *,
+        epochs: int = 300,
+        pretrain_epochs: int = 200,
+        lr: float = 5e-4,
+        w_a: float = 0.3,
+        w_x: float = 1,
+        w_c: float = 1.5,
+        w_d: float = 0,
+        info_step: int = 1,
+        max_dist: float = 20,
+        min_dist: float = 0.5,
+        force_pretrain: bool = False,
+    ):
         """Pretrain autoencoder.
 
         Parameters
         ----------
-        x :
-            input features.
-        x_raw :
-            raw input features.
-        y : list
-            true label.
-        n_counts : list
-            total counts for each cell.
-        epochs : int optional
-            number of epochs.
-        lr : float optional
-            learning rate.
-        W_a : float optional
-            parameter of reconstruction loss.
-        W_x : float optional
-            parameter of ZINB loss.
-        W_c : float optional
-            parameter of clustering loss.
-        info_step : int optional
-            interval of showing pretraining loss.
-
-        Returns
-        -------
-        None.
+        inputs
+            A tuple containing the adjacency matrix, the input feature, the raw input feature, and the total counts per
+            cell array.
+        epochs
+            Number of epochs.
+        lr
+            Learning rate.
+        w_a
+            Parameter of reconstruction loss.
+        w_x
+            Parameter of ZINB loss.
+        w_c
+            Parameter of clustering loss.
+        w_d
+            Parameter of pairwise distance loss.
+        info_step
+            Interval of showing pretraining loss.
+        min_dist
+            Minimum distance of pairwise distance loss.
+        max_dist
+            Maximum distance of pairwise distance loss.
+        force_pretrain
+            If set to True, then pre-train the model even if the pre-training has been done already,
+            or even the pre-trained model file is available to load.
 
         """
+        adj, x, x_raw, n_counts = inputs
+        self.init_model(adj, x)
+        self.pre_train(adj, x, x_raw, n_counts, epochs=pretrain_epochs, info_step=info_step, lr=lr, w_a=w_a, w_x=w_x,
+                       w_d=w_d, min_dist=min_dist, max_dist=max_dist, force_pretrain=force_pretrain)
+
         x = torch.Tensor(x).to(self.device)
         x_raw = torch.Tensor(x_raw).to(self.device)
         scale_factor = torch.tensor(n_counts / np.median(n_counts)).to(self.device)
 
         # Initializing cluster centers with kmeans
         kmeans = KMeans(self.n_clusters, n_init=20)
-        enc_h = self.encoder1(self.G_n, x)
-        z = self.encoder2(self.G_n, enc_h)
+        enc_h = self.encoder1(self.g_n, x)
+        z = self.encoder2(self.g_n, enc_h)
         kmeans.fit_predict(z.detach().cpu().numpy())
         self.mu.data.copy_(torch.tensor(kmeans.cluster_centers_, dtype=torch.float32).to(self.device))
 
@@ -276,88 +356,82 @@ class ScTAG(nn.Module):
         Q = {}
 
         for epoch in range(epochs):
-            A_out, _, q, mean, disp, pi = self.forward(self.G_n, x)
+            adj_out, _, q, mean, disp, pi = self.forward(self.g_n, x)
             self.q = q
             p = self.target_distribution(q)
             self.y_pred = self.predict()
 
             # calculate ari score for model selection
-            _, _, ari = self.score(y)
+            ari = self.score(None, y)
             aris.append(ari)
-            p_ = {f'epoch{epoch}': p}
-            q_ = {f'epoch{epoch}': q}
+            p_ = {f"epoch{epoch}": p}
+            q_ = {f"epoch{epoch}": q}
             P = {**P, **p_}
             Q = {**Q, **q_}
             if epoch % info_step == 0:
-                print("Epoch %3d, ARI: %.4f, Best ARI: %.4f" % (epoch + 1, ari, max(aris)))
+                logger.info("Epoch %3d, ARI: %.4f, Best ARI: %.4f", epoch + 1, ari, max(aris))
 
-            A_rec_loss = torch.mean(F.mse_loss(A_out, torch.Tensor(self.adj).to(self.device)))
+            adj_rec_loss = torch.mean(F.mse_loss(adj_out, torch.Tensor(adj).to(self.device)))
             Zinb_loss = self.zinb_loss(x_raw, mean, disp, pi, scale_factor)
             Cluster_loss = torch.mean(
                 F.kl_div(
                     torch.Tensor(self.y_pred).to(self.device),
-                    torch.Tensor(y).to(self.device), reduction='batchmean'))
-            loss = W_a * A_rec_loss + W_x * Zinb_loss + W_c * Cluster_loss
+                    torch.Tensor(y).to(self.device), reduction="batchmean"))
+            loss = w_a * adj_rec_loss + w_x * Zinb_loss + w_c * Cluster_loss
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
         index = np.argmax(aris)
-        self.q = Q[f'epoch{index}']
+        self.q = Q[f"epoch{index}"]
 
-    def predict(self):
+    def predict_proba(self, x: Optional[Any] = None) -> np.ndarray:
+        """Get predicted probabilities for each cell.
+
+        Parameters
+        ----------
+        x
+            Not used, for compatibility with the base module class.
+
+        Returns
+        -------
+        pred_prob
+            Predicted probabilities for each cell.
+
+        """
+        pred_prob = self.q.detach().clone().cpu().numpy()
+        return pred_prob
+
+    def predict(self, x: Optional[Any] = None) -> np.ndarray:
         """Get predictions from the trained model.
 
         Parameters
         ----------
-        None.
+        x
+            Not used, for compatibility with the base module class.
 
         Returns
         -------
-        y_pred : np.array
-            prediction of given clustering method.
+        pred
+            Prediction of given clustering method.
 
         """
-        y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
-        return y_pred
-
-    def score(self, y):
-        """Evaluate the trained model.
-
-        Parameters
-        ----------
-        y : list
-            true labels.
-
-        Returns
-        -------
-        acc : float
-            accuracy.
-        nmi : float
-            normalized mutual information.
-        ari : float
-            adjusted Rand index.
-
-        """
-        y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
-        acc = np.round(cluster_acc(y, y_pred), 5)
-        nmi = np.round(metrics.normalized_mutual_info_score(y, y_pred), 5)
-        ari = np.round(metrics.adjusted_rand_score(y, y_pred), 5)
-        return acc, nmi, ari
+        pred = self.predict_proba().argmax(1)
+        return pred
 
     def soft_assign(self, z):
         """Soft assign q with z.
 
         Parameters
         ----------
-        z :
-            embedding.
+        z
+            Embedding.
 
         Returns
         -------
-        q :
-            soft label.
+        q
+            Soft label.
 
         """
         q = 1.0 / (1.0 + torch.sum((z.unsqueeze(1) - self.mu)**2, dim=2) / self.alpha)
@@ -370,32 +444,32 @@ class ScTAG(nn.Module):
 
         Parameters
         ----------
-        q :
-            soft label.
+        q
+            Soft label.
 
         Returns
         -------
-        p :
-            target distribution.
+        p
+            Target distribution.
 
         """
         p = q**2 / q.sum(0)
         return (p.t() / p.sum(1)).t()
 
 
-class DecoderA(nn.Module):
-    """Decoder class for adjacency matrix reconstruction.
+class DecoderAdj(nn.Module):
+    """Decoder for adjacency matrix.
 
     Parameters
     ----------
-    latent_dim : int optional
-        dimension of latent embedding.
-    adj_dim : int optional
-        dimension of adjacency matrix.
-    activation : optional
-        activation function.
-    dropout : float optional
-        dropout rate.
+    latent_dim
+        Dimension of latent embedding.
+    adj_dim
+        Dimension of adjacency matrix.
+    activation
+        Activation function.
+    dropout
+        Dropout rate.
 
     """
 
@@ -410,13 +484,13 @@ class DecoderA(nn.Module):
 
         Parameters
         ----------
-        z :
-            embedding.
+        z
+            Embedding.
 
         Returns
         -------
-        adj :
-            reconstructed adjacency matrix.
+        adj
+            Reconstructed adjacency matrix.
 
         """
         dec_h = self.dec_1(z)
@@ -426,20 +500,20 @@ class DecoderA(nn.Module):
 
 
 class DecoderX(nn.Module):
-    """scTAG class.
+    """Decoder for feature.
 
     Parameters
     ----------
-    input_dim : int
-        dimension of input feature.
-    n_z : int
-        dimension of latent embedding.
-    n_dec_1 : int optional
-        number of nodes of decoder layer 1.
-    n_dec_2 : int optional
-        number of nodes of decoder layer 2.
-    n_dec_3 : int optional
-        number of nodes of decoder layer 3.
+    input_dim
+        Dimension of input feature.
+    n_z
+        Dimension of latent embedding.
+    n_dec_1
+        Number of nodes of decoder layer 1.
+    n_dec_2
+        Number of nodes of decoder layer 2.
+    n_dec_3
+        Number of nodes of decoder layer 3.
 
     """
 
@@ -459,17 +533,17 @@ class DecoderX(nn.Module):
 
         Parameters
         ----------
-        z :
-            embedding.
+        z
+            Embedding.
 
         Returns
         -------
-        _mean :
-            data mean from ZINB.
-        _disp :
-            data dispersion from ZINB.
-        _pi :
-            data dropout probability from ZINB.
+        _mean
+            Eata mean from ZINB.
+        _disp
+            Eata dispersion from ZINB.
+        _pi
+            Eata dropout probability from ZINB.
 
         """
         dec_h1 = F.relu(self.dec_1(z))
