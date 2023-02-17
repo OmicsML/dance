@@ -244,7 +244,7 @@ Note: the data split modality of DeepImpute is different from ScGNN and GraphSCI
 | scDCC         | ARI               | 0.82 / 0.81                 | 0.98 / N/A                  | 0.51 / 0.58                    | 0.60 / 0.66                      |
 | scDeepCluster | ARI               | 0.81 / 0.78                 | 0.98 / 0.97                 | 0.51 / 0.52                    | 0.56 / 0.58                      |
 | scDSC         | ARI               | 0.72 / 0.78                 | 0.84 / N/A                  | 0.46 / 0.65                    | 0.65 / 0.72                      |
-| scTAG         | ARI               | 0.75 / N/A                  | 0.96 / N/A                  | 0.53 / N/A                     | 0.60 / N/A                       |
+| scTAG         | ARI               | 0.77 / N/A                  | 0.96 / N/A                  | 0.49 / N/A                     | 0.69 / N/A                       |
 
 ### Multimodality Module
 

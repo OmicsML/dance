@@ -95,8 +95,8 @@ class ScTAG(nn.Module, BaseClusteringMethod):
         src_n, dist_n = np.nonzero(adj_n)
 
         self.g = dgl.graph((src, dist)).to(self.device)
-        # FIX: set edge weight?...
         self.g_n = dgl.graph((src_n, dist_n)).to(self.device)
+        self.g_n.edata["weight"] = torch.FloatTensor(adj_n[src_n, dist_n]).to(self.device)
 
         self.mu = Parameter(torch.Tensor(self.n_clusters, self.latent_dim).to(self.device))
         self.encoder1 = TAGConv(self.in_dim, self.hidden_dim, k=self.k)
@@ -149,13 +149,13 @@ class ScTAG(nn.Module, BaseClusteringMethod):
             log_level=log_level,
         )
 
-    def forward(self, adj_in, x_input):
+    def forward(self, g, x_input):
         """Forward propagation.
 
         Parameters
         ----------
-        adj_in
-            Input adjacency matrix.
+        g
+            Input graph.
         x_input
             Input features.
 
@@ -175,8 +175,8 @@ class ScTAG(nn.Module, BaseClusteringMethod):
             Data dropout probability from ZINB.
 
         """
-        enc_h = self.encoder1(adj_in, x_input)
-        z = self.encoder2(adj_in, enc_h)
+        enc_h = self.encoder1(g, x_input, edge_weight=g.edata["weight"])
+        z = self.encoder2(g, enc_h, edge_weight=g.edata["weight"])
         adj_out = self.decoder_adj(z)
         _mean, _disp, _pi = self.decoder_x(z)
         q = self.soft_assign(z)
