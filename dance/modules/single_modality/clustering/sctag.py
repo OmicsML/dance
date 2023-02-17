@@ -22,6 +22,7 @@ from sklearn import metrics
 from sklearn.cluster import KMeans
 from torch.nn import Parameter
 
+from dance import logger
 from dance.transforms import AnnDataTransform, CellPCA, Compose, SaveRaw, SetConfig
 from dance.transforms.graph import NeighborGraph
 from dance.typing import LogLevel
@@ -195,7 +196,7 @@ class ScTAG(nn.Module):
 
         self.train()
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, amsgrad=True)
-        print("Pretraining stage")
+        logger.info("Pre-training start")
         for epoch in range(epochs):
             adj_out, z, _, mean, disp, pi = self.forward(self.g_n, x)
 
@@ -209,20 +210,40 @@ class ScTAG(nn.Module):
 
             if epoch % info_step == 0:
                 if W_d:
-                    print("Epoch %3d: ZINB Loss: %.8f, MSE Loss: %.8f, Dist Loss: %.8f" %
-                          (epoch + 1, Zinb_loss.item(), adj_rec_loss.item(), Dist_loss.item()))
+                    logger.info("Epoch %3d: ZINB Loss: %.8f, MSE Loss: %.8f, Dist Loss: %.8f", epoch + 1,
+                                Zinb_loss.item(), adj_rec_loss.item(), Dist_loss.item())
                 else:
-                    print("Epoch %3d: ZINB Loss: %.8f, MSE Loss: %.8f" %
-                          (epoch + 1, Zinb_loss.item(), adj_rec_loss.item()))
+                    logger.info("Epoch %3d: ZINB Loss: %.8f, MSE Loss: %.8f", epoch + 1, Zinb_loss.item(),
+                                adj_rec_loss.item())
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
         torch.save(self.state_dict(), fname)
-        print("Pre_train Finish!")
+        logger.info("Pre-training done")
+        self._is_pretrained = True
 
-    def fit(self, x, x_raw, y, n_counts, epochs=300, lr=5e-4, W_a=0.3, W_x=1, W_c=1.5, info_step=1):
+    def fit(
+        self,
+        x,
+        x_raw,
+        y,
+        n_counts,
+        *,
+        epochs: int = 300,
+        pretrain_epochs: int = 200,
+        lr: float = 5e-4,
+        W_a: float = 0.3,
+        W_x: float = 1,
+        W_c: float = 1.5,
+        W_d: float = 0,
+        info_step: int = 1,
+        max_dist: float = 20,
+        min_dist: float = 0.5,
+    ):
+        # FIX:  update docstirng
+        # FIX: add pretrain save/load file option, with path
         """Pretrain autoencoder.
 
         Parameters
@@ -276,19 +297,19 @@ class ScTAG(nn.Module):
             # calculate ari score for model selection
             _, _, ari = self.score(y)
             aris.append(ari)
-            p_ = {f'epoch{epoch}': p}
-            q_ = {f'epoch{epoch}': q}
+            p_ = {f"epoch{epoch}": p}
+            q_ = {f"epoch{epoch}": q}
             P = {**P, **p_}
             Q = {**Q, **q_}
             if epoch % info_step == 0:
-                print("Epoch %3d, ARI: %.4f, Best ARI: %.4f" % (epoch + 1, ari, max(aris)))
+                logger.info("Epoch %3d, ARI: %.4f, Best ARI: %.4f", epoch + 1, ari, max(aris))
 
             adj_rec_loss = torch.mean(F.mse_loss(adj_out, torch.Tensor(self.adj).to(self.device)))
             Zinb_loss = self.zinb_loss(x_raw, mean, disp, pi, scale_factor)
             Cluster_loss = torch.mean(
                 F.kl_div(
                     torch.Tensor(self.y_pred).to(self.device),
-                    torch.Tensor(y).to(self.device), reduction='batchmean'))
+                    torch.Tensor(y).to(self.device), reduction="batchmean"))
             loss = W_a * adj_rec_loss + W_x * Zinb_loss + W_c * Cluster_loss
 
             optimizer.zero_grad()
@@ -296,7 +317,7 @@ class ScTAG(nn.Module):
             optimizer.step()
 
         index = np.argmax(aris)
-        self.q = Q[f'epoch{index}']
+        self.q = Q[f"epoch{index}"]
 
     def predict(self):
         """Get predictions from the trained model.
