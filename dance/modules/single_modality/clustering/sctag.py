@@ -192,9 +192,9 @@ class ScTAG(nn.Module):
         epochs: int = 1000,
         info_step: int = 10,
         lr: float = 5e-4,
-        W_a: float = 0.3,
-        W_x: float = 1,
-        W_d: float = 0,
+        w_a: float = 0.3,
+        w_x: float = 1,
+        w_d: float = 0,
         min_dist: float = 0.5,
         max_dist: float = 20,
         force_pretrain: bool = False,
@@ -215,11 +215,11 @@ class ScTAG(nn.Module):
             Interval of showing pretraining loss.
         lr
             Learning rate.
-        W_a
+        w_a
             Parameter of reconstruction loss.
-        W_x
+        w_x
             Parameter of ZINB loss.
-        W_d
+        w_d
             Parameter of pairwise distance loss.
         min_dist
             Minimum distance of pairwise distance loss.
@@ -255,16 +255,16 @@ class ScTAG(nn.Module):
         for epoch in range(epochs):
             adj_out, z, _, mean, disp, pi = self.forward(self.g_n, x)
 
-            if W_d:
+            if w_d:
                 dl = torch.mean(dist_loss(z, min_dist, max_dist=max_dist))
             adj_rec_loss = torch.mean(F.mse_loss(adj_out, torch.Tensor(self.adj).to(self.device)))
             Zinb_loss = self.zinb_loss(x_raw, mean, disp, pi, scale_factor)
-            loss = W_a * adj_rec_loss + W_x * Zinb_loss
-            if W_d:
-                loss += W_d * dl
+            loss = w_a * adj_rec_loss + w_x * Zinb_loss
+            if w_d:
+                loss += w_d * dl
 
             if epoch % info_step == 0:
-                if W_d:
+                if w_d:
                     logger.info("Epoch %3d: ZINB Loss: %.8f, MSE Loss: %.8f, Dist Loss: %.8f", epoch + 1,
                                 Zinb_loss.item(), adj_rec_loss.item(), dl.item())
                 else:
@@ -293,10 +293,10 @@ class ScTAG(nn.Module):
         epochs: int = 300,
         pretrain_epochs: int = 200,
         lr: float = 5e-4,
-        W_a: float = 0.3,
-        W_x: float = 1,
-        W_c: float = 1.5,
-        W_d: float = 0,
+        w_a: float = 0.3,
+        w_x: float = 1,
+        w_c: float = 1.5,
+        w_d: float = 0,
         info_step: int = 1,
         max_dist: float = 20,
         min_dist: float = 0.5,
@@ -320,13 +320,13 @@ class ScTAG(nn.Module):
             Number of epochs.
         lr
             Learning rate.
-        W_a
+        w_a
             Parameter of reconstruction loss.
-        W_x
+        w_x
             Parameter of ZINB loss.
-        W_c
+        w_c
             Parameter of clustering loss.
-        W_d
+        w_d
             Parameter of pairwise distance loss.
         info_step
             Interval of showing pretraining loss.
@@ -341,8 +341,8 @@ class ScTAG(nn.Module):
         """
         self.init_model(adj, x)
 
-        self.pre_train(x, x_raw, n_counts, epochs=pretrain_epochs, info_step=info_step, lr=lr, W_a=W_a, W_x=W_x,
-                       W_d=W_d, min_dist=min_dist, max_dist=max_dist, force_pretrain=force_pretrain)
+        self.pre_train(x, x_raw, n_counts, epochs=pretrain_epochs, info_step=info_step, lr=lr, w_a=w_a, w_x=w_x,
+                       w_d=w_d, min_dist=min_dist, max_dist=max_dist, force_pretrain=force_pretrain)
 
         x = torch.Tensor(x).to(self.device)
         x_raw = torch.Tensor(x_raw).to(self.device)
@@ -384,7 +384,7 @@ class ScTAG(nn.Module):
                 F.kl_div(
                     torch.Tensor(self.y_pred).to(self.device),
                     torch.Tensor(y).to(self.device), reduction="batchmean"))
-            loss = W_a * adj_rec_loss + W_x * Zinb_loss + W_c * Cluster_loss
+            loss = w_a * adj_rec_loss + w_x * Zinb_loss + w_c * Cluster_loss
 
             optimizer.zero_grad()
             loss.backward()
