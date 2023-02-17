@@ -36,10 +36,6 @@ class ScTAG(nn.Module):
 
     Parameters
     ----------
-    x
-        Input features.
-    adj
-        Adjacency matrix.
     n_clusters
         Number of clusters.
     k
@@ -63,60 +59,66 @@ class ScTAG(nn.Module):
 
     def __init__(
         self,
-        x,
-        adj,
-        *,
-        n_clusters,
-        k=3,
-        hidden_dim=128,
-        latent_dim=15,
-        dec_dim=None,
-        dropout=0.2,
-        device="cuda",
-        alpha=1.0,
+        n_clusters: int,
+        k: int = 3,
+        hidden_dim: int = 128,
+        latent_dim: int = 15,
+        dec_dim: Optional[int] = None,
+        dropout: float = 0.2,
+        device: str = "cuda",
+        alpha: float = 1.0,
         pretrain_save_path: Optional[str] = None,
     ):
         super().__init__()
         self._is_pretrained = False
+        self._in_dim = None
         self.pretrain_save_path = pretrain_save_path
 
-        if dec_dim is None:
-            dec_dim = [128, 256, 512]
+        self.dec_dim = dec_dim or [128, 256, 512]
         self.latent_dim = latent_dim
         self.hidden_dim = hidden_dim
-        self.adj = adj
-        self.n_sample = x.shape[0]
-        self.in_dim = x.shape[1]
         self.device = device
         self.dropout = dropout
         self.n_clusters = n_clusters
         self.alpha = alpha
         self.k = k
-        self.mu = Parameter(torch.Tensor(self.n_clusters, self.latent_dim).to(self.device))
+
+    def init_model(self, adj: np.ndarray, x: np.ndarray):
+        """Initialize model."""
+        self._in_dim = x.shape[1]
 
         src, dist = np.nonzero(adj)
-        self.g = dgl.graph((src, dist)).to(device)
-
+        # TODO: make util function for normalizing adj
         deg = adj.sum(1, keepdims=True)
         deg[deg == 0] = 1
         normalized_deg = deg**-0.5
         adj_n = adj * normalized_deg * normalized_deg.T
         src_n, dist_n = np.nonzero(adj_n)
 
-        self.g_n = dgl.graph((src_n, dist_n)).to(device)
+        self.g = dgl.graph((src, dist)).to(self.device)
+        self.g_n = dgl.graph((src_n, dist_n)).to(self.device)
 
-        self.encoder1 = TAGConv(self.in_dim, self.hidden_dim, k=k)
-        self.encoder2 = TAGConv(self.hidden_dim, self.latent_dim, k=k)
+        self.mu = Parameter(torch.Tensor(self.n_clusters, self.latent_dim).to(self.device))
+        self.encoder1 = TAGConv(self.in_dim, self.hidden_dim, k=self.k)
+        self.encoder2 = TAGConv(self.hidden_dim, self.latent_dim, k=self.k)
         self.decoder_adj = DecoderAdj(latent_dim=self.latent_dim, adj_dim=adj.shape[0], activation=torch.sigmoid,
                                       dropout=self.dropout)
-        self.decoder_x = DecoderX(self.in_dim, self.latent_dim, n_dec_1=dec_dim[0], n_dec_2=dec_dim[1],
-                                  n_dec_3=dec_dim[2])
+        self.decoder_x = DecoderX(self.in_dim, self.latent_dim, n_dec_1=self.dec_dim[0], n_dec_2=self.dec_dim[1],
+                                  n_dec_3=self.dec_dim[2])
         self.zinb_loss = ZINBLoss().to(self.device)
         self.to(self.device)
 
     @property
     def is_pretrained(self) -> bool:
         return self._is_pretrained
+
+    @property
+    def in_dim(self) -> int:
+        if self._in_dim is None:
+            raise ValueError("in_dim is unavailable since the model has not been initialized yet. Please call the "
+                             "`fit` function first to fit the model, or the `init_model` function "
+                             "if you just want to initialize the model.")
+        return self._in_dim
 
     @staticmethod
     def preprocessing_pipeline(n_top_genes: int = 3000, n_components: int = 50, n_neighbors: int = 15,
@@ -282,6 +284,7 @@ class ScTAG(nn.Module):
 
     def fit(
         self,
+        adj,
         x,
         x_raw,
         y,
@@ -303,6 +306,8 @@ class ScTAG(nn.Module):
 
         Parameters
         ----------
+        adj
+            Adjacency matrix.
         x
             Input features.
         x_raw
@@ -334,6 +339,8 @@ class ScTAG(nn.Module):
             or even the pre-trained model file is available to load.
 
         """
+        self.init_model(adj, x)
+
         self.pre_train(x, x_raw, n_counts, epochs=pretrain_epochs, info_step=info_step, lr=lr, W_a=W_a, W_x=W_x,
                        W_d=W_d, min_dist=min_dist, max_dist=max_dist, force_pretrain=force_pretrain)
 

@@ -56,11 +56,12 @@ if __name__ == "__main__":
     n_clusters = len(np.unique(y))
 
     # Build model & training
-    model = ScTAG(x, adj=adj, n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
+    model = ScTAG(n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
                   dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha,
                   pretrain_save_path=args.pretrain_file)
-    model.fit(x, x_raw, y, n_counts, epochs=args.epochs, lr=args.lr, W_a=args.W_a, W_x=args.W_x, W_c=args.W_c,
-              info_step=args.info_step)
+    model.fit(adj, x, x_raw, y, n_counts, epochs=args.epochs, pretrain_epochs=args.pretrain_epochs, lr=args.lr,
+              W_a=args.W_a, W_x=args.W_x, W_c=args.W_c, W_d=args.W_d, info_step=args.info_step, max_dist=args.max_dist,
+              min_dist=args.min_dist)
 
     y_pred = model.predict()
     print(f"Prediction (first ten): {y_pred[:10]}")
