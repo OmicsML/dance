@@ -52,14 +52,14 @@ if __name__ == "__main__":
                                                           n_neighbors=args.k_neighbor)
     preprocessing_pipeline(data)
 
-    (x, x_raw, n_counts, adj), y = data.get_train_data()
+    (adj, x, x_raw, n_counts), y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
     # Build model & training
     model = ScTAG(n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
                   dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha,
                   pretrain_save_path=args.pretrain_file)
-    model.fit(adj, x, x_raw, y, n_counts, epochs=args.epochs, pretrain_epochs=args.pretrain_epochs, lr=args.lr,
+    model.fit(adj, x, x_raw, n_counts, y, epochs=args.epochs, pretrain_epochs=args.pretrain_epochs, lr=args.lr,
               w_a=args.w_a, w_x=args.w_x, w_c=args.w_c, w_d=args.w_d, info_step=args.info_step, max_dist=args.max_dist,
               min_dist=args.min_dist)
 
