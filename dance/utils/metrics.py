@@ -57,6 +57,13 @@ def acc(true: Union[torch.Tensor, np.ndarray], pred: Union[torch.Tensor, np.ndar
     return true[np.arange(pred.shape[0]), pred.ravel()].mean()
 
 
+@register_metric_func("ari")
+@torch_to_numpy
+def ari(true: Union[torch.Tensor, np.ndarray], pred: Union[torch.Tensor, np.ndarray]) -> float:
+    """Adjusted rand index score."""
+    return adjusted_rand_score(true, pred)
+
+
 def get_bipartite_matching_adjacency_matrix_mk3(raw_logits, threshold_quantile=0.995, copy=False):
     #getting rid of unpromising graph connections
     if copy:

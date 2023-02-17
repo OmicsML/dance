@@ -95,6 +95,7 @@ class ScTAG(nn.Module, BaseClusteringMethod):
         src_n, dist_n = np.nonzero(adj_n)
 
         self.g = dgl.graph((src, dist)).to(self.device)
+        # FIX: set edge weight?...
         self.g_n = dgl.graph((src_n, dist_n)).to(self.device)
 
         self.mu = Parameter(torch.Tensor(self.n_clusters, self.latent_dim).to(self.device))
@@ -184,6 +185,7 @@ class ScTAG(nn.Module, BaseClusteringMethod):
 
     def pre_train(
         self,
+        adj,
         x,
         x_raw,
         n_counts,
@@ -202,6 +204,8 @@ class ScTAG(nn.Module, BaseClusteringMethod):
 
         Parameters
         ----------
+        adj
+            Adjacency matrix.
         x
             Input features.
         x_raw
@@ -234,6 +238,7 @@ class ScTAG(nn.Module, BaseClusteringMethod):
             if self.is_pretrained:
                 logger.info("Skipping pre_train as the model appears to be pretrained already. "
                             "If you wish to force pre-training, please set 'force_pretrain' to True.")
+                return
 
             if pt_path is not None and os.path.isfile(pt_path):
                 logger.info(f"Loading pre-trained model from {pt_path}")
@@ -241,8 +246,7 @@ class ScTAG(nn.Module, BaseClusteringMethod):
                 # TODO: change device?
                 self.load_state_dict(checkpoint)
                 self._is_pretrained = True
-
-            return
+                return
 
         x = torch.Tensor(x).to(self.device)
         x_raw = torch.Tensor(x_raw).to(self.device)
@@ -256,7 +260,7 @@ class ScTAG(nn.Module, BaseClusteringMethod):
 
             if w_d:
                 dl = torch.mean(dist_loss(z, min_dist, max_dist=max_dist))
-            adj_rec_loss = torch.mean(F.mse_loss(adj_out, torch.Tensor(self.adj).to(self.device)))
+            adj_rec_loss = torch.mean(F.mse_loss(adj_out, torch.Tensor(adj).to(self.device)))
             Zinb_loss = self.zinb_loss(x_raw, mean, disp, pi, scale_factor)
             loss = w_a * adj_rec_loss + w_x * Zinb_loss
             if w_d:
@@ -330,7 +334,7 @@ class ScTAG(nn.Module, BaseClusteringMethod):
         """
         adj, x, x_raw, n_counts = inputs
         self.init_model(adj, x)
-        self.pre_train(x, x_raw, n_counts, epochs=pretrain_epochs, info_step=info_step, lr=lr, w_a=w_a, w_x=w_x,
+        self.pre_train(adj, x, x_raw, n_counts, epochs=pretrain_epochs, info_step=info_step, lr=lr, w_a=w_a, w_x=w_x,
                        w_d=w_d, min_dist=min_dist, max_dist=max_dist, force_pretrain=force_pretrain)
 
         x = torch.Tensor(x).to(self.device)
@@ -358,7 +362,7 @@ class ScTAG(nn.Module, BaseClusteringMethod):
             self.y_pred = self.predict()
 
             # calculate ari score for model selection
-            _, _, ari = self.score(y)
+            ari = self.score(None, y)
             aris.append(ari)
             p_ = {f"epoch{epoch}": p}
             q_ = {f"epoch{epoch}": q}
@@ -367,7 +371,7 @@ class ScTAG(nn.Module, BaseClusteringMethod):
             if epoch % info_step == 0:
                 logger.info("Epoch %3d, ARI: %.4f, Best ARI: %.4f", epoch + 1, ari, max(aris))
 
-            adj_rec_loss = torch.mean(F.mse_loss(adj_out, torch.Tensor(self.adj).to(self.device)))
+            adj_rec_loss = torch.mean(F.mse_loss(adj_out, torch.Tensor(adj).to(self.device)))
             Zinb_loss = self.zinb_loss(x_raw, mean, disp, pi, scale_factor)
             Cluster_loss = torch.mean(
                 F.kl_div(
