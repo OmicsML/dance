@@ -10,7 +10,7 @@ from dance.utils import set_seed
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--epochs", default=100, type=int)
-    parser.add_argument("-cpu", "--use_cpu", default=False, action="store_true")
+    parser.add_argument("-dv", "--device", default="auto")
     parser.add_argument("-if", "--in_feats", default=50, type=int)
     parser.add_argument("-bs", "--batch_size", default=128, type=int)
     parser.add_argument("-nw", "--normalize_weights", default="log_per_cell", choices=["log_per_cell", "per_cell"])
@@ -31,8 +31,8 @@ if __name__ == "__main__":
     parser.add_argument("-ng", "--nb_genes", type=int, default=3000)
     parser.add_argument("-nr", "--num_run", type=int, default=1)
     parser.add_argument("-nbw", "--num_workers", type=int, default=1)
-    parser.add_argument("-eve", "--eval_epoch", default=True, action="store_true")
-    parser.add_argument("-show", "--show_epoch_ari", default=False, action="store_true")
+    parser.add_argument("-eve", "--eval_epoch", action="store_true")
+    parser.add_argument("-show", "--show_epoch_ari", action="store_true")
     parser.add_argument("-plot", "--plot", default=False, action="store_true")
     parser.add_argument("-dd", "--data_dir", default="./data", type=str)
     parser.add_argument("-data", "--dataset", default="10X_PBMC",
@@ -56,13 +56,15 @@ if __name__ == "__main__":
 
     for run in range(args.num_run):
         set_seed(run)
-        model = GraphSC(args)
-        model.fit(graph, args.epochs, n_clusters, args.learning_rate, cluster=["KMeans", "Leiden"])
-        pred = model.predict(n_clusters, cluster=["KMeans", "Leiden"])
-        print(f"kmeans_pred (first 10): {pred.get('kmeans_pred')[:10]}")
-        print(f"leiden_pred (first 10): {pred.get('leiden_pred')[:10]}")
-        score = model.score(y, n_clusters, plot=False, cluster=["KMeans", "Leiden"])
-        print(f"kmeans_ari: {score.get('kmeans_ari')}, leiden_ari: {score.get('leiden_ari')}")
+        model = GraphSC(agg=args.agg, activation=args.activation, in_feats=args.in_feats, n_hidden=args.n_hidden,
+                        hidden_dim=args.hidden_dim, hidden_1=args.hidden_1, hidden_2=args.hidden_2,
+                        dropout=args.dropout, n_layers=args.n_layers, hidden_relu=args.hidden_relu,
+                        hidden_bn=args.hidden_bn, n_clusters=n_clusters, cluster_method="leiden",
+                        num_workers=args.num_workers, device=args.device)
+        model.fit(graph, n_epochs=args.epochs, lr=args.learning_rate, show_epoch_ari=args.show_epoch_ari,
+                  eval_epoch=args.eval_epoch)
+        score = model.score(None, y)
+        print(f"{score:=.4f}")
 """ Reproduction information
 10X PBMC:
 python graphsc.py --dataset 10X_PBMC
