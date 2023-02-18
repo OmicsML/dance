@@ -1,6 +1,5 @@
 import argparse
 import os
-from argparse import Namespace
 from time import time
 
 from dance.data import Data
@@ -43,7 +42,7 @@ if __name__ == "__main__":
     parser.add_argument("--n_z3", default=Cluster_para[2], type=int)
     parser.add_argument("--n_input", type=int, default=Cluster_para[4])
     parser.add_argument("--n_clusters", type=int, default=Cluster_para[5])
-    parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--v", type=int, default=1)
     parser.add_argument("--nb_genes", type=int, default=2000)
     parser.add_argument("--binary_crossentropy_loss", type=float, default=Balance_para[0])
@@ -77,7 +76,10 @@ if __name__ == "__main__":
     args.n_input = x.shape[1]
 
     # Pretrain AE
-    model = SCDSCWrapper(Namespace(**vars(args)))
+    model = SCDSCWrapper(pretrain_path=args.pretrain_path, sigma=args.sigma, n_enc_1=args.n_enc_1, n_enc_2=args.n_enc_2,
+                         n_enc_3=args.n_enc_3, n_dec_1=args.n_dec_1, n_dec_2=args.n_dec_2, n_dec_3=args.n_dec_3,
+                         n_z1=args.n_z1, n_z2=args.n_z2, n_z3=args.n_z3, n_clusters=args.n_clusters,
+                         n_input=args.n_input, v=args.v, device=args.device)
     if not os.path.exists(args.pretrain_path):
         model.pretrain_ae(x, args.batch_size, args.pretrain_epochs, args.pretrain_path)
 

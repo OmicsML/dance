@@ -27,6 +27,7 @@ from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
 from dance.transforms.graph import NeighborGraph
 from dance.transforms.preprocess import sparse_mx_to_torch_sparse_tensor
 from dance.typing import LogLevel
+from dance.utils import get_device
 from dance.utils.loss import ZINBLoss
 from dance.utils.metrics import cluster_acc
 
@@ -36,19 +37,88 @@ class SCDSCWrapper:
 
     Parameters
     ----------
-    args : argparse.Namespace
-        a Namespace contains arguments of scDSC. For details of parameters in parser args, please refer to link (parser help document).
+    pretrain_path
+        Path of saved autoencoder weights.
+    sigma
+        Balance parameter.
+    n_enc_1
+        Output dimension of encoder layer 1.
+    n_enc_2
+        Output dimension of encoder layer 2.
+    n_enc_3
+        Output dimension of encoder layer 3.
+    n_dec_1
+        Output dimension of decoder layer 1.
+    n_dec_2
+        Output dimension of decoder layer 2.
+    n_dec_3
+        Output dimension of decoder layer 3.
+    n_z1
+        Output dimension of hidden layer 1.
+    n_z2
+        Output dimension of hidden layer 2.
+    n_z3
+        Output dimension of hidden layer 3.
+    n_clusters
+        Number of clusters.
+    n_input
+        Input feature dimension.
+    v
+        Parameter of soft assignment.
+    device
+        Computing device.
 
     """
 
-    def __init__(self, args):
+    def __init__(
+        self,
+        pretrain_path,
+        sigma,
+        n_enc_1,
+        n_enc_2,
+        n_enc_3,
+        n_dec_1,
+        n_dec_2,
+        n_dec_3,
+        n_z1,
+        n_z2,
+        n_z3,
+        n_clusters,
+        n_input,
+        v,
+        device,
+    ):
         super().__init__()
-        self.args = args
-        self.device = args.device
-        self.model = SCDSC(args).to(self.device)
-        self.model_pre = AE(n_enc_1=args.n_enc_1, n_enc_2=args.n_enc_2, n_enc_3=args.n_enc_3, n_dec_1=args.n_dec_1,
-                            n_dec_2=args.n_dec_2, n_dec_3=args.n_dec_3, n_input=args.n_input, n_z1=args.n_z1,
-                            n_z2=args.n_z2, n_z3=args.n_z3).to(self.device)
+        self.device = get_device(device)
+        self.model = SCDSC(
+            pretrain_path=pretrain_path,
+            sigma=sigma,
+            n_enc_1=n_enc_1,
+            n_enc_2=n_enc_2,
+            n_enc_3=n_enc_3,
+            n_dec_1=n_dec_1,
+            n_dec_2=n_dec_2,
+            n_dec_3=n_dec_3,
+            n_z1=n_z1,
+            n_z2=n_z2,
+            n_z3=n_z3,
+            n_clusters=n_clusters,
+            n_input=n_input,
+            v=v,
+            device=self.device,
+        ).to(self.device)
+        self.model_pre = AE(
+            n_enc_1=n_enc_1,
+            n_enc_2=n_enc_2,
+            n_enc_3=n_enc_3,
+            n_dec_1=n_dec_1,
+            n_dec_2=n_dec_2,
+            n_dec_3=n_dec_3,
+            n_input=n_input,
+            n_z1=n_z1,
+            n_z2=n_z2,
+            n_z3=n_z3,
+        ).to(self.device)
 
     @staticmethod
     def preprocessing_pipeline(n_top_genes: int = 2000, n_neighbors: int = 50, log_level: LogLevel = "INFO"):
@@ -82,13 +152,13 @@ class SCDSCWrapper:
 
         Parameters
         ----------
-        q :
-            soft label.
+        q
+            Soft label.
 
         Returns
         -------
-        p :
-            target distribution.
+        p
+            Target distribution.
 
         """
         p = q**2 / q.sum(0)
@@ -99,20 +169,16 @@ class SCDSCWrapper:
 
         Parameters
         ----------
-        x : np.ndarray
-            input features.
-        batch_size : int
-            size of batch.
-        n_epochs : int
-            number of epochs.
-        lr : float optional
-            learning rate.
-        fname : str
-            path to save autoencoder weights.
-
-        Returns
-        -------
-        None.
+        x
+            Input features.
+        batch_size
+            Size of batch.
+        n_epochs
+            Number of epochs.
+        lr
+            Learning rate.
+        fname
+            Path to save autoencoder weights.
 
         """
         print("Pretrain:")
@@ -146,32 +212,28 @@ class SCDSCWrapper:
 
         Parameters
         ----------
-        x : np.ndarray
-            input features.
-        y : np.ndarray
-            labels.
-        X_raw :
-            raw input features.
-        n_counts : list
-            total counts for each cell.
-        adj :
-            adjacency matrix as a sicpy sparse matrix.
-        lr : float optional
-            learning rate.
-        n_epochs : int optional
-            number of epochs.
-        bcl : float optional
-            parameter of binary crossentropy loss.
-        cl : float optional
-            parameter of Kullback–Leibler divergence loss.
-        rl : float optional
-            parameter of reconstruction loss.
-        zl : float optional
-            parameter of ZINB loss.
-
-        Returns
-        -------
-        None.
+        x
+            Input features.
+        y
+            Labels.
+        X_raw
+            Raw input features.
+        n_counts
+            Total counts for each cell.
+        adj
+            Adjacency matrix as a sicpy sparse matrix.
+        lr
+            Learning rate.
+        n_epochs
+            Number of epochs.
+        bcl
+            Parameter of binary crossentropy loss.
+        cl
+            Parameter of Kullback–Leibler divergence loss.
+        rl
+            Parameter of reconstruction loss.
+        zl
+            Parameter of ZINB loss.
 
         """
         print("Train:")
@@ -230,14 +292,10 @@ class SCDSCWrapper:
     def predict(self):
         """Get predictions from the trained model.
 
-        Parameters
-        ----------
-        None.
-
         Returns
         -------
-        y_pred : np.array
-            prediction of given clustering method.
+        y_pred
+            Prediction of given clustering method.
 
         """
         y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
@@ -248,17 +306,17 @@ class SCDSCWrapper:
 
         Parameters
         ----------
-        y : list
-            true labels.
+        y
+            True labels.
 
         Returns
         -------
-        acc : float
-            accuracy.
-        nmi : float
-            normalized mutual information.
-        ari : float
-            adjusted Rand index.
+        acc
+            Accuracy.
+        nmi
+            Normalized mutual information.
+        ari
+            Adjusted Rand index.
 
         """
         y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
@@ -273,74 +331,89 @@ class SCDSC(nn.Module):
 
     Parameters
     ----------
-    args : argparse.Namespace
-        a Namespace contains arguments of GCNAE. For details of parameters in parser args, please refer to link (parser help document).
-    device : str
-        computing device.
-    sigma : float
-        balance parameter.
-    pretrain_path : str
-        path of saved autoencoder weights.
-    n_enc_1 : int
-        output dimension of encoder layer 1.
-    n_enc_2 : int
-        output dimension of encoder layer 2.
-    n_enc_3 : int
-        output dimension of encoder layer 3.
-    n_dec_1 : int
-        output dimension of decoder layer 1.
-    n_dec_2 : int
-        output dimension of decoder layer 2.
-    n_dec_3 : int
-        output dimension of decoder layer 3.
-    n_z1 : int
-        output dimension of hidden layer 1.
-    n_z2 : int
-        output dimension of hidden layer 2.
-    n_z3 : int
-        output dimension of hidden layer 3.
-    n_clusters : int
-        number of clusters.
-    n_input : int
-        input feature dimension.
-    v : float
-        parameter of soft assignment.
+    pretrain_path
+        Path of saved autoencoder weights.
+    sigma
+        Balance parameter.
+    n_enc_1
+        Output dimension of encoder layer 1.
+    n_enc_2
+        Output dimension of encoder layer 2.
+    n_enc_3
+        Output dimension of encoder layer 3.
+    n_dec_1
+        Output dimension of decoder layer 1.
+    n_dec_2
+        Output dimension of decoder layer 2.
+    n_dec_3
+        Output dimension of decoder layer 3.
+    n_z1
+        Output dimension of hidden layer 1.
+    n_z2
+        Output dimension of hidden layer 2.
+    n_z3
+        Output dimension of hidden layer 3.
+    n_clusters
+        Number of clusters.
+    n_input
+        Input feature dimension.
+    v
+        Parameter of soft assignment.
+    device
+        Computing device.
 
     """
 
-    def __init__(self, args):
+    def __init__(
+        self,
+        pretrain_path,
+        sigma,
+        n_enc_1,
+        n_enc_2,
+        n_enc_3,
+        n_dec_1,
+        n_dec_2,
+        n_dec_3,
+        n_z1,
+        n_z2,
+        n_z3,
+        n_clusters,
+        n_input,
+        v,
+        device,
+    ):
         super().__init__()
-        device = args.device
-        self.sigma = args.sigma
-        self.pretrain_path = args.pretrain_path
+        device = device
+        self.sigma = sigma
+        self.pretrain_path = pretrain_path
         self.ae = AE(
-            n_enc_1=args.n_enc_1,
-            n_enc_2=args.n_enc_2,
-            n_enc_3=args.n_enc_3,
-            n_dec_1=args.n_dec_1,
-            n_dec_2=args.n_dec_2,
-            n_dec_3=args.n_dec_3,
-            n_input=args.n_input,
-            n_z1=args.n_z1,
-            n_z2=args.n_z2,
-            n_z3=args.n_z3,
+            n_enc_1=n_enc_1,
+            n_enc_2=n_enc_2,
+            n_enc_3=n_enc_3,
+            n_dec_1=n_dec_1,
+            n_dec_2=n_dec_2,
+            n_dec_3=n_dec_3,
+            n_input=n_input,
+            n_z1=n_z1,
+            n_z2=n_z2,
+            n_z3=n_z3,
         )
-        self.gnn_1 = GNNLayer(args.n_input, args.n_enc_1)
-        self.gnn_2 = GNNLayer(args.n_enc_1, args.n_enc_2)
-        self.gnn_3 = GNNLayer(args.n_enc_2, args.n_enc_3)
-        self.gnn_4 = GNNLayer(args.n_enc_3, args.n_z1)
-        self.gnn_5 = GNNLayer(args.n_z1, args.n_z2)
-        self.gnn_6 = GNNLayer(args.n_z2, args.n_z3)
-        self.gnn_7 = GNNLayer(args.n_z3, args.n_clusters)
+        self.gnn_1 = GNNLayer(n_input, n_enc_1)
+        self.gnn_2 = GNNLayer(n_enc_1, n_enc_2)
+        self.gnn_3 = GNNLayer(n_enc_2, n_enc_3)
+        self.gnn_4 = GNNLayer(n_enc_3, n_z1)
+        self.gnn_5 = GNNLayer(n_z1, n_z2)
+        self.gnn_6 = GNNLayer(n_z2, n_z3)
+        self.gnn_7 = GNNLayer(n_z3, n_clusters)
 
         # cluster layer
-        self.cluster_layer = Parameter(torch.Tensor(args.n_clusters, args.n_z3))
+        self.cluster_layer = Parameter(torch.Tensor(n_clusters, n_z3))
         torch.nn.init.xavier_normal_(self.cluster_layer.data)
-        self._dec_mean = nn.Sequential(nn.Linear(args.n_dec_3, args.n_input), MeanAct())
-        self._dec_disp = nn.Sequential(nn.Linear(args.n_dec_3, args.n_input), DispAct())
-        self._dec_pi = nn.Sequential(nn.Linear(args.n_dec_3, args.n_input), nn.Sigmoid())
+        self._dec_mean = nn.Sequential(nn.Linear(n_dec_3, n_input), MeanAct())
+        self._dec_disp = nn.Sequential(nn.Linear(n_dec_3, n_input), DispAct())
+        self._dec_pi = nn.Sequential(nn.Linear(n_dec_3, n_input), nn.Sigmoid())
         # degree
-        self.v = args.v
+        self.v = v
         self.zinb_loss = ZINBLoss().to(device)
 
     def forward(self, x, adj):
@@ -348,27 +421,27 @@ class SCDSC(nn.Module):
 
         Parameters
         ----------
-        x :
-            input features.
-        adj :
-            adjacency matrix
+        x
+            Input features.
+        adj
+            Adjacency matrix
 
         Returns
         -------
         x_bar:
-            reconstructed features.
-        q :
-            soft label.
+            Reconstructed features.
+        q
+            Soft label.
         predict:
-            prediction given by softmax assignment of embedding of GCN module
-        z3 :
-            embedding of autoencoder.
-        _mean :
-            data mean from ZINB.
-        _disp :
-            data dispersion from ZINB.
-        _pi :
-            data dropout probability from ZINB.
+            Prediction given by softmax assignment of embedding of GCN module
+        z3
+            Embedding of autoencoder.
+        _mean
+            Data mean from ZINB.
+        _disp
+            Data dispersion from ZINB.
+        _pi
+            Data dropout probability from ZINB.
         zinb_loss:
             ZINB loss class.
 
@@ -406,10 +479,10 @@ class GNNLayer(nn.Module):
 
     Parameters
     ----------
-    in_features : int
-        input dimension of GNN layer.
-    out_features : int
-        output dimension of GNN layer.
+    in_features
+        Input dimension of GNN layer.
+    out_features
+        Output dimension of GNN layer.
 
     """
 
@@ -435,26 +508,26 @@ class AE(nn.Module):
 
     Parameters
     ----------
-    n_enc_1 : int
-        output dimension of encoder layer 1.
-    n_enc_2 : int
-        output dimension of encoder layer 2.
-    n_enc_3 : int
-        output dimension of encoder layer 3.
-    n_dec_1 : int
-        output dimension of decoder layer 1.
-    n_dec_2 : int
-        output dimension of decoder layer 2.
-    n_dec_3 : int
-        output dimension of decoder layer 3.
-    n_input : int
-        input feature dimension.
-    n_z1 : int
-        output dimension of hidden layer 1.
-    n_z2 : int
-        output dimension of hidden layer 2.
-    n_z3 : int
-        output dimension of hidden layer 3.
+    n_enc_1
+        Output dimension of encoder layer 1.
+    n_enc_2
+        Output dimension of encoder layer 2.
+    n_enc_3
+        Output dimension of encoder layer 3.
+    n_dec_1
+        Output dimension of decoder layer 1.
+    n_dec_2
+        Output dimension of decoder layer 2.
+    n_dec_3
+        Output dimension of decoder layer 3.
+    n_input
+        Input feature dimension.
+    n_z1
+        Output dimension of hidden layer 1.
+    n_z2
+        Output dimension of hidden layer 2.
+    n_z3
+        Output dimension of hidden layer 3.
 
     """
 
@@ -488,27 +561,27 @@ class AE(nn.Module):
 
         Parameters
         ----------
-        x :
-            input features.
+        x
+            Input features.
 
         Returns
         -------
-        x_bar:
-            reconstructed features.
-        enc_h1:
-            output of encoder layer 1.
-        enc_h2:
-            output of encoder layer 2.
-        enc_h3:
-            output of encoder layer 3.
-        z3 :
-            output of hidden layer 3.
-        z2 :
-            output of hidden layer 2.
-        z1 :
-            output of hidden layer 1.
-        dec_h3 :
-            output of decoder layer 3.
+        x_bar
+            Reconstructed features.
+        enc_h1
+            Output of encoder layer 1.
+        enc_h2
+            Output of encoder layer 2.
+        enc_h3
+            Output of encoder layer 3.
+        z3
+            Output of hidden layer 3.
+        z2
+            Output of hidden layer 2.
+        z1
+            Output of hidden layer 1.
+        dec_h3
+            Output of decoder layer 3.
 
         """
         enc_h1 = F.relu(self.BN1(self.enc_1(x)))
@@ -532,18 +605,18 @@ class RAdam(Optimizer):
 
     Parameters
     ----------
-    params :
-        model parameters.
-    lr : float optional
-        learning rate.
-    betas : tuple optional
-        coefficients used for computing running averages of gradient and its square.
-    eps : float optional
-        term added to the denominator to improve numerical stability.
-    weight decay : float optional
-        weight decay (L2 penalty).
-    degenerated_to_sgd : bool optional
-        degenerated to SGD or not.
+    params
+        Model parameters.
+    lr
+        Learning rate.
+    betas
+        Coefficients used for computing running averages of gradient and its square.
+    eps
+        Term added to the denominator to improve numerical stability.
+    weight decay
+        Weight decay (L2 penalty).
+    degenerated_to_sgd
+        Degenerated to SGD or not.
 
     """
 
