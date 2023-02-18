@@ -196,7 +196,7 @@ class GraphSC:
 
             for input_nodes, output_nodes, blocks in dataloader:
                 blocks = [b.to(device) for b in blocks]
-                input_features = blocks[0].srcdata['features']
+                input_features = blocks[0].srcdata["features"]
                 g = blocks[-1]
 
                 adj_logits, emb = self.model.forward(blocks, input_features)
@@ -233,8 +233,8 @@ class GraphSC:
                 score = self.score(y, n_clusters, cluster=cluster)
                 aris_kmeans.append(score["kmeans_ari"])
                 if show_epoch_ari:
-                    print(f'epoch {epoch}, ARI {score.get("kmeans_ari")}')
-                z_ = {f'epoch{epoch}': z}
+                    print(f"epoch {epoch}, ARI {score.get('kmeans_ari')}")
+                z_ = {f"epoch{epoch}": z}
                 Z = {**Z, **z_}
 
             elif epoch == n_epochs - 1:
@@ -242,7 +242,7 @@ class GraphSC:
 
         if eval_epoch:
             index = np.argmax(aris_kmeans)
-            self.z = Z[f'epoch{index}']
+            self.z = Z[f"epoch{index}"]
 
     def predict(self, n_clusters, cluster=["KMeans"]):
         """Get predictions from the graph autoencoder model.
@@ -416,13 +416,13 @@ class GCNAE(nn.Module):
 
         self.agg = agg
 
-        if activation == 'gelu':
+        if activation == "gelu":
             activation = F.gelu
-        elif activation == 'prelu':
+        elif activation == "prelu":
             activation = F.prelu
-        elif activation == 'relu':
+        elif activation == "relu":
             activation = F.relu
-        elif activation == 'leaky_relu':
+        elif activation == "leaky_relu":
             activation = F.leaky_relu
 
         if n_hidden == 0:
@@ -456,12 +456,12 @@ class GCNAE(nn.Module):
             self.encoder = nn.Sequential(*enc)
 
     def forward(self, blocks, features):
-        x = blocks[0].srcdata['features']
+        x = blocks[0].srcdata["features"]
         for i in range(len(blocks)):
             with blocks[i].local_scope():
                 if self.dropout is not None:
                     x = self.dropout(x)
-                blocks[i].srcdata['h'] = x
+                blocks[i].srcdata["h"] = x
                 if i == 0:
                     x = self.layer1(blocks[i], x, agg=self.agg)
                 else:
@@ -512,25 +512,25 @@ class WeightedGraphConv(GraphConv):
             Edges of graph.
 
         """
-        return {'m': edges.src['h'] * edges.data['weight']}
+        return {"m": edges.src["h"] * edges.data["weight"]}
 
     def forward(self, graph, feat, weight=None, agg="sum"):
         with graph.local_scope():
             if not self._allow_zero_in_degree:
                 if (graph.in_degrees() == 0).any():
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
+                    raise DGLError("There are 0-in-degree nodes in the graph, "
+                                   "output for those nodes will be invalid. "
+                                   "This is harmful for some applications, "
+                                   "causing silent performance regression. "
+                                   "Adding self-loop on the input graph by "
+                                   "calling `g = dgl.add_self_loop(g)` will resolve "
+                                   "the issue. Setting ``allow_zero_in_degree`` "
+                                   "to be `True` when constructing this module will "
+                                   "suppress the check and let the code run.")
 
             # (BarclayII) For RGCN on heterogeneous graphs we need to support GCN on bipartite.
             feat_src, feat_dst = expand_as_pair(feat, graph)
-            if self._norm == 'both':
+            if self._norm == "both":
                 degs = graph.out_degrees().float().clamp(min=1)
                 norm = torch.pow(degs, -0.5)
                 shp = norm.shape + (1, ) * (feat_src.dim() - 1)
@@ -539,24 +539,24 @@ class WeightedGraphConv(GraphConv):
 
             if weight is not None:
                 if self.weight is not None:
-                    raise DGLError('External weight is provided while at the same time the'
-                                   ' module has defined its own weight parameter. Please'
-                                   ' create the module with flag weight=False.')
+                    raise DGLError("External weight is provided while at the same time the"
+                                   " module has defined its own weight parameter. Please"
+                                   " create the module with flag weight=False.")
             else:
                 weight = self.weight
 
             if weight is not None:
                 feat_src = torch.matmul(feat_src, weight)
-            graph.srcdata['h'] = feat_src
+            graph.srcdata["h"] = feat_src
             if agg == "sum":
-                graph.update_all(self.edge_selection_simple, fn.sum(msg='m', out='h'))
+                graph.update_all(self.edge_selection_simple, fn.sum(msg="m", out="h"))
             if agg == "mean":
-                graph.update_all(self.edge_selection_simple, fn.mean(msg='m', out='h'))
-            rst = graph.dstdata['h']
-            if self._norm != 'none':
+                graph.update_all(self.edge_selection_simple, fn.mean(msg="m", out="h"))
+            rst = graph.dstdata["h"]
+            if self._norm != "none":
 
                 degs = graph.in_degrees().float().clamp(min=1)
-                if self._norm == 'both':
+                if self._norm == "both":
                     norm = torch.pow(degs, -0.5)
                 else:
                     norm = 1.0 / degs
@@ -586,16 +586,16 @@ class WeightedGraphConvAlpha(GraphConv):
             Edges of graph.
 
         """
-        number_of_edges = edges.src['h'].shape[0]
+        number_of_edges = edges.src["h"].shape[0]
         indices = np.expand_dims(np.array([self.gene_num + 1] * number_of_edges, dtype=np.int32), axis=1)
-        src_id, dst_id = edges.src['id'].cpu().numpy(), edges.dst['id'].cpu().numpy()
+        src_id, dst_id = edges.src["id"].cpu().numpy(), edges.dst["id"].cpu().numpy()
         indices = np.where((src_id >= 0) & (dst_id < 0), src_id, indices)  # gene->cell
         indices = np.where((dst_id >= 0) & (src_id < 0), dst_id, indices)  # cell->gene
         indices = np.where((dst_id >= 0) & (src_id >= 0), self.gene_num, indices)  # gene-gene
-        h = edges.src['h'] * self.alpha[indices.squeeze()]
-        return {'m': h}
+        h = edges.src["h"] * self.alpha[indices.squeeze()]
+        return {"m": h}
 
-    #         return {'m': h * edges.data['weight']}
+    #         return {"m": h * edges.data["weight"]}
 
     def forward(self, graph, feat, weight=None, alpha=None, gene_num=None):
         self.alpha = alpha
@@ -603,20 +603,20 @@ class WeightedGraphConvAlpha(GraphConv):
         with graph.local_scope():
             if not self._allow_zero_in_degree:
                 if (graph.in_degrees() == 0).any():
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
+                    raise DGLError("There are 0-in-degree nodes in the graph, "
+                                   "output for those nodes will be invalid. "
+                                   "This is harmful for some applications, "
+                                   "causing silent performance regression. "
+                                   "Adding self-loop on the input graph by "
+                                   "calling `g = dgl.add_self_loop(g)` will resolve "
+                                   "the issue. Setting ``allow_zero_in_degree`` "
+                                   "to be `True` when constructing this module will "
+                                   "suppress the check and let the code run.")
 
             # (BarclayII) For RGCN on heterogeneous graphs we need to support GCN on bipartite.
             feat_src, feat_dst = expand_as_pair(feat, graph)
             #             print(f"feat_src : {feat_src.shape}, feat_dst {feat_dst.shape}")
-            if self._norm == 'both':
+            if self._norm == "both":
                 degs = graph.out_degrees().float().clamp(min=1)
                 norm = torch.pow(degs, -0.5)
                 shp = norm.shape + (1, ) * (feat_src.dim() - 1)
@@ -625,22 +625,22 @@ class WeightedGraphConvAlpha(GraphConv):
 
             if weight is not None:
                 if self.weight is not None:
-                    raise DGLError('External weight is provided while at the same time the'
-                                   ' module has defined its own weight parameter. Please'
-                                   ' create the module with flag weight=False.')
+                    raise DGLError("External weight is provided while at the same time the"
+                                   " module has defined its own weight parameter. Please"
+                                   " create the module with flag weight=False.")
                 else:
                     feat_src = torch.matmul(feat_src, weight)
             else:
                 weight = self.weight
 
-            graph.srcdata['h'] = feat_src
-            graph.update_all(self.edge_selection_simple, fn.sum(msg='m', out='h'))
-            rst = graph.dstdata['h']
+            graph.srcdata["h"] = feat_src
+            graph.update_all(self.edge_selection_simple, fn.sum(msg="m", out="h"))
+            rst = graph.dstdata["h"]
 
-            if self._norm != 'none':
+            if self._norm != "none":
 
                 degs = graph.in_degrees().float().clamp(min=1)
-                if self._norm == 'both':
+                if self._norm == "both":
                     norm = torch.pow(degs, -0.5)
                 else:
                     norm = 1.0 / degs
@@ -672,8 +672,8 @@ def run_leiden(data):
 
     """
     adata = sc.AnnData(data)
-    sc.pp.neighbors(adata, use_rep='X', n_neighbors=300, n_pcs=0)
+    sc.pp.neighbors(adata, use_rep="X", n_neighbors=300, n_pcs=0)
     sc.tl.leiden(adata)
-    pred = adata.obs['leiden'].to_list()
+    pred = adata.obs["leiden"].to_list()
     pred = [int(x) for x in pred]
     return pred
