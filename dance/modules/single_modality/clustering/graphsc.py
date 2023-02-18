@@ -32,6 +32,7 @@ from tqdm import tqdm
 from dance.transforms import AnnDataTransform, Compose, SetConfig
 from dance.transforms.graph import PCACellFeatureGraph
 from dance.typing import LogLevel
+from dance.utils import get_device
 
 
 class GraphSC:
@@ -39,17 +40,69 @@ class GraphSC:
 
     Parameters
     ----------
-    args : argparse.Namespace
-        a Namespace contains arguments of GCNAE. For details of parameters in parser args, please refer to link
-        (parser help document).
+    agg
+        Aggregation layer.
+    activation
+        Activation function.
+    in_feats
+        Dimension of input feature
+    n_hidden
+        Number of hidden layer.
+    hidden_dim
+        Input dimension of hidden layer 1.
+    hidden_1
+        Output dimension of hidden layer 1.
+    hidden_2
+        Output dimension of hidden layer 2.
+    dropout
+        Dropout rate.
+    n_layers
+        Number of graph convolutional layers.
+    hidden_relu
+        Use relu activation in hidden layers or not.
+    hidden_bn
+        Use batch norm in hidden layers or not.
+    num_workers
+        Number of workers.
+    device
+        Computation device to use.
 
     """
 
-    def __init__(self, args):
+    def __init__(
+        self,
+        agg: str = "sum",
+        activation: str = "relu",
+        in_feats: int = 50,
+        n_hidden: int = 1,
+        hidden_dim: int = 200,
+        hidden_1: int = 300,
+        hidden_2: int = 0,
+        dropout: float = 0.1,
+        n_layers: int = 1,
+        hidden_relu: bool = False,
+        hidden_bn: bool = False,
+        num_workers: int = 1,
+        device: str = "auto",
+    ):
         super().__init__()
-        self.args = args
-        self.device = get_device(args.use_cpu)
-        self.model = GCNAE(args).to(self.device)
+        self.n_layers = n_layers
+        self.num_workers = num_workers
+        self.device = get_device(device)
+
+        self.model = GCNAE(
+            agg=agg,
+            activation=activation,
+            in_feats=in_feats,
+            n_hidden=n_hidden,
+            hidden_dim=hidden_dim,
+            hidden_1=hidden_1,
+            hidden_2=hidden_2,
+            dropout=dropout,
+            n_layers=n_layers,
+            hidden_relu=hidden_relu,
+            hidden_bn=hidden_bn,
+        ).to(self.device)
 
     @staticmethod
     def preprocessing_pipeline(n_top_genes: int = 3000, normalize_weights: str = "log_per_cell", n_components: int = 50,
@@ -90,89 +143,104 @@ class GraphSC:
 
         return Compose(*transforms, log_level=log_level)
 
-    def fit(self, g, n_epochs, n_clusters, lr, cluster=["KMeans"]):
+    def fit(
+        self,
+        g,
+        n_epochs,
+        n_clusters,
+        lr,
+        cluster=["KMeans"],
+        batch_size: int = 128,
+        show_epoch_ari: bool = False,
+        eval_epoch: bool = False,
+    ):
         """Train graph-sc.
 
         Parameters
         ----------
-        g : dgl.DGLGraph
-            input cell-gene graph.
-        n_epochs : int
-            number of epochs.
-        n_clusters : int
-            number of clusters.
-        lr : float
-            learning rate.
-        cluster : list optional
-            clustering method.
+        g
+            Input cell-gene graph.
+        n_epochs
+            Number of epochs.
+        n_clusters
+            Number of clusters.
+        lr
+            Learning rate.
+        cluster
+            Clustering method.
+        batch_size
+            Batch size.
+        show_epoch_ari
+            Show ARI score for each epoch
+        eval_epoch
+            Evaluate every epoch.
 
         """
         g.ndata["order"] = g.ndata["label"] = g.ndata["feat_id"]
         train_ids = np.where(g.ndata["label"] != -1)[0]
-        sampler = dgl.dataloading.MultiLayerFullNeighborSampler(self.args.n_layers)
-        dataloader = dgl.dataloading.NodeDataLoader(g, train_ids, sampler, batch_size=self.args.batch_size,
-                                                    shuffle=True, drop_last=False, num_workers=self.args.num_workers)
+        sampler = dgl.dataloading.MultiLayerFullNeighborSampler(self.n_layers)
+        dataloader = dgl.dataloading.NodeDataLoader(g, train_ids, sampler, batch_size=batch_size, shuffle=True,
+                                                    drop_last=False, num_workers=self.num_workers)
 
-        device = get_device(self.args.use_cpu)
+        device = get_device(self.device)
         optim = torch.optim.Adam(self.model.parameters(), lr=lr)
         losses = []
         aris_kmeans = []
         Z = {}
 
-        with dataloader.enable_cpu_affinity():
-            for epoch in tqdm(range(n_epochs)):
-                self.model.train()
-                z = []
-                y = []
-                order = []
+        for epoch in tqdm(range(n_epochs)):
+            self.model.train()
+            z = []
+            y = []
+            order = []
 
-                for input_nodes, output_nodes, blocks in dataloader:
-                    blocks = [b.to(device) for b in blocks]
-                    input_features = blocks[0].srcdata['features']
-                    g = blocks[-1]
+            for input_nodes, output_nodes, blocks in dataloader:
+                blocks = [b.to(device) for b in blocks]
+                input_features = blocks[0].srcdata['features']
+                g = blocks[-1]
 
-                    adj_logits, emb = self.model.forward(blocks, input_features)
-                    z.extend(emb.detach().cpu().numpy())
-                    if "label" in blocks[-1].dstdata:
-                        y.extend(blocks[-1].dstdata["label"].cpu().numpy())
-                    order.extend(blocks[-1].dstdata["order"].cpu().numpy())
+                adj_logits, emb = self.model.forward(blocks, input_features)
+                z.extend(emb.detach().cpu().numpy())
+                if "label" in blocks[-1].dstdata:
+                    y.extend(blocks[-1].dstdata["label"].cpu().numpy())
+                order.extend(blocks[-1].dstdata["order"].cpu().numpy())
 
-                    adj = g.adjacency_matrix().to_dense().to(device)
-                    adj = adj[g.dstnodes()]
-                    pos_weight = torch.Tensor([float(adj.shape[0] * adj.shape[0] - adj.sum()) / adj.sum()])
-                    factor = float((adj.shape[0] * adj.shape[0] - adj.sum()) * 2)
-                    if factor == 0:
-                        factor = 1
-                    norm = adj.shape[0] * adj.shape[0] / factor
-                    adj_logits, _ = self.model.forward(blocks, input_features)
-                    loss = norm * BCELoss(adj_logits, adj.to(device), pos_weight=pos_weight.to(device))
-                    optim.zero_grad()
-                    loss.backward()
-                    optim.step()
-                    losses.append(loss.item())
+                adj = g.adjacency_matrix().to_dense().to(device)
+                adj = adj[g.dstnodes()]
+                pos_weight = torch.Tensor([float(adj.shape[0] * adj.shape[0] - adj.sum()) / adj.sum()])
+                factor = float((adj.shape[0] * adj.shape[0] - adj.sum()) * 2)
+                if factor == 0:
+                    factor = 1
+                norm = adj.shape[0] * adj.shape[0] / factor
+                adj_logits, _ = self.model.forward(blocks, input_features)
+                loss = norm * BCELoss(adj_logits, adj.to(device), pos_weight=pos_weight.to(device))
+                optim.zero_grad()
+                loss.backward()
+                optim.step()
+                losses.append(loss.item())
 
-                z = np.array(z)
-                y = np.array(y)
-                order = np.array(order)
-                order = np.argsort(order)
-                z = z[order]
-                y = y[order]
-                if pd.isnull(y[0]):
-                    y = None
+            z = np.array(z)
+            y = np.array(y)
+            order = np.array(order)
+            order = np.argsort(order)
+            z = z[order]
+            y = y[order]
+            if pd.isnull(y[0]):
+                y = None
+            self.z = z
+
+            if eval_epoch:
+                score = self.score(y, n_clusters, cluster=cluster)
+                aris_kmeans.append(score["kmeans_ari"])
+                if show_epoch_ari:
+                    print(f'epoch {epoch}, ARI {score.get("kmeans_ari")}')
+                z_ = {f'epoch{epoch}': z}
+                Z = {**Z, **z_}
+
+            elif epoch == n_epochs - 1:
                 self.z = z
 
-                if self.args.eval_epoch:
-                    score = self.score(y, n_clusters, cluster=cluster)
-                    aris_kmeans.append(score["kmeans_ari"])
-                    if self.args.show_epoch_ari:
-                        print(f'epoch {epoch}, ARI {score.get("kmeans_ari")}')
-                    z_ = {f'epoch{epoch}': z}
-                    Z = {**Z, **z_}
-
-                elif epoch == n_epochs - 1:
-                    self.z = z
-
-        if self.args.eval_epoch:
+        if eval_epoch:
             index = np.argmax(aris_kmeans)
             self.z = Z[f'epoch{index}']
 
@@ -181,15 +249,15 @@ class GraphSC:
 
         Parameters
         ----------
-        n_clusters : int
-            number of clusters.
-        cluster : list optional
-            clustering method.
+        n_clusters
+            Number of clusters.
+        cluster
+            Clustering method.
 
         Returns
         -------
-        pred : dict
-            prediction of given clustering method.
+        pred
+            Prediction of given clustering method.
 
         """
         z = self.z
@@ -211,19 +279,19 @@ class GraphSC:
 
         Parameters
         ----------
-        y : list
-            true labels.
-        n_clusters : int
-            number of clusters.
-        plot : bool optional
-            show plot or not.
-        cluster : list optional
-            clustering method.
+        y
+            True labels.
+        n_clusters
+            Number of clusters.
+        plot
+            Show plot or not.
+        cluster
+            Clustering method.
 
         Returns
         -------
-        scores : dict
-            metric evaluation scores.
+        scores
+            Metric evaluation scores.
 
         """
         z = self.z
@@ -297,83 +365,93 @@ class GCNAE(nn.Module):
 
     Parameters
     ----------
-    args : argparse.Namespace
-        a Namespace contains arguments of scDSC. For details of parameters in parser args, please refer to link
-        (parser help document).
-    agg : str
-        aggregation layer.
-    activation :str
-        activation function.
-    in_feats : int
-        dimension of input feature
-    n_hidden : int
-        number of hidden layer.
-    hidden_dim :int
-        input dimension of hidden layer 1.
-    hidden_1 : int
-        output dimension of hidden layer 1.
-    hidden_2 : int
-        output dimension of hidden layer 2.
-    dropout : float
-        dropout rate.
-    n_layers :int
-        number of graph convolutional layers.
-    hidden_relu : bool
-        use relu activation in hidden layers or not.
-    hidden_bn : bool
-        use batch norm in hidden layers or not.
+    agg
+        Aggregation layer.
+    activation
+        Activation function.
+    in_feats
+        Dimension of input feature
+    n_hidden
+        Number of hidden layer.
+    hidden_dim
+        Input dimension of hidden layer 1.
+    hidden_1
+        Output dimension of hidden layer 1.
+    hidden_2
+        Output dimension of hidden layer 2.
+    dropout
+        Dropout rate.
+    n_layers
+        Number of graph convolutional layers.
+    hidden_relu
+        Use relu activation in hidden layers or not.
+    hidden_bn
+        Use batch norm in hidden layers or not.
 
     Returns
     -------
-    adj_rec :
-        reconstructed adjacency matrix.
-    x :
-        embedding.
+    adj_rec
+        Reconstructed adjacency matrix.
+    x
+        Embedding.
 
     """
 
-    def __init__(self, args):
-
+    def __init__(
+        self,
+        *,
+        agg: str,
+        activation: str,
+        in_feats: int,
+        n_hidden: int,
+        hidden_dim: int,
+        hidden_1: int,
+        hidden_2: int,
+        dropout: float,
+        n_layers: int,
+        hidden_relu: bool,
+        hidden_bn: bool,
+    ):
         super().__init__()
-        self.args = args
-        self.agg = args.agg
 
-        if args.activation == 'gelu':
+        self.agg = agg
+
+        if activation == 'gelu':
             activation = F.gelu
-        elif args.activation == 'prelu':
+        elif activation == 'prelu':
             activation = F.prelu
-        elif args.activation == 'relu':
+        elif activation == 'relu':
             activation = F.relu
-        elif args.activation == 'leaky_relu':
+        elif activation == 'leaky_relu':
             activation = F.leaky_relu
 
-        if args.n_hidden == 0:
+        if n_hidden == 0:
             hidden = None
-        elif args.n_hidden == 1:
-            hidden = [args.hidden_1]
-        elif args.n_hidden == 2:
-            hidden = [args.hidden_1, args.hidden_2]
+        elif n_hidden == 1:
+            hidden = [hidden_1]
+        elif n_hidden == 2:
+            hidden = [hidden_1, hidden_2]
 
-        if args.dropout != 0:
-            self.dropout = nn.Dropout(p=args.dropout)
+        if dropout != 0:
+            self.dropout = nn.Dropout(p=dropout)
         else:
             self.dropout = None
 
-        self.layer1 = WeightedGraphConv(in_feats=args.in_feats, out_feats=args.hidden_dim, activation=activation)
-        if args.n_layers == 2:
-            self.layer2 = WeightedGraphConv(in_feats=args.hidden_dim, out_feats=args.hidden_dim, activation=activation)
+        self.layer1 = WeightedGraphConv(in_feats=in_feats, out_feats=hidden_dim, activation=activation)
+        if n_layers == 2:
+            self.layer2 = WeightedGraphConv(in_feats=hidden_dim, out_feats=hidden_dim, activation=activation)
         self.decoder = InnerProductDecoder(activation=lambda x: x)
         self.hidden = hidden
         if hidden is not None:
             enc = []
             for i, s in enumerate(hidden):
                 if i == 0:
-                    enc.append(nn.Linear(args.hidden_dim, hidden[i]))
+                    enc.append(nn.Linear(hidden_dim, hidden[i]))
                 else:
                     enc.append(nn.Linear(hidden[i - 1], hidden[i]))
-                if args.hidden_bn and i != len(hidden):
+                if hidden_bn and i != len(hidden):
                     enc.append(nn.BatchNorm1d(hidden[i]))
-                if args.hidden_relu and i != len(hidden):
+                if hidden_relu and i != len(hidden):
                     enc.append(nn.ReLU())
             self.encoder = nn.Sequential(*enc)
 
@@ -399,15 +477,15 @@ class InnerProductDecoder(nn.Module):
 
     Parameters
     ----------
-    activation : optional
-        activation function.
-    dropout : float optional
-        dropout rate.
+    activation
+        Activation function.
+    dropout
+        Dropout rate.
 
     Returns
     -------
-    adj :
-        reconstructed adjacency matrix.
+    adj
+        Reconstructed adjacency matrix.
 
     """
 
@@ -430,8 +508,8 @@ class WeightedGraphConv(GraphConv):
 
         Parameters
         ----------
-        edges :
-            edges of graph.
+        edges
+            Edges of graph.
 
         """
         return {'m': edges.src['h'] * edges.data['weight']}
@@ -504,8 +582,8 @@ class WeightedGraphConvAlpha(GraphConv):
 
         Parameters
         ----------
-        edges :
-            edges of graph.
+        edges
+            Edges of graph.
 
         """
         number_of_edges = edges.src['h'].shape[0]
@@ -584,13 +662,13 @@ def run_leiden(data):
 
     Parameters
     ----------
-    data :
-        data for leiden
+    data
+        Aata for leiden
 
     Returns
     -------
-    pred : list
-        prediction of leiden.
+    pred
+        Prediction of leiden.
 
     """
     adata = sc.AnnData(data)

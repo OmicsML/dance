@@ -10,7 +10,7 @@ from dance.utils import set_seed
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--epochs", default=100, type=int)
-    parser.add_argument("-cpu", "--use_cpu", default=False, action="store_true")
+    parser.add_argument("-dv", "--device", default="auto")
     parser.add_argument("-if", "--in_feats", default=50, type=int)
     parser.add_argument("-bs", "--batch_size", default=128, type=int)
     parser.add_argument("-nw", "--normalize_weights", default="log_per_cell", choices=["log_per_cell", "per_cell"])
@@ -56,7 +56,10 @@ if __name__ == "__main__":
 
     for run in range(args.num_run):
         set_seed(run)
-        model = GraphSC(args)
+        model = GraphSC(agg=args.agg, activation=args.activation, in_feats=args.in_feats, n_hidden=args.n_hidden,
+                        hidden_dim=args.hidden_dim, hidden_1=args.hidden_1, hidden_2=args.hidden_2,
+                        dropout=args.dropout, n_layers=args.n_layers, hidden_relu=args.hidden_relu,
+                        hidden_bn=args.hidden_bn, num_workers=args.num_workers, device=args.device)
         model.fit(graph, args.epochs, n_clusters, args.learning_rate, cluster=["KMeans", "Leiden"])
         pred = model.predict(n_clusters, cluster=["KMeans", "Leiden"])
         print(f"kmeans_pred (first 10): {pred.get('kmeans_pred')[:10]}")
