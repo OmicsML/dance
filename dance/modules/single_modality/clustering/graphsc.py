@@ -9,10 +9,7 @@ Ciortan, Madalina, and Matthieu Defrance. "GNN-based embedding for clustering sc
 
 """
 
-import time
-
 import dgl
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scanpy as sc
@@ -24,18 +21,17 @@ from dgl import function as fn
 from dgl.nn.pytorch import GraphConv
 from dgl.utils import expand_as_pair
 from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
-from sklearn.metrics import adjusted_rand_score, calinski_harabasz_score, normalized_mutual_info_score, silhouette_score
 from torch.nn.functional import binary_cross_entropy_with_logits as BCELoss
 from tqdm import tqdm
 
+from dance.modules.base import BaseClusteringMethod
 from dance.transforms import AnnDataTransform, Compose, SetConfig
 from dance.transforms.graph import PCACellFeatureGraph
-from dance.typing import LogLevel
+from dance.typing import Any, Literal, LogLevel, Optional
 from dance.utils import get_device
 
 
-class GraphSC:
+class GraphSC(BaseClusteringMethod):
     """GraphSC class.
 
     Parameters
@@ -62,6 +58,8 @@ class GraphSC:
         Use relu activation in hidden layers or not.
     hidden_bn
         Use batch norm in hidden layers or not.
+    cluster_method
+        Method for clustering.
     num_workers
         Number of workers.
     device
@@ -82,11 +80,15 @@ class GraphSC:
         n_layers: int = 1,
         hidden_relu: bool = False,
         hidden_bn: bool = False,
+        n_clusters: int = 10,
+        cluster_method: Literal["kmeans", "leiden"] = "kmeans",
         num_workers: int = 1,
         device: str = "auto",
     ):
         super().__init__()
         self.n_layers = n_layers
+        self.n_clusters = n_clusters
+        self.cluster_method = cluster_method
         self.num_workers = num_workers
         self.device = get_device(device)
 
@@ -145,11 +147,11 @@ class GraphSC:
 
     def fit(
         self,
-        g,
-        n_epochs,
-        n_clusters,
-        lr,
-        cluster=["KMeans"],
+        g: dgl.DGLGraph,
+        y: Optional[Any] = None,
+        *,
+        n_epochs: int = 100,
+        lr: float = 1e-5,
         batch_size: int = 128,
         show_epoch_ari: bool = False,
         eval_epoch: bool = False,
@@ -160,14 +162,12 @@ class GraphSC:
         ----------
         g
             Input cell-gene graph.
+        y
+            Not used, for compatibility with the BaseClusteringMethod class.
         n_epochs
             Number of epochs.
-        n_clusters
-            Number of clusters.
         lr
             Learning rate.
-        cluster
-            Clustering method.
         batch_size
             Batch size.
         show_epoch_ari
@@ -185,7 +185,7 @@ class GraphSC:
         device = get_device(self.device)
         optim = torch.optim.Adam(self.model.parameters(), lr=lr)
         losses = []
-        aris_kmeans = []
+        aris = []
         Z = {}
 
         for epoch in tqdm(range(n_epochs)):
@@ -230,10 +230,10 @@ class GraphSC:
             self.z = z
 
             if eval_epoch:
-                score = self.score(y, n_clusters, cluster=cluster)
-                aris_kmeans.append(score["kmeans_ari"])
+                score = self.score(None, y)
+                aris.append(score)
                 if show_epoch_ari:
-                    print(f"epoch {epoch}, ARI {score.get('kmeans_ari')}")
+                    print(f"epoch {epoch}, ARI {score}")
                 z_ = {f"epoch{epoch}": z}
                 Z = {**Z, **z_}
 
@@ -241,18 +241,16 @@ class GraphSC:
                 self.z = z
 
         if eval_epoch:
-            index = np.argmax(aris_kmeans)
+            index = np.argmax(aris)
             self.z = Z[f"epoch{index}"]
 
-    def predict(self, n_clusters, cluster=["KMeans"]):
+    def predict(self, x: Optional[Any] = None):
         """Get predictions from the graph autoencoder model.
 
         Parameters
         ----------
-        n_clusters
-            Number of clusters.
-        cluster
-            Clustering method.
+        x
+            Not used, for compatibility with BaseClusteringMethod class.
 
         Returns
         -------
@@ -260,104 +258,14 @@ class GraphSC:
             Prediction of given clustering method.
 
         """
-        z = self.z
-        pred = {}
-
-        if "KMeans" in cluster:
-            kmeans = KMeans(n_clusters=n_clusters, init="k-means++", random_state=5, n_init=10)
-            kmeans_pred = {"kmeans_pred": kmeans.fit_predict(z)}
-            pred = {**pred, **kmeans_pred}
-
-        if "Leiden" in cluster:
-            leiden_pred = {"leiden_pred": run_leiden(z)}
-            pred = {**pred, **leiden_pred}
-
+        if self.cluster_method == "kmeans":
+            kmeans = KMeans(n_clusters=self.n_clusters, init="k-means++", random_state=5, n_init=10)
+            pred = kmeans.fit_predict(self.z)
+        elif self.cluster_method == "leiden":
+            pred = run_leiden(self.z)
+        else:
+            raise ValueError(f"Unknown clustering {self.cluster_method}, available options are: 'kmeans', 'leiden'")
         return pred
-
-    def score(self, y, n_clusters, plot=False, cluster=["KMeans"]):
-        """Evaluate the graph autoencoder model.
-
-        Parameters
-        ----------
-        y
-            True labels.
-        n_clusters
-            Number of clusters.
-        plot
-            Show plot or not.
-        cluster
-            Clustering method.
-
-        Returns
-        -------
-        scores
-            Metric evaluation scores.
-
-        """
-        z = self.z
-        self.model.eval()
-
-        k_start = time.time()
-        scores = {"ae_end": k_start}
-
-        if "KMeans" in cluster:
-            kmeans = KMeans(n_clusters=n_clusters, init="k-means++", random_state=5, n_init=10)
-            kmeans_pred = kmeans.fit_predict(z)
-            ari_k = None
-            nmi_k = None
-            if y is not None:
-                ari_k = round(adjusted_rand_score(y, kmeans_pred), 4)
-                nmi_k = round(normalized_mutual_info_score(y, kmeans_pred), 4)
-            sil_k = silhouette_score(z, kmeans_pred)
-            cal_k = calinski_harabasz_score(z, kmeans_pred)
-            k_end = time.time()
-            scores_k = {
-                "kmeans_ari": ari_k,
-                "kmeans_nmi": nmi_k,
-                "kmeans_sil": sil_k,
-                "kmeans_cal": cal_k,
-                "kmeans_pred": kmeans_pred,
-                "kmeans_time": k_end - k_start,
-            }
-            scores = {**scores, **scores_k}
-
-        if "Leiden" in cluster:
-            l_start = time.time()
-            leiden_pred = run_leiden(z)
-            ari_l = None
-            nmi_l = None
-            if y is not None:
-                ari_l = round(adjusted_rand_score(y, leiden_pred), 4)
-                nmi_l = round(normalized_mutual_info_score(y, leiden_pred), 4)
-            sil_l = silhouette_score(z, leiden_pred)
-            cal_l = calinski_harabasz_score(z, leiden_pred)
-            l_end = time.time()
-            scores_l = {
-                "leiden_ari": ari_l,
-                "leiden_nmi": nmi_l,
-                "leiden_sil": sil_l,
-                "leiden_cal": cal_l,
-                "leiden_pred": leiden_pred,
-                "leiden_time": l_end - l_start,
-            }
-            scores = {**scores, **scores_l}
-
-        if plot:
-            pca = PCA(2).fit_transform(z)
-            plt.figure(figsize=(12, 4))
-            plt.subplot(131)
-            plt.title("Ground truth")
-            plt.scatter(pca[:, 0], pca[:, 1], c=y, s=4)
-
-            plt.subplot(132)
-            plt.title("K-Means pred")
-            plt.scatter(pca[:, 0], pca[:, 1], c=kmeans_pred, s=4)
-
-            plt.subplot(133)
-            plt.title("Leiden pred")
-            plt.scatter(pca[:, 0], pca[:, 1], c=leiden_pred, s=4)
-            plt.show()
-        return scores
 
 
 class GCNAE(nn.Module):
