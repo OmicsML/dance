@@ -52,19 +52,6 @@ if __name__ == "__main__":
     parser.add_argument("--sigma", type=float, default=Balance_para[4])
     args = parser.parse_args()
 
-    # File = [gene_expresion data file, Graph file, h5 file, pretrain_path]
-    File = [
-        os.path.join("data", args.name),
-        None,
-        os.path.join("data", f"{args.name}.h5"),
-        os.path.join("model", f"{args.name}_pre.pkl"),
-    ]
-    args.pretrain_path = File[3]
-    if not os.path.exists("./graph/"):
-        os.makedirs("./graph/")
-    if not os.path.exists("./model/"):
-        os.makedirs("./model/")
-
     adata, labels = ClusteringDataset("./data", args.name).load_data()
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
@@ -76,12 +63,13 @@ if __name__ == "__main__":
     args.n_input = x.shape[1]
 
     # Pretrain AE
-    model = ScDSC(pretrain_path=args.pretrain_path, sigma=args.sigma, n_enc_1=args.n_enc_1, n_enc_2=args.n_enc_2,
+    pretrain_path = f"{args.name}_pre.pkl"
+    model = ScDSC(pretrain_path=pretrain_path, sigma=args.sigma, n_enc_1=args.n_enc_1, n_enc_2=args.n_enc_2,
                   n_enc_3=args.n_enc_3, n_dec_1=args.n_dec_1, n_dec_2=args.n_dec_2, n_dec_3=args.n_dec_3,
                   n_z1=args.n_z1, n_z2=args.n_z2, n_z3=args.n_z3, n_clusters=args.n_clusters, n_input=args.n_input,
                   v=args.v, device=args.device)
-    if not os.path.exists(args.pretrain_path):
-        model.pretrain_ae(x, args.batch_size, args.pretrain_epochs, args.pretrain_path)
+    if not os.path.exists(pretrain_path):
+        model.pretrain_ae(x, args.batch_size, args.pretrain_epochs, pretrain_path)
 
     # Train scDSC
     model.fit(x, y, x_raw, n_counts, adj, lr=args.lr, n_epochs=args.n_epochs, bcl=args.binary_crossentropy_loss,
