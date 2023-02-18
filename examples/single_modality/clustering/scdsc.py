@@ -4,7 +4,7 @@ from time import time
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
-from dance.modules.single_modality.clustering.scdsc import SCDSCWrapper
+from dance.modules.single_modality.clustering.scdsc import ScDSC
 from dance.utils import set_seed
 
 # for repeatability
@@ -69,17 +69,17 @@ if __name__ == "__main__":
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
 
-    preprocessing_pipeline = SCDSCWrapper.preprocessing_pipeline(n_top_genes=args.nb_genes, n_neighbors=args.topk)
+    preprocessing_pipeline = ScDSC.preprocessing_pipeline(n_top_genes=args.nb_genes, n_neighbors=args.topk)
     preprocessing_pipeline(data)
 
     (x, x_raw, n_counts, adj), y = data.get_data(return_type="default")
     args.n_input = x.shape[1]
 
     # Pretrain AE
-    model = SCDSCWrapper(pretrain_path=args.pretrain_path, sigma=args.sigma, n_enc_1=args.n_enc_1, n_enc_2=args.n_enc_2,
-                         n_enc_3=args.n_enc_3, n_dec_1=args.n_dec_1, n_dec_2=args.n_dec_2, n_dec_3=args.n_dec_3,
-                         n_z1=args.n_z1, n_z2=args.n_z2, n_z3=args.n_z3, n_clusters=args.n_clusters,
-                         n_input=args.n_input, v=args.v, device=args.device)
+    model = ScDSC(pretrain_path=args.pretrain_path, sigma=args.sigma, n_enc_1=args.n_enc_1, n_enc_2=args.n_enc_2,
+                  n_enc_3=args.n_enc_3, n_dec_1=args.n_dec_1, n_dec_2=args.n_dec_2, n_dec_3=args.n_dec_3,
+                  n_z1=args.n_z1, n_z2=args.n_z2, n_z3=args.n_z3, n_clusters=args.n_clusters, n_input=args.n_input,
+                  v=args.v, device=args.device)
     if not os.path.exists(args.pretrain_path):
         model.pretrain_ae(x, args.batch_size, args.pretrain_epochs, args.pretrain_path)
 

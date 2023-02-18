@@ -32,7 +32,7 @@ from dance.utils.loss import ZINBLoss
 from dance.utils.metrics import cluster_acc
 
 
-class SCDSCWrapper:
+class ScDSC:
     """scDSC wrapper class.
 
     Parameters
@@ -90,7 +90,7 @@ class SCDSCWrapper:
     ):
         super().__init__()
         self.device = get_device(device)
-        self.model = SCDSC(
+        self.model = ScDSCModel(
             pretrain_path=pretrain_path,
             sigma=sigma,
             n_enc_1=n_enc_1,
@@ -326,7 +326,7 @@ class SCDSCWrapper:
         return acc, nmi, ari
 
 
-class SCDSC(nn.Module):
+class ScDSCModel(nn.Module):
     """scDSC class.
 
     Parameters

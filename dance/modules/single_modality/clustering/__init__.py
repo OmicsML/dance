@@ -1,7 +1,7 @@
 from .graphsc import GraphSC
 from .scdcc import ScDCC
 from .scdeepcluster import ScDeepCluster
-from .scdsc import SCDSC
+from .scdsc import ScDSCModel
 from .sctag import ScTAG
 
 __all__ = [
