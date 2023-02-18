@@ -599,24 +599,3 @@ def run_leiden(data):
     pred = adata.obs['leiden'].to_list()
     pred = [int(x) for x in pred]
     return pred
-
-
-def get_device(use_cpu=False):
-    """Get device for training.
-
-    Parameters
-    ----------
-    use_cpu : bool optional
-        use cpu or not.
-
-    Returns
-    -------
-    device :
-        torch device.
-
-    """
-    if torch.cuda.is_available() and not use_cpu:
-        device = torch.device('cuda')
-    else:
-        device = torch.device('cpu')
-    return device

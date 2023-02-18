@@ -8,6 +8,12 @@ import torch
 from torch.utils.data import Dataset
 
 
+def get_device(device: str) -> str:
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    return device
+
+
 def hexdigest(x: str, /) -> str:
     return hashlib.md5(x.encode()).hexdigest()
 
