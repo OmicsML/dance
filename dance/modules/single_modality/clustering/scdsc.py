@@ -72,21 +72,21 @@ class ScDSC:
 
     def __init__(
         self,
-        pretrain_path,
-        sigma,
-        n_enc_1,
-        n_enc_2,
-        n_enc_3,
-        n_dec_1,
-        n_dec_2,
-        n_dec_3,
-        n_z1,
-        n_z2,
-        n_z3,
-        n_clusters,
-        n_input,
-        v,
-        device,
+        pretrain_path: str,
+        sigma: float = 1,
+        n_enc_1: int = 512,
+        n_enc_2: int = 256,
+        n_enc_3: int = 256,
+        n_dec_1: int = 256,
+        n_dec_2: int = 256,
+        n_dec_3: int = 512,
+        n_z1: int = 256,
+        n_z2: int = 128,
+        n_z3: int = 32,
+        n_clusters: int = 100,
+        n_input: int = 10,
+        v: float = 1,
+        device: str = "auto",
     ):
         super().__init__()
         self.device = get_device(device)
@@ -366,24 +366,24 @@ class ScDSCModel(nn.Module):
 
     def __init__(
         self,
-        pretrain_path,
-        sigma,
-        n_enc_1,
-        n_enc_2,
-        n_enc_3,
-        n_dec_1,
-        n_dec_2,
-        n_dec_3,
-        n_z1,
-        n_z2,
-        n_z3,
-        n_clusters,
-        n_input,
-        v,
-        device,
+        pretrain_path: str,
+        sigma: float = 1,
+        n_enc_1: int = 512,
+        n_enc_2: int = 256,
+        n_enc_3: int = 256,
+        n_dec_1: int = 256,
+        n_dec_2: int = 256,
+        n_dec_3: int = 512,
+        n_z1: int = 256,
+        n_z2: int = 128,
+        n_z3: int = 32,
+        n_clusters: int = 10,
+        n_input: int = 100,
+        v: float = 1,
+        device: str = "auto",
     ):
         super().__init__()
-        device = device
+        device = get_device(device)
         self.sigma = sigma
         self.pretrain_path = pretrain_path
         self.ae = AE(
