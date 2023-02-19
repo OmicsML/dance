@@ -1,5 +1,10 @@
+import os
 from abc import ABC, abstractmethod, abstractstaticmethod
+from time import time
 
+import torch
+
+from dance import logger
 from dance.data import Data
 from dance.transforms.base import BaseTransform
 from dance.typing import Any, Mapping, Optional, Tuple, Union
@@ -45,6 +50,64 @@ class BaseMethod(ABC):
         func = resolve_score_func(score_func or self._DEFAULT_METRIC)
         score = func(y, y_pred)
         return (score, y_pred) if return_pred else score
+
+
+class BasePretrain(ABC):
+
+    @property
+    def is_pretrained(self) -> bool:
+        return getattr(self, "_is_pretrained", False)
+
+    def _pretrain(self, *args, force_pretrain: bool = False, **kwargs):
+        pt_path = getattr(self, "pretrain_path", None)
+        if not force_pretrain:
+            if self.is_pretrained:
+                logger.info("Skipping pre_train as the model appears to be pretrained already. "
+                            "If you wish to force pre-training, please set 'force_pretrain' to True.")
+                return
+
+            if pt_path is not None and os.path.isfile(pt_path):
+                logger.info(f"Loading pre-trained model from {pt_path}")
+                self.load_pretrained(pt_path)
+                self._is_pretrained = True
+                return
+
+        logger.info("Pre-training started")
+        if pt_path is None:
+            logger.warning("`pretrain_path` is not set, pre-trained model will not be saved.")
+        else:
+            logger.info(f"Pre-trained model will to saved to {pt_path}")
+
+        t = time()
+        self.pretrain(*args, **kwargs)
+        elapsed = time() - t
+        logger.info(f"Pre-training finished (took {elapsed:.2f} seconds)")
+        self._is_pretrained = True
+
+        if pt_path is not None:
+            logger.info(f"Saving pre-trained model to {pt_path}")
+            self.save_pretrained(pt_path)
+
+    def pretrain(self, *args, **kwargs):
+        ...
+
+    def save_pretrained(self, path, **kwargs):
+        ...
+
+    def load_pretrained(self, path, **kwargs):
+        ...
+
+
+class TorchNNPretrain(BasePretrain, ABC):
+
+    def save_pretrained(self, path):
+        torch.save(self.state_dict(), path)
+
+    def load_pretrained(self, path):
+        device = getattr(self, "device", None)
+        # FIX: check if map_loc can be set to `cuda`, or is the index strictly required
+        checkpoint = torch.load(path, map_location=device)
+        self.load_state_dict(checkpoint)
 
 
 class BaseClassificationMethod(BaseMethod):

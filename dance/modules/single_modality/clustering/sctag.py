@@ -9,8 +9,6 @@ Interpretations”. Proceedings of the AAAI Conference on Artificial Intelligenc
 doi:10.1609/aaai.v36i4.20392.
 
 """
-import os
-
 import dgl
 import numpy as np
 import scanpy as sc
@@ -23,14 +21,14 @@ from sklearn.cluster import KMeans
 from torch.nn import Parameter
 
 from dance import logger
-from dance.modules.base import BaseClusteringMethod
+from dance.modules.base import BaseClusteringMethod, TorchNNPretrain
 from dance.transforms import AnnDataTransform, CellPCA, Compose, SaveRaw, SetConfig
 from dance.transforms.graph import NeighborGraph
 from dance.typing import Any, LogLevel, Optional, Tuple
 from dance.utils.loss import ZINBLoss, dist_loss
 
 
-class ScTAG(nn.Module, BaseClusteringMethod):
+class ScTAG(nn.Module, TorchNNPretrain, BaseClusteringMethod):
     """The scTAG clustering model.
 
     Parameters
@@ -109,10 +107,6 @@ class ScTAG(nn.Module, BaseClusteringMethod):
         self.to(self.device)
 
     @property
-    def is_pretrained(self) -> bool:
-        return self._is_pretrained
-
-    @property
     def in_dim(self) -> int:
         if self._in_dim is None:
             raise ValueError("in_dim is unavailable since the model has not been initialized yet. Please call the "
@@ -183,7 +177,7 @@ class ScTAG(nn.Module, BaseClusteringMethod):
 
         return adj_out, z, q, _mean, _disp, _pi
 
-    def pre_train(
+    def pretrain(
         self,
         adj,
         x,
@@ -233,21 +227,6 @@ class ScTAG(nn.Module, BaseClusteringMethod):
             or even the pre-trained model file is available to load.
 
         """
-        pt_path = self.pretrain_save_path
-        if not force_pretrain:
-            if self.is_pretrained:
-                logger.info("Skipping pre_train as the model appears to be pretrained already. "
-                            "If you wish to force pre-training, please set 'force_pretrain' to True.")
-                return
-
-            if pt_path is not None and os.path.isfile(pt_path):
-                logger.info(f"Loading pre-trained model from {pt_path}")
-                checkpoint = torch.load(pt_path)
-                # TODO: change device?
-                self.load_state_dict(checkpoint)
-                self._is_pretrained = True
-                return
-
         x = torch.Tensor(x).to(self.device)
         x_raw = torch.Tensor(x_raw).to(self.device)
         scale_factor = torch.tensor(n_counts / np.median(n_counts)).to(self.device)
@@ -277,13 +256,6 @@ class ScTAG(nn.Module, BaseClusteringMethod):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-
-        if pt_path is not None:
-            logger.info(f"Saving pre-trained model to {pt_path}")
-            torch.save(self.state_dict(), pt_path)
-
-        logger.info("Pre-training done")
-        self._is_pretrained = True
 
     def fit(
         self,
@@ -334,7 +306,7 @@ class ScTAG(nn.Module, BaseClusteringMethod):
         """
         adj, x, x_raw, n_counts = inputs
         self.init_model(adj, x)
-        self.pre_train(adj, x, x_raw, n_counts, epochs=pretrain_epochs, info_step=info_step, lr=lr, w_a=w_a, w_x=w_x,
+        self._pretrain(adj, x, x_raw, n_counts, epochs=pretrain_epochs, info_step=info_step, lr=lr, w_a=w_a, w_x=w_x,
                        w_d=w_d, min_dist=min_dist, max_dist=max_dist, force_pretrain=force_pretrain)
 
         x = torch.Tensor(x).to(self.device)
