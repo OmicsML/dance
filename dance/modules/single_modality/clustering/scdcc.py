@@ -22,8 +22,9 @@ from sklearn.cluster import KMeans
 from torch.nn import Parameter
 from torch.utils.data import DataLoader, TensorDataset
 
+from dance.modules.base import TorchNNPretrain
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
-from dance.typing import LogLevel
+from dance.typing import LogLevel, Optional
 from dance.utils import get_device
 from dance.utils.loss import ZINBLoss
 from dance.utils.metrics import cluster_acc
@@ -58,7 +59,7 @@ def buildNetwork(layers, type, activation="relu"):
     return net
 
 
-class ScDCC(nn.Module):
+class ScDCC(nn.Module, TorchNNPretrain):
     """scDCC class.
 
     Parameters
@@ -91,7 +92,8 @@ class ScDCC(nn.Module):
     """
 
     def __init__(self, input_dim, z_dim, n_clusters, encodeLayer=[], decodeLayer=[], activation="relu", sigma=1.,
-                 alpha=1., gamma=1., ml_weight=1., cl_weight=1., device: str = "auto"):
+                 alpha=1., gamma=1., ml_weight=1., cl_weight=1., device: str = "auto",
+                 pretrain_path: Optional[str] = None):
         super().__init__()
         self.z_dim = z_dim
         self.n_clusters = n_clusters
@@ -102,6 +104,7 @@ class ScDCC(nn.Module):
         self.ml_weight = ml_weight
         self.cl_weight = cl_weight
         self.device = get_device(device)
+        self.pretrain_path = pretrain_path
 
         self.encoder = buildNetwork([input_dim] + encodeLayer, type="encode", activation=activation)
         self.decoder = buildNetwork([z_dim] + decodeLayer, type="decode", activation=activation)
@@ -314,8 +317,7 @@ class ScDCC(nn.Module):
             loss = self.cl_weight * cl_loss
             return loss
 
-    def pretrain(self, x, X_raw, n_counts, batch_size=256, lr=0.001, epochs=400, ae_save=True,
-                 ae_weights='AE_weights.pth.tar'):
+    def pretrain(self, x, X_raw, n_counts, batch_size=256, lr=0.001, epochs=400):
         """Pretrain autoencoder.
 
         Parameters
@@ -332,10 +334,6 @@ class ScDCC(nn.Module):
             learning rate.
         epochs : int optional
             number of epochs.
-        ae_save : bool optional
-            save autoencoder weights or not.
-        ae_weights : str optional
-            path to save autoencoder weights.
 
         Returns
         -------
@@ -345,7 +343,6 @@ class ScDCC(nn.Module):
         size_factor = torch.tensor(n_counts / np.median(n_counts))
         dataset = TensorDataset(torch.Tensor(x), torch.Tensor(X_raw), torch.Tensor(size_factor))
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-        print("Pretraining stage")
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, amsgrad=True)
         for epoch in range(epochs):
             for batch_idx, (x_batch, x_raw_batch, sf_batch) in enumerate(dataloader):
@@ -359,9 +356,6 @@ class ScDCC(nn.Module):
                 loss.backward()
                 optimizer.step()
                 print('Pretrain epoch [{}/{}], ZINB loss:{:.4f}'.format(batch_idx + 1, epoch + 1, loss.item()))
-
-        if ae_save:
-            torch.save({'ae_state_dict': self.state_dict(), 'optimizer_state_dict': optimizer.state_dict()}, ae_weights)
 
     def save_checkpoint(self, state, index, filename):
         """Save training checkpoint.
@@ -383,9 +377,28 @@ class ScDCC(nn.Module):
         newfilename = os.path.join(filename, 'FTcheckpoint_%d.pth.tar' % index)
         torch.save(state, newfilename)
 
-    def fit(self, X, X_raw, n_counts, ml_ind1=np.array([]), ml_ind2=np.array([]), cl_ind1=np.array([]),
-            cl_ind2=np.array([]), ml_p=1., cl_p=1., y=None, lr=1., batch_size=256, num_epochs=10, update_interval=1,
-            tol=1e-3, save_dir=""):
+    def fit(
+        self,
+        X,
+        X_raw,
+        n_counts,
+        ml_ind1=np.array([]),
+        ml_ind2=np.array([]),
+        cl_ind1=np.array([]),
+        cl_ind2=np.array([]),
+        ml_p=1.,
+        cl_p=1.,
+        y=None,
+        lr=1.,
+        batch_size=256,
+        num_epochs=10,
+        update_interval=1,
+        tol=1e-3,
+        save_dir="",
+        pt_batch_size: int = 256,
+        pt_lr: float = 0.001,
+        pt_epochs: int = 400,
+    ):
         """Train model.
 
         Parameters
@@ -422,14 +435,20 @@ class ScDCC(nn.Module):
             tolerance for training loss.
         save_dir : str optional
             path to save model weights.
+        pt_batch_size
+            Pretrain batch size.
+        pt_lr
+            Pretrain learning rate.
+        pt_epochs
+            Pretrain epochs.
 
         Returns
         -------
         None.
 
         """
+        self._pretrain(X, X_raw, n_counts, batch_size=pt_batch_size, lr=pt_lr, epochs=pt_epochs)
 
-        print("Training stage")
         X = torch.tensor(X).to(self.device)
         X_raw = torch.tensor(X_raw).to(self.device)
         sf = torch.tensor(n_counts / np.median(n_counts)).to(self.device)
@@ -457,6 +476,7 @@ class ScDCC(nn.Module):
         P = {}
         Q = {}
 
+        delta_label = np.inf
         for epoch in range(num_epochs):
             if epoch % update_interval == 0:
                 # update the targe distribution p
@@ -467,7 +487,7 @@ class ScDCC(nn.Module):
                 self.y_pred = self.predict()
 
                 # save current model
-                if (epoch > 0 and delta_label < tol) or epoch % 10 == 0:
+                if delta_label < tol or epoch % 10 == 0:
                     self.save_checkpoint(
                         {
                             'epoch': epoch + 1,
