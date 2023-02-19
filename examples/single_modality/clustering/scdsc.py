@@ -32,6 +32,7 @@ if __name__ == "__main__":
     parser.add_argument("--n_dec_3", default=model_para[0], type=int)
     parser.add_argument("--topk", type=int, default=50)
     parser.add_argument("--lr", type=float, default=1e-2)
+    parser.add_argument("--pretrain_lr", type=float, default=1e-3)
     parser.add_argument("--pretrain_epochs", type=int, default=200)
     parser.add_argument("--n_epochs", type=int, default=1000)
     parser.add_argument("--n_z1", default=Cluster_para[0], type=int)
@@ -68,7 +69,7 @@ if __name__ == "__main__":
     # Build and train model
     model.fit(inputs, y, lr=args.lr, n_epochs=args.n_epochs, bcl=args.binary_crossentropy_loss, cl=args.ce_loss,
               rl=args.re_loss, zl=args.zinb_loss, pt_epochs=args.pretrain_epochs, pt_batch_size=args.batch_size,
-              pt_lr=args.lr)
+              pt_lr=args.pretrain_lr)
 
     # Evaluate model predictions
     score = model.score(None, y)
