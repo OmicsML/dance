@@ -37,7 +37,9 @@ if __name__ == "__main__":
     parser.add_argument("-dd", "--data_dir", default="./data", type=str)
     parser.add_argument("-data", "--dataset", default="10X_PBMC",
                         choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+    set_seed(args.seed)
 
     # Load data
     adata, labels = ClusteringDataset(args.data_dir, args.dataset).load_data()

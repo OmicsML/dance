@@ -7,6 +7,8 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+from dance import logger
+
 
 def get_device(device: str) -> str:
     if device == "auto":
@@ -31,8 +33,8 @@ class SimpleIndexDataset(Dataset):
         return x
 
 
-def set_seed(rndseed, cuda=True, extreme_mode=False):
-    os.environ['PYTHONHASHSEED'] = str(rndseed)
+def set_seed(rndseed, cuda: bool = True, extreme_mode: bool = False):
+    os.environ["PYTHONHASHSEED"] = str(rndseed)
     random.seed(rndseed)
     np.random.seed(rndseed)
     torch.manual_seed(rndseed)
@@ -44,7 +46,7 @@ def set_seed(rndseed, cuda=True, extreme_mode=False):
         torch.backends.cudnn.deterministic = True
     dgl.seed(rndseed)
     dgl.random.seed(rndseed)
-    print('Global random seed:', rndseed)
+    logger.info(f"Setting global random seed to {rndseed}")
 
 
 def calculate_p(adj, l):

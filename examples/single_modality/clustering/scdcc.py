@@ -9,9 +9,6 @@ from dance.modules.single_modality.clustering.scdcc import ScDCC
 from dance.transforms.preprocess import generate_random_pair
 from dance.utils import set_seed
 
-# for repeatability
-set_seed(42)
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="train", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--label_cells", default=0.1, type=float)
@@ -35,8 +32,9 @@ if __name__ == "__main__":
     parser.add_argument("--ae_weights", default=None)
     parser.add_argument("--ae_weight_file", default="AE_weights.pth.tar")
     parser.add_argument("--device", default="auto")
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
-    args.ae_weight_file = f"scdcc_{args.data_file}_{args.ae_weight_file}"
+    set_seed(args.seed)
 
     # Load data
     adata, labels = ClusteringDataset(args.data_dir, args.data_file).load_data()
