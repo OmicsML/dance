@@ -19,7 +19,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 from sklearn import metrics
 from sklearn.cluster import KMeans
-from torch.autograd import Variable
 from torch.nn import Parameter
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -257,7 +256,7 @@ class ScDCC(nn.Module):
         num_batch = int(math.ceil(1.0 * X.shape[0] / batch_size))
         for batch_idx in range(num_batch):
             xbatch = X[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
-            inputs = Variable(xbatch)
+            inputs = xbatch
             z, _, _, _, _ = self.forward(inputs)
             encoded.append(z.data)
 
@@ -350,9 +349,9 @@ class ScDCC(nn.Module):
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, amsgrad=True)
         for epoch in range(epochs):
             for batch_idx, (x_batch, x_raw_batch, sf_batch) in enumerate(dataloader):
-                x_tensor = Variable(x_batch).to(self.device)
-                x_raw_tensor = Variable(x_raw_batch).to(self.device)
-                sf_tensor = Variable(sf_batch).to(self.device)
+                x_tensor = x_batch.to(self.device)
+                x_raw_tensor = x_raw_batch.to(self.device)
+                sf_tensor = sf_batch.to(self.device)
                 _, _, mean_tensor, disp_tensor, pi_tensor = self.forward(x_tensor)
                 loss = self.zinb_loss(x=x_raw_tensor, mean=mean_tensor, disp=disp_tensor, pi=pi_tensor,
                                       scale_factor=sf_tensor)
@@ -505,10 +504,10 @@ class ScDCC(nn.Module):
                 sfbatch = sf[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
                 pbatch = p[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
                 optimizer.zero_grad()
-                inputs = Variable(xbatch)
-                rawinputs = Variable(xrawbatch)
-                sfinputs = Variable(sfbatch)
-                target = Variable(pbatch)
+                inputs = xbatch
+                rawinputs = xrawbatch
+                sfinputs = sfbatch
+                target = pbatch
 
                 z, qbatch, meanbatch, dispbatch, pibatch = self.forward(inputs)
 
@@ -534,12 +533,12 @@ class ScDCC(nn.Module):
                     sf2 = sf[ml_ind2[ml_batch_idx * batch_size:min(ml_num, (ml_batch_idx + 1) * batch_size)]]
                     pxraw2 = X_raw[ml_ind2[ml_batch_idx * batch_size:min(ml_num, (ml_batch_idx + 1) * batch_size)]]
                     optimizer.zero_grad()
-                    inputs1 = Variable(px1)
-                    rawinputs1 = Variable(pxraw1)
-                    sfinput1 = Variable(sf1)
-                    inputs2 = Variable(px2)
-                    rawinputs2 = Variable(pxraw2)
-                    sfinput2 = Variable(sf2)
+                    inputs1 = px1
+                    rawinputs1 = pxraw1
+                    sfinput1 = sf1
+                    inputs2 = px2
+                    rawinputs2 = pxraw2
+                    sfinput2 = sf2
                     z1, q1, mean1, disp1, pi1 = self.forward(inputs1)
                     z2, q2, mean2, disp2, pi2 = self.forward(inputs2)
                     loss = (ml_p * self.pairwise_loss(q1, q2, "ML") +
@@ -556,8 +555,8 @@ class ScDCC(nn.Module):
                     px1 = X[cl_ind1[cl_batch_idx * batch_size:min(cl_num, (cl_batch_idx + 1) * batch_size)]]
                     px2 = X[cl_ind2[cl_batch_idx * batch_size:min(cl_num, (cl_batch_idx + 1) * batch_size)]]
                     optimizer.zero_grad()
-                    inputs1 = Variable(px1)
-                    inputs2 = Variable(px2)
+                    inputs1 = px1
+                    inputs2 = px2
                     z1, q1, _, _, _ = self.forward(inputs1)
                     z2, q2, _, _, _ = self.forward(inputs2)
                     loss = cl_p * self.pairwise_loss(q1, q2, "CL")
