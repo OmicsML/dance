@@ -8,7 +8,6 @@ Tian, Tian, et al. "Model-based deep embedding for constrained clustering analys
 Nature communications 12.1 (2021): 1-12.
 
 """
-
 import math
 import os
 
@@ -26,6 +25,7 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
 from dance.typing import LogLevel
+from dance.utils import get_device
 from dance.utils.loss import ZINBLoss
 from dance.utils.metrics import cluster_acc
 
@@ -86,11 +86,13 @@ class ScDCC(nn.Module):
         parameter of must-link loss.
     cl_weight : float optional
         parameter of cannot-link loss.
+    device
+        Computation device.
 
     """
 
     def __init__(self, input_dim, z_dim, n_clusters, encodeLayer=[], decodeLayer=[], activation="relu", sigma=1.,
-                 alpha=1., gamma=1., ml_weight=1., cl_weight=1.):
+                 alpha=1., gamma=1., ml_weight=1., cl_weight=1., device: str = "auto"):
         super().__init__()
         self.z_dim = z_dim
         self.n_clusters = n_clusters
@@ -100,6 +102,8 @@ class ScDCC(nn.Module):
         self.gamma = gamma
         self.ml_weight = ml_weight
         self.cl_weight = cl_weight
+        self.device = get_device(device)
+
         self.encoder = buildNetwork([input_dim] + encodeLayer, type="encode", activation=activation)
         self.decoder = buildNetwork([z_dim] + decodeLayer, type="decode", activation=activation)
         self._enc_mu = nn.Linear(encodeLayer[-1], z_dim)
@@ -107,7 +111,9 @@ class ScDCC(nn.Module):
         self._dec_disp = nn.Sequential(nn.Linear(decodeLayer[-1], input_dim), DispAct())
         self._dec_pi = nn.Sequential(nn.Linear(decodeLayer[-1], input_dim), nn.Sigmoid())
         self.mu = Parameter(torch.Tensor(n_clusters, z_dim))
-        self.zinb_loss = ZINBLoss().cpu()
+        self.zinb_loss = ZINBLoss().to(self.device)
+
+        self.to(self.device)
 
     @staticmethod
     def preprocessing_pipeline(log_level: LogLevel = "INFO"):
@@ -246,13 +252,6 @@ class ScDCC(nn.Module):
             embedding.
 
         """
-        use_cuda = torch.cuda.is_available()
-        if use_cuda:
-            device = 'cuda'
-        else:
-            device = 'cpu'
-        self.to(device)
-
         encoded = []
         num = X.shape[0]
         num_batch = int(math.ceil(1.0 * X.shape[0] / batch_size))
@@ -316,8 +315,8 @@ class ScDCC(nn.Module):
             loss = self.cl_weight * cl_loss
             return loss
 
-    def pretrain_autoencoder(self, x, X_raw, n_counts, batch_size=256, lr=0.001, epochs=400, ae_save=True,
-                             ae_weights='AE_weights.pth.tar'):
+    def pretrain(self, x, X_raw, n_counts, batch_size=256, lr=0.001, epochs=400, ae_save=True,
+                 ae_weights='AE_weights.pth.tar'):
         """Pretrain autoencoder.
 
         Parameters
@@ -344,12 +343,6 @@ class ScDCC(nn.Module):
         None.
 
         """
-        use_cuda = torch.cuda.is_available()
-        if use_cuda:
-            device = 'cuda'
-        else:
-            device = 'cpu'
-        self.to(device)
         size_factor = torch.tensor(n_counts / np.median(n_counts))
         dataset = TensorDataset(torch.Tensor(x), torch.Tensor(X_raw), torch.Tensor(size_factor))
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -357,9 +350,9 @@ class ScDCC(nn.Module):
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, amsgrad=True)
         for epoch in range(epochs):
             for batch_idx, (x_batch, x_raw_batch, sf_batch) in enumerate(dataloader):
-                x_tensor = Variable(x_batch).to(device)
-                x_raw_tensor = Variable(x_raw_batch).to(device)
-                sf_tensor = Variable(sf_batch).to(device)
+                x_tensor = Variable(x_batch).to(self.device)
+                x_raw_tensor = Variable(x_raw_batch).to(self.device)
+                sf_tensor = Variable(sf_batch).to(self.device)
                 _, _, mean_tensor, disp_tensor, pi_tensor = self.forward(x_tensor)
                 loss = self.zinb_loss(x=x_raw_tensor, mean=mean_tensor, disp=disp_tensor, pi=pi_tensor,
                                       scale_factor=sf_tensor)
@@ -438,15 +431,9 @@ class ScDCC(nn.Module):
         """
 
         print("Training stage")
-        use_cuda = torch.cuda.is_available()
-        if use_cuda:
-            device = 'cuda'
-        else:
-            device = 'cpu'
-        self.to(device)
-        X = torch.tensor(X).to(device)
-        X_raw = torch.tensor(X_raw).to(device)
-        sf = torch.tensor(n_counts / np.median(n_counts)).to(device)
+        X = torch.tensor(X).to(self.device)
+        X_raw = torch.tensor(X_raw).to(self.device)
+        sf = torch.tensor(n_counts / np.median(n_counts)).to(self.device)
         optimizer = optim.Adadelta(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, rho=.95)
 
         # Initializing cluster centers with kmeans

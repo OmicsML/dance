@@ -14,8 +14,6 @@ from dance.utils import set_seed
 # for repeatability
 set_seed(42)
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="train", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--label_cells", default=0.1, type=float)
@@ -38,6 +36,7 @@ if __name__ == "__main__":
     parser.add_argument("--ae_weights", default=None)
     parser.add_argument("--save_dir", default="results/scdcc/")
     parser.add_argument("--ae_weight_file", default="AE_weights.pth.tar")
+    parser.add_argument("--device", default="auto")
     args = parser.parse_args()
     args.ae_weight_file = f"scdcc_{args.data_file}_{args.ae_weight_file}"
 
@@ -71,13 +70,14 @@ if __name__ == "__main__":
     # Construct moodel
     sigma = 2.75
     model = ScDCC(input_dim=x.shape[1], z_dim=32, n_clusters=n_clusters, encodeLayer=[256, 64], decodeLayer=[64, 256],
-                  sigma=args.sigma, gamma=args.gamma, ml_weight=args.ml_weight, cl_weight=args.ml_weight).to(device)
+                  sigma=args.sigma, gamma=args.gamma, ml_weight=args.ml_weight, cl_weight=args.ml_weight,
+                  device=args.device)
 
     # Pretrain model
     t0 = time()
     if args.ae_weights is None:
-        model.pretrain_autoencoder(x=x, X_raw=x_raw, n_counts=n_counts, batch_size=args.batch_size,
-                                   epochs=args.pretrain_epochs, ae_weights=args.ae_weight_file)
+        model.pretrain(x=x, X_raw=x_raw, n_counts=n_counts, batch_size=args.batch_size, epochs=args.pretrain_epochs,
+                       ae_weights=args.ae_weight_file)
     else:
         if os.path.isfile(args.ae_weights):
             print(f"==> loading checkpoint {args.ae_weights}")
