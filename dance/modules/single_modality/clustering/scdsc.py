@@ -19,6 +19,7 @@ from torch.nn.parameter import Parameter
 from torch.optim import Adam
 from torch.utils.data import DataLoader, TensorDataset
 
+from dance import logger
 from dance.modules.base import BaseClusteringMethod, TorchNNPretrain
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
 from dance.transforms.graph import NeighborGraph
@@ -165,7 +166,6 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
             Learning rate.
 
         """
-        print("Pretrain:")
         with self.pretrain_context("model.ae"):
             x_tensor = torch.from_numpy(x)
             train_loader = DataLoader(TensorDataset(x_tensor), batch_size, shuffle=True)
@@ -187,7 +187,7 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
                     total_size += size
                     total_loss += loss.item() * size
 
-                print(f"Pretrain epoch {epoch + 1:4d}, MSE loss:{total_loss / total_size:.8f}")
+                logger.info(f"Pretrain epoch {epoch + 1:4d}, MSE loss:{total_loss / total_size:.8f}")
 
     def save_pretrained(self, path):
         torch.save(self.model.ae.state_dict(), path)
@@ -243,7 +243,6 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
         """
         self._pretrain(x, batch_size=pt_batch_size, n_epochs=pt_epochs, lr=pt_lr)
 
-        print("Train:")
         device = self.device
         model = self.model
         optimizer = Adam(filter(lambda x: x.requires_grad, model.parameters()), lr=lr)
@@ -274,7 +273,7 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
                     _, _, ari = self.score(y)
                     aris.append(ari)
                     keys.append(key := f"epoch{epoch}")
-                    print("Epoch %3d, ARI: %.4f, Best ARI: %.4f" % (epoch + 1, ari, max(aris)))
+                    logger.info("Epoch %3d, ARI: %.4f, Best ARI: %.4f", epoch + 1, ari, max(aris))
 
                     P[key] = p
                     Q[key] = tmp_q
@@ -283,7 +282,7 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
             x_bar, q, pred, z, meanbatch, dispbatch, pibatch, zinb_loss = model(data, adj)
 
             binary_crossentropy_loss = F.binary_cross_entropy(q, p)
-            ce_loss = F.kl_div(pred.log(), p, reduction='batchmean')
+            ce_loss = F.kl_div(pred.log(), p, reduction="batchmean")
             re_loss = F.mse_loss(x_bar, data)
             zinb_loss = zinb_loss(X_raw, meanbatch, dispbatch, pibatch, sf)
             loss = bcl * binary_crossentropy_loss + cl * ce_loss + rl * re_loss + zl * zinb_loss
