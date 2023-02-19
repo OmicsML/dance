@@ -14,6 +14,7 @@ if __name__ == "__main__":
     # Balance_para = [binary_crossentropy_loss, ce_loss, re_loss, zinb_loss, sigma]
     Balance_para = [1, 0.01, 0.1, 0.1, 1]
 
+    parser.add_argument("--data_dir", default="./data")
     parser.add_argument("--dataset", type=str, default="worm_neuron_cell",
                         choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
     # TODO: implement callbacks for "heat_kernel" and "cosine_normalized"
