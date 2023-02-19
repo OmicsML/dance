@@ -18,34 +18,32 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from sklearn import metrics
 from sklearn.cluster import KMeans
-from torch.autograd import Variable
 from torch.nn import Parameter
 from torch.utils.data import DataLoader, TensorDataset
 
+from dance.modules.base import BaseClusteringMethod, TorchNNPretrain
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
-from dance.typing import LogLevel
+from dance.typing import Any, List, LogLevel, Optional, Tuple
 from dance.utils.loss import ZINBLoss
-from dance.utils.metrics import cluster_acc
 
 
-def buildNetwork(layers, type, activation="relu"):
+def buildNetwork(layers: List[int], network_type: str, activation: str = "relu"):
     """Build network layer.
 
     Parameters
     ----------
-    layers : list
-        dimensions of layers.
-    type : str
-        type of network.
-    activation : str optional
-        activation function.
+    layers
+        Dimensions of layers.
+    network_type
+        Type of network.
+    activation
+        Activation function.
 
     Returns
     -------
-    net :
-        torch.nn network.
+    net
+        Built network.
 
     """
     net = []
@@ -64,34 +62,36 @@ def euclidean_dist(x, y):
     return torch.sum(torch.square(x - y), dim=1)
 
 
-class ScDeepCluster(nn.Module):
+class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
     """scDeepCluster class.
 
     Parameters
     ----------
-    input_dim : int
-        dimension of encoder input.
-    z_dim : int
-        dimension of embedding.
-    encodeLayer : list optional
-        dimensions of encoder layers.
-    decodeLayer : list optional
-        dimensions of decoder layers.
-    activation : str optional
-        activation function.
-    sigma : float optional
-        parameter of Gaussian noise.
-    alpha : float optional
-        parameter of soft assign.
-    gamma : float optional
-        parameter of cluster loss.
-    device : str optional
-        computing device.
+    input_dim
+        Dimension of encoder input.
+    z_dim
+        Dimension of embedding.
+    encodeLayer
+        Dimensions of encoder layers.
+    decodeLayer
+        Dimensions of decoder layers.
+    activation
+        Activation function.
+    sigma
+        Parameter of Gaussian noise.
+    alpha
+        Parameter of soft assign.
+    gamma
+        Parameter of cluster loss.
+    device
+        Computing device.
+    pretrain_path
+        Path to pretrained weights.
 
     """
 
     def __init__(self, input_dim, z_dim, encodeLayer=[], decodeLayer=[], activation="relu", sigma=1., alpha=1.,
-                 gamma=1., device="cuda"):
+                 gamma=1., device="cuda", pretrain_path: Optional[str] = None):
         super().__init__()
         self.z_dim = z_dim
         self.activation = activation
@@ -99,8 +99,10 @@ class ScDeepCluster(nn.Module):
         self.alpha = alpha
         self.gamma = gamma
         self.device = device
-        self.encoder = buildNetwork([input_dim] + encodeLayer, type="encode", activation=activation)
-        self.decoder = buildNetwork([z_dim] + decodeLayer, type="decode", activation=activation)
+        self.pretrain_path = pretrain_path
+
+        self.encoder = buildNetwork([input_dim] + encodeLayer, network_type="encode", activation=activation)
+        self.decoder = buildNetwork([z_dim] + decodeLayer, network_type="decode", activation=activation)
         self._enc_mu = nn.Linear(encodeLayer[-1], z_dim)
         self._dec_mean = nn.Sequential(nn.Linear(decodeLayer[-1], input_dim), MeanAct())
         self._dec_disp = nn.Sequential(nn.Linear(decodeLayer[-1], input_dim), DispAct())
@@ -131,12 +133,8 @@ class ScDeepCluster(nn.Module):
 
         Parameters
         ----------
-        path : str
-            path to save model.
-
-        Returns
-        -------
-        None.
+        path
+            Path to save model.
 
         """
         torch.save(self.state_dict(), path)
@@ -146,12 +144,8 @@ class ScDeepCluster(nn.Module):
 
         Parameters
         ----------
-        path : str
-            path to load model.
-
-        Returns
-        -------
-        None.
+        path
+            Path to load model.
 
         """
         pretrained_dict = torch.load(path, map_location=lambda storage, loc: storage)
@@ -165,13 +159,13 @@ class ScDeepCluster(nn.Module):
 
         Parameters
         ----------
-        z :
-            embedding.
+        z
+            Embedding.
 
         Returns
         -------
-        q :
-            soft label.
+        q
+            Soft label.
 
         """
         q = 1.0 / (1.0 + torch.sum((z.unsqueeze(1) - self.mu)**2, dim=2) / self.alpha)
@@ -184,13 +178,13 @@ class ScDeepCluster(nn.Module):
 
         Parameters
         ----------
-        q :
-            soft label.
+        q
+            Soft label.
 
         Returns
         -------
-        p :
-            target distribution.
+        p
+            Target distribution.
 
         """
         p = q**2 / q.sum(0)
@@ -201,19 +195,19 @@ class ScDeepCluster(nn.Module):
 
         Parameters
         ----------
-        x :
-            input features.
+        x
+            Input features.
 
         Returns
         -------
-        z0 :
-            embedding.
-        _mean :
-            data mean from ZINB.
-        _disp :
-            data dispersion from ZINB.
-        _pi :
-            data dropout probability from ZINB.
+        z0
+            Embedding.
+        _mean
+            Data mean from ZINB.
+        _disp
+            Data dispersion from ZINB.
+        _pi
+            Data dropout probability from ZINB.
 
         """
         h = self.encoder(x + torch.randn_like(x) * self.sigma)
@@ -232,21 +226,21 @@ class ScDeepCluster(nn.Module):
 
         Parameters
         ----------
-        x :
-            input features.
+        x
+            Input features.
 
         Returns
         -------
-        z0 :
-            embedding.
-        q :
-            soft label.
-        _mean :
-            data mean from ZINB.
-        _disp :
-            data dispersion from ZINB.
-        _pi :
-            data dropout probability from ZINB.
+        z0
+            Embedding.
+        q
+            Soft label.
+        _mean
+            Data mean from ZINB.
+        _disp
+            Data dispersion from ZINB.
+        _pi
+            Data dropout probability from ZINB.
 
         """
         h = self.encoder(x + torch.randn_like(x) * self.sigma)
@@ -261,29 +255,29 @@ class ScDeepCluster(nn.Module):
         q = self.soft_assign(z0)
         return z0, q, _mean, _disp, _pi
 
-    def encodeBatch(self, X, batch_size=256):
+    def encodeBatch(self, x, batch_size=256):
         """Batch encoder.
 
         Parameters
         ----------
-        X :
-            input features.
-        batch_size : int optional
-            size of batch.
+        x
+            Input features.
+        batch_size
+            Size of batch.
 
         Returns
         -------
-        encoded :
-            embedding.
+        encoded
+            Embedding.
 
         """
         self.eval()
         encoded = []
-        num = X.shape[0]
-        num_batch = int(math.ceil(1.0 * X.shape[0] / batch_size))
+        num = x.shape[0]
+        num_batch = int(math.ceil(1.0 * x.shape[0] / batch_size))
         for batch_idx in range(num_batch):
-            xbatch = X[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
-            inputs = Variable(xbatch).to(self.device)
+            xbatch = x[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
+            inputs = xbatch.to(self.device)
             z, _, _, _ = self.forwardAE(inputs)
             encoded.append(z.data)
 
@@ -295,15 +289,15 @@ class ScDeepCluster(nn.Module):
 
         Parameters
         ----------
-        p :
-            target distribution.
-        q :
-            soft label.
+        p
+            Target distribution.
+        q
+            Soft label.
 
         Returns
         -------
-        loss :
-            cluster loss.
+        loss
+            Cluster loss.
 
         """
 
@@ -313,46 +307,36 @@ class ScDeepCluster(nn.Module):
         kldloss = kld(p, q)
         return self.gamma * kldloss
 
-    def pretrain_autoencoder(self, X, X_raw, n_counts, batch_size=256, lr=0.001, epochs=400, ae_save=True,
-                             ae_weights='AE_weights.pth.tar'):
+    def pretrain(self, x, x_raw, n_counts, batch_size=256, lr=0.001, epochs=400):
         """Pretrain autoencoder.
 
         Parameters
         ----------
-        X :
-            input features.
-        X_raw :
-            raw input features.
-        n_counts : list
-            total counts for each cell.
-        batch_size : int optional
-            size of batch.
-        lr : float optional
-            learning rate.
-        epochs : int optional
-            number of epochs.
-        ae_save : bool optional
-            save autoencoder weights or not.
-        ae_weights : str optional
-            path to save autoencoder weights.
-
-        Returns
-        -------
-        None.
+        x
+            Input features.
+        x_raw
+            Raw input features.
+        n_counts
+            Total counts for each cell.
+        batch_size
+            Size of batch.
+        lr
+            Learning rate.
+        epochs
+            Number of epochs.
 
         """
         self.train()
         size_factor = torch.tensor(n_counts / np.median(n_counts))
-        dataset = TensorDataset(torch.Tensor(X), torch.Tensor(X_raw), size_factor)
+        dataset = TensorDataset(torch.Tensor(x), torch.Tensor(x_raw), size_factor)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-        print("Pretraining stage")
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, amsgrad=True)
         for epoch in range(epochs):
             loss_val = 0
             for batch_idx, (x_batch, x_raw_batch, sf_batch) in enumerate(dataloader):
-                x_tensor = Variable(x_batch).to(self.device)
-                x_raw_tensor = Variable(x_raw_batch).to(self.device)
-                sf_tensor = Variable(sf_batch).to(self.device)
+                x_tensor = x_batch.to(self.device)
+                x_raw_tensor = x_raw_batch.to(self.device)
+                sf_tensor = sf_batch.to(self.device)
                 _, mean_tensor, disp_tensor, pi_tensor = self.forwardAE(x_tensor)
                 loss = self.zinb_loss(x=x_raw_tensor, mean=mean_tensor, disp=disp_tensor, pi=pi_tensor,
                                       scale_factor=sf_tensor)
@@ -360,73 +344,81 @@ class ScDeepCluster(nn.Module):
                 loss.backward()
                 optimizer.step()
                 loss_val += loss.item() * len(x_batch)
-            print('Pretrain epoch %3d, ZINB loss: %.8f' % (epoch + 1, loss_val / X.shape[0]))
-
-        if ae_save:
-            torch.save({'ae_state_dict': self.state_dict(), 'optimizer_state_dict': optimizer.state_dict()}, ae_weights)
+            print('Pretrain epoch %3d, ZINB loss: %.8f' % (epoch + 1, loss_val / x.shape[0]))
 
     def save_checkpoint(self, state, index, filename):
         """Save training checkpoint.
 
         Parameters
         ----------
-        state :
-            model state
-        index : int
-            checkpoint index
-        filename : str
-            filename to save
-
-        Returns
-        -------
-        None.
+        state
+            Model state
+        index
+            Checkpoint index
+        filename
+            Filename to save
 
         """
         newfilename = os.path.join(filename, 'FTcheckpoint_%d.pth.tar' % index)
         torch.save(state, newfilename)
 
-    def fit(self, X, X_raw, n_counts, n_clusters, init_centroid=None, y=None, y_pred_init=None, lr=1., batch_size=256,
-            num_epochs=10, update_interval=1, tol=1e-3, save_dir=""):
+    def fit(
+        self,
+        inputs: Tuple[np.ndarray, np.ndarray, np.ndarray],
+        y: np.ndarray,
+        n_clusters: int = 10,
+        init_centroid: Optional[List[int]] = None,
+        y_pred_init: Optional[List[int]] = None,
+        lr: float = 1,
+        batch_size: int = 256,
+        num_epochs: int = 10,
+        update_interval: int = 1,
+        tol: float = 1e-3,
+        save_dir: str = "",
+        pt_batch_size: int = 256,
+        pt_lr: float = 0.001,
+        pt_epochs: int = 400,
+    ):
         """Train model.
 
         Parameters
         ----------
-        X :
-            input features.
-        X_raw :
-            raw input features.
-        n_counts : list
-            total counts for each cell.
-        n_clusters : int
-            number of clusters.
-        init_centroid : list optional
-            initialization of centroids. If None, perform kmeans to initialize cluster centers.
-        y : list optional
-            true label. Used for model selection.
-        y_pred_init : list optional
-            predicted label for initialization.
-        lr : float optional
-            learning rate.
-        batch_size : int optional
-            size of batch.
-        num_epochs : int optional
-            number of epochs.
-        update_interval : int optional
-            update interval of soft label and target distribution.
-        tol : float optional
-            tolerance for training loss.
-        save_dir : str optional
-            path to save model weights.
-
-        Returns
-        -------
-        None.
+        inputs
+            A tuple containing (1) the input features, (2) the raw input features, and (3) the total counts per cell.
+        y
+            True label. Used for model selection.
+        n_clusters
+            Number of clusters.
+        init_centroid
+            Initialization of centroids. If None, perform kmeans to initialize cluster centers.
+        y_pred_init
+            Predicted label for initialization.
+        lr
+            Learning rate.
+        batch_size
+            Size of batch.
+        num_epochs
+            Number of epochs.
+        update_interval
+            Update interval of soft label and target distribution.
+        tol
+            Tolerance for training loss.
+        save_dir
+            Path to save model weights.
+        pt_batch_size
+            Pretraining batch size.
+        pt_lr
+            Pretraining learning rate.
+        pt_epochs
+            pretraining epochs.
 
         """
+        x, x_raw, n_counts = inputs
+        self._pretrain(x, x_raw, n_counts, batch_size=pt_batch_size, lr=pt_lr, epochs=pt_epochs)
+
         self.train()
-        print("Clustering stage")
-        X = torch.tensor(X, dtype=torch.float32)
-        X_raw = torch.tensor(X_raw, dtype=torch.float32)
+        x = torch.tensor(x, dtype=torch.float32)
+        x_raw = torch.tensor(x_raw, dtype=torch.float32)
         size_factor = torch.FloatTensor(n_counts / np.median(n_counts))
         self.mu = Parameter(torch.Tensor(n_clusters, self.z_dim).to(self.device))
         optimizer = optim.Adadelta(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, rho=.95)
@@ -434,7 +426,7 @@ class ScDeepCluster(nn.Module):
         print("Initializing cluster centers with kmeans.")
         if init_centroid is None:
             kmeans = KMeans(n_clusters, n_init=20)
-            data = self.encodeBatch(X)
+            data = self.encodeBatch(x)
             self.y_pred = kmeans.fit_predict(data.data.cpu().numpy())
             self.y_pred_last = self.y_pred
             self.mu.data.copy_(torch.tensor(kmeans.cluster_centers_, dtype=torch.float32))
@@ -443,24 +435,25 @@ class ScDeepCluster(nn.Module):
             self.y_pred = y_pred_init
             self.y_pred_last = self.y_pred
 
-        num = X.shape[0]
-        num_batch = int(math.ceil(1.0 * X.shape[0] / batch_size))
+        num = x.shape[0]
+        num_batch = int(math.ceil(1.0 * x.shape[0] / batch_size))
 
         aris = []
         P = {}
         Q = {}
 
+        delta_label = np.inf
         for epoch in range(num_epochs):
             if epoch % update_interval == 0:
                 # update the targe distribution p
-                latent = self.encodeBatch(X.to(self.device))
+                latent = self.encodeBatch(x.to(self.device))
                 q = self.soft_assign(latent)
                 self.q = q
                 p = self.target_distribution(q).data
                 self.y_pred = self.predict()
 
                 # save current model
-                if (epoch > 0 and delta_label < tol) or epoch % 10 == 0:
+                if delta_label or epoch % 10 == 0:
                     self.save_checkpoint(
                         {
                             'epoch': epoch + 1,
@@ -484,7 +477,7 @@ class ScDeepCluster(nn.Module):
                     break
 
                 # calculate ari score for model selection
-                _, _, ari = self.score(y)
+                ari = self.score(None, y)
                 aris.append(ari)
 
             # train 1 epoch for clustering loss
@@ -492,15 +485,15 @@ class ScDeepCluster(nn.Module):
             recon_loss_val = 0.0
             cluster_loss_val = 0.0
             for batch_idx in range(num_batch):
-                xbatch = X[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
-                xrawbatch = X_raw[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
+                xbatch = x[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
+                xrawbatch = x_raw[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
                 sfbatch = size_factor[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
                 pbatch = p[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
                 optimizer.zero_grad()
-                inputs = Variable(xbatch).to(self.device)
-                rawinputs = Variable(xrawbatch).to(self.device)
-                sfinputs = Variable(sfbatch).to(self.device)
-                target = Variable(pbatch).to(self.device)
+                inputs = xbatch.to(self.device)
+                rawinputs = xrawbatch.to(self.device)
+                sfinputs = sfbatch.to(self.device)
+                target = pbatch.to(self.device)
 
                 zbatch, qbatch, meanbatch, dispbatch, pibatch = self.forward(inputs)
 
@@ -520,45 +513,39 @@ class ScDeepCluster(nn.Module):
         index = update_interval * np.argmax(aris)
         self.q = Q[f'epoch{index}']
 
-    def predict(self):
+    def predict_proba(self, x: Optional[Any] = None) -> np.ndarray:
+        """Get the predicted propabilities for each cell.
+
+        Parameters
+        ----------
+        x
+            Not used, for compatibility with the BaseClusteringMethod class.
+
+        Returns
+        -------
+        pred_prop
+            Predicted probability for each cell.
+
+        """
+        pred_prob = self.q.detach().clone().cpu().numpy()
+        return pred_prob
+
+    def predict(self, x: Optional[Any] = None) -> np.ndarray:
         """Get predictions from the trained model.
 
         Parameters
         ----------
-        None.
+        x
+            Not used, for compatibility with the BaseClusteringMethod class.
 
         Returns
         -------
-        y_pred : np.array
-            prediction of given clustering method.
+        pred
+            Predicted clustering assignment for each cell.
 
         """
-        y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
-        return y_pred
-
-    def score(self, y):
-        """Evaluate the trained model.
-
-        Parameters
-        ----------
-        y : list
-            true labels.
-
-        Returns
-        -------
-        acc : float
-            accuracy.
-        nmi : float
-            normalized mutual information.
-        ari : float
-            adjusted Rand index.
-
-        """
-        y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
-        acc = np.round(cluster_acc(y, y_pred), 5)
-        nmi = np.round(metrics.normalized_mutual_info_score(y, y_pred), 5)
-        ari = np.round(metrics.adjusted_rand_score(y, y_pred), 5)
-        return acc, nmi, ari
+        pred = self.predict_proba().argmax(1)
+        return pred
 
 
 class MeanAct(nn.Module):
