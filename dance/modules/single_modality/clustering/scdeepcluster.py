@@ -263,12 +263,12 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         q = self.soft_assign(z0)
         return z0, q, _mean, _disp, _pi
 
-    def encodeBatch(self, X, batch_size=256):
+    def encodeBatch(self, x, batch_size=256):
         """Batch encoder.
 
         Parameters
         ----------
-        X :
+        x :
             input features.
         batch_size : int optional
             size of batch.
@@ -281,10 +281,10 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         """
         self.eval()
         encoded = []
-        num = X.shape[0]
-        num_batch = int(math.ceil(1.0 * X.shape[0] / batch_size))
+        num = x.shape[0]
+        num_batch = int(math.ceil(1.0 * x.shape[0] / batch_size))
         for batch_idx in range(num_batch):
-            xbatch = X[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
+            xbatch = x[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
             inputs = xbatch.to(self.device)
             z, _, _, _ = self.forwardAE(inputs)
             encoded.append(z.data)
@@ -315,14 +315,14 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         kldloss = kld(p, q)
         return self.gamma * kldloss
 
-    def pretrain(self, X, X_raw, n_counts, batch_size=256, lr=0.001, epochs=400):
+    def pretrain(self, x, x_raw, n_counts, batch_size=256, lr=0.001, epochs=400):
         """Pretrain autoencoder.
 
         Parameters
         ----------
-        X :
+        x :
             input features.
-        X_raw :
+        x_raw :
             raw input features.
         n_counts : list
             total counts for each cell.
@@ -340,7 +340,7 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         """
         self.train()
         size_factor = torch.tensor(n_counts / np.median(n_counts))
-        dataset = TensorDataset(torch.Tensor(X), torch.Tensor(X_raw), size_factor)
+        dataset = TensorDataset(torch.Tensor(x), torch.Tensor(x_raw), size_factor)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, amsgrad=True)
         for epoch in range(epochs):
@@ -356,7 +356,7 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 loss.backward()
                 optimizer.step()
                 loss_val += loss.item() * len(x_batch)
-            print('Pretrain epoch %3d, ZINB loss: %.8f' % (epoch + 1, loss_val / X.shape[0]))
+            print('Pretrain epoch %3d, ZINB loss: %.8f' % (epoch + 1, loss_val / x.shape[0]))
 
     def save_checkpoint(self, state, index, filename):
         """Save training checkpoint.
@@ -380,12 +380,10 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
     def fit(
         self,
-        X,
-        X_raw,
-        n_counts,
-        n_clusters,
+        inputs,
+        y,
+        n_clusters=10,
         init_centroid=None,
-        y=None,
         y_pred_init=None,
         lr=1.,
         batch_size=256,
@@ -401,18 +399,14 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        X :
-            input features.
-        X_raw :
-            raw input features.
-        n_counts : list
-            total counts for each cell.
+        inputs
+            A tuple containing (1) the input features, (2) the raw input features, and (3) the total counts per cell.
+        y : list optional
+            true label. Used for model selection.
         n_clusters : int
             number of clusters.
         init_centroid : list optional
             initialization of centroids. If None, perform kmeans to initialize cluster centers.
-        y : list optional
-            true label. Used for model selection.
         y_pred_init : list optional
             predicted label for initialization.
         lr : float optional
@@ -439,11 +433,12 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         None.
 
         """
-        self._pretrain(X, X_raw, n_counts, batch_size=pt_batch_size, lr=pt_lr, epochs=pt_epochs)
+        x, x_raw, n_counts = inputs
+        self._pretrain(x, x_raw, n_counts, batch_size=pt_batch_size, lr=pt_lr, epochs=pt_epochs)
 
         self.train()
-        X = torch.tensor(X, dtype=torch.float32)
-        X_raw = torch.tensor(X_raw, dtype=torch.float32)
+        x = torch.tensor(x, dtype=torch.float32)
+        x_raw = torch.tensor(x_raw, dtype=torch.float32)
         size_factor = torch.FloatTensor(n_counts / np.median(n_counts))
         self.mu = Parameter(torch.Tensor(n_clusters, self.z_dim).to(self.device))
         optimizer = optim.Adadelta(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, rho=.95)
@@ -451,7 +446,7 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         print("Initializing cluster centers with kmeans.")
         if init_centroid is None:
             kmeans = KMeans(n_clusters, n_init=20)
-            data = self.encodeBatch(X)
+            data = self.encodeBatch(x)
             self.y_pred = kmeans.fit_predict(data.data.cpu().numpy())
             self.y_pred_last = self.y_pred
             self.mu.data.copy_(torch.tensor(kmeans.cluster_centers_, dtype=torch.float32))
@@ -460,8 +455,8 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
             self.y_pred = y_pred_init
             self.y_pred_last = self.y_pred
 
-        num = X.shape[0]
-        num_batch = int(math.ceil(1.0 * X.shape[0] / batch_size))
+        num = x.shape[0]
+        num_batch = int(math.ceil(1.0 * x.shape[0] / batch_size))
 
         aris = []
         P = {}
@@ -471,7 +466,7 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         for epoch in range(num_epochs):
             if epoch % update_interval == 0:
                 # update the targe distribution p
-                latent = self.encodeBatch(X.to(self.device))
+                latent = self.encodeBatch(x.to(self.device))
                 q = self.soft_assign(latent)
                 self.q = q
                 p = self.target_distribution(q).data
@@ -510,8 +505,8 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
             recon_loss_val = 0.0
             cluster_loss_val = 0.0
             for batch_idx in range(num_batch):
-                xbatch = X[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
-                xrawbatch = X_raw[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
+                xbatch = x[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
+                xrawbatch = x_raw[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
                 sfbatch = size_factor[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
                 pbatch = p[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
                 optimizer.zero_grad()

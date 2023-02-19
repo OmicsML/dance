@@ -48,18 +48,19 @@ if __name__ == "__main__":
     preprocessing_pipeline = ScDeepCluster.preprocessing_pipeline()
     preprocessing_pipeline(data)
 
-    (x, x_raw, n_counts), y = data.get_train_data()
+    # inputs: x, x_raw, n_counts
+    inputs, y = data.get_train_data()
     n_clusters = len(np.unique(y))
+    in_dim = inputs[0].shape[1]
 
     # Build and train model
-    model = ScDeepCluster(input_dim=x.shape[1], z_dim=32, encodeLayer=[256, 64], decodeLayer=[64, 256],
-                          sigma=args.sigma, gamma=args.gamma, device=args.device, pretrain_path=args.ae_weights)
+    model = ScDeepCluster(input_dim=in_dim, z_dim=32, encodeLayer=[256, 64], decodeLayer=[64, 256], sigma=args.sigma,
+                          gamma=args.gamma, device=args.device, pretrain_path=args.ae_weights)
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
-    model.fit(X=x, X_raw=x_raw, n_counts=n_counts, n_clusters=n_clusters, init_centroid=None, y_pred_init=None, y=y,
-              lr=args.lr, batch_size=args.batch_size, num_epochs=args.maxiter, update_interval=args.update_interval,
-              tol=args.tol, save_dir=args.save_dir, pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr,
-              pt_epochs=args.pretrain_epochs)
+    model.fit(inputs, y, n_clusters=n_clusters, y_pred_init=None, lr=args.lr, batch_size=args.batch_size,
+              num_epochs=args.maxiter, update_interval=args.update_interval, tol=args.tol, save_dir=args.save_dir,
+              pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
 
     # Evaluate model predictions
     score = model.score(None, y)
