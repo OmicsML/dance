@@ -1,9 +1,7 @@
 import argparse
 import os
-from time import time
 
 import numpy as np
-import torch
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
@@ -28,6 +26,7 @@ if __name__ == "__main__":
     parser.add_argument("--maxiter", default=500, type=int)
     parser.add_argument("--pretrain_epochs", default=50, type=int)
     parser.add_argument("--lr", default=0.1, type=float)
+    parser.add_argument("--pretrain_lr", default=0.001, type=float)
     parser.add_argument("--gamma", default=1., type=float, help="coefficient of clustering loss")
     parser.add_argument("--sigma", default=2.5, type=float, help="coefficient of random noise")
     parser.add_argument("--update_interval", default=1, type=int)
@@ -53,29 +52,15 @@ if __name__ == "__main__":
     n_clusters = len(np.unique(y))
 
     model = ScDeepCluster(input_dim=x.shape[1], z_dim=32, encodeLayer=[256, 64], decodeLayer=[64, 256],
-                          sigma=args.sigma, gamma=args.gamma, device=args.device)
-    t0 = time()
-    if args.ae_weights is None:
-        model.pretrain(X=x, X_raw=x_raw, n_counts=n_counts, batch_size=args.batch_size, epochs=args.pretrain_epochs,
-                       ae_weights=args.ae_weight_file)
-    else:
-        if os.path.isfile(args.ae_weights):
-            print(f"==> loading checkpoint {args.ae_weights}")
-            checkpoint = torch.load(args.ae_weights)
-            model.load_state_dict(checkpoint["ae_state_dict"])
-        else:
-            print(f"==> no checkpoint found at {args.ae_weights}")
-            raise ValueError
-    print(f"Pretraining time: {int(time() - t0)} seconds.")
+                          sigma=args.sigma, gamma=args.gamma, device=args.device, pretrain_path=args.ae_weights)
 
     # model training
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
     model.fit(X=x, X_raw=x_raw, n_counts=n_counts, n_clusters=n_clusters, init_centroid=None, y_pred_init=None, y=y,
               lr=args.lr, batch_size=args.batch_size, num_epochs=args.maxiter, update_interval=args.update_interval,
-              tol=args.tol, save_dir=args.save_dir)
-
-    print(f"Total time: {int(time() - t0)} seconds.")
+              tol=args.tol, save_dir=args.save_dir, pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr,
+              pt_epochs=args.pretrain_epochs)
 
     y_pred = model.predict()
     print(f"Prediction (first ten): {y_pred[:10]}")

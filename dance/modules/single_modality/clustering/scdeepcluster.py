@@ -23,8 +23,9 @@ from sklearn.cluster import KMeans
 from torch.nn import Parameter
 from torch.utils.data import DataLoader, TensorDataset
 
+from dance.modules.base import TorchNNPretrain
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
-from dance.typing import LogLevel
+from dance.typing import LogLevel, Optional
 from dance.utils.loss import ZINBLoss
 from dance.utils.metrics import cluster_acc
 
@@ -63,7 +64,7 @@ def euclidean_dist(x, y):
     return torch.sum(torch.square(x - y), dim=1)
 
 
-class ScDeepCluster(nn.Module):
+class ScDeepCluster(nn.Module, TorchNNPretrain):
     """scDeepCluster class.
 
     Parameters
@@ -86,11 +87,13 @@ class ScDeepCluster(nn.Module):
         parameter of cluster loss.
     device : str optional
         computing device.
+    pretrain_path
+        Path to pretrained weights.
 
     """
 
     def __init__(self, input_dim, z_dim, encodeLayer=[], decodeLayer=[], activation="relu", sigma=1., alpha=1.,
-                 gamma=1., device="cuda"):
+                 gamma=1., device="cuda", pretrain_path: Optional[str] = None):
         super().__init__()
         self.z_dim = z_dim
         self.activation = activation
@@ -98,6 +101,8 @@ class ScDeepCluster(nn.Module):
         self.alpha = alpha
         self.gamma = gamma
         self.device = device
+        self.pretrain_path = pretrain_path
+
         self.encoder = buildNetwork([input_dim] + encodeLayer, type="encode", activation=activation)
         self.decoder = buildNetwork([z_dim] + decodeLayer, type="decode", activation=activation)
         self._enc_mu = nn.Linear(encodeLayer[-1], z_dim)
@@ -312,8 +317,7 @@ class ScDeepCluster(nn.Module):
         kldloss = kld(p, q)
         return self.gamma * kldloss
 
-    def pretrain(self, X, X_raw, n_counts, batch_size=256, lr=0.001, epochs=400, ae_save=True,
-                 ae_weights='AE_weights.pth.tar'):
+    def pretrain(self, X, X_raw, n_counts, batch_size=256, lr=0.001, epochs=400):
         """Pretrain autoencoder.
 
         Parameters
@@ -330,10 +334,6 @@ class ScDeepCluster(nn.Module):
             learning rate.
         epochs : int optional
             number of epochs.
-        ae_save : bool optional
-            save autoencoder weights or not.
-        ae_weights : str optional
-            path to save autoencoder weights.
 
         Returns
         -------
@@ -344,7 +344,6 @@ class ScDeepCluster(nn.Module):
         size_factor = torch.tensor(n_counts / np.median(n_counts))
         dataset = TensorDataset(torch.Tensor(X), torch.Tensor(X_raw), size_factor)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-        print("Pretraining stage")
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, amsgrad=True)
         for epoch in range(epochs):
             loss_val = 0
@@ -360,9 +359,6 @@ class ScDeepCluster(nn.Module):
                 optimizer.step()
                 loss_val += loss.item() * len(x_batch)
             print('Pretrain epoch %3d, ZINB loss: %.8f' % (epoch + 1, loss_val / X.shape[0]))
-
-        if ae_save:
-            torch.save({'ae_state_dict': self.state_dict(), 'optimizer_state_dict': optimizer.state_dict()}, ae_weights)
 
     def save_checkpoint(self, state, index, filename):
         """Save training checkpoint.
@@ -384,8 +380,25 @@ class ScDeepCluster(nn.Module):
         newfilename = os.path.join(filename, 'FTcheckpoint_%d.pth.tar' % index)
         torch.save(state, newfilename)
 
-    def fit(self, X, X_raw, n_counts, n_clusters, init_centroid=None, y=None, y_pred_init=None, lr=1., batch_size=256,
-            num_epochs=10, update_interval=1, tol=1e-3, save_dir=""):
+    def fit(
+        self,
+        X,
+        X_raw,
+        n_counts,
+        n_clusters,
+        init_centroid=None,
+        y=None,
+        y_pred_init=None,
+        lr=1.,
+        batch_size=256,
+        num_epochs=10,
+        update_interval=1,
+        tol=1e-3,
+        save_dir="",
+        pt_batch_size=256,
+        pt_lr=0.001,
+        pt_epochs=400,
+    ):
         """Train model.
 
         Parameters
@@ -416,14 +429,21 @@ class ScDeepCluster(nn.Module):
             tolerance for training loss.
         save_dir : str optional
             path to save model weights.
+        pt_batch_size
+            Pretraining batch size.
+        pt_lr
+            Pretraining learning rate.
+        pt_epochs
+            pretraining epochs.
 
         Returns
         -------
         None.
 
         """
+        self._pretrain(X, X_raw, n_counts, batch_size=pt_batch_size, lr=pt_lr, epochs=pt_epochs)
+
         self.train()
-        print("Clustering stage")
         X = torch.tensor(X, dtype=torch.float32)
         X_raw = torch.tensor(X_raw, dtype=torch.float32)
         size_factor = torch.FloatTensor(n_counts / np.median(n_counts))
