@@ -1,6 +1,4 @@
 import argparse
-import os
-from time import time
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
@@ -11,7 +9,6 @@ from dance.utils import set_seed
 set_seed(42)
 
 if __name__ == "__main__":
-    time_start = time()
     parser = argparse.ArgumentParser()
 
     # model_para = [n_enc_1(n_dec_3), n_enc_2(n_dec_2), n_enc_3(n_dec_1)]
@@ -59,24 +56,23 @@ if __name__ == "__main__":
     preprocessing_pipeline = ScDSC.preprocessing_pipeline(n_top_genes=args.nb_genes, n_neighbors=args.topk)
     preprocessing_pipeline(data)
 
-    (x, x_raw, n_counts, adj), y = data.get_data(return_type="default")
-    args.n_input = x.shape[1]
+    # inputs: adj, x, x_raw, n_counts
+    inputs, y = data.get_data(return_type="default")
+    args.n_input = inputs[1].shape[1]
 
     model = ScDSC(pretrain_path=f"{args.name}_scdcs_pre.pkl", sigma=args.sigma, n_enc_1=args.n_enc_1,
                   n_enc_2=args.n_enc_2, n_enc_3=args.n_enc_3, n_dec_1=args.n_dec_1, n_dec_2=args.n_dec_2,
                   n_dec_3=args.n_dec_3, n_z1=args.n_z1, n_z2=args.n_z2, n_z3=args.n_z3, n_clusters=args.n_clusters,
                   n_input=args.n_input, v=args.v, device=args.device)
 
-    # Train scDSC
-    model.fit(x, y, x_raw, n_counts, adj, lr=args.lr, n_epochs=args.n_epochs, bcl=args.binary_crossentropy_loss,
-              cl=args.ce_loss, rl=args.re_loss, zl=args.zinb_loss, pt_epochs=args.pretrain_epochs,
-              pt_batch_size=args.batch_size, pt_lr=args.lr)
-    print(f"Running Time：{int(time() - time_start)} seconds")
+    # Build and train model
+    model.fit(inputs, y, lr=args.lr, n_epochs=args.n_epochs, bcl=args.binary_crossentropy_loss, cl=args.ce_loss,
+              rl=args.re_loss, zl=args.zinb_loss, pt_epochs=args.pretrain_epochs, pt_batch_size=args.batch_size,
+              pt_lr=args.lr)
 
-    y_pred = model.predict()
-    print(f"Prediction (first ten): {y_pred[:10]}")
-    acc, nmi, ari = model.score(y)
-    print("ACC: {:.4f}, NMI: {:.4f}, ARI: {:.4f}".format(acc, nmi, ari))
+    # Evaluate model predictions
+    score = model.score(None, y)
+    print(f"{score=:.4f}")
 """Reproduction information
 10X PBMC:
 python scdsc.py --name 10X_PBMC --method cosine --topk 30 --v 7 --binary_crossentropy_loss 0.75 --ce_loss 0.5 --re_loss 0.1 --zinb_loss 2.5 --sigma 0.4

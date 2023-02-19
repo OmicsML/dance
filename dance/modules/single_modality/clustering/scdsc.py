@@ -24,7 +24,7 @@ from dance.modules.base import BaseClusteringMethod, TorchNNPretrain
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
 from dance.transforms.graph import NeighborGraph
 from dance.transforms.preprocess import sparse_mx_to_torch_sparse_tensor
-from dance.typing import LogLevel
+from dance.typing import Any, LogLevel, Optional
 from dance.utils import get_device
 from dance.utils.loss import ZINBLoss
 from dance.utils.metrics import cluster_acc
@@ -127,8 +127,8 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
             # Construct k-neighbors graph using the noramlized feature matrix
             NeighborGraph(n_neighbors=n_neighbors, metric="correlation", channel="X"),
             SetConfig({
-                "feature_channel": [None, None, "n_counts", "NeighborGraph"],
-                "feature_channel_type": ["X", "raw_X", "obs", "obsp"],
+                "feature_channel": ["NeighborGraph", None, None, "n_counts"],
+                "feature_channel_type": ["obsp", "X", "raw_X", "obs"],
                 "label_channel": "Group"
             }),
             log_level=log_level,
@@ -198,11 +198,8 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
 
     def fit(
         self,
-        x,
+        inputs,
         y,
-        X_raw,
-        n_counts,
-        adj,
         lr=1e-03,
         n_epochs=300,
         bcl=0.1,
@@ -217,16 +214,11 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        x
-            Input features.
+        inputs
+            A tuple containing (1) the adjacency matrix, (2) the input features, (3) the raw input features, and (4)
+            the total counts for each cell.
         y
-            Labels.
-        X_raw
-            Raw input features.
-        n_counts
-            Total counts for each cell.
-        adj
-            Adjacency matrix as a sicpy sparse matrix.
+            Label.
         lr
             Learning rate.
         n_epochs
@@ -241,6 +233,7 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
             Parameter of ZINB loss.
 
         """
+        adj, x, x_raw, n_counts = inputs
         self._pretrain(x, batch_size=pt_batch_size, n_epochs=pt_epochs, lr=pt_lr)
 
         device = self.device
@@ -248,7 +241,7 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
         optimizer = Adam(filter(lambda x: x.requires_grad, model.parameters()), lr=lr)
 
         adj = sparse_mx_to_torch_sparse_tensor(adj).to(device)
-        X_raw = torch.tensor(X_raw).to(device)
+        x_raw = torch.tensor(x_raw).to(device)
         sf = torch.tensor(n_counts / np.median(n_counts)).to(device)
         data = torch.from_numpy(x).to(device)
 
@@ -270,7 +263,7 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
                     p = self.target_distribution(tmp_q)
 
                     # calculate ari score for model selection
-                    _, _, ari = self.score(y)
+                    ari = self.score(None, y)
                     aris.append(ari)
                     keys.append(key := f"epoch{epoch}")
                     logger.info("Epoch %3d, ARI: %.4f, Best ARI: %.4f", epoch + 1, ari, max(aris))
@@ -284,7 +277,7 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
             binary_crossentropy_loss = F.binary_cross_entropy(q, p)
             ce_loss = F.kl_div(pred.log(), p, reduction="batchmean")
             re_loss = F.mse_loss(x_bar, data)
-            zinb_loss = zinb_loss(X_raw, meanbatch, dispbatch, pibatch, sf)
+            zinb_loss = zinb_loss(x_raw, meanbatch, dispbatch, pibatch, sf)
             loss = bcl * binary_crossentropy_loss + cl * ce_loss + rl * re_loss + zl * zinb_loss
 
             optimizer.zero_grad()
@@ -294,41 +287,39 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
         index = np.argmax(aris)
         self.q = Q[keys[index]]
 
-    def predict(self):
-        """Get predictions from the trained model.
-
-        Returns
-        -------
-        y_pred
-            Prediction of given clustering method.
-
-        """
-        y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
-        return y_pred
-
-    def score(self, y):
-        """Evaluate the trained model.
+    def predict_proba(self, x: Optional[Any] = None) -> np.ndarray:
+        """Get the predicted propabilities for each cell.
 
         Parameters
         ----------
-        y
-            True labels.
+        x
+            Not used, for compatibility with the BaseClusteringMethod class.
 
         Returns
         -------
-        acc
-            Accuracy.
-        nmi
-            Normalized mutual information.
-        ari
-            Adjusted Rand index.
+        pred_prop
+            Predicted probability for each cell.
 
         """
-        y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
-        acc = np.round(cluster_acc(y, y_pred), 5)
-        nmi = np.round(metrics.normalized_mutual_info_score(y, y_pred), 5)
-        ari = np.round(metrics.adjusted_rand_score(y, y_pred), 5)
-        return acc, nmi, ari
+        pred_prob = self.q.detach().clone().cpu().numpy()
+        return pred_prob
+
+    def predict(self, x: Optional[Any] = None) -> np.ndarray:
+        """Get predictions from the trained model.
+
+        Parameters
+        ----------
+        x
+            Not used, for compatibility with the BaseClusteringMethod class.
+
+        Returns
+        -------
+        pred
+            Predicted clustering assignment for each cell.
+
+        """
+        pred = self.predict_proba().argmax(1)
+        return pred
 
 
 class ScDSCModel(nn.Module):

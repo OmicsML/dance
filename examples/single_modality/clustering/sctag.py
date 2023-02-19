@@ -56,7 +56,7 @@ if __name__ == "__main__":
     inputs, y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
-    # Build model & training
+    # Build and train model
     model = ScTAG(n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
                   dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha,
                   pretrain_save_path=args.pretrain_file)
