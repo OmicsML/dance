@@ -9,7 +9,6 @@ Nature communications 12.1 (2021): 1-12.
 
 """
 import math
-import os
 
 import numpy as np
 import scanpy as sc
@@ -21,6 +20,7 @@ from sklearn.cluster import KMeans
 from torch.nn import Parameter
 from torch.utils.data import DataLoader, TensorDataset
 
+from dance import logger
 from dance.modules.base import BaseClusteringMethod, TorchNNPretrain
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
 from dance.typing import Any, List, LogLevel, Optional, Tuple
@@ -325,23 +325,7 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                print('Pretrain epoch [{}/{}], ZINB loss:{:.4f}'.format(batch_idx + 1, epoch + 1, loss.item()))
-
-    def save_checkpoint(self, state, index, filename):
-        """Save training checkpoint.
-
-        Parameters
-        ----------
-        state
-            Model state
-        index
-            Checkpoint index
-        filename
-            Filename to save
-
-        """
-        newfilename = os.path.join(filename, 'FTcheckpoint_%d.pth.tar' % index)
-        torch.save(state, newfilename)
+                logger.info("Pretrain epoch [%2d/%3d], ZINB loss: %.4f", batch_idx + 1, epoch + 1, loss.item())
 
     def fit(
         self,
@@ -440,8 +424,8 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 p = self.target_distribution(q).data
                 self.y_pred = self.predict()
 
-                p_ = {f'epoch{epoch}': p}
-                q_ = {f'epoch{epoch}': q}
+                p_ = {f"epoch{epoch}": p}
+                q_ = {f"epoch{epoch}": q}
                 P = {**P, **p_}
                 Q = {**Q, **q_}
 
@@ -449,8 +433,7 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 delta_label = np.sum(self.y_pred != self.y_pred_last).astype(np.float32) / num
                 self.y_pred_last = self.y_pred
                 if epoch > 0 and delta_label < tol:
-                    print('delta_label ', delta_label, '< tol ', tol)
-                    print("Reach tolerance threshold. Stopping training.")
+                    logger.info("Reach tolerance threshold (%.3e < %.3e). Stopping training.", delta_label, tol)
                     break
 
                 # calculate ari score for model selection
@@ -483,8 +466,8 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 recon_loss_val += recon_loss.data * len(inputs)
                 train_loss = cluster_loss_val + recon_loss_val
 
-            print("#Epoch %3d: Total: %.4f, Clustering Loss: %.4f, ZINB Loss: %.4f" %
-                  (epoch + 1, train_loss / num, cluster_loss_val / num, recon_loss_val / num))
+            logger.info("#Epoch %3d: Total: %.4f, Clustering Loss: %.4f, ZINB Loss: %.4f", epoch + 1, train_loss / num,
+                        cluster_loss_val / num, recon_loss_val / num)
 
             ml_loss = 0.0
             if epoch % update_ml == 0:
@@ -528,11 +511,11 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                     optimizer.step()
 
             if ml_num_batch > 0 and cl_num_batch > 0:
-                print("Pairwise Total: %.4f, ML loss: %.4f, CL loss: %.4f" %
-                      (float(ml_loss.cpu()) + float(cl_loss.cpu()), ml_loss.cpu(), cl_loss.cpu()))
+                logger.info("Pairwise Total: %.4f, ML loss: %.4f, CL loss: %.4f",
+                            float(ml_loss.cpu()) + float(cl_loss.cpu()), ml_loss.cpu(), cl_loss.cpu())
 
         index = update_interval * np.argmax(aris)
-        self.q = Q[f'epoch{index}']
+        self.q = Q[f"epoch{index}"]
 
     def predict_proba(self, x: Optional[Any] = None) -> np.ndarray:
         """Get the predicted propabilities for each cell.
