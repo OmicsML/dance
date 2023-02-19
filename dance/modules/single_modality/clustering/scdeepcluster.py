@@ -24,26 +24,26 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from dance.modules.base import BaseClusteringMethod, TorchNNPretrain
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
-from dance.typing import Any, LogLevel, Optional
+from dance.typing import Any, List, LogLevel, Optional, Tuple
 from dance.utils.loss import ZINBLoss
 
 
-def buildNetwork(layers, type, activation="relu"):
+def buildNetwork(layers: List[int], network_type: str, activation: str = "relu"):
     """Build network layer.
 
     Parameters
     ----------
-    layers : list
-        dimensions of layers.
-    type : str
-        type of network.
-    activation : str optional
-        activation function.
+    layers
+        Dimensions of layers.
+    network_type
+        Type of network.
+    activation
+        Activation function.
 
     Returns
     -------
-    net :
-        torch.nn network.
+    net
+        Built network.
 
     """
     net = []
@@ -67,24 +67,24 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
     Parameters
     ----------
-    input_dim : int
-        dimension of encoder input.
-    z_dim : int
-        dimension of embedding.
-    encodeLayer : list optional
-        dimensions of encoder layers.
-    decodeLayer : list optional
-        dimensions of decoder layers.
-    activation : str optional
-        activation function.
-    sigma : float optional
-        parameter of Gaussian noise.
-    alpha : float optional
-        parameter of soft assign.
-    gamma : float optional
-        parameter of cluster loss.
-    device : str optional
-        computing device.
+    input_dim
+        Dimension of encoder input.
+    z_dim
+        Dimension of embedding.
+    encodeLayer
+        Dimensions of encoder layers.
+    decodeLayer
+        Dimensions of decoder layers.
+    activation
+        Activation function.
+    sigma
+        Parameter of Gaussian noise.
+    alpha
+        Parameter of soft assign.
+    gamma
+        Parameter of cluster loss.
+    device
+        Computing device.
     pretrain_path
         Path to pretrained weights.
 
@@ -101,8 +101,8 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         self.device = device
         self.pretrain_path = pretrain_path
 
-        self.encoder = buildNetwork([input_dim] + encodeLayer, type="encode", activation=activation)
-        self.decoder = buildNetwork([z_dim] + decodeLayer, type="decode", activation=activation)
+        self.encoder = buildNetwork([input_dim] + encodeLayer, network_type="encode", activation=activation)
+        self.decoder = buildNetwork([z_dim] + decodeLayer, network_type="decode", activation=activation)
         self._enc_mu = nn.Linear(encodeLayer[-1], z_dim)
         self._dec_mean = nn.Sequential(nn.Linear(decodeLayer[-1], input_dim), MeanAct())
         self._dec_disp = nn.Sequential(nn.Linear(decodeLayer[-1], input_dim), DispAct())
@@ -133,12 +133,8 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        path : str
-            path to save model.
-
-        Returns
-        -------
-        None.
+        path
+            Path to save model.
 
         """
         torch.save(self.state_dict(), path)
@@ -148,12 +144,8 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        path : str
-            path to load model.
-
-        Returns
-        -------
-        None.
+        path
+            Path to load model.
 
         """
         pretrained_dict = torch.load(path, map_location=lambda storage, loc: storage)
@@ -167,13 +159,13 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        z :
-            embedding.
+        z
+            Embedding.
 
         Returns
         -------
-        q :
-            soft label.
+        q
+            Soft label.
 
         """
         q = 1.0 / (1.0 + torch.sum((z.unsqueeze(1) - self.mu)**2, dim=2) / self.alpha)
@@ -186,13 +178,13 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        q :
-            soft label.
+        q
+            Soft label.
 
         Returns
         -------
-        p :
-            target distribution.
+        p
+            Target distribution.
 
         """
         p = q**2 / q.sum(0)
@@ -203,19 +195,19 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        x :
-            input features.
+        x
+            Input features.
 
         Returns
         -------
-        z0 :
-            embedding.
-        _mean :
-            data mean from ZINB.
-        _disp :
-            data dispersion from ZINB.
-        _pi :
-            data dropout probability from ZINB.
+        z0
+            Embedding.
+        _mean
+            Data mean from ZINB.
+        _disp
+            Data dispersion from ZINB.
+        _pi
+            Data dropout probability from ZINB.
 
         """
         h = self.encoder(x + torch.randn_like(x) * self.sigma)
@@ -234,21 +226,21 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        x :
-            input features.
+        x
+            Input features.
 
         Returns
         -------
-        z0 :
-            embedding.
-        q :
-            soft label.
-        _mean :
-            data mean from ZINB.
-        _disp :
-            data dispersion from ZINB.
-        _pi :
-            data dropout probability from ZINB.
+        z0
+            Embedding.
+        q
+            Soft label.
+        _mean
+            Data mean from ZINB.
+        _disp
+            Data dispersion from ZINB.
+        _pi
+            Data dropout probability from ZINB.
 
         """
         h = self.encoder(x + torch.randn_like(x) * self.sigma)
@@ -268,15 +260,15 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        x :
-            input features.
-        batch_size : int optional
-            size of batch.
+        x
+            Input features.
+        batch_size
+            Size of batch.
 
         Returns
         -------
-        encoded :
-            embedding.
+        encoded
+            Embedding.
 
         """
         self.eval()
@@ -297,15 +289,15 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        p :
-            target distribution.
-        q :
-            soft label.
+        p
+            Target distribution.
+        q
+            Soft label.
 
         Returns
         -------
-        loss :
-            cluster loss.
+        loss
+            Cluster loss.
 
         """
 
@@ -320,22 +312,18 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        x :
-            input features.
-        x_raw :
-            raw input features.
-        n_counts : list
-            total counts for each cell.
-        batch_size : int optional
-            size of batch.
-        lr : float optional
-            learning rate.
-        epochs : int optional
-            number of epochs.
-
-        Returns
-        -------
-        None.
+        x
+            Input features.
+        x_raw
+            Raw input features.
+        n_counts
+            Total counts for each cell.
+        batch_size
+            Size of batch.
+        lr
+            Learning rate.
+        epochs
+            Number of epochs.
 
         """
         self.train()
@@ -363,16 +351,12 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        state :
-            model state
-        index : int
-            checkpoint index
-        filename : str
-            filename to save
-
-        Returns
-        -------
-        None.
+        state
+            Model state
+        index
+            Checkpoint index
+        filename
+            Filename to save
 
         """
         newfilename = os.path.join(filename, 'FTcheckpoint_%d.pth.tar' % index)
@@ -380,20 +364,20 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
     def fit(
         self,
-        inputs,
-        y,
-        n_clusters=10,
-        init_centroid=None,
-        y_pred_init=None,
-        lr=1.,
-        batch_size=256,
-        num_epochs=10,
-        update_interval=1,
-        tol=1e-3,
-        save_dir="",
-        pt_batch_size=256,
-        pt_lr=0.001,
-        pt_epochs=400,
+        inputs: Tuple[np.ndarray, np.ndarray, np.ndarray],
+        y: np.ndarray,
+        n_clusters: int = 10,
+        init_centroid: Optional[List[int]] = None,
+        y_pred_init: Optional[List[int]] = None,
+        lr: float = 1,
+        batch_size: int = 256,
+        num_epochs: int = 10,
+        update_interval: int = 1,
+        tol: float = 1e-3,
+        save_dir: str = "",
+        pt_batch_size: int = 256,
+        pt_lr: float = 0.001,
+        pt_epochs: int = 400,
     ):
         """Train model.
 
@@ -401,36 +385,32 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         ----------
         inputs
             A tuple containing (1) the input features, (2) the raw input features, and (3) the total counts per cell.
-        y : list optional
-            true label. Used for model selection.
-        n_clusters : int
-            number of clusters.
-        init_centroid : list optional
-            initialization of centroids. If None, perform kmeans to initialize cluster centers.
-        y_pred_init : list optional
-            predicted label for initialization.
-        lr : float optional
-            learning rate.
-        batch_size : int optional
-            size of batch.
-        num_epochs : int optional
-            number of epochs.
-        update_interval : int optional
-            update interval of soft label and target distribution.
-        tol : float optional
-            tolerance for training loss.
-        save_dir : str optional
-            path to save model weights.
+        y
+            True label. Used for model selection.
+        n_clusters
+            Number of clusters.
+        init_centroid
+            Initialization of centroids. If None, perform kmeans to initialize cluster centers.
+        y_pred_init
+            Predicted label for initialization.
+        lr
+            Learning rate.
+        batch_size
+            Size of batch.
+        num_epochs
+            Number of epochs.
+        update_interval
+            Update interval of soft label and target distribution.
+        tol
+            Tolerance for training loss.
+        save_dir
+            Path to save model weights.
         pt_batch_size
             Pretraining batch size.
         pt_lr
             Pretraining learning rate.
         pt_epochs
             pretraining epochs.
-
-        Returns
-        -------
-        None.
 
         """
         x, x_raw, n_counts = inputs
