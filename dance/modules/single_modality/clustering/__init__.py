@@ -1,13 +1,14 @@
-from .graphsc import GraphSC
-from .scdcc import ScDCC
-from .scdeepcluster import ScDeepCluster
-from .scdsc import ScDSCModel
-from .sctag import ScTAG
+from dance.modules.single_modality.clustering.graphsc import GraphSC
+from dance.modules.single_modality.clustering.scdcc import ScDCC
+from dance.modules.single_modality.clustering.scdeepcluster import ScDeepCluster
+from dance.modules.single_modality.clustering.scdsc import ScDSC
+from dance.modules.single_modality.clustering.sctag import ScTAG
 
 __all__ = [
     "GraphSC",
-    "ScDCC",
-    "ScDeepCluster",
     "SCDSC",
+    "ScDCC",
+    "ScDSC",
+    "ScDeepCluster",
     "ScTAG",
 ]
