@@ -31,7 +31,7 @@ if __name__ == "__main__":
     parser.add_argument("--alpha", default=1.0, type=float)
     parser.add_argument("--pretrain_epochs", default=200, type=int)
     parser.add_argument("--epochs", default=500, type=int)
-    parser.add_argument("--device", default="cuda")
+    parser.add_argument("--device", default="auto")
     parser.add_argument("--w_a", default=1, type=float)
     parser.add_argument("--w_x", default=1, type=float)
     parser.add_argument("--w_d", default=0, type=float)

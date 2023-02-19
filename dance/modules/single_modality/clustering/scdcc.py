@@ -8,9 +8,7 @@ Tian, Tian, et al. "Model-based deep embedding for constrained clustering analys
 Nature communications 12.1 (2021): 1-12.
 
 """
-
 import math
-import os
 
 import numpy as np
 import scanpy as sc
@@ -18,34 +16,34 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from sklearn import metrics
 from sklearn.cluster import KMeans
-from torch.autograd import Variable
 from torch.nn import Parameter
 from torch.utils.data import DataLoader, TensorDataset
 
+from dance import logger
+from dance.modules.base import BaseClusteringMethod, TorchNNPretrain
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
-from dance.typing import LogLevel
+from dance.typing import Any, List, LogLevel, Optional, Tuple
+from dance.utils import get_device
 from dance.utils.loss import ZINBLoss
-from dance.utils.metrics import cluster_acc
 
 
-def buildNetwork(layers, type, activation="relu"):
+def buildNetwork(layers: List[int], network_type: str, activation: str = "relu"):
     """Build network layer.
 
     Parameters
     ----------
-    layers : list
-        dimensions of layers.
-    type : str
-        type of network.
-    activation : str optional
-        activation function.
+    layers
+        Dimensions of layers.
+    network_type
+        Type of network.
+    activation
+        Activation function.
+
 
     Returns
     -------
-    net :
-        torch.nn network.
+    Built network.
 
     """
     net = []
@@ -59,38 +57,54 @@ def buildNetwork(layers, type, activation="relu"):
     return net
 
 
-class ScDCC(nn.Module):
+class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
     """scDCC class.
 
     Parameters
     ----------
-    input_dim : int
-        dimension of encoder input.
-    z_dim : int
-        dimension of embedding.
-    n_clusters : int
-        number of clusters.
-    encodeLayer : list optional
-        dimensions of encoder layers.
-    decodeLayer : list optional
-        dimensions of decoder layers.
-    activation : str optional
-        activation function.
-    sigma : float optional
-        parameter of Gaussian noise.
-    alpha : float optional
-        parameter of soft assign.
-    gamma : float optional
-        parameter of cluster loss.
-    ml_weight : float optional
-        parameter of must-link loss.
-    cl_weight : float optional
-        parameter of cannot-link loss.
+    input_dim
+        Dimension of encoder input.
+    z_dim
+        Dimension of embedding.
+    n_clusters
+        Number of clusters.
+    encodeLayer
+        Dimensions of encoder layers.
+    decodeLayer
+        Dimensions of decoder layers.
+    activation
+        Activation function.
+    sigma
+        Parameter of Gaussian noise.
+    alpha
+        Parameter of soft assign.
+    gamma
+        Parameter of cluster loss.
+    ml_weight
+        Parameter of must-link loss.
+    cl_weight
+        Parameter of cannot-link loss.
+    device
+        Computation device.
 
     """
 
-    def __init__(self, input_dim, z_dim, n_clusters, encodeLayer=[], decodeLayer=[], activation="relu", sigma=1.,
-                 alpha=1., gamma=1., ml_weight=1., cl_weight=1.):
+    def __init__(
+        self,
+        input_dim: int,
+        z_dim: int,
+        n_clusters: int,
+        encodeLayer: List[int] = [],
+        decodeLayer: List[int] = [],
+        activation: str = "relu",
+        sigma: float = 1.,
+        alpha: float = 1.,
+        gamma: float = 1.,
+        ml_weight: float = 1.,
+        cl_weight: float = 1.,
+        device: str = "auto",
+        pretrain_path: Optional[str] = None,
+    ):
         super().__init__()
         self.z_dim = z_dim
         self.n_clusters = n_clusters
@@ -100,14 +114,19 @@ class ScDCC(nn.Module):
         self.gamma = gamma
         self.ml_weight = ml_weight
         self.cl_weight = cl_weight
-        self.encoder = buildNetwork([input_dim] + encodeLayer, type="encode", activation=activation)
-        self.decoder = buildNetwork([z_dim] + decodeLayer, type="decode", activation=activation)
+        self.device = get_device(device)
+        self.pretrain_path = pretrain_path
+
+        self.encoder = buildNetwork([input_dim] + encodeLayer, network_type="encode", activation=activation)
+        self.decoder = buildNetwork([z_dim] + decodeLayer, network_type="decode", activation=activation)
         self._enc_mu = nn.Linear(encodeLayer[-1], z_dim)
         self._dec_mean = nn.Sequential(nn.Linear(decodeLayer[-1], input_dim), MeanAct())
         self._dec_disp = nn.Sequential(nn.Linear(decodeLayer[-1], input_dim), DispAct())
         self._dec_pi = nn.Sequential(nn.Linear(decodeLayer[-1], input_dim), nn.Sigmoid())
         self.mu = Parameter(torch.Tensor(n_clusters, z_dim))
-        self.zinb_loss = ZINBLoss().cpu()
+        self.zinb_loss = ZINBLoss().to(self.device)
+
+        self.to(self.device)
 
     @staticmethod
     def preprocessing_pipeline(log_level: LogLevel = "INFO"):
@@ -126,52 +145,18 @@ class ScDCC(nn.Module):
             log_level=log_level,
         )
 
-    def save_model(self, path):
-        """Save model to path.
-
-        Parameters
-        ----------
-        path : str
-            path to save model.
-
-        Returns
-        -------
-        None.
-
-        """
-        torch.save(self.state_dict(), path)
-
-    def load_model(self, path):
-        """Load model from path.
-
-        Parameters
-        ----------
-        path : str
-            path to load model.
-
-        Returns
-        -------
-        None.
-
-        """
-        pretrained_dict = torch.load(path, map_location=lambda storage, loc: storage)
-        model_dict = self.state_dict()
-        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-        model_dict.update(pretrained_dict)
-        self.load_state_dict(model_dict)
-
     def soft_assign(self, z):
         """Soft assign q with z.
 
         Parameters
         ----------
-        z :
-            embedding.
+        z
+            Embedding.
 
         Returns
         -------
-        q :
-            soft label.
+        q
+            Soft label.
 
         """
         q = 1.0 / (1.0 + torch.sum((z.unsqueeze(1) - self.mu)**2, dim=2) / self.alpha)
@@ -184,13 +169,13 @@ class ScDCC(nn.Module):
 
         Parameters
         ----------
-        q :
-            soft label.
+        q
+            Soft label.
 
         Returns
         -------
-        p :
-            target distribution.
+        p
+            Target distribution.
 
         """
         p = q**2 / q.sum(0)
@@ -201,21 +186,21 @@ class ScDCC(nn.Module):
 
         Parameters
         ----------
-        x :
-            input features.
+        x
+            Input features.
 
         Returns
         -------
-        z0 :
-            embedding.
-        q :
-            soft label.
-        _mean :
-            data mean from ZINB.
-        _disp :
-            data dispersion from ZINB.
-        _pi :
-            data dropout probability from ZINB.
+        z0
+            Embedding.
+        q
+            Soft label.
+        _mean
+            Data mean from ZINB.
+        _disp
+            Data dispersion from ZINB.
+        _pi
+            Data dropout probability from ZINB.
 
         """
         h = self.encoder(x + torch.randn_like(x) * self.sigma)
@@ -235,30 +220,22 @@ class ScDCC(nn.Module):
 
         Parameters
         ----------
-        X :
-            input features.
-        batch_size : int optional
-            size of batch.
+        X
+            Input features.
+        batch_size
+            Size of batch.
 
         Returns
         -------
-        encoded :
-            embedding.
+        Embedding.
 
         """
-        use_cuda = torch.cuda.is_available()
-        if use_cuda:
-            device = 'cuda'
-        else:
-            device = 'cpu'
-        self.to(device)
-
         encoded = []
         num = X.shape[0]
         num_batch = int(math.ceil(1.0 * X.shape[0] / batch_size))
         for batch_idx in range(num_batch):
             xbatch = X[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
-            inputs = Variable(xbatch)
+            inputs = xbatch
             z, _, _, _, _ = self.forward(inputs)
             encoded.append(z.data)
 
@@ -270,15 +247,14 @@ class ScDCC(nn.Module):
 
         Parameters
         ----------
-        p :
-            target distribution.
-        q :
-            soft label.
+        p
+            Target distribution.
+        q
+            Soft label.
 
         Returns
         -------
-        loss :
-            cluster loss.
+        Cluster loss.
 
         """
 
@@ -294,17 +270,16 @@ class ScDCC(nn.Module):
 
         Parameters
         ----------
-        p1 :
-            distribution 1.
-        p2 :
-            distribution 2.
-        cons_type : str
-            type of loss.
+        p1
+            Distribution 1.
+        p2
+            Distribution 2.
+        cons_type
+            Type of loss.
 
         Returns
         -------
-        loss :
-            pairwise loss.
+        Pairwise loss.
 
         """
         if cons_type == "ML":
@@ -316,137 +291,105 @@ class ScDCC(nn.Module):
             loss = self.cl_weight * cl_loss
             return loss
 
-    def pretrain_autoencoder(self, x, X_raw, n_counts, batch_size=256, lr=0.001, epochs=400, ae_save=True,
-                             ae_weights='AE_weights.pth.tar'):
+    def pretrain(self, x, X_raw, n_counts, batch_size=256, lr=0.001, epochs=400):
         """Pretrain autoencoder.
 
         Parameters
         ----------
-        x :
-            input features.
-        X_raw :
-            raw input features.
-        n_counts : list
-            total counts for each cell.
-        batch_size : int optional
-            size of batch.
-        lr : float optional
-            learning rate.
-        epochs : int optional
-            number of epochs.
-        ae_save : bool optional
-            save autoencoder weights or not.
-        ae_weights : str optional
-            path to save autoencoder weights.
-
-        Returns
-        -------
-        None.
+        x
+            Input features.
+        X_raw
+            Raw input features.
+        n_counts
+            Total counts for each cell.
+        batch_size
+            Size of batch.
+        lr
+            Learning rate.
+        epochs
+            Number of epochs.
 
         """
-        use_cuda = torch.cuda.is_available()
-        if use_cuda:
-            device = 'cuda'
-        else:
-            device = 'cpu'
-        self.to(device)
         size_factor = torch.tensor(n_counts / np.median(n_counts))
         dataset = TensorDataset(torch.Tensor(x), torch.Tensor(X_raw), torch.Tensor(size_factor))
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-        print("Pretraining stage")
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, amsgrad=True)
         for epoch in range(epochs):
             for batch_idx, (x_batch, x_raw_batch, sf_batch) in enumerate(dataloader):
-                x_tensor = Variable(x_batch).to(device)
-                x_raw_tensor = Variable(x_raw_batch).to(device)
-                sf_tensor = Variable(sf_batch).to(device)
+                x_tensor = x_batch.to(self.device)
+                x_raw_tensor = x_raw_batch.to(self.device)
+                sf_tensor = sf_batch.to(self.device)
                 _, _, mean_tensor, disp_tensor, pi_tensor = self.forward(x_tensor)
                 loss = self.zinb_loss(x=x_raw_tensor, mean=mean_tensor, disp=disp_tensor, pi=pi_tensor,
                                       scale_factor=sf_tensor)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                print('Pretrain epoch [{}/{}], ZINB loss:{:.4f}'.format(batch_idx + 1, epoch + 1, loss.item()))
+                logger.info("Pretrain epoch [%2d/%3d], ZINB loss: %.4f", batch_idx + 1, epoch + 1, loss.item())
 
-        if ae_save:
-            torch.save({'ae_state_dict': self.state_dict(), 'optimizer_state_dict': optimizer.state_dict()}, ae_weights)
-
-    def save_checkpoint(self, state, index, filename):
-        """Save training checkpoint.
-
-        Parameters
-        ----------
-        state :
-            model state
-        index : int
-            checkpoint index
-        filename : str
-            filename to save
-
-        Returns
-        -------
-        None.
-
-        """
-        newfilename = os.path.join(filename, 'FTcheckpoint_%d.pth.tar' % index)
-        torch.save(state, newfilename)
-
-    def fit(self, X, X_raw, n_counts, ml_ind1=np.array([]), ml_ind2=np.array([]), cl_ind1=np.array([]),
-            cl_ind2=np.array([]), ml_p=1., cl_p=1., y=None, lr=1., batch_size=256, num_epochs=10, update_interval=1,
-            tol=1e-3, save_dir=""):
+    def fit(
+        self,
+        inputs: Tuple[np.ndarray, np.ndarray, np.ndarray],
+        y: np.ndarray = None,
+        ml_ind1: np.ndarray = np.array([]),
+        ml_ind2: np.ndarray = np.array([]),
+        cl_ind1: np.ndarray = np.array([]),
+        cl_ind2: np.ndarray = np.array([]),
+        ml_p: float = 1.,
+        cl_p: float = 1.,
+        lr: float = 1.,
+        batch_size: int = 256,
+        num_epochs: int = 10,
+        update_interval: int = 1,
+        tol: float = 1e-3,
+        pt_batch_size: int = 256,
+        pt_lr: float = 0.001,
+        pt_epochs: int = 400,
+    ):
         """Train model.
 
         Parameters
         ----------
-        X :
-            input features.
-        X_raw :
-            raw input features.
-        n_counts : float
-            total counts for each cell.
-        ml_ind1 : np.array optional
-            index 1 of must-link pairs.
-        ml_ind2 : np.array optional
-            index 2 of must-link pairs.
-        cl_ind1 : np.array optional
-            index 1 of cannot-link pairs.
-        cl_ind2 : np.array optional
-            index 2 of cannot-link pairs.
-        ml_p : float optional
-            parameter of must-link loss.
-        cl_p : float optional
-            parameter of cannot-link loss.
-        y : list optional
-            true label. Used for model selection.
-        lr : float optional
-            learning rate.
-        batch_size : int optional
-            size of batch.
-        num_epochs : int optional
-            number of epochs.
-        update_interval : int optional
-            update interval of soft label and target distribution.
-        tol : float optional
-            tolerance for training loss.
-        save_dir : str optional
-            path to save model weights.
-
-        Returns
-        -------
-        None.
+        inputs
+            A tuple containing (1) the input features, (2) the raw input features, and (3) the total counts per cell.
+        y
+            True label. Used for model selection.
+        ml_ind1
+            Index 1 of must-link pairs.
+        ml_ind2
+            Index 2 of must-link pairs.
+        cl_ind1
+            Index 1 of cannot-link pairs.
+        cl_ind2
+            Index 2 of cannot-link pairs.
+        ml_p
+            Parameter of must-link loss.
+        cl_p
+            Parameter of cannot-link loss.
+        lr
+            Learning rate.
+        batch_size
+            Size of batch.
+        num_epochs
+            Number of epochs.
+        update_interval
+            Update interval of soft label and target distribution.
+        tol
+            Tolerance for training loss.
+        pt_batch_size
+            Pretrain batch size.
+        pt_lr
+            Pretrain learning rate.
+        pt_epochs
+            Pretrain epochs.
 
         """
+        X, X_raw, n_counts = inputs
+        self._pretrain(X, X_raw, n_counts, batch_size=pt_batch_size, lr=pt_lr, epochs=pt_epochs)
 
-        print("Training stage")
-        use_cuda = torch.cuda.is_available()
-        if use_cuda:
-            device = 'cuda'
-        else:
-            device = 'cpu'
-        self.to(device)
-        X = torch.tensor(X).to(device)
-        X_raw = torch.tensor(X_raw).to(device)
-        sf = torch.tensor(n_counts / np.median(n_counts)).to(device)
+        X = torch.tensor(X).to(self.device)
+        X_raw = torch.tensor(X_raw).to(self.device)
+        sf = torch.tensor(n_counts / np.median(n_counts)).to(self.device)
         optimizer = optim.Adadelta(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, rho=.95)
 
         # Initializing cluster centers with kmeans
@@ -471,6 +414,7 @@ class ScDCC(nn.Module):
         P = {}
         Q = {}
 
+        delta_label = np.inf
         for epoch in range(num_epochs):
             if epoch % update_interval == 0:
                 # update the targe distribution p
@@ -480,19 +424,8 @@ class ScDCC(nn.Module):
                 p = self.target_distribution(q).data
                 self.y_pred = self.predict()
 
-                # save current model
-                if (epoch > 0 and delta_label < tol) or epoch % 10 == 0:
-                    self.save_checkpoint(
-                        {
-                            'epoch': epoch + 1,
-                            'state_dict': self.state_dict(),
-                            'mu': self.mu,
-                            'p': p,
-                            'q': q,
-                            'y': y
-                        }, epoch + 1, filename=save_dir)
-                p_ = {f'epoch{epoch}': p}
-                q_ = {f'epoch{epoch}': q}
+                p_ = {f"epoch{epoch}": p}
+                q_ = {f"epoch{epoch}": q}
                 P = {**P, **p_}
                 Q = {**Q, **q_}
 
@@ -500,12 +433,11 @@ class ScDCC(nn.Module):
                 delta_label = np.sum(self.y_pred != self.y_pred_last).astype(np.float32) / num
                 self.y_pred_last = self.y_pred
                 if epoch > 0 and delta_label < tol:
-                    print('delta_label ', delta_label, '< tol ', tol)
-                    print("Reach tolerance threshold. Stopping training.")
+                    logger.info("Reach tolerance threshold (%.3e < %.3e). Stopping training.", delta_label, tol)
                     break
 
                 # calculate ari score for model selection
-                _, _, ari = self.score(y)
+                ari = self.score(None, y)
                 aris.append(ari)
 
             # train 1 epoch for clustering loss
@@ -518,10 +450,10 @@ class ScDCC(nn.Module):
                 sfbatch = sf[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
                 pbatch = p[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
                 optimizer.zero_grad()
-                inputs = Variable(xbatch)
-                rawinputs = Variable(xrawbatch)
-                sfinputs = Variable(sfbatch)
-                target = Variable(pbatch)
+                inputs = xbatch
+                rawinputs = xrawbatch
+                sfinputs = sfbatch
+                target = pbatch
 
                 z, qbatch, meanbatch, dispbatch, pibatch = self.forward(inputs)
 
@@ -534,8 +466,8 @@ class ScDCC(nn.Module):
                 recon_loss_val += recon_loss.data * len(inputs)
                 train_loss = cluster_loss_val + recon_loss_val
 
-            print("#Epoch %3d: Total: %.4f, Clustering Loss: %.4f, ZINB Loss: %.4f" %
-                  (epoch + 1, train_loss / num, cluster_loss_val / num, recon_loss_val / num))
+            logger.info("#Epoch %3d: Total: %.4f, Clustering Loss: %.4f, ZINB Loss: %.4f", epoch + 1, train_loss / num,
+                        cluster_loss_val / num, recon_loss_val / num)
 
             ml_loss = 0.0
             if epoch % update_ml == 0:
@@ -547,12 +479,12 @@ class ScDCC(nn.Module):
                     sf2 = sf[ml_ind2[ml_batch_idx * batch_size:min(ml_num, (ml_batch_idx + 1) * batch_size)]]
                     pxraw2 = X_raw[ml_ind2[ml_batch_idx * batch_size:min(ml_num, (ml_batch_idx + 1) * batch_size)]]
                     optimizer.zero_grad()
-                    inputs1 = Variable(px1)
-                    rawinputs1 = Variable(pxraw1)
-                    sfinput1 = Variable(sf1)
-                    inputs2 = Variable(px2)
-                    rawinputs2 = Variable(pxraw2)
-                    sfinput2 = Variable(sf2)
+                    inputs1 = px1
+                    rawinputs1 = pxraw1
+                    sfinput1 = sf1
+                    inputs2 = px2
+                    rawinputs2 = pxraw2
+                    sfinput2 = sf2
                     z1, q1, mean1, disp1, pi1 = self.forward(inputs1)
                     z2, q2, mean2, disp2, pi2 = self.forward(inputs2)
                     loss = (ml_p * self.pairwise_loss(q1, q2, "ML") +
@@ -569,8 +501,8 @@ class ScDCC(nn.Module):
                     px1 = X[cl_ind1[cl_batch_idx * batch_size:min(cl_num, (cl_batch_idx + 1) * batch_size)]]
                     px2 = X[cl_ind2[cl_batch_idx * batch_size:min(cl_num, (cl_batch_idx + 1) * batch_size)]]
                     optimizer.zero_grad()
-                    inputs1 = Variable(px1)
-                    inputs2 = Variable(px2)
+                    inputs1 = px1
+                    inputs2 = px2
                     z1, q1, _, _, _ = self.forward(inputs1)
                     z2, q2, _, _, _ = self.forward(inputs2)
                     loss = cl_p * self.pairwise_loss(q1, q2, "CL")
@@ -579,51 +511,45 @@ class ScDCC(nn.Module):
                     optimizer.step()
 
             if ml_num_batch > 0 and cl_num_batch > 0:
-                print("Pairwise Total: %.4f, ML loss: %.4f, CL loss: %.4f" %
-                      (float(ml_loss.cpu()) + float(cl_loss.cpu()), ml_loss.cpu(), cl_loss.cpu()))
+                logger.info("Pairwise Total: %.4f, ML loss: %.4f, CL loss: %.4f",
+                            float(ml_loss.cpu()) + float(cl_loss.cpu()), ml_loss.cpu(), cl_loss.cpu())
 
         index = update_interval * np.argmax(aris)
-        self.q = Q[f'epoch{index}']
+        self.q = Q[f"epoch{index}"]
 
-    def predict(self):
+    def predict_proba(self, x: Optional[Any] = None) -> np.ndarray:
+        """Get the predicted propabilities for each cell.
+
+        Parameters
+        ----------
+        x
+            Not used, for compatibility with the BaseClusteringMethod class.
+
+        Returns
+        -------
+        pred_prop
+            Predicted probability for each cell.
+
+        """
+        pred_prob = self.q.detach().clone().cpu().numpy()
+        return pred_prob
+
+    def predict(self, x: Optional[Any] = None) -> np.ndarray:
         """Get predictions from the trained model.
 
         Parameters
         ----------
-        None.
+        x
+            Not used, for compatibility with the BaseClusteringMethod class.
 
         Returns
         -------
-        y_pred : np.array
-            prediction of given clustering method.
+        pred
+            Predicted clustering assignment for each cell.
 
         """
-        y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
-        return y_pred
-
-    def score(self, y):
-        """Evaluate the trained model.
-
-        Parameters
-        ----------
-        y : list
-            true labels.
-
-        Returns
-        -------
-        acc : float
-            accuracy.
-        nmi : float
-            normalized mutual information.
-        ari : float
-            adjusted Rand index.
-
-        """
-        y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
-        acc = np.round(cluster_acc(y, y_pred), 5)
-        nmi = np.round(metrics.normalized_mutual_info_score(y, y_pred), 5)
-        ari = np.round(metrics.adjusted_rand_score(y, y_pred), 5)
-        return acc, nmi, ari
+        pred = self.predict_proba().argmax(1)
+        return pred
 
 
 class MeanAct(nn.Module):

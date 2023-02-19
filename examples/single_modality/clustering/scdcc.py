@@ -1,9 +1,7 @@
 import argparse
 import os
-from time import time
 
 import numpy as np
-import torch
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
@@ -13,8 +11,6 @@ from dance.utils import set_seed
 
 # for repeatability
 set_seed(42)
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="train", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -29,6 +25,7 @@ if __name__ == "__main__":
     parser.add_argument("--maxiter", default=500, type=int)
     parser.add_argument("--pretrain_epochs", default=50, type=int)
     parser.add_argument("--lr", default=0.01, type=float)
+    parser.add_argument("--pretrain_lr", default=0.001, type=float)
     parser.add_argument("--sigma", default=2.5, type=float, help="coefficient of Gaussian noise")
     parser.add_argument("--gamma", default=1., type=float, help="coefficient of clustering loss")
     parser.add_argument("--ml_weight", default=1., type=float, help="coefficient of must-link loss")
@@ -36,8 +33,8 @@ if __name__ == "__main__":
     parser.add_argument("--update_interval", default=1, type=int)
     parser.add_argument("--tol", default=0.00001, type=float)
     parser.add_argument("--ae_weights", default=None)
-    parser.add_argument("--save_dir", default="results/scdcc/")
     parser.add_argument("--ae_weight_file", default="AE_weights.pth.tar")
+    parser.add_argument("--device", default="auto")
     args = parser.parse_args()
     args.ae_weight_file = f"scdcc_{args.data_file}_{args.ae_weight_file}"
 
@@ -48,8 +45,10 @@ if __name__ == "__main__":
     preprocessing_pipeline = ScDCC.preprocessing_pipeline()
     preprocessing_pipeline(data)
 
-    (x, x_raw, n_counts), y = data.get_train_data()
+    # inputs: x, x_raw, n_counts
+    inputs, y = data.get_train_data()
     n_clusters = len(np.unique(y))
+    in_dim = inputs[0].shape[1]
 
     # Generate random pairs
     if not os.path.exists(args.label_cells_files):
@@ -68,40 +67,17 @@ if __name__ == "__main__":
     else:
         ml_ind1, ml_ind2, cl_ind1, cl_ind2 = np.array([]), np.array([]), np.array([]), np.array([])
 
-    # Construct moodel
-    sigma = 2.75
-    model = ScDCC(input_dim=x.shape[1], z_dim=32, n_clusters=n_clusters, encodeLayer=[256, 64], decodeLayer=[64, 256],
-                  sigma=args.sigma, gamma=args.gamma, ml_weight=args.ml_weight, cl_weight=args.ml_weight).to(device)
+    # Build and train moodel
+    model = ScDCC(input_dim=in_dim, z_dim=32, n_clusters=n_clusters, encodeLayer=[256, 64], decodeLayer=[64, 256],
+                  sigma=args.sigma, gamma=args.gamma, ml_weight=args.ml_weight, cl_weight=args.ml_weight,
+                  device=args.device, pretrain_path=args.ae_weights)
+    model.fit(inputs, y, lr=args.lr, batch_size=args.batch_size, num_epochs=args.maxiter, ml_ind1=ml_ind1,
+              ml_ind2=ml_ind2, cl_ind1=cl_ind1, cl_ind2=cl_ind2, update_interval=args.update_interval, tol=args.tol,
+              pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
 
-    # Pretrain model
-    t0 = time()
-    if args.ae_weights is None:
-        model.pretrain_autoencoder(x=x, X_raw=x_raw, n_counts=n_counts, batch_size=args.batch_size,
-                                   epochs=args.pretrain_epochs, ae_weights=args.ae_weight_file)
-    else:
-        if os.path.isfile(args.ae_weights):
-            print(f"==> loading checkpoint {args.ae_weights}")
-            checkpoint = torch.load(args.ae_weights)
-            model.load_state_dict(checkpoint["ae_state_dict"])
-        else:
-            print(f"==> no checkpoint found at {args.ae_weights}")
-            raise ValueError
-    print(f"Pretraining time: {int(time() - t0)} seconds.")
-
-    # Train model
-    if not os.path.exists(args.save_dir):
-        os.makedirs(args.save_dir)
-    model.fit(X=x, X_raw=x_raw, n_counts=n_counts, y=y, lr=args.lr, batch_size=args.batch_size, num_epochs=args.maxiter,
-              ml_ind1=ml_ind1, ml_ind2=ml_ind2, cl_ind1=cl_ind1, cl_ind2=cl_ind2, update_interval=args.update_interval,
-              tol=args.tol, save_dir=args.save_dir)
-    print(f"Total time: {int(time() - t0)} seconds.")
-
-    y_pred = model.predict()
-    print(f"Prediction (first ten): {y_pred[:10]}")
-    acc, nmi, ari = model.score(y)
-    print("ACC: {:.4f}, NMI: {:.4f}, ARI: {:.4f}".format(acc, nmi, ari))
-    if not os.path.exists(args.label_cells_files):
-        np.savetxt(args.label_cells_files, label_cell_indx, fmt="%i")
+    # Evaluate model predictions
+    score = model.score(None, y)
+    print(f"{score=:.4f}")
 """ Reproduction information
 10X PBMC:
 python scdcc.py --data_file 10X_PBMC --label_cells_files label_10X_PBMC.txt --gamma=1.5

@@ -10,7 +10,6 @@ Intelligence 1.4 (2019): 191-198.
 """
 
 import math
-import os
 
 import numpy as np
 import scanpy as sc
@@ -22,6 +21,7 @@ from sklearn.cluster import KMeans
 from torch.nn import Parameter
 from torch.utils.data import DataLoader, TensorDataset
 
+from dance import logger
 from dance.modules.base import BaseClusteringMethod, TorchNNPretrain
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
 from dance.typing import Any, List, LogLevel, Optional, Tuple
@@ -42,8 +42,7 @@ def buildNetwork(layers: List[int], network_type: str, activation: str = "relu")
 
     Returns
     -------
-    net
-        Built network.
+    Built network.
 
     """
     net = []
@@ -344,23 +343,7 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 loss.backward()
                 optimizer.step()
                 loss_val += loss.item() * len(x_batch)
-            print('Pretrain epoch %3d, ZINB loss: %.8f' % (epoch + 1, loss_val / x.shape[0]))
-
-    def save_checkpoint(self, state, index, filename):
-        """Save training checkpoint.
-
-        Parameters
-        ----------
-        state
-            Model state
-        index
-            Checkpoint index
-        filename
-            Filename to save
-
-        """
-        newfilename = os.path.join(filename, 'FTcheckpoint_%d.pth.tar' % index)
-        torch.save(state, newfilename)
+            logger.info("Pretrain epoch %3d, ZINB loss: %.8f", epoch + 1, loss_val / x.shape[0])
 
     def fit(
         self,
@@ -374,7 +357,6 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         num_epochs: int = 10,
         update_interval: int = 1,
         tol: float = 1e-3,
-        save_dir: str = "",
         pt_batch_size: int = 256,
         pt_lr: float = 0.001,
         pt_epochs: int = 400,
@@ -403,8 +385,6 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
             Update interval of soft label and target distribution.
         tol
             Tolerance for training loss.
-        save_dir
-            Path to save model weights.
         pt_batch_size
             Pretraining batch size.
         pt_lr
@@ -423,7 +403,7 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         self.mu = Parameter(torch.Tensor(n_clusters, self.z_dim).to(self.device))
         optimizer = optim.Adadelta(filter(lambda p: p.requires_grad, self.parameters()), lr=lr, rho=.95)
 
-        print("Initializing cluster centers with kmeans.")
+        logger.info("Initializing cluster centers with kmeans.")
         if init_centroid is None:
             kmeans = KMeans(n_clusters, n_init=20)
             data = self.encodeBatch(x)
@@ -452,19 +432,8 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 p = self.target_distribution(q).data
                 self.y_pred = self.predict()
 
-                # save current model
-                if delta_label or epoch % 10 == 0:
-                    self.save_checkpoint(
-                        {
-                            'epoch': epoch + 1,
-                            'state_dict': self.state_dict(),
-                            'mu': self.mu,
-                            'y_pred': self.y_pred,
-                            'y_pred_last': self.y_pred_last,
-                            'y': y
-                        }, epoch + 1, filename=save_dir)
-                p_ = {f'epoch{epoch}': p}
-                q_ = {f'epoch{epoch}': q}
+                p_ = {f"epoch{epoch}": p}
+                q_ = {f"epoch{epoch}": q}
                 P = {**P, **p_}
                 Q = {**Q, **q_}
 
@@ -472,8 +441,7 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 delta_label = np.sum(self.y_pred != self.y_pred_last).astype(np.float32) / num
                 self.y_pred_last = self.y_pred
                 if epoch > 0 and delta_label < tol:
-                    print('delta_label ', delta_label, '< tol ', tol)
-                    print("Reach tolerance threshold. Stopping training.")
+                    logger.info("Reach tolerance threshold (%.3e < %.3e). Stopping training.", delta_label, tol)
                     break
 
                 # calculate ari score for model selection
@@ -507,11 +475,11 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 recon_loss_val += recon_loss.item() * len(inputs)
                 train_loss += loss.item() * len(inputs)
 
-            print("Epoch %3d: Total: %.8f, Clustering Loss: %.8f, ZINB Loss: %.8f" %
-                  (epoch + 1, train_loss / num, cluster_loss_val / num, recon_loss_val / num))
+            logger.info("Epoch %3d: Total: %.8f, Clustering Loss: %.8f, ZINB Loss: %.8f", epoch + 1, train_loss / num,
+                        cluster_loss_val / num, recon_loss_val / num)
 
         index = update_interval * np.argmax(aris)
-        self.q = Q[f'epoch{index}']
+        self.q = Q[f"epoch{index}"]
 
     def predict_proba(self, x: Optional[Any] = None) -> np.ndarray:
         """Get the predicted propabilities for each cell.

@@ -1,12 +1,10 @@
 import numpy as np
-import scanpy as sc
 import torch
 from networkx.algorithms import bipartite
 from scipy import sparse
 from sklearn.cluster import KMeans
 from sklearn.metrics import adjusted_rand_score
 from sklearn.metrics.cluster import normalized_mutual_info_score
-from sklearn.neighbors import NearestNeighbors
 
 from dance import logger
 from dance.registers import METRIC_FUNCS, register_metric_func
@@ -103,46 +101,6 @@ def batch_separated_bipartite_matching(dataset, emb1, emb2):
     return matrix
 
 
-def knn_accuracy(A, B, k, train_idx, test_idx, metric='l1'):
-    nn = NearestNeighbors(k, metric=metric)
-    nn.fit(A)
-    transp_nearest_neighbor = nn.kneighbors(B, 1, return_distance=False)
-    actual_nn = nn.kneighbors(A, k, return_distance=False)
-    train_correct = 0
-    test_correct = 0
-
-    for i in range(len(transp_nearest_neighbor)):
-        if transp_nearest_neighbor[i] not in actual_nn[i]:
-            continue
-        elif i in test_idx:
-            test_correct += 1
-        else:
-            train_correct += 1
-
-    return train_correct / len(train_idx), test_correct / len(test_idx)
-
-
-def cluster_acc(y_true, y_pred):
-    """Calculate clustering accuracy. Require scikit-learn installed.
-
-    # Arguments
-        y: true labels, numpy.array with shape `(n_samples,)`
-        y_pred: predicted labels, numpy.array with shape `(n_samples,)`
-    # Return
-        accuracy, in [0,1]
-
-    """
-    y_true = y_true.astype(np.int64)
-    assert y_pred.size == y_true.size
-    D = max(y_pred.max(), y_true.max()) + 1
-    w = np.zeros((D, D), dtype=np.int64)
-    for i in range(y_pred.size):
-        w[y_pred[i], y_true[i]] += 1
-    from scipy.optimize import linear_sum_assignment as linear_assignment
-    ind = np.column_stack(linear_assignment(w.max() - w))
-    return sum(w[i, j] for i, j in ind) * 1.0 / y_pred.size
-
-
 def labeled_clustering_evaluate(adata, dataset, cluster=10):
     kmeans = KMeans(n_clusters=cluster, n_init=5, random_state=200)
 
@@ -157,59 +115,3 @@ def labeled_clustering_evaluate(adata, dataset, cluster=10):
 
     print('NMI: ' + str(NMI_score) + ' ARI: ' + str(ARI_score))
     return NMI_score, ARI_score
-
-
-def joint_embedding_competition_score(adata, adata_sol):
-    sc._settings.ScanpyConfig.n_jobs = 4
-    adata.obs['batch'] = adata_sol.obs['batch'][adata.obs_names]
-    adata.obs['cell_type'] = adata_sol.obs['cell_type'][adata.obs_names]
-    print(adata.shape, adata_sol.shape)
-    adata_bc = adata.obs_names
-    adata_sol_bc = adata_sol.obs_names
-    select = [item in adata_bc for item in adata_sol_bc]
-    adata_sol = adata_sol[select, :]
-    print(adata.shape, adata_sol.shape)
-
-    adata.obsm['X_emb'] = adata.X
-    nmi = get_nmi(adata)
-    cell_type_asw = get_cell_type_ASW(adata)
-    cc_con = get_cell_cycle_conservation(adata, adata_sol)
-    traj_con = get_traj_conservation(adata, adata_sol)
-    batch_asw = get_batch_ASW(adata)
-    graph_score = get_graph_connectivity(adata)
-
-    print('nmi %.4f, celltype_asw %.4f, cc_con %.4f, traj_con %.4f, batch_asw %.4f, graph_score %.4f\n' %
-          (nmi, cell_type_asw, cc_con, traj_con, batch_asw, graph_score))
-
-    print('average metric: %.4f' %
-          np.mean([round(i, 4) for i in [nmi, cell_type_asw, cc_con, traj_con, batch_asw, graph_score]]))
-
-    return [round(i, 4) for i in [nmi, cell_type_asw, cc_con, traj_con, batch_asw, graph_score]]
-
-
-# def joint_embedding_competition_score(adata, adata_sol):
-#     sc._settings.ScanpyConfig.n_jobs = 4
-#     adata.obs['batch'] = adata_sol.obs['batch'][adata.obs_names]
-#     adata.obs['cell_type'] = adata_sol.obs['cell_type'][adata.obs_names]
-#     print(adata.shape,adata_sol.shape)
-#     adata_bc = adata.obs_names
-#     adata_sol_bc = adata_sol.obs_names
-#     select = [item in adata_bc for item in adata_sol_bc]
-#     adata_sol = adata_sol[select, :]
-#     print(adata.shape, adata_sol.shape)
-#
-#     adata.obsm['X_emb'] = adata.X
-#     nmi = get_nmi(adata)
-#     cell_type_asw = get_cell_type_ASW(adata)
-#     cc_con = get_cell_cycle_conservation(adata, adata_sol)
-#     traj_con = get_traj_conservation(adata, adata_sol)
-#     batch_asw = get_batch_ASW(adata)
-#     graph_score = get_graph_connectivity(adata)
-#
-#     print('nmi %.4f, celltype_asw %.4f, cc_con %.4f, traj_con %.4f, batch_asw %.4f, graph_score %.4f\n' % (
-#     nmi, cell_type_asw, cc_con, traj_con, batch_asw, graph_score))
-#
-#     print('average metric: %.4f' % np.mean(
-#         [round(i, 4) for i in [nmi, cell_type_asw, cc_con, traj_con, batch_asw, graph_score]]))
-#
-#     return [round(i, 4) for i in [nmi, cell_type_asw, cc_con, traj_con, batch_asw, graph_score]]
