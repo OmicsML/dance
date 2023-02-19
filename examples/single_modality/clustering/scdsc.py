@@ -1,18 +1,14 @@
 import argparse
-import os
-from argparse import Namespace
-from time import time
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
-from dance.modules.single_modality.clustering.scdsc import SCDSCWrapper
+from dance.modules.single_modality.clustering.scdsc import ScDSC
 from dance.utils import set_seed
 
 # for repeatability
 set_seed(42)
 
 if __name__ == "__main__":
-    time_start = time()
     parser = argparse.ArgumentParser()
 
     # model_para = [n_enc_1(n_dec_3), n_enc_2(n_dec_2), n_enc_3(n_dec_1)]
@@ -36,6 +32,7 @@ if __name__ == "__main__":
     parser.add_argument("--n_dec_3", default=model_para[0], type=int)
     parser.add_argument("--topk", type=int, default=50)
     parser.add_argument("--lr", type=float, default=1e-2)
+    parser.add_argument("--pretrain_lr", type=float, default=1e-3)
     parser.add_argument("--pretrain_epochs", type=int, default=200)
     parser.add_argument("--n_epochs", type=int, default=1000)
     parser.add_argument("--n_z1", default=Cluster_para[0], type=int)
@@ -43,7 +40,7 @@ if __name__ == "__main__":
     parser.add_argument("--n_z3", default=Cluster_para[2], type=int)
     parser.add_argument("--n_input", type=int, default=Cluster_para[4])
     parser.add_argument("--n_clusters", type=int, default=Cluster_para[5])
-    parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--v", type=int, default=1)
     parser.add_argument("--nb_genes", type=int, default=2000)
     parser.add_argument("--binary_crossentropy_loss", type=float, default=Balance_para[0])
@@ -53,43 +50,30 @@ if __name__ == "__main__":
     parser.add_argument("--sigma", type=float, default=Balance_para[4])
     args = parser.parse_args()
 
-    # File = [gene_expresion data file, Graph file, h5 file, pretrain_path]
-    File = [
-        os.path.join("data", args.name),
-        None,
-        os.path.join("data", f"{args.name}.h5"),
-        os.path.join("model", f"{args.name}_pre.pkl"),
-    ]
-    args.pretrain_path = File[3]
-    if not os.path.exists("./graph/"):
-        os.makedirs("./graph/")
-    if not os.path.exists("./model/"):
-        os.makedirs("./model/")
-
     adata, labels = ClusteringDataset("./data", args.name).load_data()
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
 
-    preprocessing_pipeline = SCDSCWrapper.preprocessing_pipeline(n_top_genes=args.nb_genes, n_neighbors=args.topk)
+    preprocessing_pipeline = ScDSC.preprocessing_pipeline(n_top_genes=args.nb_genes, n_neighbors=args.topk)
     preprocessing_pipeline(data)
 
-    (x, x_raw, n_counts, adj), y = data.get_data(return_type="default")
-    args.n_input = x.shape[1]
+    # inputs: adj, x, x_raw, n_counts
+    inputs, y = data.get_data(return_type="default")
+    args.n_input = inputs[1].shape[1]
 
-    # Pretrain AE
-    model = SCDSCWrapper(Namespace(**vars(args)))
-    if not os.path.exists(args.pretrain_path):
-        model.pretrain_ae(x, args.batch_size, args.pretrain_epochs, args.pretrain_path)
+    model = ScDSC(pretrain_path=f"{args.name}_scdcs_pre.pkl", sigma=args.sigma, n_enc_1=args.n_enc_1,
+                  n_enc_2=args.n_enc_2, n_enc_3=args.n_enc_3, n_dec_1=args.n_dec_1, n_dec_2=args.n_dec_2,
+                  n_dec_3=args.n_dec_3, n_z1=args.n_z1, n_z2=args.n_z2, n_z3=args.n_z3, n_clusters=args.n_clusters,
+                  n_input=args.n_input, v=args.v, device=args.device)
 
-    # Train scDSC
-    model.fit(x, y, x_raw, n_counts, adj, lr=args.lr, n_epochs=args.n_epochs, bcl=args.binary_crossentropy_loss,
-              cl=args.ce_loss, rl=args.re_loss, zl=args.zinb_loss)
-    print(f"Running Time：{int(time() - time_start)} seconds")
+    # Build and train model
+    model.fit(inputs, y, lr=args.lr, n_epochs=args.n_epochs, bcl=args.binary_crossentropy_loss, cl=args.ce_loss,
+              rl=args.re_loss, zl=args.zinb_loss, pt_epochs=args.pretrain_epochs, pt_batch_size=args.batch_size,
+              pt_lr=args.pretrain_lr)
 
-    y_pred = model.predict()
-    print(f"Prediction (first ten): {y_pred[:10]}")
-    acc, nmi, ari = model.score(y)
-    print("ACC: {:.4f}, NMI: {:.4f}, ARI: {:.4f}".format(acc, nmi, ari))
+    # Evaluate model predictions
+    score = model.score(None, y)
+    print(f"{score=:.4f}")
 """Reproduction information
 10X PBMC:
 python scdsc.py --name 10X_PBMC --method cosine --topk 30 --v 7 --binary_crossentropy_loss 0.75 --ce_loss 0.5 --re_loss 0.1 --zinb_loss 2.5 --sigma 0.4

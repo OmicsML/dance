@@ -8,47 +8,104 @@ Gan, Yanglan, et al. "Deep structural clustering for single-cell RNA-seq data jo
 neural network." Briefings in Bioinformatics 23.2 (2022): bbac018.
 
 """
-
-import math
-
 import numpy as np
+import pandas as pd
 import scanpy as sc
+import scipy.sparse as sp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sklearn import metrics
 from torch.nn import Linear
 from torch.nn.parameter import Parameter
 from torch.optim import Adam
-from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, TensorDataset
 
+from dance import logger
+from dance.modules.base import BaseClusteringMethod, TorchNNPretrain
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
 from dance.transforms.graph import NeighborGraph
 from dance.transforms.preprocess import sparse_mx_to_torch_sparse_tensor
-from dance.typing import LogLevel
+from dance.typing import Any, LogLevel, Optional, Tuple
+from dance.utils import get_device
 from dance.utils.loss import ZINBLoss
-from dance.utils.metrics import cluster_acc
 
 
-class SCDSCWrapper:
+class ScDSC(TorchNNPretrain, BaseClusteringMethod):
     """scDSC wrapper class.
 
     Parameters
     ----------
-    args : argparse.Namespace
-        a Namespace contains arguments of scDSC. For details of parameters in parser args, please refer to link (parser help document).
+    pretrain_path
+        Path of saved autoencoder weights.
+    sigma
+        Balance parameter.
+    n_enc_1
+        Output dimension of encoder layer 1.
+    n_enc_2
+        Output dimension of encoder layer 2.
+    n_enc_3
+        Output dimension of encoder layer 3.
+    n_dec_1
+        Output dimension of decoder layer 1.
+    n_dec_2
+        Output dimension of decoder layer 2.
+    n_dec_3
+        Output dimension of decoder layer 3.
+    n_z1
+        Output dimension of hidden layer 1.
+    n_z2
+        Output dimension of hidden layer 2.
+    n_z3
+        Output dimension of hidden layer 3.
+    n_clusters
+        Number of clusters.
+    n_input
+        Input feature dimension.
+    v
+        Parameter of soft assignment.
+    device
+        Computing device.
 
     """
 
-    def __init__(self, args):
+    def __init__(
+        self,
+        pretrain_path: str,
+        sigma: float = 1,
+        n_enc_1: int = 512,
+        n_enc_2: int = 256,
+        n_enc_3: int = 256,
+        n_dec_1: int = 256,
+        n_dec_2: int = 256,
+        n_dec_3: int = 512,
+        n_z1: int = 256,
+        n_z2: int = 128,
+        n_z3: int = 32,
+        n_clusters: int = 100,
+        n_input: int = 10,
+        v: float = 1,
+        device: str = "auto",
+    ):
         super().__init__()
-        self.args = args
-        self.device = args.device
-        self.model = SCDSC(args).to(self.device)
-        self.model_pre = AE(n_enc_1=args.n_enc_1, n_enc_2=args.n_enc_2, n_enc_3=args.n_enc_3, n_dec_1=args.n_dec_1,
-                            n_dec_2=args.n_dec_2, n_dec_3=args.n_dec_3, n_input=args.n_input, n_z1=args.n_z1,
-                            n_z2=args.n_z2, n_z3=args.n_z3).to(self.device)
+        self.pretrain_path = pretrain_path
+        self.device = get_device(device)
+        self.model = ScDSCModel(
+            sigma=sigma,
+            n_enc_1=n_enc_1,
+            n_enc_2=n_enc_2,
+            n_enc_3=n_enc_3,
+            n_dec_1=n_dec_1,
+            n_dec_2=n_dec_2,
+            n_dec_3=n_dec_3,
+            n_z1=n_z1,
+            n_z2=n_z2,
+            n_z3=n_z3,
+            n_clusters=n_clusters,
+            n_input=n_input,
+            v=v,
+            device=self.device,
+        ).to(self.device)
+        self.fix_module("model.ae")
 
     @staticmethod
     def preprocessing_pipeline(n_top_genes: int = 2000, n_neighbors: int = 50, log_level: LogLevel = "INFO"):
@@ -70,8 +127,8 @@ class SCDSCWrapper:
             # Construct k-neighbors graph using the noramlized feature matrix
             NeighborGraph(n_neighbors=n_neighbors, metric="correlation", channel="X"),
             SetConfig({
-                "feature_channel": [None, None, "n_counts", "NeighborGraph"],
-                "feature_channel_type": ["X", "raw_X", "obs", "obsp"],
+                "feature_channel": ["NeighborGraph", None, None, "n_counts"],
+                "feature_channel_type": ["obsp", "X", "raw_X", "obs"],
                 "label_channel": "Group"
             }),
             log_level=log_level,
@@ -82,106 +139,109 @@ class SCDSCWrapper:
 
         Parameters
         ----------
-        q :
-            soft label.
+        q
+            Soft label.
 
         Returns
         -------
-        p :
-            target distribution.
+        p
+            Target distribution.
 
         """
         p = q**2 / q.sum(0)
         return (p.t() / p.sum(1)).t()
 
-    def pretrain_ae(self, x, batch_size, n_epochs, fname, lr=1e-3):
+    def pretrain(self, x, batch_size=256, n_epochs=200, lr=1e-3):
         """Pretrain autoencoder.
 
         Parameters
         ----------
-        x : np.ndarray
-            input features.
-        batch_size : int
-            size of batch.
-        n_epochs : int
-            number of epochs.
-        lr : float optional
-            learning rate.
-        fname : str
-            path to save autoencoder weights.
-
-        Returns
-        -------
-        None.
+        x
+            Input features.
+        batch_size
+            Size of batch.
+        n_epochs
+            Number of epochs.
+        lr
+            Learning rate.
 
         """
-        print("Pretrain:")
-        device = self.device
-        x_tensor = torch.from_numpy(x)
-        train_loader = DataLoader(TensorDataset(x_tensor), batch_size, shuffle=True)
-        model = self.model_pre
-        optimizer = Adam(model.parameters(), lr=lr)
-        for epoch in range(n_epochs):
+        with self.pretrain_context("model.ae"):
+            x_tensor = torch.from_numpy(x)
+            train_loader = DataLoader(TensorDataset(x_tensor), batch_size, shuffle=True)
+            model = self.model.ae
+            optimizer = Adam(model.parameters(), lr=lr)
+            for epoch in range(n_epochs):
 
-            total_loss = total_size = 0
-            for batch_idx, (x_batch, ) in enumerate(train_loader):
-                x_batch = x_batch.to(device)
-                x_bar, _, _, _, _, _, _, _ = model(x_batch)
+                total_loss = total_size = 0
+                for batch_idx, (x_batch, ) in enumerate(train_loader):
+                    x_batch = x_batch.to(self.device)
+                    x_bar, _, _, _, _, _, _, _ = model(x_batch)
 
-                loss = F.mse_loss(x_bar, x_batch)
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+                    loss = F.mse_loss(x_bar, x_batch)
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
 
-                size = x_batch.shape[0]
-                total_size += size
-                total_loss += loss.item() * size
+                    size = x_batch.shape[0]
+                    total_size += size
+                    total_loss += loss.item() * size
 
-            print(f"Pretrain epoch {epoch + 1:4d}, MSE loss:{total_loss / total_size:.8f}")
+                logger.info(f"Pretrain epoch {epoch + 1:4d}, MSE loss:{total_loss / total_size:.8f}")
 
-        torch.save(model.state_dict(), fname)
+    def save_pretrained(self, path):
+        torch.save(self.model.ae.state_dict(), path)
 
-    def fit(self, x, y, X_raw, n_counts, adj, lr=1e-03, n_epochs=300, bcl=0.1, cl=0.01, rl=1, zl=0.1):
+    def load_pretrained(self, path):
+        checkpoint = torch.load(self.pretrain_path, map_location=self.device)
+        self.model.ae.load_state_dict(checkpoint)
+
+    def fit(
+        self,
+        inputs: Tuple[sp.spmatrix, np.ndarray, np.ndarray, pd.Series],
+        y: np.ndarray,
+        lr: float = 1e-03,
+        n_epochs: int = 300,
+        bcl: float = 0.1,
+        cl: float = 0.01,
+        rl: float = 1,
+        zl: float = 0.1,
+        pt_epochs: int = 200,
+        pt_batch_size: int = 256,
+        pt_lr: float = 1e-3,
+    ):
         """Train model.
 
         Parameters
         ----------
-        x : np.ndarray
-            input features.
-        y : np.ndarray
-            labels.
-        X_raw :
-            raw input features.
-        n_counts : list
-            total counts for each cell.
-        adj :
-            adjacency matrix as a sicpy sparse matrix.
-        lr : float optional
-            learning rate.
-        n_epochs : int optional
-            number of epochs.
-        bcl : float optional
-            parameter of binary crossentropy loss.
-        cl : float optional
-            parameter of Kullback–Leibler divergence loss.
-        rl : float optional
-            parameter of reconstruction loss.
-        zl : float optional
-            parameter of ZINB loss.
-
-        Returns
-        -------
-        None.
+        inputs
+            A tuple containing (1) the adjacency matrix, (2) the input features, (3) the raw input features, and (4)
+            the total counts for each cell.
+        y
+            Label.
+        lr
+            Learning rate.
+        n_epochs
+            Number of epochs.
+        bcl
+            Parameter of binary crossentropy loss.
+        cl
+            Parameter of Kullback–Leibler divergence loss.
+        rl
+            Parameter of reconstruction loss.
+        zl
+            Parameter of ZINB loss.
 
         """
-        print("Train:")
+        adj, x, x_raw, n_counts = inputs
+        self._pretrain(x, batch_size=pt_batch_size, n_epochs=pt_epochs, lr=pt_lr)
+
         device = self.device
         model = self.model
-        optimizer = Adam(model.parameters(), lr=lr)
-        # optimizer = RAdam(model.parameters(), lr=lr)
+        optimizer = Adam(filter(lambda x: x.requires_grad, model.parameters()), lr=lr)
 
         adj = sparse_mx_to_torch_sparse_tensor(adj).to(device)
-        X_raw = torch.tensor(X_raw).to(device)
+        x_raw = torch.tensor(x_raw).to(device)
         sf = torch.tensor(n_counts / np.median(n_counts)).to(device)
         data = torch.from_numpy(x).to(device)
 
@@ -203,10 +263,10 @@ class SCDSCWrapper:
                     p = self.target_distribution(tmp_q)
 
                     # calculate ari score for model selection
-                    _, _, ari = self.score(y)
+                    ari = self.score(None, y)
                     aris.append(ari)
                     keys.append(key := f"epoch{epoch}")
-                    print("Epoch %3d, ARI: %.4f, Best ARI: %.4f" % (epoch + 1, ari, max(aris)))
+                    logger.info("Epoch %3d, ARI: %.4f, Best ARI: %.4f", epoch + 1, ari, max(aris))
 
                     P[key] = p
                     Q[key] = tmp_q
@@ -215,9 +275,9 @@ class SCDSCWrapper:
             x_bar, q, pred, z, meanbatch, dispbatch, pibatch, zinb_loss = model(data, adj)
 
             binary_crossentropy_loss = F.binary_cross_entropy(q, p)
-            ce_loss = F.kl_div(pred.log(), p, reduction='batchmean')
+            ce_loss = F.kl_div(pred.log(), p, reduction="batchmean")
             re_loss = F.mse_loss(x_bar, data)
-            zinb_loss = zinb_loss(X_raw, meanbatch, dispbatch, pibatch, sf)
+            zinb_loss = zinb_loss(x_raw, meanbatch, dispbatch, pibatch, sf)
             loss = bcl * binary_crossentropy_loss + cl * ce_loss + rl * re_loss + zl * zinb_loss
 
             optimizer.zero_grad()
@@ -227,158 +287,166 @@ class SCDSCWrapper:
         index = np.argmax(aris)
         self.q = Q[keys[index]]
 
-    def predict(self):
+    def predict_proba(self, x: Optional[Any] = None) -> np.ndarray:
+        """Get the predicted propabilities for each cell.
+
+        Parameters
+        ----------
+        x
+            Not used, for compatibility with the BaseClusteringMethod class.
+
+        Returns
+        -------
+        pred_prop
+            Predicted probability for each cell.
+
+        """
+        pred_prob = self.q.detach().clone().cpu().numpy()
+        return pred_prob
+
+    def predict(self, x: Optional[Any] = None) -> np.ndarray:
         """Get predictions from the trained model.
 
         Parameters
         ----------
-        None.
+        x
+            Not used, for compatibility with the BaseClusteringMethod class.
 
         Returns
         -------
-        y_pred : np.array
-            prediction of given clustering method.
+        pred
+            Predicted clustering assignment for each cell.
 
         """
-        y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
-        return y_pred
-
-    def score(self, y):
-        """Evaluate the trained model.
-
-        Parameters
-        ----------
-        y : list
-            true labels.
-
-        Returns
-        -------
-        acc : float
-            accuracy.
-        nmi : float
-            normalized mutual information.
-        ari : float
-            adjusted Rand index.
-
-        """
-        y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
-        acc = np.round(cluster_acc(y, y_pred), 5)
-        nmi = np.round(metrics.normalized_mutual_info_score(y, y_pred), 5)
-        ari = np.round(metrics.adjusted_rand_score(y, y_pred), 5)
-        return acc, nmi, ari
+        pred = self.predict_proba().argmax(1)
+        return pred
 
 
-class SCDSC(nn.Module):
+class ScDSCModel(nn.Module):
     """scDSC class.
 
     Parameters
     ----------
-    args : argparse.Namespace
-        a Namespace contains arguments of GCNAE. For details of parameters in parser args, please refer to link (parser help document).
-    device : str
-        computing device.
-    sigma : float
-        balance parameter.
-    pretrain_path : str
-        path of saved autoencoder weights.
-    n_enc_1 : int
-        output dimension of encoder layer 1.
-    n_enc_2 : int
-        output dimension of encoder layer 2.
-    n_enc_3 : int
-        output dimension of encoder layer 3.
-    n_dec_1 : int
-        output dimension of decoder layer 1.
-    n_dec_2 : int
-        output dimension of decoder layer 2.
-    n_dec_3 : int
-        output dimension of decoder layer 3.
-    n_z1 : int
-        output dimension of hidden layer 1.
-    n_z2 : int
-        output dimension of hidden layer 2.
-    n_z3 : int
-        output dimension of hidden layer 3.
-    n_clusters : int
-        number of clusters.
-    n_input : int
-        input feature dimension.
-    v : float
-        parameter of soft assignment.
+    sigma
+        Balance parameter.
+    n_enc_1
+        Output dimension of encoder layer 1.
+    n_enc_2
+        Output dimension of encoder layer 2.
+    n_enc_3
+        Output dimension of encoder layer 3.
+    n_dec_1
+        Output dimension of decoder layer 1.
+    n_dec_2
+        Output dimension of decoder layer 2.
+    n_dec_3
+        Output dimension of decoder layer 3.
+    n_z1
+        Output dimension of hidden layer 1.
+    n_z2
+        Output dimension of hidden layer 2.
+    n_z3
+        Output dimension of hidden layer 3.
+    n_clusters
+        Number of clusters.
+    n_input
+        Input feature dimension.
+    v
+        Parameter of soft assignment.
+    device
+        Computing device.
 
     """
 
-    def __init__(self, args):
+    def __init__(
+        self,
+        sigma: float = 1,
+        n_enc_1: int = 512,
+        n_enc_2: int = 256,
+        n_enc_3: int = 256,
+        n_dec_1: int = 256,
+        n_dec_2: int = 256,
+        n_dec_3: int = 512,
+        n_z1: int = 256,
+        n_z2: int = 128,
+        n_z3: int = 32,
+        n_clusters: int = 10,
+        n_input: int = 100,
+        v: float = 1,
+        device: str = "auto",
+    ):
         super().__init__()
-        device = args.device
-        self.sigma = args.sigma
-        self.pretrain_path = args.pretrain_path
+        self.device = get_device(device)
+        self.sigma = sigma
+
         self.ae = AE(
-            n_enc_1=args.n_enc_1,
-            n_enc_2=args.n_enc_2,
-            n_enc_3=args.n_enc_3,
-            n_dec_1=args.n_dec_1,
-            n_dec_2=args.n_dec_2,
-            n_dec_3=args.n_dec_3,
-            n_input=args.n_input,
-            n_z1=args.n_z1,
-            n_z2=args.n_z2,
-            n_z3=args.n_z3,
+            n_enc_1=n_enc_1,
+            n_enc_2=n_enc_2,
+            n_enc_3=n_enc_3,
+            n_dec_1=n_dec_1,
+            n_dec_2=n_dec_2,
+            n_dec_3=n_dec_3,
+            n_input=n_input,
+            n_z1=n_z1,
+            n_z2=n_z2,
+            n_z3=n_z3,
         )
-        self.gnn_1 = GNNLayer(args.n_input, args.n_enc_1)
-        self.gnn_2 = GNNLayer(args.n_enc_1, args.n_enc_2)
-        self.gnn_3 = GNNLayer(args.n_enc_2, args.n_enc_3)
-        self.gnn_4 = GNNLayer(args.n_enc_3, args.n_z1)
-        self.gnn_5 = GNNLayer(args.n_z1, args.n_z2)
-        self.gnn_6 = GNNLayer(args.n_z2, args.n_z3)
-        self.gnn_7 = GNNLayer(args.n_z3, args.n_clusters)
+
+        self.gnn_1 = GNNLayer(n_input, n_enc_1)
+        self.gnn_2 = GNNLayer(n_enc_1, n_enc_2)
+        self.gnn_3 = GNNLayer(n_enc_2, n_enc_3)
+        self.gnn_4 = GNNLayer(n_enc_3, n_z1)
+        self.gnn_5 = GNNLayer(n_z1, n_z2)
+        self.gnn_6 = GNNLayer(n_z2, n_z3)
+        self.gnn_7 = GNNLayer(n_z3, n_clusters)
 
         # cluster layer
-        self.cluster_layer = Parameter(torch.Tensor(args.n_clusters, args.n_z3))
+        self.cluster_layer = Parameter(torch.Tensor(n_clusters, n_z3))
         torch.nn.init.xavier_normal_(self.cluster_layer.data)
-        self._dec_mean = nn.Sequential(nn.Linear(args.n_dec_3, args.n_input), MeanAct())
-        self._dec_disp = nn.Sequential(nn.Linear(args.n_dec_3, args.n_input), DispAct())
-        self._dec_pi = nn.Sequential(nn.Linear(args.n_dec_3, args.n_input), nn.Sigmoid())
+        self._dec_mean = nn.Sequential(nn.Linear(n_dec_3, n_input), MeanAct())
+        self._dec_disp = nn.Sequential(nn.Linear(n_dec_3, n_input), DispAct())
+        self._dec_pi = nn.Sequential(nn.Linear(n_dec_3, n_input), nn.Sigmoid())
         # degree
-        self.v = args.v
-        self.zinb_loss = ZINBLoss().to(device)
+        self.v = v
+        self.zinb_loss = ZINBLoss().to(self.device)
+
+        self.to(self.device)
 
     def forward(self, x, adj):
         """Forward propagation.
 
         Parameters
         ----------
-        x :
-            input features.
-        adj :
-            adjacency matrix
+        x
+            Input features.
+        adj
+            Adjacency matrix
 
         Returns
         -------
         x_bar:
-            reconstructed features.
-        q :
-            soft label.
+            Reconstructed features.
+        q
+            Soft label.
         predict:
-            prediction given by softmax assignment of embedding of GCN module
-        z3 :
-            embedding of autoencoder.
-        _mean :
-            data mean from ZINB.
-        _disp :
-            data dispersion from ZINB.
-        _pi :
-            data dropout probability from ZINB.
+            Prediction given by softmax assignment of embedding of GCN module
+        z3
+            Embedding of autoencoder.
+        _mean
+            Data mean from ZINB.
+        _disp
+            Data dispersion from ZINB.
+        _pi
+            Data dropout probability from ZINB.
         zinb_loss:
             ZINB loss class.
 
         """
         # DNN Module
-        self.ae.load_state_dict(torch.load(self.pretrain_path, map_location='cpu'))
         x_bar, tra1, tra2, tra3, z3, z2, z1, dec_h3 = self.ae(x)
 
-        sigma = self.sigma
         # GCN Module
+        sigma = self.sigma
         h = self.gnn_1(x, adj)
         h = self.gnn_2((1 - sigma) * h + sigma * tra1, adj)
         h = self.gnn_3((1 - sigma) * h + sigma * tra2, adj)
@@ -406,10 +474,10 @@ class GNNLayer(nn.Module):
 
     Parameters
     ----------
-    in_features : int
-        input dimension of GNN layer.
-    out_features : int
-        output dimension of GNN layer.
+    in_features
+        Input dimension of GNN layer.
+    out_features
+        Output dimension of GNN layer.
 
     """
 
@@ -435,26 +503,26 @@ class AE(nn.Module):
 
     Parameters
     ----------
-    n_enc_1 : int
-        output dimension of encoder layer 1.
-    n_enc_2 : int
-        output dimension of encoder layer 2.
-    n_enc_3 : int
-        output dimension of encoder layer 3.
-    n_dec_1 : int
-        output dimension of decoder layer 1.
-    n_dec_2 : int
-        output dimension of decoder layer 2.
-    n_dec_3 : int
-        output dimension of decoder layer 3.
-    n_input : int
-        input feature dimension.
-    n_z1 : int
-        output dimension of hidden layer 1.
-    n_z2 : int
-        output dimension of hidden layer 2.
-    n_z3 : int
-        output dimension of hidden layer 3.
+    n_enc_1
+        Output dimension of encoder layer 1.
+    n_enc_2
+        Output dimension of encoder layer 2.
+    n_enc_3
+        Output dimension of encoder layer 3.
+    n_dec_1
+        Output dimension of decoder layer 1.
+    n_dec_2
+        Output dimension of decoder layer 2.
+    n_dec_3
+        Output dimension of decoder layer 3.
+    n_input
+        Input feature dimension.
+    n_z1
+        Output dimension of hidden layer 1.
+    n_z2
+        Output dimension of hidden layer 2.
+    n_z3
+        Output dimension of hidden layer 3.
 
     """
 
@@ -488,27 +556,27 @@ class AE(nn.Module):
 
         Parameters
         ----------
-        x :
-            input features.
+        x
+            Input features.
 
         Returns
         -------
-        x_bar:
-            reconstructed features.
-        enc_h1:
-            output of encoder layer 1.
-        enc_h2:
-            output of encoder layer 2.
-        enc_h3:
-            output of encoder layer 3.
-        z3 :
-            output of hidden layer 3.
-        z2 :
-            output of hidden layer 2.
-        z1 :
-            output of hidden layer 1.
-        dec_h3 :
-            output of decoder layer 3.
+        x_bar
+            Reconstructed features.
+        enc_h1
+            Output of encoder layer 1.
+        enc_h2
+            Output of encoder layer 2.
+        enc_h3
+            Output of encoder layer 3.
+        z3
+            Output of hidden layer 3.
+        z2
+            Output of hidden layer 2.
+        z1
+            Output of hidden layer 1.
+        dec_h3
+            Output of decoder layer 3.
 
         """
         enc_h1 = F.relu(self.BN1(self.enc_1(x)))
@@ -525,119 +593,6 @@ class AE(nn.Module):
         x_bar = self.x_bar_layer(dec_h3)
 
         return x_bar, enc_h1, enc_h2, enc_h3, z3, z2, z1, dec_h3
-
-
-class RAdam(Optimizer):
-    """RAdam optimizer class.
-
-    Parameters
-    ----------
-    params :
-        model parameters.
-    lr : float optional
-        learning rate.
-    betas : tuple optional
-        coefficients used for computing running averages of gradient and its square.
-    eps : float optional
-        term added to the denominator to improve numerical stability.
-    weight decay : float optional
-        weight decay (L2 penalty).
-    degenerated_to_sgd : bool optional
-        degenerated to SGD or not.
-
-    """
-
-    def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=0, degenerated_to_sgd=True):
-        if not 0.0 <= lr:
-            raise ValueError("Invalid learning rate: {}".format(lr))
-        if not 0.0 <= eps:
-            raise ValueError("Invalid epsilon value: {}".format(eps))
-        if not 0.0 <= betas[0] < 1.0:
-            raise ValueError("Invalid beta parameter at index 0: {}".format(betas[0]))
-        if not 0.0 <= betas[1] < 1.0:
-            raise ValueError("Invalid beta parameter at index 1: {}".format(betas[1]))
-
-        self.degenerated_to_sgd = degenerated_to_sgd
-        if isinstance(params, (list, tuple)) and len(params) > 0 and isinstance(params[0], dict):
-            for param in params:
-                if 'betas' in param and (param['betas'][0] != betas[0] or param['betas'][1] != betas[1]):
-                    param['buffer'] = [[None, None, None] for _ in range(10)]
-        defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay,
-                        buffer=[[None, None, None] for _ in range(10)])
-        super().__init__(params, defaults)
-
-    def __setstate__(self, state):
-        super().__setstate__(state)
-
-    def step(self, closure=None):
-
-        loss = None
-        if closure is not None:
-            loss = closure()
-
-        for group in self.param_groups:
-
-            for p in group['params']:
-                if p.grad is None:
-                    continue
-                grad = p.grad.data.float()
-                if grad.is_sparse:
-                    raise RuntimeError('RAdam does not support sparse gradients')
-
-                p_data_fp32 = p.data.float()
-
-                state = self.state[p]
-
-                if len(state) == 0:
-                    state['step'] = 0
-                    state['exp_avg'] = torch.zeros_like(p_data_fp32)
-                    state['exp_avg_sq'] = torch.zeros_like(p_data_fp32)
-                else:
-                    state['exp_avg'] = state['exp_avg'].type_as(p_data_fp32)
-                    state['exp_avg_sq'] = state['exp_avg_sq'].type_as(p_data_fp32)
-
-                exp_avg, exp_avg_sq = state['exp_avg'], state['exp_avg_sq']
-                beta1, beta2 = group['betas']
-
-                exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, grad, grad)
-                exp_avg.mul_(beta1).add_(1 - beta1, grad)
-
-                state['step'] += 1
-                buffered = group['buffer'][int(state['step'] % 10)]
-                if state['step'] == buffered[0]:
-                    N_sma, step_size = buffered[1], buffered[2]
-                else:
-                    buffered[0] = state['step']
-                    beta2_t = beta2**state['step']
-                    N_sma_max = 2 / (1 - beta2) - 1
-                    N_sma = N_sma_max - 2 * state['step'] * beta2_t / (1 - beta2_t)
-                    buffered[1] = N_sma
-
-                    # more conservative since it's an approximated value
-                    if N_sma >= 5:
-                        step_size = math.sqrt(
-                            (1 - beta2_t) * (N_sma - 4) / (N_sma_max - 4) * (N_sma - 2) / N_sma * N_sma_max /
-                            (N_sma_max - 2)) / (1 - beta1**state['step'])
-                    elif self.degenerated_to_sgd:
-                        step_size = 1.0 / (1 - beta1**state['step'])
-                    else:
-                        step_size = -1
-                    buffered[2] = step_size
-
-                # more conservative since it's an approximated value
-                if N_sma >= 5:
-                    if group['weight_decay'] != 0:
-                        p_data_fp32.add_(-group['weight_decay'] * group['lr'], p_data_fp32)
-                    denom = exp_avg_sq.sqrt().add_(group['eps'])
-                    p_data_fp32.addcdiv_(-step_size * group['lr'], exp_avg, denom)
-                    p.data.copy_(p_data_fp32)
-                elif step_size > 0:
-                    if group['weight_decay'] != 0:
-                        p_data_fp32.add_(-group['weight_decay'] * group['lr'], p_data_fp32)
-                    p_data_fp32.add_(-step_size * group['lr'], exp_avg)
-                    p.data.copy_(p_data_fp32)
-
-        return loss
 
 
 class MeanAct(nn.Module):
