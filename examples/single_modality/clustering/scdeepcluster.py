@@ -1,5 +1,4 @@
 import argparse
-import os
 
 import numpy as np
 
@@ -33,8 +32,6 @@ if __name__ == "__main__":
     parser.add_argument("--tol", default=0.001, type=float,
                         help="tolerance for delta clustering labels to terminate training stage")
     parser.add_argument("--ae_weights", default=None, help="file to pretrained weights, None for a new pretraining")
-    parser.add_argument("--save_dir", default="results/scDeepCluster/",
-                        help="directory to save model weights during the training stage")
     parser.add_argument("--ae_weight_file", default="AE_weights.pth.tar",
                         help="file name to save model weights after the pretraining stage")
     parser.add_argument("--device", default="cuda")
@@ -56,10 +53,8 @@ if __name__ == "__main__":
     # Build and train model
     model = ScDeepCluster(input_dim=in_dim, z_dim=32, encodeLayer=[256, 64], decodeLayer=[64, 256], sigma=args.sigma,
                           gamma=args.gamma, device=args.device, pretrain_path=args.ae_weights)
-    if not os.path.exists(args.save_dir):
-        os.makedirs(args.save_dir)
     model.fit(inputs, y, n_clusters=n_clusters, y_pred_init=None, lr=args.lr, batch_size=args.batch_size,
-              num_epochs=args.maxiter, update_interval=args.update_interval, tol=args.tol, save_dir=args.save_dir,
+              num_epochs=args.maxiter, update_interval=args.update_interval, tol=args.tol,
               pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
 
     # Evaluate model predictions

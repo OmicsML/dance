@@ -374,7 +374,6 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         num_epochs: int = 10,
         update_interval: int = 1,
         tol: float = 1e-3,
-        save_dir: str = "",
         pt_batch_size: int = 256,
         pt_lr: float = 0.001,
         pt_epochs: int = 400,
@@ -403,8 +402,6 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
             Update interval of soft label and target distribution.
         tol
             Tolerance for training loss.
-        save_dir
-            Path to save model weights.
         pt_batch_size
             Pretraining batch size.
         pt_lr
@@ -452,17 +449,6 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 p = self.target_distribution(q).data
                 self.y_pred = self.predict()
 
-                # save current model
-                if delta_label or epoch % 10 == 0:
-                    self.save_checkpoint(
-                        {
-                            'epoch': epoch + 1,
-                            'state_dict': self.state_dict(),
-                            'mu': self.mu,
-                            'y_pred': self.y_pred,
-                            'y_pred_last': self.y_pred_last,
-                            'y': y
-                        }, epoch + 1, filename=save_dir)
                 p_ = {f'epoch{epoch}': p}
                 q_ = {f'epoch{epoch}': q}
                 P = {**P, **p_}
