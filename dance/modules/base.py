@@ -1,5 +1,8 @@
 import os
 from abc import ABC, abstractmethod, abstractstaticmethod
+from contextlib import contextmanager
+from functools import partialmethod
+from operator import attrgetter
 from time import time
 
 import torch
@@ -100,12 +103,36 @@ class BasePretrain(ABC):
 
 class TorchNNPretrain(BasePretrain, ABC):
 
+    def _fix_unfix_modules(self, *module_names: Tuple[str], unfix: bool = False, single: bool = True):
+        modules = attrgetter(*module_names)(self)
+        modules = [modules] if single else modules
+
+        for module in modules:
+            for p in module.parameters():
+                p.requires_grad = unfix
+
+    fix_module = partialmethod(_fix_unfix_modules, unfix=False, single=True)
+    fix_modules = partialmethod(_fix_unfix_modules, unfix=False, single=False)
+    unfix_module = partialmethod(_fix_unfix_modules, unfix=True, single=True)
+    unfix_modules = partialmethod(_fix_unfix_modules, unfix=True, single=False)
+
+    @contextmanager
+    def pretrain_context(self, *module_names: Tuple[str]):
+        """Unlock module for pretraining and lock once pretraining is done."""
+        is_single = len(module_names) == 1
+        logger.info(f"Entering pre-training context; unlocking: {module_names}")
+        self._fix_unfix_modules(*module_names, unfix=True, single=is_single)
+        try:
+            yield
+        finally:
+            logger.info(f"Exiting pre-training context; locking: {module_names}")
+            self._fix_unfix_modules(*module_names, unfix=False, single=is_single)
+
     def save_pretrained(self, path):
         torch.save(self.state_dict(), path)
 
     def load_pretrained(self, path):
         device = getattr(self, "device", None)
-        # FIX: check if map_loc can be set to `cuda`, or is the index strictly required
         checkpoint = torch.load(path, map_location=device)
         self.load_state_dict(checkpoint)
 
