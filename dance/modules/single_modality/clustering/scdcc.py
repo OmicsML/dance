@@ -339,7 +339,7 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         cl_p: float = 1.,
         lr: float = 1.,
         batch_size: int = 256,
-        num_epochs: int = 10,
+        epochs: int = 10,
         update_interval: int = 1,
         tol: float = 1e-3,
         pt_batch_size: int = 256,
@@ -370,7 +370,7 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
             Learning rate.
         batch_size
             Size of batch.
-        num_epochs
+        epochs
             Number of epochs.
         update_interval
             Update interval of soft label and target distribution.
@@ -415,7 +415,7 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         Q = {}
 
         delta_label = np.inf
-        for epoch in range(num_epochs):
+        for epoch in range(epochs):
             if epoch % update_interval == 0:
                 # update the targe distribution p
                 latent = self.encodeBatch(X)

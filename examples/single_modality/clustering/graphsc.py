@@ -64,7 +64,7 @@ if __name__ == "__main__":
                         dropout=args.dropout, n_layers=args.n_layers, hidden_relu=args.hidden_relu,
                         hidden_bn=args.hidden_bn, n_clusters=n_clusters, cluster_method="leiden",
                         num_workers=args.num_workers, device=args.device)
-        model.fit(graph, n_epochs=args.epochs, lr=args.learning_rate, show_epoch_ari=args.show_epoch_ari,
+        model.fit(graph, epochs=args.epochs, lr=args.learning_rate, show_epoch_ari=args.show_epoch_ari,
                   eval_epoch=args.eval_epoch)
         score = model.score(None, y)
         print(f"{score:=.4f}")

@@ -151,7 +151,7 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
         p = q**2 / q.sum(0)
         return (p.t() / p.sum(1)).t()
 
-    def pretrain(self, x, batch_size=256, n_epochs=200, lr=1e-3):
+    def pretrain(self, x, batch_size=256, epochs=200, lr=1e-3):
         """Pretrain autoencoder.
 
         Parameters
@@ -160,7 +160,7 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
             Input features.
         batch_size
             Size of batch.
-        n_epochs
+        epochs
             Number of epochs.
         lr
             Learning rate.
@@ -171,7 +171,7 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
             train_loader = DataLoader(TensorDataset(x_tensor), batch_size, shuffle=True)
             model = self.model.ae
             optimizer = Adam(model.parameters(), lr=lr)
-            for epoch in range(n_epochs):
+            for epoch in range(epochs):
 
                 total_loss = total_size = 0
                 for batch_idx, (x_batch, ) in enumerate(train_loader):
@@ -201,7 +201,7 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
         inputs: Tuple[sp.spmatrix, np.ndarray, np.ndarray, pd.Series],
         y: np.ndarray,
         lr: float = 1e-03,
-        n_epochs: int = 300,
+        epochs: int = 300,
         bcl: float = 0.1,
         cl: float = 0.01,
         rl: float = 1,
@@ -221,7 +221,7 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
             Label.
         lr
             Learning rate.
-        n_epochs
+        epochs
             Number of epochs.
         bcl
             Parameter of binary crossentropy loss.
@@ -234,7 +234,7 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
 
         """
         adj, x, x_raw, n_counts = inputs
-        self._pretrain(x, batch_size=pt_batch_size, n_epochs=pt_epochs, lr=pt_lr)
+        self._pretrain(x, batch_size=pt_batch_size, epochs=pt_epochs, lr=pt_lr)
 
         device = self.device
         model = self.model
@@ -253,7 +253,7 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
         with torch.no_grad():
             _, _, _, _, z, _, _, _ = model.ae(data)
 
-        for epoch in range(n_epochs):
+        for epoch in range(epochs):
             if epoch % 10 == 0:
                 model.eval()
                 with torch.no_grad():

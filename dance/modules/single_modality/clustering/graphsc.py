@@ -150,7 +150,7 @@ class GraphSC(BaseClusteringMethod):
         g: dgl.DGLGraph,
         y: Optional[Any] = None,
         *,
-        n_epochs: int = 100,
+        epochs: int = 100,
         lr: float = 1e-5,
         batch_size: int = 128,
         show_epoch_ari: bool = False,
@@ -164,7 +164,7 @@ class GraphSC(BaseClusteringMethod):
             Input cell-gene graph.
         y
             Not used, for compatibility with the BaseClusteringMethod class.
-        n_epochs
+        epochs
             Number of epochs.
         lr
             Learning rate.
@@ -188,7 +188,7 @@ class GraphSC(BaseClusteringMethod):
         aris = []
         Z = {}
 
-        for epoch in tqdm(range(n_epochs)):
+        for epoch in tqdm(range(epochs)):
             self.model.train()
             z = []
             y = []
@@ -237,7 +237,7 @@ class GraphSC(BaseClusteringMethod):
                 z_ = {f"epoch{epoch}": z}
                 Z = {**Z, **z_}
 
-            elif epoch == n_epochs - 1:
+            elif epoch == epochs - 1:
                 self.z = z
 
         if eval_epoch:

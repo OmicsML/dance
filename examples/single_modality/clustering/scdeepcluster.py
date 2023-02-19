@@ -22,7 +22,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_dir", default="./data")
     parser.add_argument("--data_file", default="mouse_bladder_cell", type=str,
                         choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
-    parser.add_argument("--maxiter", default=500, type=int)
+    parser.add_argument("--epochs", default=500, type=int)
     parser.add_argument("--pretrain_epochs", default=50, type=int)
     parser.add_argument("--lr", default=0.1, type=float)
     parser.add_argument("--pretrain_lr", default=0.001, type=float)
@@ -56,8 +56,8 @@ if __name__ == "__main__":
     model = ScDeepCluster(input_dim=in_dim, z_dim=32, encodeLayer=[256, 64], decodeLayer=[64, 256], sigma=args.sigma,
                           gamma=args.gamma, device=args.device, pretrain_path=args.ae_weights)
     model.fit(inputs, y, n_clusters=n_clusters, y_pred_init=None, lr=args.lr, batch_size=args.batch_size,
-              num_epochs=args.maxiter, update_interval=args.update_interval, tol=args.tol,
-              pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
+              num_epochs=args.epochs, update_interval=args.update_interval, tol=args.tol, pt_batch_size=args.batch_size,
+              pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
 
     # Evaluate model predictions
     score = model.score(None, y)
