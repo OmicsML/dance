@@ -51,10 +51,9 @@ if __name__ == "__main__":
     (x, x_raw, n_counts), y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
+    # Build and train model
     model = ScDeepCluster(input_dim=x.shape[1], z_dim=32, encodeLayer=[256, 64], decodeLayer=[64, 256],
                           sigma=args.sigma, gamma=args.gamma, device=args.device, pretrain_path=args.ae_weights)
-
-    # model training
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
     model.fit(X=x, X_raw=x_raw, n_counts=n_counts, n_clusters=n_clusters, init_centroid=None, y_pred_init=None, y=y,
@@ -62,11 +61,9 @@ if __name__ == "__main__":
               tol=args.tol, save_dir=args.save_dir, pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr,
               pt_epochs=args.pretrain_epochs)
 
-    y_pred = model.predict()
-    print(f"Prediction (first ten): {y_pred[:10]}")
-
-    acc, nmi, ari = model.score(y)
-    print("ACC: {:.4f}, NMI: {:.4f}, ARI: {:.4f}".format(acc, nmi, ari))
+    # Evaluate model predictions
+    score = model.score(None, y)
+    print(f"{score=:.4f}")
 """ Reproduction information
 10X PBMC:
 python scdeepcluster.py --data_file 10X_PBMC
