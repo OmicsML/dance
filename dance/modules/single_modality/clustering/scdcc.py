@@ -23,27 +23,27 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from dance.modules.base import BaseClusteringMethod, TorchNNPretrain
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
-from dance.typing import Any, LogLevel, Optional
+from dance.typing import Any, List, LogLevel, Optional
 from dance.utils import get_device
 from dance.utils.loss import ZINBLoss
 
 
-def buildNetwork(layers, type, activation="relu"):
+def buildNetwork(layers: List[int], network_type: str, activation: str = "relu"):
     """Build network layer.
 
     Parameters
     ----------
-    layers : list
-        dimensions of layers.
-    type : str
-        type of network.
-    activation : str optional
-        activation function.
+    layers
+        Dimensions of layers.
+    network_type
+        Type of network.
+    activation
+        Activation function.
+
 
     Returns
     -------
-    net :
-        torch.nn network.
+    Built network.
 
     """
     net = []
@@ -62,36 +62,49 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
     Parameters
     ----------
-    input_dim : int
-        dimension of encoder input.
-    z_dim : int
-        dimension of embedding.
-    n_clusters : int
-        number of clusters.
-    encodeLayer : list optional
-        dimensions of encoder layers.
-    decodeLayer : list optional
-        dimensions of decoder layers.
-    activation : str optional
-        activation function.
-    sigma : float optional
-        parameter of Gaussian noise.
-    alpha : float optional
-        parameter of soft assign.
-    gamma : float optional
-        parameter of cluster loss.
-    ml_weight : float optional
-        parameter of must-link loss.
-    cl_weight : float optional
-        parameter of cannot-link loss.
+    input_dim
+        Dimension of encoder input.
+    z_dim
+        Dimension of embedding.
+    n_clusters
+        Number of clusters.
+    encodeLayer
+        Dimensions of encoder layers.
+    decodeLayer
+        Dimensions of decoder layers.
+    activation
+        Activation function.
+    sigma
+        Parameter of Gaussian noise.
+    alpha
+        Parameter of soft assign.
+    gamma
+        Parameter of cluster loss.
+    ml_weight
+        Parameter of must-link loss.
+    cl_weight
+        Parameter of cannot-link loss.
     device
         Computation device.
 
     """
 
-    def __init__(self, input_dim, z_dim, n_clusters, encodeLayer=[], decodeLayer=[], activation="relu", sigma=1.,
-                 alpha=1., gamma=1., ml_weight=1., cl_weight=1., device: str = "auto",
-                 pretrain_path: Optional[str] = None):
+    def __init__(
+        self,
+        input_dim: int,
+        z_dim: int,
+        n_clusters: int,
+        encodeLayer: List[int] = [],
+        decodeLayer: List[int] = [],
+        activation: str = "relu",
+        sigma: float = 1.,
+        alpha: float = 1.,
+        gamma: float = 1.,
+        ml_weight: float = 1.,
+        cl_weight: float = 1.,
+        device: str = "auto",
+        pretrain_path: Optional[str] = None,
+    ):
         super().__init__()
         self.z_dim = z_dim
         self.n_clusters = n_clusters
@@ -104,8 +117,8 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         self.device = get_device(device)
         self.pretrain_path = pretrain_path
 
-        self.encoder = buildNetwork([input_dim] + encodeLayer, type="encode", activation=activation)
-        self.decoder = buildNetwork([z_dim] + decodeLayer, type="decode", activation=activation)
+        self.encoder = buildNetwork([input_dim] + encodeLayer, network_type="encode", activation=activation)
+        self.decoder = buildNetwork([z_dim] + decodeLayer, network_type="decode", activation=activation)
         self._enc_mu = nn.Linear(encodeLayer[-1], z_dim)
         self._dec_mean = nn.Sequential(nn.Linear(decodeLayer[-1], input_dim), MeanAct())
         self._dec_disp = nn.Sequential(nn.Linear(decodeLayer[-1], input_dim), DispAct())
@@ -132,52 +145,18 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
             log_level=log_level,
         )
 
-    def save_model(self, path):
-        """Save model to path.
-
-        Parameters
-        ----------
-        path : str
-            path to save model.
-
-        Returns
-        -------
-        None.
-
-        """
-        torch.save(self.state_dict(), path)
-
-    def load_model(self, path):
-        """Load model from path.
-
-        Parameters
-        ----------
-        path : str
-            path to load model.
-
-        Returns
-        -------
-        None.
-
-        """
-        pretrained_dict = torch.load(path, map_location=lambda storage, loc: storage)
-        model_dict = self.state_dict()
-        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-        model_dict.update(pretrained_dict)
-        self.load_state_dict(model_dict)
-
     def soft_assign(self, z):
         """Soft assign q with z.
 
         Parameters
         ----------
-        z :
-            embedding.
+        z
+            Embedding.
 
         Returns
         -------
-        q :
-            soft label.
+        q
+            Soft label.
 
         """
         q = 1.0 / (1.0 + torch.sum((z.unsqueeze(1) - self.mu)**2, dim=2) / self.alpha)
@@ -190,13 +169,13 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        q :
-            soft label.
+        q
+            Soft label.
 
         Returns
         -------
-        p :
-            target distribution.
+        p
+            Target distribution.
 
         """
         p = q**2 / q.sum(0)
@@ -207,21 +186,21 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        x :
-            input features.
+        x
+            Input features.
 
         Returns
         -------
-        z0 :
-            embedding.
-        q :
-            soft label.
-        _mean :
-            data mean from ZINB.
-        _disp :
-            data dispersion from ZINB.
-        _pi :
-            data dropout probability from ZINB.
+        z0
+            Embedding.
+        q
+            Soft label.
+        _mean
+            Data mean from ZINB.
+        _disp
+            Data dispersion from ZINB.
+        _pi
+            Data dropout probability from ZINB.
 
         """
         h = self.encoder(x + torch.randn_like(x) * self.sigma)
@@ -241,15 +220,14 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        X :
-            input features.
-        batch_size : int optional
-            size of batch.
+        X
+            Input features.
+        batch_size
+            Size of batch.
 
         Returns
         -------
-        encoded :
-            embedding.
+        Embedding.
 
         """
         encoded = []
@@ -269,15 +247,14 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        p :
-            target distribution.
-        q :
-            soft label.
+        p
+            Target distribution.
+        q
+            Soft label.
 
         Returns
         -------
-        loss :
-            cluster loss.
+        Cluster loss.
 
         """
 
@@ -293,17 +270,16 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        p1 :
-            distribution 1.
-        p2 :
-            distribution 2.
-        cons_type : str
-            type of loss.
+        p1
+            Distribution 1.
+        p2
+            Distribution 2.
+        cons_type
+            Type of loss.
 
         Returns
         -------
-        loss :
-            pairwise loss.
+        Pairwise loss.
 
         """
         if cons_type == "ML":
@@ -320,22 +296,18 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        x :
-            input features.
-        X_raw :
-            raw input features.
-        n_counts : list
-            total counts for each cell.
-        batch_size : int optional
-            size of batch.
-        lr : float optional
-            learning rate.
-        epochs : int optional
-            number of epochs.
-
-        Returns
-        -------
-        None.
+        x
+            Input features.
+        X_raw
+            Raw input features.
+        n_counts
+            Total counts for each cell.
+        batch_size
+            Size of batch.
+        lr
+            Learning rate.
+        epochs
+            Number of epochs.
 
         """
         size_factor = torch.tensor(n_counts / np.median(n_counts))
@@ -360,16 +332,12 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        state :
-            model state
-        index : int
-            checkpoint index
-        filename : str
-            filename to save
-
-        Returns
-        -------
-        None.
+        state
+            Model state
+        index
+            Checkpoint index
+        filename
+            Filename to save
 
         """
         newfilename = os.path.join(filename, 'FTcheckpoint_%d.pth.tar' % index)
@@ -377,21 +345,21 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
     def fit(
         self,
-        X,
-        X_raw,
-        n_counts,
-        ml_ind1=np.array([]),
-        ml_ind2=np.array([]),
-        cl_ind1=np.array([]),
-        cl_ind2=np.array([]),
-        ml_p=1.,
-        cl_p=1.,
-        y=None,
-        lr=1.,
-        batch_size=256,
-        num_epochs=10,
-        update_interval=1,
-        tol=1e-3,
+        X: np.ndarray,
+        X_raw: np.ndarray,
+        n_counts: np.ndarray,
+        ml_ind1: np.ndarray = np.array([]),
+        ml_ind2: np.ndarray = np.array([]),
+        cl_ind1: np.ndarray = np.array([]),
+        cl_ind2: np.ndarray = np.array([]),
+        ml_p: float = 1.,
+        cl_p: float = 1.,
+        y: Optional[List[int]] = None,
+        lr: float = 1.,
+        batch_size: int = 256,
+        num_epochs: int = 10,
+        update_interval: int = 1,
+        tol: float = 1e-3,
         pt_batch_size: int = 256,
         pt_lr: float = 0.001,
         pt_epochs: int = 400,
@@ -400,46 +368,42 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        X :
-            input features.
-        X_raw :
-            raw input features.
-        n_counts : float
-            total counts for each cell.
-        ml_ind1 : np.array optional
-            index 1 of must-link pairs.
-        ml_ind2 : np.array optional
-            index 2 of must-link pairs.
-        cl_ind1 : np.array optional
-            index 1 of cannot-link pairs.
-        cl_ind2 : np.array optional
-            index 2 of cannot-link pairs.
-        ml_p : float optional
-            parameter of must-link loss.
-        cl_p : float optional
-            parameter of cannot-link loss.
-        y : list optional
-            true label. Used for model selection.
-        lr : float optional
-            learning rate.
-        batch_size : int optional
-            size of batch.
-        num_epochs : int optional
-            number of epochs.
-        update_interval : int optional
-            update interval of soft label and target distribution.
-        tol : float optional
-            tolerance for training loss.
+        X
+            Input features.
+        X_raw
+            Raw input features.
+        n_counts
+            Total counts for each cell.
+        ml_ind1
+            Index 1 of must-link pairs.
+        ml_ind2
+            Index 2 of must-link pairs.
+        cl_ind1
+            Index 1 of cannot-link pairs.
+        cl_ind2
+            Index 2 of cannot-link pairs.
+        ml_p
+            Parameter of must-link loss.
+        cl_p
+            Parameter of cannot-link loss.
+        y
+            True label. Used for model selection.
+        lr
+            Learning rate.
+        batch_size
+            Size of batch.
+        num_epochs
+            Number of epochs.
+        update_interval
+            Update interval of soft label and target distribution.
+        tol
+            Tolerance for training loss.
         pt_batch_size
             Pretrain batch size.
         pt_lr
             Pretrain learning rate.
         pt_epochs
             Pretrain epochs.
-
-        Returns
-        -------
-        None.
 
         """
         self._pretrain(X, X_raw, n_counts, batch_size=pt_batch_size, lr=pt_lr, epochs=pt_epochs)

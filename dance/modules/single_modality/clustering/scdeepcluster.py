@@ -42,8 +42,7 @@ def buildNetwork(layers: List[int], network_type: str, activation: str = "relu")
 
     Returns
     -------
-    net
-        Built network.
+    Built network.
 
     """
     net = []
