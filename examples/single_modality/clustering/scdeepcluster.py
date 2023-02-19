@@ -50,9 +50,9 @@ if __name__ == "__main__":
 
     # Build and train model
     model = ScDeepCluster(input_dim=in_dim, z_dim=32, encodeLayer=[256, 64], decodeLayer=[64, 256], sigma=args.sigma,
-                          gamma=args.gamma, device=args.device, pretrain_path=f"scdeepcluster_{args.name}_pre.pkl")
+                          gamma=args.gamma, device=args.device, pretrain_path=f"scdeepcluster_{args.data_file}_pre.pkl")
     model.fit(inputs, y, n_clusters=n_clusters, y_pred_init=None, lr=args.lr, batch_size=args.batch_size,
-              num_epochs=args.epochs, update_interval=args.update_interval, tol=args.tol, pt_batch_size=args.batch_size,
+              epochs=args.epochs, update_interval=args.update_interval, tol=args.tol, pt_batch_size=args.batch_size,
               pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
 
     # Evaluate model predictions

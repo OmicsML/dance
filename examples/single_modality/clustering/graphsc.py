@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
     # Evaluate model for several runs
     for run in range(args.num_run):
-        set_seed(run)
+        set_seed(args.seed + run)
         model = GraphSC(agg=args.agg, activation=args.activation, in_feats=args.in_feats, n_hidden=args.n_hidden,
                         hidden_dim=args.hidden_dim, hidden_1=args.hidden_1, hidden_2=args.hidden_2,
                         dropout=args.dropout, n_layers=args.n_layers, hidden_relu=args.hidden_relu,
