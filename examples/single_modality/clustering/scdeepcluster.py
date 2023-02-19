@@ -2,7 +2,6 @@ import argparse
 
 import numpy as np
 
-from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdeepcluster import ScDeepCluster
 from dance.utils import set_seed
@@ -17,7 +16,7 @@ if __name__ == "__main__":
     parser.add_argument("--select_genes", default=0, type=int, help="number of selected genes, 0 means using all genes")
     parser.add_argument("--batch_size", default=256, type=int)
     parser.add_argument("--data_dir", default="./data")
-    parser.add_argument("--data_file", default="mouse_bladder_cell", type=str,
+    parser.add_argument("--dataset", default="mouse_bladder_cell", type=str,
                         choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
     parser.add_argument("--epochs", default=500, type=int)
     parser.add_argument("--pretrain_epochs", default=50, type=int)
@@ -31,17 +30,14 @@ if __name__ == "__main__":
     parser.add_argument("--ae_weights", default=None, help="file to pretrained weights, None for a new pretraining")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     args = parser.parse_args()
     set_seed(args.seed)
 
-    # Load data
-    adata, labels = ClusteringDataset(args.data_dir, args.data_file).load_data()
-    adata.obsm["Group"] = labels
-    data = Data(adata, train_size="all")
-
-    # Apply method specific preprocessing pipeline
+    # Load data and perform necessary preprocessing
+    dataloader = ClusteringDataset(args.data_dir, args.dataset)
     preprocessing_pipeline = ScDeepCluster.preprocessing_pipeline()
-    preprocessing_pipeline(data)
+    data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
     # inputs: x, x_raw, n_counts
     inputs, y = data.get_train_data()
@@ -50,7 +46,7 @@ if __name__ == "__main__":
 
     # Build and train model
     model = ScDeepCluster(input_dim=in_dim, z_dim=32, encodeLayer=[256, 64], decodeLayer=[64, 256], sigma=args.sigma,
-                          gamma=args.gamma, device=args.device, pretrain_path=f"scdeepcluster_{args.data_file}_pre.pkl")
+                          gamma=args.gamma, device=args.device, pretrain_path=f"scdeepcluster_{args.dataset}_pre.pkl")
     model.fit(inputs, y, n_clusters=n_clusters, y_pred_init=None, lr=args.lr, batch_size=args.batch_size,
               epochs=args.epochs, update_interval=args.update_interval, tol=args.tol, pt_batch_size=args.batch_size,
               pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
@@ -60,14 +56,14 @@ if __name__ == "__main__":
     print(f"{score=:.4f}")
 """ Reproduction information
 10X PBMC:
-python scdeepcluster.py --data_file 10X_PBMC
+python scdeepcluster.py --dataset 10X_PBMC
 
 Mouse ES:
-python scdeepcluster.py --data_file mouse_ES_cell
+python scdeepcluster.py --dataset mouse_ES_cell
 
 Worm Neuron:
-python scdeepcluster.py --data_file worm_neuron_cell --pretrain_epochs 300
+python scdeepcluster.py --dataset worm_neuron_cell --pretrain_epochs 300
 
 Mouse Bladder:
-python scdeepcluster.py --data_file mouse_bladder_cell --pretrain_epochs 300 --sigma 2.75
+python scdeepcluster.py --dataset mouse_bladder_cell --pretrain_epochs 300 --sigma 2.75
 """

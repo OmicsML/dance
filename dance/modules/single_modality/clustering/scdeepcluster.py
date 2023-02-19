@@ -8,7 +8,6 @@ Tian, Tian, et al. "Clustering single-cell RNA-seq data with a model-based deep 
 Intelligence 1.4 (2019): 191-198.
 
 """
-
 import math
 
 import numpy as np

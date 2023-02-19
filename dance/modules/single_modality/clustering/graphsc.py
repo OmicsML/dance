@@ -8,7 +8,6 @@ Ciortan, Madalina, and Matthieu Defrance. "GNN-based embedding for clustering sc
 (2022) 1037-1044.
 
 """
-
 import dgl
 import numpy as np
 import pandas as pd
@@ -140,7 +139,7 @@ class GraphSC(BaseClusteringMethod):
             SetConfig({
                 "feature_channel": "CellFeatureGraph",
                 "feature_channel_type": "uns",
-                "label_channel": "labels",
+                "label_channel": "Group",
             }),
         ])
 

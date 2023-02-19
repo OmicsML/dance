@@ -11,8 +11,6 @@ import anndata as ad
 import h5py
 import numpy as np
 import pandas as pd
-import torch
-from torch.utils.data import Dataset
 
 from dance import logger
 from dance.data import Data
@@ -137,7 +135,7 @@ class ScDeepSortDataset(BaseDataset):
                 return False
         return True
 
-    def _load_raw_data(self, ct_col: str = "Cell_type"):
+    def _load_raw_data(self, ct_col: str = "Cell_type") -> Tuple[ad.AnnData, List[Set[str]], List[str], int]:
         species = self.species
         tissue = self.tissue
         train_dataset_ids = self.train_dataset
@@ -233,51 +231,52 @@ class ScDeepSortDataset(BaseDataset):
         return dict(map_dict)
 
 
-class ClusteringDataset():
+class ClusteringDataset(BaseDataset):
     """Data downloading and loading for clustering.
 
-    Args:
-            data_dir (str, optional): Path to store datasets. Defaults to "./data".
-            dataset (str, optional): Choice of dataset. Defaults to "mouse_bladder_cell",
-                                     choices=['10X_PBMC', 'mouse_bladder_cell', 'mouse_ES_cell', 'worm_neuron_cell'].
+    Parameters
+    ----------
+    data_dir
+        Path to store datasets.
+    dataset
+        Choice of dataset. Available options are '10X_PBMC', 'mouse_bladder_cell', 'mouse_ES_cell', 'worm_neuron_cell'.
 
     """
 
-    def __init__(self, data_dir="./data", dataset="mouse_bladder_cell"):
+    data_url_dict: Dict[str, str] = {
+        "10X_PBMC": "https://www.dropbox.com/s/pfunm27qzgfpj3u/10X_PBMC.h5?dl=1",
+        "mouse_bladder_cell": "https://www.dropbox.com/s/xxtnomx5zrifdwi/mouse_bladder_cell.h5?dl=1",
+        "mouse_ES_cell": "https://www.dropbox.com/s/zbuku7oznvji8jk/mouse_ES_cell.h5?dl=1",
+        "worm_neuron_cell": "https://www.dropbox.com/s/58fkgemi2gcnp2k/worm_neuron_cell.h5?dl=1",
+    }
+
+    def __init__(self, data_dir: str = "./data", dataset: str = "mouse_bladder_cell"):
+        super().__init__(data_dir, full_download=False)
         self.data_dir = data_dir
         self.dataset = dataset
-        self.X = None
-        self.Y = None
 
-    def download_data(self):
-        # download data
-        data_url = {
-            "10X_PBMC": "https://www.dropbox.com/s/pfunm27qzgfpj3u/10X_PBMC.h5?dl=1",
-            "mouse_bladder_cell": "https://www.dropbox.com/s/xxtnomx5zrifdwi/mouse_bladder_cell.h5?dl=1",
-            "mouse_ES_cell": "https://www.dropbox.com/s/zbuku7oznvji8jk/mouse_ES_cell.h5?dl=1",
-            "worm_neuron_cell": "https://www.dropbox.com/s/58fkgemi2gcnp2k/worm_neuron_cell.h5?dl=1"
-        }
-        data_name = self.dataset
-        download_file(data_url.get(data_name), self.data_dir + "/{}.h5".format(data_name))
-        return self
+    @property
+    def data_path(self) -> str:
+        return osp.join(self.data_dir, f"{self.dataset}.h5")
+
+    def download(self):
+        download_file(self.data_url_dict[self.dataset], self.data_path)
 
     def is_complete(self):
-        # judge data is complete or not
-        return osp.exists(osp.join(self.data_dir, f"{self.dataset}.h5"))
+        return osp.exists(self.data_path)
 
-    def load_data(self):
-        # Load data from existing h5ad files, or download files and load data.
-        if self.is_complete():
-            pass
-        else:
-            self.download_data()
-            assert self.is_complete()
+    def _load_raw_data(self) -> Tuple[ad.AnnData, np.ndarray]:
+        with h5py.File(self.data_path, "r") as f:
+            x = np.array(f["X"])
+            y = np.array(f["Y"])
+        adata = ad.AnnData(x, dtype=np.float32)
+        return adata, y
 
-        data_mat = h5py.File(f"{self.data_dir}/{self.dataset}.h5", "r")
-        X = np.array(data_mat["X"])
-        adata = ad.AnnData(X, dtype=np.float32)
-        Y = np.array(data_mat["Y"])
-        return adata, Y
+    def _raw_to_dance(self, raw_data: Tuple[ad.AnnData, np.ndarray]):
+        adata, y = raw_data
+        adata.obsm["Group"] = y
+        data = Data(adata, train_size="all")
+        return data
 
 
 @dataclass
