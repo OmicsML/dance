@@ -50,7 +50,7 @@ class ScTAG(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         Computing device.
     alpha
         Parameter of soft assign.
-    pretrain_save_path
+    pretrain_path
         Path to save the pretrained autoencoder. If not specified, then do not save/load.
 
     """
@@ -65,12 +65,12 @@ class ScTAG(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         dropout: float = 0.2,
         device: str = "cuda",
         alpha: float = 1.0,
-        pretrain_save_path: Optional[str] = None,
+        pretrain_path: Optional[str] = None,
     ):
         super().__init__()
         self._is_pretrained = False
         self._in_dim = None
-        self.pretrain_save_path = pretrain_save_path
+        self.pretrain_path = pretrain_path
 
         self.dec_dim = dec_dim or [128, 256, 512]
         self.latent_dim = latent_dim

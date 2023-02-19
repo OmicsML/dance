@@ -70,7 +70,7 @@ if __name__ == "__main__":
     # Build and train moodel
     model = ScDCC(input_dim=in_dim, z_dim=32, n_clusters=n_clusters, encodeLayer=[256, 64], decodeLayer=[64, 256],
                   sigma=args.sigma, gamma=args.gamma, ml_weight=args.ml_weight, cl_weight=args.ml_weight,
-                  device=args.device, pretrain_path=args.ae_weights)
+                  device=args.device, pretrain_path=f"scdcc_{args.data_file}_pre.pkl")
     model.fit(inputs, y, lr=args.lr, batch_size=args.batch_size, epochs=args.epochs, ml_ind1=ml_ind1, ml_ind2=ml_ind2,
               cl_ind1=cl_ind1, cl_ind2=cl_ind2, update_interval=args.update_interval, tol=args.tol,
               pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)

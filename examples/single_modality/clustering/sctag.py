@@ -53,7 +53,7 @@ if __name__ == "__main__":
     # Build and train model
     model = ScTAG(n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
                   dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha,
-                  pretrain_save_path=f"sctag_{args.data_file}_pre.pkl")
+                  pretrain_path=f"sctag_{args.data_file}_pre.pkl")
     model.fit(inputs, y, epochs=args.epochs, pretrain_epochs=args.pretrain_epochs, lr=args.lr, w_a=args.w_a,
               w_x=args.w_x, w_c=args.w_c, w_d=args.w_d, info_step=args.info_step, max_dist=args.max_dist,
               min_dist=args.min_dist)
