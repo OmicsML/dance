@@ -33,7 +33,6 @@ if __name__ == "__main__":
     parser.add_argument("--update_interval", default=1, type=int)
     parser.add_argument("--tol", default=0.00001, type=float)
     parser.add_argument("--ae_weights", default=None)
-    parser.add_argument("--save_dir", default="results/scdcc/")
     parser.add_argument("--ae_weight_file", default="AE_weights.pth.tar")
     parser.add_argument("--device", default="auto")
     args = parser.parse_args()
@@ -73,12 +72,9 @@ if __name__ == "__main__":
                   device=args.device, pretrain_path=args.ae_weights)
 
     # Train model
-    if not os.path.exists(args.save_dir):
-        os.makedirs(args.save_dir)
     model.fit(X=x, X_raw=x_raw, n_counts=n_counts, y=y, lr=args.lr, batch_size=args.batch_size, num_epochs=args.maxiter,
               ml_ind1=ml_ind1, ml_ind2=ml_ind2, cl_ind1=cl_ind1, cl_ind2=cl_ind2, update_interval=args.update_interval,
-              tol=args.tol, save_dir=args.save_dir, pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr,
-              pt_epochs=args.pretrain_epochs)
+              tol=args.tol, pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
 
     y_pred = model.predict()
     print(f"Prediction (first ten): {y_pred[:10]}")

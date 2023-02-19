@@ -394,7 +394,6 @@ class ScDCC(nn.Module, TorchNNPretrain):
         num_epochs=10,
         update_interval=1,
         tol=1e-3,
-        save_dir="",
         pt_batch_size: int = 256,
         pt_lr: float = 0.001,
         pt_epochs: int = 400,
@@ -433,8 +432,6 @@ class ScDCC(nn.Module, TorchNNPretrain):
             update interval of soft label and target distribution.
         tol : float optional
             tolerance for training loss.
-        save_dir : str optional
-            path to save model weights.
         pt_batch_size
             Pretrain batch size.
         pt_lr
@@ -486,17 +483,6 @@ class ScDCC(nn.Module, TorchNNPretrain):
                 p = self.target_distribution(q).data
                 self.y_pred = self.predict()
 
-                # save current model
-                if delta_label < tol or epoch % 10 == 0:
-                    self.save_checkpoint(
-                        {
-                            'epoch': epoch + 1,
-                            'state_dict': self.state_dict(),
-                            'mu': self.mu,
-                            'p': p,
-                            'q': q,
-                            'y': y
-                        }, epoch + 1, filename=save_dir)
                 p_ = {f'epoch{epoch}': p}
                 q_ = {f'epoch{epoch}': q}
                 P = {**P, **p_}
