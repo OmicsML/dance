@@ -50,10 +50,12 @@ if __name__ == "__main__":
     parser.add_argument("--sigma", type=float, default=Balance_para[4])
     args = parser.parse_args()
 
+    # Load data
     adata, labels = ClusteringDataset("./data", args.name).load_data()
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
 
+    # Apply method specific preprocessing pipeline
     preprocessing_pipeline = ScDSC.preprocessing_pipeline(n_top_genes=args.nb_genes, n_neighbors=args.topk)
     preprocessing_pipeline(data)
 

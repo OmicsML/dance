@@ -38,10 +38,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     args.ae_weight_file = f"scdcc_{args.data_file}_{args.ae_weight_file}"
 
+    # Load data
     adata, labels = ClusteringDataset(args.data_dir, args.data_file).load_data()
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
 
+    # Apply method specific preprocessing pipeline
     preprocessing_pipeline = ScDCC.preprocessing_pipeline()
     preprocessing_pipeline(data)
 

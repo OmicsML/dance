@@ -39,10 +39,12 @@ if __name__ == "__main__":
                         choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
     args = parser.parse_args()
 
+    # Load data
     adata, labels = ClusteringDataset(args.data_dir, args.dataset).load_data()
     adata.obsm["labels"] = labels
     data = Data(adata, train_size="all")
 
+    # Apply method specific preprocessing pipeline
     preprocessing_pipeline = GraphSC.preprocessing_pipeline(
         n_top_genes=args.nb_genes,
         normalize_weights=args.normalize_weights,
@@ -54,6 +56,7 @@ if __name__ == "__main__":
     graph, y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
+    # Evaluate model for several runs
     for run in range(args.num_run):
         set_seed(run)
         model = GraphSC(agg=args.agg, activation=args.activation, in_feats=args.in_feats, n_hidden=args.n_hidden,
