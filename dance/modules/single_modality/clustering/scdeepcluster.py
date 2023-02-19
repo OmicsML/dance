@@ -20,7 +20,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 from sklearn import metrics
 from sklearn.cluster import KMeans
-from torch.autograd import Variable
 from torch.nn import Parameter
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -283,7 +282,7 @@ class ScDeepCluster(nn.Module):
         num_batch = int(math.ceil(1.0 * X.shape[0] / batch_size))
         for batch_idx in range(num_batch):
             xbatch = X[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
-            inputs = Variable(xbatch).to(self.device)
+            inputs = xbatch.to(self.device)
             z, _, _, _ = self.forwardAE(inputs)
             encoded.append(z.data)
 
@@ -350,9 +349,9 @@ class ScDeepCluster(nn.Module):
         for epoch in range(epochs):
             loss_val = 0
             for batch_idx, (x_batch, x_raw_batch, sf_batch) in enumerate(dataloader):
-                x_tensor = Variable(x_batch).to(self.device)
-                x_raw_tensor = Variable(x_raw_batch).to(self.device)
-                sf_tensor = Variable(sf_batch).to(self.device)
+                x_tensor = x_batch.to(self.device)
+                x_raw_tensor = x_raw_batch.to(self.device)
+                sf_tensor = sf_batch.to(self.device)
                 _, mean_tensor, disp_tensor, pi_tensor = self.forwardAE(x_tensor)
                 loss = self.zinb_loss(x=x_raw_tensor, mean=mean_tensor, disp=disp_tensor, pi=pi_tensor,
                                       scale_factor=sf_tensor)
@@ -498,10 +497,10 @@ class ScDeepCluster(nn.Module):
                 sfbatch = size_factor[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
                 pbatch = p[batch_idx * batch_size:min((batch_idx + 1) * batch_size, num)]
                 optimizer.zero_grad()
-                inputs = Variable(xbatch).to(self.device)
-                rawinputs = Variable(xrawbatch).to(self.device)
-                sfinputs = Variable(sfbatch).to(self.device)
-                target = Variable(pbatch).to(self.device)
+                inputs = xbatch.to(self.device)
+                rawinputs = xrawbatch.to(self.device)
+                sfinputs = sfbatch.to(self.device)
+                target = pbatch.to(self.device)
 
                 zbatch, qbatch, meanbatch, dispbatch, pibatch = self.forward(inputs)
 
