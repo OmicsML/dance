@@ -9,11 +9,12 @@ neural network." Briefings in Bioinformatics 23.2 (2022): bbac018.
 
 """
 import numpy as np
+import pandas as pd
 import scanpy as sc
+import scipy.sparse as sp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sklearn import metrics
 from torch.nn import Linear
 from torch.nn.parameter import Parameter
 from torch.optim import Adam
@@ -24,10 +25,9 @@ from dance.modules.base import BaseClusteringMethod, TorchNNPretrain
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
 from dance.transforms.graph import NeighborGraph
 from dance.transforms.preprocess import sparse_mx_to_torch_sparse_tensor
-from dance.typing import Any, LogLevel, Optional
+from dance.typing import Any, LogLevel, Optional, Tuple
 from dance.utils import get_device
 from dance.utils.loss import ZINBLoss
-from dance.utils.metrics import cluster_acc
 
 
 class ScDSC(TorchNNPretrain, BaseClusteringMethod):
@@ -198,17 +198,17 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
 
     def fit(
         self,
-        inputs,
-        y,
-        lr=1e-03,
-        n_epochs=300,
-        bcl=0.1,
-        cl=0.01,
-        rl=1,
-        zl=0.1,
-        pt_epochs=200,
-        pt_batch_size=256,
-        pt_lr=1e-3,
+        inputs: Tuple[sp.spmatrix, np.ndarray, np.ndarray, pd.Series],
+        y: np.ndarray,
+        lr: float = 1e-03,
+        n_epochs: int = 300,
+        bcl: float = 0.1,
+        cl: float = 0.01,
+        rl: float = 1,
+        zl: float = 0.1,
+        pt_epochs: int = 200,
+        pt_batch_size: int = 256,
+        pt_lr: float = 1e-3,
     ):
         """Train model.
 
