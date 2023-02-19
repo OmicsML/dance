@@ -23,6 +23,7 @@ from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, TensorDataset
 
+from dance.modules.base import TorchNNPretrain
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
 from dance.transforms.graph import NeighborGraph
 from dance.transforms.preprocess import sparse_mx_to_torch_sparse_tensor
@@ -32,7 +33,7 @@ from dance.utils.loss import ZINBLoss
 from dance.utils.metrics import cluster_acc
 
 
-class ScDSC:
+class ScDSC(TorchNNPretrain):
     """scDSC wrapper class.
 
     Parameters
@@ -89,9 +90,9 @@ class ScDSC:
         device: str = "auto",
     ):
         super().__init__()
+        self.pretrain_path = pretrain_path
         self.device = get_device(device)
         self.model = ScDSCModel(
-            pretrain_path=pretrain_path,
             sigma=sigma,
             n_enc_1=n_enc_1,
             n_enc_2=n_enc_2,
@@ -164,7 +165,7 @@ class ScDSC:
         p = q**2 / q.sum(0)
         return (p.t() / p.sum(1)).t()
 
-    def pretrain_ae(self, x, batch_size, n_epochs, fname, lr=1e-3):
+    def pretrain(self, x, batch_size=256, n_epochs=200, lr=1e-3):
         """Pretrain autoencoder.
 
         Parameters
@@ -177,12 +178,9 @@ class ScDSC:
             Number of epochs.
         lr
             Learning rate.
-        fname
-            Path to save autoencoder weights.
 
         """
         print("Pretrain:")
-        device = self.device
         x_tensor = torch.from_numpy(x)
         train_loader = DataLoader(TensorDataset(x_tensor), batch_size, shuffle=True)
         model = self.model_pre
@@ -191,7 +189,7 @@ class ScDSC:
 
             total_loss = total_size = 0
             for batch_idx, (x_batch, ) in enumerate(train_loader):
-                x_batch = x_batch.to(device)
+                x_batch = x_batch.to(self.device)
                 x_bar, _, _, _, _, _, _, _ = model(x_batch)
 
                 loss = F.mse_loss(x_bar, x_batch)
@@ -205,9 +203,32 @@ class ScDSC:
 
             print(f"Pretrain epoch {epoch + 1:4d}, MSE loss:{total_loss / total_size:.8f}")
 
-        torch.save(model.state_dict(), fname)
+        self.model.ae.load_state_dict(self.model_pre.state_dict())
 
-    def fit(self, x, y, X_raw, n_counts, adj, lr=1e-03, n_epochs=300, bcl=0.1, cl=0.01, rl=1, zl=0.1):
+    def save_pretrained(self, path):
+        torch.save(self.model_pre.state_dict(), path)
+
+    def load_pretrained(self, path):
+        checkpoint = torch.load(self.pretrain_path, map_location=self.device)
+        self.model.ae.load_state_dict(checkpoint)
+
+    def fit(
+        self,
+        x,
+        y,
+        X_raw,
+        n_counts,
+        adj,
+        lr=1e-03,
+        n_epochs=300,
+        bcl=0.1,
+        cl=0.01,
+        rl=1,
+        zl=0.1,
+        pt_epochs=200,
+        pt_batch_size=256,
+        pt_lr=1e-3,
+    ):
         """Train model.
 
         Parameters
@@ -236,10 +257,12 @@ class ScDSC:
             Parameter of ZINB loss.
 
         """
+        self._pretrain(x, batch_size=pt_batch_size, n_epochs=pt_epochs, lr=pt_lr)
+
         print("Train:")
         device = self.device
         model = self.model
-        optimizer = Adam(model.parameters(), lr=lr)
+        optimizer = Adam(filter(lambda x: x.requires_grad, model.parameters()), lr=lr)
         # optimizer = RAdam(model.parameters(), lr=lr)
 
         adj = sparse_mx_to_torch_sparse_tensor(adj).to(device)
@@ -331,8 +354,6 @@ class ScDSCModel(nn.Module):
 
     Parameters
     ----------
-    pretrain_path
-        Path of saved autoencoder weights.
     sigma
         Balance parameter.
     n_enc_1
@@ -366,7 +387,6 @@ class ScDSCModel(nn.Module):
 
     def __init__(
         self,
-        pretrain_path: str,
         sigma: float = 1,
         n_enc_1: int = 512,
         n_enc_2: int = 256,
@@ -383,9 +403,9 @@ class ScDSCModel(nn.Module):
         device: str = "auto",
     ):
         super().__init__()
-        device = get_device(device)
+        self.device = get_device(device)
         self.sigma = sigma
-        self.pretrain_path = pretrain_path
+
         self.ae = AE(
             n_enc_1=n_enc_1,
             n_enc_2=n_enc_2,
@@ -398,6 +418,9 @@ class ScDSCModel(nn.Module):
             n_z2=n_z2,
             n_z3=n_z3,
         )
+        for p in self.ae.parameters():
+            p.requires_grad = False
+
         self.gnn_1 = GNNLayer(n_input, n_enc_1)
         self.gnn_2 = GNNLayer(n_enc_1, n_enc_2)
         self.gnn_3 = GNNLayer(n_enc_2, n_enc_3)
@@ -414,7 +437,9 @@ class ScDSCModel(nn.Module):
         self._dec_pi = nn.Sequential(nn.Linear(n_dec_3, n_input), nn.Sigmoid())
         # degree
         self.v = v
-        self.zinb_loss = ZINBLoss().to(device)
+        self.zinb_loss = ZINBLoss().to(self.device)
+
+        self.to(self.device)
 
     def forward(self, x, adj):
         """Forward propagation.
@@ -447,11 +472,10 @@ class ScDSCModel(nn.Module):
 
         """
         # DNN Module
-        self.ae.load_state_dict(torch.load(self.pretrain_path, map_location='cpu'))
         x_bar, tra1, tra2, tra3, z3, z2, z1, dec_h3 = self.ae(x)
 
-        sigma = self.sigma
         # GCN Module
+        sigma = self.sigma
         h = self.gnn_1(x, adj)
         h = self.gnn_2((1 - sigma) * h + sigma * tra1, adj)
         h = self.gnn_3((1 - sigma) * h + sigma * tra2, adj)

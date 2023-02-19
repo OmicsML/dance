@@ -62,18 +62,15 @@ if __name__ == "__main__":
     (x, x_raw, n_counts, adj), y = data.get_data(return_type="default")
     args.n_input = x.shape[1]
 
-    # Pretrain AE
-    pretrain_path = f"{args.name}_pre.pkl"
-    model = ScDSC(pretrain_path=pretrain_path, sigma=args.sigma, n_enc_1=args.n_enc_1, n_enc_2=args.n_enc_2,
-                  n_enc_3=args.n_enc_3, n_dec_1=args.n_dec_1, n_dec_2=args.n_dec_2, n_dec_3=args.n_dec_3,
-                  n_z1=args.n_z1, n_z2=args.n_z2, n_z3=args.n_z3, n_clusters=args.n_clusters, n_input=args.n_input,
-                  v=args.v, device=args.device)
-    if not os.path.exists(pretrain_path):
-        model.pretrain_ae(x, args.batch_size, args.pretrain_epochs, pretrain_path)
+    model = ScDSC(pretrain_path=f"{args.name}_scdcs_pre.pkl", sigma=args.sigma, n_enc_1=args.n_enc_1,
+                  n_enc_2=args.n_enc_2, n_enc_3=args.n_enc_3, n_dec_1=args.n_dec_1, n_dec_2=args.n_dec_2,
+                  n_dec_3=args.n_dec_3, n_z1=args.n_z1, n_z2=args.n_z2, n_z3=args.n_z3, n_clusters=args.n_clusters,
+                  n_input=args.n_input, v=args.v, device=args.device)
 
     # Train scDSC
     model.fit(x, y, x_raw, n_counts, adj, lr=args.lr, n_epochs=args.n_epochs, bcl=args.binary_crossentropy_loss,
-              cl=args.ce_loss, rl=args.re_loss, zl=args.zinb_loss)
+              cl=args.ce_loss, rl=args.re_loss, zl=args.zinb_loss, pt_epochs=args.pretrain_epochs,
+              pt_batch_size=args.batch_size, pt_lr=args.lr)
     print(f"Running Time：{int(time() - time_start)} seconds")
 
     y_pred = model.predict()
