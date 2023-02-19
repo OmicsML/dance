@@ -3,7 +3,6 @@ import os
 
 import numpy as np
 
-from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdcc import ScDCC
 from dance.transforms.preprocess import generate_random_pair
@@ -17,7 +16,7 @@ if __name__ == "__main__":
     parser.add_argument("--n_pairwise_error", default=0, type=float)
     parser.add_argument("--batch_size", default=256, type=int)
     parser.add_argument("--data_dir", default="./data")
-    parser.add_argument("--data_file", default="mouse_ES_cell", type=str,
+    parser.add_argument("--dataset", default="mouse_ES_cell", type=str,
                         choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
     parser.add_argument("--epochs", default=500, type=int)
     parser.add_argument("--pretrain_epochs", default=50, type=int)
@@ -33,17 +32,14 @@ if __name__ == "__main__":
     parser.add_argument("--ae_weight_file", default="AE_weights.pth.tar")
     parser.add_argument("--device", default="auto")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     args = parser.parse_args()
     set_seed(args.seed)
 
-    # Load data
-    adata, labels = ClusteringDataset(args.data_dir, args.data_file).load_data()
-    adata.obsm["Group"] = labels
-    data = Data(adata, train_size="all")
-
-    # Apply method specific preprocessing pipeline
+    # Load data and perform necessary preprocessing
+    dataloader = ClusteringDataset(args.data_dir, args.dataset)
     preprocessing_pipeline = ScDCC.preprocessing_pipeline()
-    preprocessing_pipeline(data)
+    data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
     # inputs: x, x_raw, n_counts
     inputs, y = data.get_train_data()
@@ -70,7 +66,7 @@ if __name__ == "__main__":
     # Build and train moodel
     model = ScDCC(input_dim=in_dim, z_dim=32, n_clusters=n_clusters, encodeLayer=[256, 64], decodeLayer=[64, 256],
                   sigma=args.sigma, gamma=args.gamma, ml_weight=args.ml_weight, cl_weight=args.ml_weight,
-                  device=args.device, pretrain_path=f"scdcc_{args.data_file}_pre.pkl")
+                  device=args.device, pretrain_path=f"scdcc_{args.dataset}_pre.pkl")
     model.fit(inputs, y, lr=args.lr, batch_size=args.batch_size, epochs=args.epochs, ml_ind1=ml_ind1, ml_ind2=ml_ind2,
               cl_ind1=cl_ind1, cl_ind2=cl_ind2, update_interval=args.update_interval, tol=args.tol,
               pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
@@ -80,14 +76,14 @@ if __name__ == "__main__":
     print(f"{score=:.4f}")
 """ Reproduction information
 10X PBMC:
-python scdcc.py --data_file 10X_PBMC --label_cells_files label_10X_PBMC.txt --gamma=1.5
+python scdcc.py --dataset 10X_PBMC --label_cells_files label_10X_PBMC.txt --gamma=1.5
 
 Mouse ES:
-python scdcc.py --data_file mouse_ES_cell --label_cells_files label_mouse_ES_cell.txt --gamma 1 --ml_weight 0.8 --cl_weight 0.8
+python scdcc.py --dataset mouse_ES_cell --label_cells_files label_mouse_ES_cell.txt --gamma 1 --ml_weight 0.8 --cl_weight 0.8
 
 Worm Neuron:
-python scdcc.py --data_file worm_neuron_cell --label_cells_files label_worm_neuron_cell.txt --gamma 1 --pretrain_epochs 300
+python scdcc.py --dataset worm_neuron_cell --label_cells_files label_worm_neuron_cell.txt --gamma 1 --pretrain_epochs 300
 
 Mouse Bladder:
-python scdcc.py --data_file mouse_bladder_cell --label_cells_files label_mouse_bladder_cell.txt --gamma 1.5 --pretrain_epochs 100 --sigma 3
+python scdcc.py --dataset mouse_bladder_cell --label_cells_files label_mouse_bladder_cell.txt --gamma 1.5 --pretrain_epochs 100 --sigma 3
 """

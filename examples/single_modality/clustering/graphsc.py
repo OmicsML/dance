@@ -2,7 +2,6 @@ import argparse
 
 import numpy as np
 
-from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.graphsc import GraphSC
 from dance.utils import set_seed
@@ -38,22 +37,19 @@ if __name__ == "__main__":
     parser.add_argument("-data", "--dataset", default="10X_PBMC",
                         choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     args = parser.parse_args()
     set_seed(args.seed)
 
-    # Load data
-    adata, labels = ClusteringDataset(args.data_dir, args.dataset).load_data()
-    adata.obsm["labels"] = labels
-    data = Data(adata, train_size="all")
-
-    # Apply method specific preprocessing pipeline
+    # Load data and perform necessary preprocessing
+    dataloader = ClusteringDataset(args.data_dir, args.dataset)
     preprocessing_pipeline = GraphSC.preprocessing_pipeline(
         n_top_genes=args.nb_genes,
         normalize_weights=args.normalize_weights,
         n_components=args.in_feats,
         normalize_edges=args.edge_norm,
     )
-    preprocessing_pipeline(data)
+    data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
     graph, y = data.get_train_data()
     n_clusters = len(np.unique(y))
@@ -69,7 +65,7 @@ if __name__ == "__main__":
         model.fit(graph, epochs=args.epochs, lr=args.learning_rate, show_epoch_ari=args.show_epoch_ari,
                   eval_epoch=args.eval_epoch)
         score = model.score(None, y)
-        print(f"{score:=.4f}")
+        print(f"{score=:.4f}")
 """ Reproduction information
 10X PBMC:
 python graphsc.py --dataset 10X_PBMC
