@@ -56,8 +56,8 @@ if __name__ == "__main__":
                           sigma=args.sigma, gamma=args.gamma, device=args.device)
     t0 = time()
     if args.ae_weights is None:
-        model.pretrain_autoencoder(X=x, X_raw=x_raw, n_counts=n_counts, batch_size=args.batch_size,
-                                   epochs=args.pretrain_epochs, ae_weights=args.ae_weight_file)
+        model.pretrain(X=x, X_raw=x_raw, n_counts=n_counts, batch_size=args.batch_size, epochs=args.pretrain_epochs,
+                       ae_weights=args.ae_weight_file)
     else:
         if os.path.isfile(args.ae_weights):
             print(f"==> loading checkpoint {args.ae_weights}")

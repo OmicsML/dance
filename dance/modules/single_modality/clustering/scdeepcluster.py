@@ -313,8 +313,8 @@ class ScDeepCluster(nn.Module):
         kldloss = kld(p, q)
         return self.gamma * kldloss
 
-    def pretrain_autoencoder(self, X, X_raw, n_counts, batch_size=256, lr=0.001, epochs=400, ae_save=True,
-                             ae_weights='AE_weights.pth.tar'):
+    def pretrain(self, X, X_raw, n_counts, batch_size=256, lr=0.001, epochs=400, ae_save=True,
+                 ae_weights='AE_weights.pth.tar'):
         """Pretrain autoencoder.
 
         Parameters
@@ -450,6 +450,7 @@ class ScDeepCluster(nn.Module):
         P = {}
         Q = {}
 
+        delta_label = np.inf
         for epoch in range(num_epochs):
             if epoch % update_interval == 0:
                 # update the targe distribution p
@@ -460,7 +461,7 @@ class ScDeepCluster(nn.Module):
                 self.y_pred = self.predict()
 
                 # save current model
-                if (epoch > 0 and delta_label < tol) or epoch % 10 == 0:
+                if delta_label or epoch % 10 == 0:
                     self.save_checkpoint(
                         {
                             'epoch': epoch + 1,
