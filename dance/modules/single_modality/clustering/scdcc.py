@@ -17,17 +17,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from sklearn import metrics
 from sklearn.cluster import KMeans
 from torch.nn import Parameter
 from torch.utils.data import DataLoader, TensorDataset
 
-from dance.modules.base import TorchNNPretrain
+from dance.modules.base import BaseClusteringMethod, TorchNNPretrain
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
-from dance.typing import LogLevel, Optional
+from dance.typing import Any, LogLevel, Optional
 from dance.utils import get_device
 from dance.utils.loss import ZINBLoss
-from dance.utils.metrics import cluster_acc
 
 
 def buildNetwork(layers, type, activation="relu"):
@@ -59,7 +57,7 @@ def buildNetwork(layers, type, activation="relu"):
     return net
 
 
-class ScDCC(nn.Module, TorchNNPretrain):
+class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
     """scDCC class.
 
     Parameters
@@ -497,7 +495,7 @@ class ScDCC(nn.Module, TorchNNPretrain):
                     break
 
                 # calculate ari score for model selection
-                _, _, ari = self.score(y)
+                ari = self.score(None, y)
                 aris.append(ari)
 
             # train 1 epoch for clustering loss
@@ -577,45 +575,39 @@ class ScDCC(nn.Module, TorchNNPretrain):
         index = update_interval * np.argmax(aris)
         self.q = Q[f'epoch{index}']
 
-    def predict(self):
+    def predict_proba(self, x: Optional[Any] = None) -> np.ndarray:
+        """Get the predicted propabilities for each cell.
+
+        Parameters
+        ----------
+        x
+            Not used, for compatibility with the BaseClusteringMethod class.
+
+        Returns
+        -------
+        pred_prop
+            Predicted probability for each cell.
+
+        """
+        pred_prob = self.q.detach().clone().cpu().numpy()
+        return pred_prob
+
+    def predict(self, x: Optional[Any] = None) -> np.ndarray:
         """Get predictions from the trained model.
 
         Parameters
         ----------
-        None.
+        x
+            Not used, for compatibility with the BaseClusteringMethod class.
 
         Returns
         -------
-        y_pred : np.array
-            prediction of given clustering method.
+        pred
+            Predicted clustering assignment for each cell.
 
         """
-        y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
-        return y_pred
-
-    def score(self, y):
-        """Evaluate the trained model.
-
-        Parameters
-        ----------
-        y : list
-            true labels.
-
-        Returns
-        -------
-        acc : float
-            accuracy.
-        nmi : float
-            normalized mutual information.
-        ari : float
-            adjusted Rand index.
-
-        """
-        y_pred = torch.argmax(self.q, dim=1).data.cpu().numpy()
-        acc = np.round(cluster_acc(y, y_pred), 5)
-        nmi = np.round(metrics.normalized_mutual_info_score(y, y_pred), 5)
-        ari = np.round(metrics.adjusted_rand_score(y, y_pred), 5)
-        return acc, nmi, ari
+        pred = self.predict_proba().argmax(1)
+        return pred
 
 
 class MeanAct(nn.Module):
