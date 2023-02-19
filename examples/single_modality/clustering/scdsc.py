@@ -5,9 +5,6 @@ from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdsc import ScDSC
 from dance.utils import set_seed
 
-# for repeatability
-set_seed(42)
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
@@ -20,7 +17,6 @@ if __name__ == "__main__":
 
     parser.add_argument("--name", type=str, default="worm_neuron_cell",
                         choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
-    parser.add_argument("--pretrain_path", type=str, default="worm_neuron_cell")
     # TODO: implement callbacks for "heat_kernel" and "cosine_normalized"
     parser.add_argument("--method", type=str, default="correlation", choices=["cosine", "correlation"])
     parser.add_argument("--batch_size", default=256, type=int)
@@ -34,7 +30,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=1e-2)
     parser.add_argument("--pretrain_lr", type=float, default=1e-3)
     parser.add_argument("--pretrain_epochs", type=int, default=200)
-    parser.add_argument("--n_epochs", type=int, default=1000)
+    parser.add_argument("--epochs", type=int, default=1000)
     parser.add_argument("--n_z1", default=Cluster_para[0], type=int)
     parser.add_argument("--n_z2", default=Cluster_para[1], type=int)
     parser.add_argument("--n_z3", default=Cluster_para[2], type=int)
@@ -48,12 +44,16 @@ if __name__ == "__main__":
     parser.add_argument("--re_loss", type=float, default=Balance_para[2])
     parser.add_argument("--zinb_loss", type=float, default=Balance_para[3])
     parser.add_argument("--sigma", type=float, default=Balance_para[4])
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+    set_seed(args.seed)
 
+    # Load data
     adata, labels = ClusteringDataset("./data", args.name).load_data()
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
 
+    # Apply method specific preprocessing pipeline
     preprocessing_pipeline = ScDSC.preprocessing_pipeline(n_top_genes=args.nb_genes, n_neighbors=args.topk)
     preprocessing_pipeline(data)
 
@@ -61,13 +61,13 @@ if __name__ == "__main__":
     inputs, y = data.get_data(return_type="default")
     args.n_input = inputs[1].shape[1]
 
-    model = ScDSC(pretrain_path=f"{args.name}_scdcs_pre.pkl", sigma=args.sigma, n_enc_1=args.n_enc_1,
+    model = ScDSC(pretrain_path=f"scdsc_{args.name}_pre.pkl", sigma=args.sigma, n_enc_1=args.n_enc_1,
                   n_enc_2=args.n_enc_2, n_enc_3=args.n_enc_3, n_dec_1=args.n_dec_1, n_dec_2=args.n_dec_2,
                   n_dec_3=args.n_dec_3, n_z1=args.n_z1, n_z2=args.n_z2, n_z3=args.n_z3, n_clusters=args.n_clusters,
                   n_input=args.n_input, v=args.v, device=args.device)
 
     # Build and train model
-    model.fit(inputs, y, lr=args.lr, n_epochs=args.n_epochs, bcl=args.binary_crossentropy_loss, cl=args.ce_loss,
+    model.fit(inputs, y, lr=args.lr, epochs=args.epochs, bcl=args.binary_crossentropy_loss, cl=args.ce_loss,
               rl=args.re_loss, zl=args.zinb_loss, pt_epochs=args.pretrain_epochs, pt_batch_size=args.batch_size,
               pt_lr=args.pretrain_lr)
 

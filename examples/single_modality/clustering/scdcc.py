@@ -9,9 +9,6 @@ from dance.modules.single_modality.clustering.scdcc import ScDCC
 from dance.transforms.preprocess import generate_random_pair
 from dance.utils import set_seed
 
-# for repeatability
-set_seed(42)
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="train", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--label_cells", default=0.1, type=float)
@@ -22,7 +19,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_dir", default="./data")
     parser.add_argument("--data_file", default="mouse_ES_cell", type=str,
                         choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
-    parser.add_argument("--maxiter", default=500, type=int)
+    parser.add_argument("--epochs", default=500, type=int)
     parser.add_argument("--pretrain_epochs", default=50, type=int)
     parser.add_argument("--lr", default=0.01, type=float)
     parser.add_argument("--pretrain_lr", default=0.001, type=float)
@@ -35,13 +32,16 @@ if __name__ == "__main__":
     parser.add_argument("--ae_weights", default=None)
     parser.add_argument("--ae_weight_file", default="AE_weights.pth.tar")
     parser.add_argument("--device", default="auto")
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
-    args.ae_weight_file = f"scdcc_{args.data_file}_{args.ae_weight_file}"
+    set_seed(args.seed)
 
+    # Load data
     adata, labels = ClusteringDataset(args.data_dir, args.data_file).load_data()
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
 
+    # Apply method specific preprocessing pipeline
     preprocessing_pipeline = ScDCC.preprocessing_pipeline()
     preprocessing_pipeline(data)
 
@@ -70,9 +70,9 @@ if __name__ == "__main__":
     # Build and train moodel
     model = ScDCC(input_dim=in_dim, z_dim=32, n_clusters=n_clusters, encodeLayer=[256, 64], decodeLayer=[64, 256],
                   sigma=args.sigma, gamma=args.gamma, ml_weight=args.ml_weight, cl_weight=args.ml_weight,
-                  device=args.device, pretrain_path=args.ae_weights)
-    model.fit(inputs, y, lr=args.lr, batch_size=args.batch_size, num_epochs=args.maxiter, ml_ind1=ml_ind1,
-              ml_ind2=ml_ind2, cl_ind1=cl_ind1, cl_ind2=cl_ind2, update_interval=args.update_interval, tol=args.tol,
+                  device=args.device, pretrain_path=f"scdcc_{args.data_file}_pre.pkl")
+    model.fit(inputs, y, lr=args.lr, batch_size=args.batch_size, epochs=args.epochs, ml_ind1=ml_ind1, ml_ind2=ml_ind2,
+              cl_ind1=cl_ind1, cl_ind2=cl_ind2, update_interval=args.update_interval, tol=args.tol,
               pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
 
     # Evaluate model predictions

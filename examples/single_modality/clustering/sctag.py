@@ -1,25 +1,17 @@
 import argparse
-import random
 
 import numpy as np
-import torch
 
 from dance.data import Data
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.sctag import ScTAG
-
-# for repeatability
-random.seed(42)
-np.random.seed(42)
-torch.manual_seed(42)
-torch.cuda.manual_seed(42)
+from dance.utils import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="train", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--data_dir", default="./data", type=str)
     parser.add_argument("--data_file", default="mouse_bladder_cell", type=str,
                         choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
-    parser.add_argument("--pretrain_file", type=str, default="./sctag_mouse_bladder_cell_pre.pkl")
     parser.add_argument("--k_neighbor", default=15, type=int)
     parser.add_argument("--highly_genes", default=3000, type=int)
     parser.add_argument("--pca_dim", default=50, type=int)
@@ -40,14 +32,16 @@ if __name__ == "__main__":
     parser.add_argument("--min_dist", default=0.5, type=float)
     parser.add_argument("--max_dist", default=20.0, type=float)
     parser.add_argument("--info_step", default=50, type=int)
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
-    args.pretrain_file = f"sctag_{args.data_file}_pre.pkl"
+    set_seed(args.seed)
 
     # Load data
     adata, labels = ClusteringDataset(args.data_dir, args.data_file).load_data()
     adata.obsm["Group"] = labels
     data = Data(adata, train_size="all")
 
+    # Apply method specific preprocessing pipeline
     preprocessing_pipeline = ScTAG.preprocessing_pipeline(n_top_genes=args.highly_genes, n_components=args.pca_dim,
                                                           n_neighbors=args.k_neighbor)
     preprocessing_pipeline(data)
@@ -59,7 +53,7 @@ if __name__ == "__main__":
     # Build and train model
     model = ScTAG(n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
                   dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha,
-                  pretrain_save_path=args.pretrain_file)
+                  pretrain_path=f"sctag_{args.data_file}_pre.pkl")
     model.fit(inputs, y, epochs=args.epochs, pretrain_epochs=args.pretrain_epochs, lr=args.lr, w_a=args.w_a,
               w_x=args.w_x, w_c=args.w_c, w_d=args.w_d, info_step=args.info_step, max_dist=args.max_dist,
               min_dist=args.min_dist)

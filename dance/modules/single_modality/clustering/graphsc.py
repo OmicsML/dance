@@ -24,6 +24,7 @@ from sklearn.cluster import KMeans
 from torch.nn.functional import binary_cross_entropy_with_logits as BCELoss
 from tqdm import tqdm
 
+from dance import logger
 from dance.modules.base import BaseClusteringMethod
 from dance.transforms import AnnDataTransform, Compose, SetConfig
 from dance.transforms.graph import PCACellFeatureGraph
@@ -150,7 +151,7 @@ class GraphSC(BaseClusteringMethod):
         g: dgl.DGLGraph,
         y: Optional[Any] = None,
         *,
-        n_epochs: int = 100,
+        epochs: int = 100,
         lr: float = 1e-5,
         batch_size: int = 128,
         show_epoch_ari: bool = False,
@@ -164,7 +165,7 @@ class GraphSC(BaseClusteringMethod):
             Input cell-gene graph.
         y
             Not used, for compatibility with the BaseClusteringMethod class.
-        n_epochs
+        epochs
             Number of epochs.
         lr
             Learning rate.
@@ -188,7 +189,7 @@ class GraphSC(BaseClusteringMethod):
         aris = []
         Z = {}
 
-        for epoch in tqdm(range(n_epochs)):
+        for epoch in tqdm(range(epochs)):
             self.model.train()
             z = []
             y = []
@@ -233,11 +234,11 @@ class GraphSC(BaseClusteringMethod):
                 score = self.score(None, y)
                 aris.append(score)
                 if show_epoch_ari:
-                    print(f"epoch {epoch}, ARI {score}")
+                    logger.info(f"epoch {epoch:4d}, ARI {score:.4f}")
                 z_ = {f"epoch{epoch}": z}
                 Z = {**Z, **z_}
 
-            elif epoch == n_epochs - 1:
+            elif epoch == epochs - 1:
                 self.z = z
 
         if eval_epoch:
@@ -503,8 +504,6 @@ class WeightedGraphConvAlpha(GraphConv):
         h = edges.src["h"] * self.alpha[indices.squeeze()]
         return {"m": h}
 
-    #         return {"m": h * edges.data["weight"]}
-
     def forward(self, graph, feat, weight=None, alpha=None, gene_num=None):
         self.alpha = alpha
         self.gene_num = gene_num
@@ -523,7 +522,6 @@ class WeightedGraphConvAlpha(GraphConv):
 
             # (BarclayII) For RGCN on heterogeneous graphs we need to support GCN on bipartite.
             feat_src, feat_dst = expand_as_pair(feat, graph)
-            #             print(f"feat_src : {feat_src.shape}, feat_dst {feat_dst.shape}")
             if self._norm == "both":
                 degs = graph.out_degrees().float().clamp(min=1)
                 norm = torch.pow(degs, -0.5)

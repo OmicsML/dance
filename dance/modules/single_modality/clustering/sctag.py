@@ -25,6 +25,7 @@ from dance.modules.base import BaseClusteringMethod, TorchNNPretrain
 from dance.transforms import AnnDataTransform, CellPCA, Compose, SaveRaw, SetConfig
 from dance.transforms.graph import NeighborGraph
 from dance.typing import Any, LogLevel, Optional, Tuple
+from dance.utils import get_device
 from dance.utils.loss import ZINBLoss, dist_loss
 
 
@@ -49,7 +50,7 @@ class ScTAG(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         Computing device.
     alpha
         Parameter of soft assign.
-    pretrain_save_path
+    pretrain_path
         Path to save the pretrained autoencoder. If not specified, then do not save/load.
 
     """
@@ -64,17 +65,17 @@ class ScTAG(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         dropout: float = 0.2,
         device: str = "cuda",
         alpha: float = 1.0,
-        pretrain_save_path: Optional[str] = None,
+        pretrain_path: Optional[str] = None,
     ):
         super().__init__()
         self._is_pretrained = False
         self._in_dim = None
-        self.pretrain_save_path = pretrain_save_path
+        self.pretrain_path = pretrain_path
 
         self.dec_dim = dec_dim or [128, 256, 512]
         self.latent_dim = latent_dim
         self.hidden_dim = hidden_dim
-        self.device = device
+        self.device = get_device(device)
         self.dropout = dropout
         self.n_clusters = n_clusters
         self.alpha = alpha

@@ -37,12 +37,16 @@ if __name__ == "__main__":
     parser.add_argument("-dd", "--data_dir", default="./data", type=str)
     parser.add_argument("-data", "--dataset", default="10X_PBMC",
                         choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+    set_seed(args.seed)
 
+    # Load data
     adata, labels = ClusteringDataset(args.data_dir, args.dataset).load_data()
     adata.obsm["labels"] = labels
     data = Data(adata, train_size="all")
 
+    # Apply method specific preprocessing pipeline
     preprocessing_pipeline = GraphSC.preprocessing_pipeline(
         n_top_genes=args.nb_genes,
         normalize_weights=args.normalize_weights,
@@ -54,14 +58,15 @@ if __name__ == "__main__":
     graph, y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
+    # Evaluate model for several runs
     for run in range(args.num_run):
-        set_seed(run)
+        set_seed(args.seed + run)
         model = GraphSC(agg=args.agg, activation=args.activation, in_feats=args.in_feats, n_hidden=args.n_hidden,
                         hidden_dim=args.hidden_dim, hidden_1=args.hidden_1, hidden_2=args.hidden_2,
                         dropout=args.dropout, n_layers=args.n_layers, hidden_relu=args.hidden_relu,
                         hidden_bn=args.hidden_bn, n_clusters=n_clusters, cluster_method="leiden",
                         num_workers=args.num_workers, device=args.device)
-        model.fit(graph, n_epochs=args.epochs, lr=args.learning_rate, show_epoch_ari=args.show_epoch_ari,
+        model.fit(graph, epochs=args.epochs, lr=args.learning_rate, show_epoch_ari=args.show_epoch_ari,
                   eval_epoch=args.eval_epoch)
         score = model.score(None, y)
         print(f"{score:=.4f}")
