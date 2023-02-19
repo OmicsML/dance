@@ -45,8 +45,10 @@ if __name__ == "__main__":
     preprocessing_pipeline = ScDCC.preprocessing_pipeline()
     preprocessing_pipeline(data)
 
-    (x, x_raw, n_counts), y = data.get_train_data()
+    # inputs: x, x_raw, n_counts
+    inputs, y = data.get_train_data()
     n_clusters = len(np.unique(y))
+    in_dim = inputs[0].shape[1]
 
     # Generate random pairs
     if not os.path.exists(args.label_cells_files):
@@ -66,12 +68,12 @@ if __name__ == "__main__":
         ml_ind1, ml_ind2, cl_ind1, cl_ind2 = np.array([]), np.array([]), np.array([]), np.array([])
 
     # Build and train moodel
-    model = ScDCC(input_dim=x.shape[1], z_dim=32, n_clusters=n_clusters, encodeLayer=[256, 64], decodeLayer=[64, 256],
+    model = ScDCC(input_dim=in_dim, z_dim=32, n_clusters=n_clusters, encodeLayer=[256, 64], decodeLayer=[64, 256],
                   sigma=args.sigma, gamma=args.gamma, ml_weight=args.ml_weight, cl_weight=args.ml_weight,
                   device=args.device, pretrain_path=args.ae_weights)
-    model.fit(X=x, X_raw=x_raw, n_counts=n_counts, y=y, lr=args.lr, batch_size=args.batch_size, num_epochs=args.maxiter,
-              ml_ind1=ml_ind1, ml_ind2=ml_ind2, cl_ind1=cl_ind1, cl_ind2=cl_ind2, update_interval=args.update_interval,
-              tol=args.tol, pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
+    model.fit(inputs, y, lr=args.lr, batch_size=args.batch_size, num_epochs=args.maxiter, ml_ind1=ml_ind1,
+              ml_ind2=ml_ind2, cl_ind1=cl_ind1, cl_ind2=cl_ind2, update_interval=args.update_interval, tol=args.tol,
+              pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
 
     # Evaluate model predictions
     score = model.score(None, y)

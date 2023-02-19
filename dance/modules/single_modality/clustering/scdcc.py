@@ -23,7 +23,7 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from dance.modules.base import BaseClusteringMethod, TorchNNPretrain
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
-from dance.typing import Any, List, LogLevel, Optional
+from dance.typing import Any, List, LogLevel, Optional, Tuple
 from dance.utils import get_device
 from dance.utils.loss import ZINBLoss
 
@@ -345,16 +345,14 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
     def fit(
         self,
-        X: np.ndarray,
-        X_raw: np.ndarray,
-        n_counts: np.ndarray,
+        inputs: Tuple[np.ndarray, np.ndarray, np.ndarray],
+        y: np.ndarray = None,
         ml_ind1: np.ndarray = np.array([]),
         ml_ind2: np.ndarray = np.array([]),
         cl_ind1: np.ndarray = np.array([]),
         cl_ind2: np.ndarray = np.array([]),
         ml_p: float = 1.,
         cl_p: float = 1.,
-        y: Optional[List[int]] = None,
         lr: float = 1.,
         batch_size: int = 256,
         num_epochs: int = 10,
@@ -368,12 +366,10 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         Parameters
         ----------
-        X
-            Input features.
-        X_raw
-            Raw input features.
-        n_counts
-            Total counts for each cell.
+        inputs
+            A tuple containing (1) the input features, (2) the raw input features, and (3) the total counts per cell.
+        y
+            True label. Used for model selection.
         ml_ind1
             Index 1 of must-link pairs.
         ml_ind2
@@ -386,8 +382,6 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
             Parameter of must-link loss.
         cl_p
             Parameter of cannot-link loss.
-        y
-            True label. Used for model selection.
         lr
             Learning rate.
         batch_size
@@ -406,6 +400,7 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
             Pretrain epochs.
 
         """
+        X, X_raw, n_counts = inputs
         self._pretrain(X, X_raw, n_counts, batch_size=pt_batch_size, lr=pt_lr, epochs=pt_epochs)
 
         X = torch.tensor(X).to(self.device)
