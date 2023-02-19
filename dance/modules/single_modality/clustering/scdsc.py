@@ -23,7 +23,7 @@ from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, TensorDataset
 
-from dance.modules.base import TorchNNPretrain
+from dance.modules.base import BaseClusteringMethod, TorchNNPretrain
 from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig
 from dance.transforms.graph import NeighborGraph
 from dance.transforms.preprocess import sparse_mx_to_torch_sparse_tensor
@@ -33,7 +33,7 @@ from dance.utils.loss import ZINBLoss
 from dance.utils.metrics import cluster_acc
 
 
-class ScDSC(TorchNNPretrain):
+class ScDSC(TorchNNPretrain, BaseClusteringMethod):
     """scDSC wrapper class.
 
     Parameters
@@ -108,18 +108,7 @@ class ScDSC(TorchNNPretrain):
             v=v,
             device=self.device,
         ).to(self.device)
-        self.model_pre = AE(
-            n_enc_1=n_enc_1,
-            n_enc_2=n_enc_2,
-            n_enc_3=n_enc_3,
-            n_dec_1=n_dec_1,
-            n_dec_2=n_dec_2,
-            n_dec_3=n_dec_3,
-            n_input=n_input,
-            n_z1=n_z1,
-            n_z2=n_z2,
-            n_z3=n_z3,
-        ).to(self.device)
+        self.fix_module("model.ae")
 
     @staticmethod
     def preprocessing_pipeline(n_top_genes: int = 2000, n_neighbors: int = 50, log_level: LogLevel = "INFO"):
@@ -181,32 +170,31 @@ class ScDSC(TorchNNPretrain):
 
         """
         print("Pretrain:")
-        x_tensor = torch.from_numpy(x)
-        train_loader = DataLoader(TensorDataset(x_tensor), batch_size, shuffle=True)
-        model = self.model_pre
-        optimizer = Adam(model.parameters(), lr=lr)
-        for epoch in range(n_epochs):
+        with self.pretrain_context("model.ae"):
+            x_tensor = torch.from_numpy(x)
+            train_loader = DataLoader(TensorDataset(x_tensor), batch_size, shuffle=True)
+            model = self.model.ae
+            optimizer = Adam(model.parameters(), lr=lr)
+            for epoch in range(n_epochs):
 
-            total_loss = total_size = 0
-            for batch_idx, (x_batch, ) in enumerate(train_loader):
-                x_batch = x_batch.to(self.device)
-                x_bar, _, _, _, _, _, _, _ = model(x_batch)
+                total_loss = total_size = 0
+                for batch_idx, (x_batch, ) in enumerate(train_loader):
+                    x_batch = x_batch.to(self.device)
+                    x_bar, _, _, _, _, _, _, _ = model(x_batch)
 
-                loss = F.mse_loss(x_bar, x_batch)
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+                    loss = F.mse_loss(x_bar, x_batch)
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
 
-                size = x_batch.shape[0]
-                total_size += size
-                total_loss += loss.item() * size
+                    size = x_batch.shape[0]
+                    total_size += size
+                    total_loss += loss.item() * size
 
-            print(f"Pretrain epoch {epoch + 1:4d}, MSE loss:{total_loss / total_size:.8f}")
-
-        self.model.ae.load_state_dict(self.model_pre.state_dict())
+                print(f"Pretrain epoch {epoch + 1:4d}, MSE loss:{total_loss / total_size:.8f}")
 
     def save_pretrained(self, path):
-        torch.save(self.model_pre.state_dict(), path)
+        torch.save(self.model.ae.state_dict(), path)
 
     def load_pretrained(self, path):
         checkpoint = torch.load(self.pretrain_path, map_location=self.device)
@@ -418,8 +406,6 @@ class ScDSCModel(nn.Module):
             n_z2=n_z2,
             n_z3=n_z3,
         )
-        for p in self.ae.parameters():
-            p.requires_grad = False
 
         self.gnn_1 = GNNLayer(n_input, n_enc_1)
         self.gnn_2 = GNNLayer(n_enc_1, n_enc_2)
