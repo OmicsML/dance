@@ -28,8 +28,7 @@ MIN = 0.0000001
 class Status:
     """To handle several data in one struct.
 
-    Could be replaced by named tuple, but don't want to depend on python
-    2.6
+    Could be replaced by named tuple, but don't want to depend on python 2.6
 
     """
     node2com = {}

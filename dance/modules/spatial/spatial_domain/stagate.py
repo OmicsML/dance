@@ -23,6 +23,7 @@ from torch_geometric.utils import add_self_loops, remove_self_loops, softmax
 from torch_sparse import SparseTensor, set_diag
 from tqdm import tqdm
 
+from dance import logger
 from dance.modules.base import BaseClusteringMethod
 from dance.transforms import AnnDataTransform, Compose, SetConfig
 from dance.transforms.graph import StagateGraph
@@ -265,7 +266,7 @@ class Stagate(torch.nn.Module, BaseClusteringMethod):
             adata_Vars = adata
 
         if verbose:
-            print("Size of Input: ", adata_Vars.shape)
+            logger.info(f"Size of Input: {adata_Vars.shape}")
 
         data = transfer_pytorch_data(adata_Vars, graph)
 
@@ -283,7 +284,6 @@ class Stagate(torch.nn.Module, BaseClusteringMethod):
             torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clipping)
             optimizer.step()
 
-        print("eval ....")
         model.eval()
         z, out = model(data.x, data.edge_index)
 
@@ -297,7 +297,7 @@ class Stagate(torch.nn.Module, BaseClusteringMethod):
             ReX[ReX < 0] = 0
             adata.layers["STAGATE_ReX"] = ReX
 
-        print("post process...")
+        logger.info("Start post-processing")
         sc.pp.neighbors(adata, use_rep="STAGATE")
         sc.tl.umap(adata)
         adata = mclust(adata, used_obsm="STAGATE", num_cluster=7)

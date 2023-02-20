@@ -35,29 +35,27 @@ def search_l(p, adj, start=0.01, end=1000, tol=0.01, max_run=100):
     p_low = calculate_p(adj, start)
     p_high = calculate_p(adj, end)
     if p_low > p + tol:
-        print("l not found, try smaller start point.")
+        logger.info("l not found, try smaller start point.")
         return None
     elif p_high < p - tol:
-        print("l not found, try bigger end point.")
+        logger.info("l not found, try bigger end point.")
         return None
     elif np.abs(p_low - p) <= tol:
-        print("recommended l = ", str(start))
+        logger.info(f"recommended l: {start}")
         return start
     elif np.abs(p_high - p) <= tol:
-        print("recommended l = ", str(end))
+        logger.info(f"recommended l: {end}")
         return end
     while (p_low + tol) < p < (p_high - tol):
         run += 1
-        print("Run " + str(run) + ": l [" + str(start) + ", " + str(end) + "], p [" + str(p_low) + ", " + str(p_high) +
-              "]")
+        logger.info("Run {run}: l [{start}, {end}], p [{p_low}, {p_high}]")
         if run > max_run:
-            print("Exact l not found, closest values are:\n" + "l=" + str(start) + ": " + "p=" + str(p_low) + "\nl=" +
-                  str(end) + ": " + "p=" + str(p_high))
+            logger.info("Exact l not found, closest values are:\nl={start}: p={p_low}\nl={end}: p={p_high}")
             return None
         mid = (start + end) / 2
         p_mid = calculate_p(adj, mid)
         if np.abs(p_mid - p) <= tol:
-            print("recommended l = ", str(mid))
+            logger.info("recommended l = ", str(mid))
             return mid
         if p_mid <= p:
             start = mid
