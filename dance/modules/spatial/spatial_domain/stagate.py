@@ -13,7 +13,7 @@ import scanpy as sc
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sklearn import mixture
+from sklearn.mixture import GaussianMixture
 from torch import Tensor
 from torch.nn import Parameter
 from torch_geometric.nn.conv import MessagePassing
@@ -22,10 +22,10 @@ from torch_sparse import SparseTensor, set_diag
 from tqdm import tqdm
 
 from dance import logger
-from dance.modules.base import BaseClusteringMethod
+from dance.modules.base import BaseClusteringMethod, BasePretrain
 from dance.transforms import AnnDataTransform, Compose, SetConfig
 from dance.transforms.graph import StagateGraph
-from dance.typing import Any, LogLevel, Optional
+from dance.typing import Any, LogLevel, Optional, Tuple
 from dance.utils import get_device
 
 
@@ -135,7 +135,7 @@ class GATConv(MessagePassing):
         return "{}({}, {}, heads={})".format(self.__class__.__name__, self.in_channels, self.out_channels, self.heads)
 
 
-class Stagate(torch.nn.Module, BaseClusteringMethod):
+class Stagate(nn.Module, BasePretrain, BaseClusteringMethod):
     """Stagate class.
 
     Parameters
@@ -144,11 +144,14 @@ class Stagate(torch.nn.Module, BaseClusteringMethod):
         Hidden dimensions.
     device
         Computation device.
+    pretrain_path
+        Save the cell representations from the trained STAGATE model to the specified path. Do not save if unspecified.
 
     """
 
-    def __init__(self, hidden_dims, device: str = "auto"):
+    def __init__(self, hidden_dims, device: str = "auto", pretrain_path: Optional[str] = None):
         super().__init__()
+        self.pretrain_path = pretrain_path
 
         [in_dim, num_hidden, out_dim] = hidden_dims
         self.conv1 = GATConv(in_dim, num_hidden, heads=1, concat=False, dropout=0, add_self_loops=False, bias=False)
@@ -203,42 +206,21 @@ class Stagate(torch.nn.Module, BaseClusteringMethod):
 
         return h2, h4
 
-    def fit(
+    def pretrain(
         self,
         x: np.ndarray,
         edge_index_array: np.ndarray,
-        n_epochs: int = 1,
-        lr: float = 0.001,
-        gradient_clipping: float = 5,
+        lr: float = 1e-3,
         weight_decay: float = 1e-4,
-        num_cluster: int = 7,
+        epochs: int = 100,
+        gradient_clipping: float = 5,
     ):
-        """Fit function for training.
-
-        Parameters
-        ----------
-        x
-            Input feature.
-        edge_index_array
-            Edge index (coo representation) as (2 x num_edges) numpy array.
-        n_epochs
-            Number of epochs.
-        lr
-            Learning rate.
-        gradient_clipping
-            Gradient clipping.
-        weight_decay
-            Weight decay.
-        num_cluster
-            Number of cluster.
-
-        """
         x_tensor = torch.from_numpy(x.astype(np.float32)).to(self.device)
         edge_index_tensor = torch.from_numpy(edge_index_array.astype(int)).to(self.device)
 
         optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
         self.train()
-        for epoch in tqdm(range(1, n_epochs + 1)):
+        for epoch in tqdm(range(1, epochs + 1)):
             optimizer.zero_grad()
             z, out = self(x_tensor, edge_index_tensor)
             loss = F.mse_loss(x_tensor, out)
@@ -250,11 +232,52 @@ class Stagate(torch.nn.Module, BaseClusteringMethod):
         z, _ = self(x_tensor, edge_index_tensor)
         self.rep = z.detach().clone().cpu().numpy()
 
-        logger.info("Start post-processing")
-        gm = mixture.GaussianMixture(n_components=num_cluster, covariance_type="tied", warm_start=True, n_init=100,
-                                     max_iter=300, reg_covar=1.4663143602030552e-04, random_state=36282,
-                                     tol=0.00022187708009762592)
-        self.clust_res = gm.fit_predict(x)
+    def save_pretrained(self, path):
+        np.save(path, self.rep)
+
+    def load_pretrained(self, path):
+        self.rep = np.load(path)
+
+    def fit(
+        self,
+        inputs: Tuple[np.ndarray, np.ndarray],
+        epochs: int = 100,
+        lr: float = 0.001,
+        gradient_clipping: float = 5,
+        weight_decay: float = 1e-4,
+        num_cluster: int = 7,
+        gmm_reg_covar: float = 1.5e-4,
+        gmm_n_init: int = 10,
+        gmm_max_iter: int = 300,
+        gmm_tol: float = 2e-4,
+        random_state: Optional[int] = None,
+    ):
+        """Fit function for training.
+
+        Parameters
+        ----------
+        inputs
+            A tuple containing (1) the input features and (2) the edge index array (coo representation) of the
+            adjacency matrix.
+        epochs
+            Number of epochs.
+        lr
+            Learning rate.
+        gradient_clipping
+            Gradient clipping.
+        weight_decay
+            Weight decay.
+        num_cluster
+            Number of cluster.
+
+        """
+        x, edge_index_array = inputs
+        self._pretrain(x, edge_index_array, lr, weight_decay, epochs, gradient_clipping)
+
+        logger.info("Fitting Gaussian Mixture model for cluster assignments.")
+        gmm = GaussianMixture(n_components=num_cluster, covariance_type="tied", n_init=gmm_n_init, tol=gmm_tol,
+                              max_iter=gmm_max_iter, reg_covar=gmm_reg_covar, random_state=random_state)
+        self.clust_res = gmm.fit_predict(self.rep)
 
     def predict(self, x: Optional[Any] = None):
         """Prediction function.
