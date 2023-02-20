@@ -80,7 +80,6 @@ class GATConv(MessagePassing):
 
         if not attention:
             return x[0].mean(dim=1)
-            # return x[0].view(-1, self.heads * self.out_channels)
 
         if tied_attention is None:
             # Next, we compute node-level attention coefficients, both for source
@@ -126,10 +125,7 @@ class GATConv(MessagePassing):
 
     def message(self, x_j, alpha_j, alpha_i, index, ptr, size_i):
         alpha = alpha_j if alpha_i is None else alpha_j + alpha_i
-
-        # alpha = F.leaky_relu(alpha, self.negative_slope)
         alpha = torch.sigmoid(alpha)
-
         alpha = softmax(alpha, index, ptr, size_i)
         self._alpha = alpha  # Save for later use.
         alpha = F.dropout(alpha, p=self.dropout, training=self.training)
@@ -144,7 +140,7 @@ class Stagate(torch.nn.Module, BaseClusteringMethod):
 
     Parameters
     ----------
-    hidden_dims : int
+    hidden_dims
         Hidden dimensions.
     device
         Computation device.
@@ -185,9 +181,9 @@ class Stagate(torch.nn.Module, BaseClusteringMethod):
 
         Parameters
         ----------
-        features :
+        features
             Node features.
-        edge_index :
+        edge_index
             Adjacent matrix.
 
         Returns
@@ -205,7 +201,7 @@ class Stagate(torch.nn.Module, BaseClusteringMethod):
         h3 = F.elu(self.conv3(h2, edge_index, attention=True, tied_attention=self.conv1.attentions))
         h4 = self.conv4(h3, edge_index, attention=False)
 
-        return h2, h4  # F.log_softmax(x, dim=-1)
+        return h2, h4
 
     def fit(
         self,
