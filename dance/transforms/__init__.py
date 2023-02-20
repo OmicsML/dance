@@ -1,6 +1,6 @@
 from dance.transforms import graph
 from dance.transforms.cell_feature import CellPCA, WeightedFeaturePCA
-from dance.transforms.filter import FilterGenesMatch, FilterGenesPercentile
+from dance.transforms.filter import FilterGenesCommon, FilterGenesMatch, FilterGenesPercentile
 from dance.transforms.interface import AnnDataTransform
 from dance.transforms.misc import Compose, SaveRaw, SetConfig
 from dance.transforms.scn_feature import SCNFeature
@@ -11,6 +11,7 @@ __all__ = [
     "AnnDataTransform",
     "CellPCA",
     "Compose",
+    "FilterGenesCommon",
     "FilterGenesMatch",
     "FilterGenesPercentile",
     "GeneStats",
