@@ -59,7 +59,7 @@ class BaseMethod(ABC):
         return pred
 
     def fit_score(self, x, y, *, score_func: Optional[Union[str, Mapping[Any, float]]] = None,
-                  return_pred: bool = False) -> Union[float, Tuple[float, Any]]:
+                  return_pred: bool = False, **fit_kwargs) -> Union[float, Tuple[float, Any]]:
         """Shortcut for fitting data using the input feature and return eval.
 
         Note
@@ -67,7 +67,7 @@ class BaseMethod(ABC):
         Only work for models where the fitting does not require labeled data, i.e. unsupervised methods.
 
         """
-        self.fit(x)
+        self.fit(x, **fit_kwargs)
         return self.score(x, y, score_func=score_func, return_pred=return_pred)
 
 
