@@ -28,11 +28,13 @@ if __name__ == "__main__":
     dataloader = SpatialLIBDDataset(data_id=args.sample_number)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
     adj, y = data.get_data(return_type="default")
+    x = data.data.X.A
+    edge_list_array = np.vstack(np.nonzero(adj))
 
     model = Stagate([args.high_variable_genes] + args.hidden_dims)
     # TODO: extract nn model part of stagate and wrap with BaseClusteringMethod
     # TODO: extract features from adata and directly pass to model.
-    model.fit(data.data, np.nonzero(adj), n_epochs=args.n_epochs)
+    model.fit(x, edge_list_array, n_epochs=args.n_epochs)
     pred = model.predict()
     score = model.default_score_func(y.values.ravel(), pred)
     print(f"ARI: {score:.4f}")
