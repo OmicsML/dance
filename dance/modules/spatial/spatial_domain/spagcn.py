@@ -203,7 +203,7 @@ class SimpleGCDEC(nn.Module):
         p = p / torch.sum(p, dim=1, keepdim=True)
         return p
 
-    def fit(self, X, adj, lr=0.001, max_epochs=5000, update_interval=3, trajectory_interval=50, weight_decay=5e-4,
+    def fit(self, X, adj, lr=0.001, epochs=5000, update_interval=3, trajectory_interval=50, weight_decay=5e-4,
             opt="sgd", init="louvain", n_neighbors=10, res=0.4, n_clusters=10, init_spa=True, tol=1e-3):
         """Fit function for model training.
 
@@ -215,7 +215,7 @@ class SimpleGCDEC(nn.Module):
             Adjacent matrix.
         lr : float
             Learning rate.
-        max_epochs : int
+        epochs : int
             Maximum number of epochs.
         update_interval : int
             Interval for update.
@@ -288,7 +288,7 @@ class SimpleGCDEC(nn.Module):
         adj = adj.to(device)
 
         self.train()
-        for epoch in range(max_epochs):
+        for epoch in range(epochs):
             if epoch % update_interval == 0:
                 _, q = self.forward(X, adj)
                 p = self.target_distribution(q).data
@@ -317,7 +317,7 @@ class SimpleGCDEC(nn.Module):
         X = X.cpu()
         adj = adj.cpu()
 
-    def fit_with_init(self, X, adj, init_y, lr=0.001, max_epochs=5000, update_interval=1, weight_decay=5e-4, opt="sgd"):
+    def fit_with_init(self, X, adj, init_y, lr=0.001, epochs=5000, update_interval=1, weight_decay=5e-4, opt="sgd"):
         """Initializing cluster centers with kmeans."""
         logger.info("Initializing cluster centers with kmeans.")
         if opt == "sgd":
@@ -340,7 +340,7 @@ class SimpleGCDEC(nn.Module):
         adj = adj.to(device)
 
         self.train()
-        for epoch in range(max_epochs):
+        for epoch in range(epochs):
             if epoch % update_interval == 0:
                 _, q = self.forward(torch.FloatTensor(X), torch.FloatTensor(adj))
                 p = self.target_distribution(q).data
@@ -399,7 +399,7 @@ class GC_DEC(nn.Module):
         p = p / torch.sum(p, dim=1, keepdim=True)
         return p
 
-    def fit(self, X, adj, lr=0.001, max_epochs=10, update_interval=5, weight_decay=5e-4, opt="sgd", init="louvain",
+    def fit(self, X, adj, lr=0.001, epochs=10, update_interval=5, weight_decay=5e-4, opt="sgd", init="louvain",
             n_neighbors=10, res=0.4):
         self.trajectory = []
         logger.info("Initializing cluster centers with kmeans.")
@@ -431,7 +431,7 @@ class GC_DEC(nn.Module):
 
         self.mu.data.copy_(torch.Tensor(cluster_centers))
         self.train()
-        for epoch in range(max_epochs):
+        for epoch in range(epochs):
             if epoch % update_interval == 0:
                 _, q = self.forward(X, adj)
                 p = self.target_distribution(q).data
@@ -444,7 +444,7 @@ class GC_DEC(nn.Module):
             optimizer.step()
             self.trajectory.append(torch.argmax(q, dim=1).data.cpu().numpy())
 
-    def fit_with_init(self, X, adj, init_y, lr=0.001, max_epochs=10, update_interval=1, weight_decay=5e-4, opt="sgd"):
+    def fit_with_init(self, X, adj, init_y, lr=0.001, epochs=10, update_interval=1, weight_decay=5e-4, opt="sgd"):
         logger.info("Initializing cluster centers with kmeans.")
         if opt == "sgd":
             optimizer = optim.SGD(self.parameters(), lr=lr, momentum=0.9)
@@ -459,7 +459,7 @@ class GC_DEC(nn.Module):
         cluster_centers = np.asarray(Mergefeature.groupby("Group").mean())
         self.mu.data.copy_(torch.Tensor(cluster_centers))
         self.train()
-        for epoch in range(max_epochs):
+        for epoch in range(epochs):
             if epoch % update_interval == 0:
                 _, q = self.forward(torch.FloatTensor(X), torch.FloatTensor(adj))
                 p = self.target_distribution(q).data
@@ -546,12 +546,12 @@ class SpaGCN(BaseClusteringMethod):
         """
         self.l = l
 
-    def search_set_res(self, x, l, target_num, start=0.4, step=0.1, tol=5e-3, lr=0.05, max_epochs=10, max_run=10):
+    def search_set_res(self, x, l, target_num, start=0.4, step=0.1, tol=5e-3, lr=0.05, epochs=10, max_run=10):
         """Search for optimal resolution parameter."""
         res = start
         logger.info(f"Start at {res = :.4f}, {step = :.4f}")
         clf = SpaGCN(l)
-        y_pred = clf.fit_predict(x, init_spa=True, init="louvain", res=res, tol=tol, lr=lr, max_epochs=max_epochs)
+        y_pred = clf.fit_predict(x, init_spa=True, init="louvain", res=res, tol=tol, lr=lr, epochs=epochs)
         old_num = len(set(y_pred))
         logger.info(f"Res = {res:.4f}, Num of clusters = {old_num}")
         run = 0
@@ -559,7 +559,7 @@ class SpaGCN(BaseClusteringMethod):
             old_sign = 1 if (old_num < target_num) else -1
             clf = SpaGCN(l)
             y_pred = clf.fit_predict(x, init_spa=True, init="louvain", res=res + step * old_sign, tol=tol, lr=lr,
-                                     max_epochs=max_epochs)
+                                     epochs=epochs)
             new_num = len(set(y_pred))
             logger.info(f"Res = {res + step * old_sign:.3e}, Num of clusters = {new_num}")
             if new_num == target_num:
@@ -586,7 +586,7 @@ class SpaGCN(BaseClusteringMethod):
         adj_exp = np.exp(-1 * (adj**2) / (2 * (self.l**2)))
         return adj_exp
 
-    def fit(self, x, y=None, *, num_pcs=50, lr=0.005, max_epochs=2000, weight_decay=0, opt="admin", init_spa=True,
+    def fit(self, x, y=None, *, num_pcs=50, lr=0.005, epochs=2000, weight_decay=0, opt="admin", init_spa=True,
             init="louvain", n_neighbors=10, n_clusters=None, res=0.4, tol=1e-3):
         """Fit function for model training.
 
@@ -600,7 +600,7 @@ class SpaGCN(BaseClusteringMethod):
             The number of component used in PCA.
         lr : float
             Learning rate.
-        max_epochs : int
+        epochs : int
             Maximum number of epochs.
         weight_decay : float
             Weight decay.
@@ -624,7 +624,7 @@ class SpaGCN(BaseClusteringMethod):
         self.num_pcs = num_pcs
         self.res = res
         self.lr = lr
-        self.max_epochs = max_epochs
+        self.epochs = epochs
         self.weight_decay = weight_decay
         self.opt = opt
         self.init_spa = init_spa
@@ -638,9 +638,9 @@ class SpaGCN(BaseClusteringMethod):
 
         self.model = SimpleGCDEC(embed.shape[1], embed.shape[1])
         adj_exp = self.calc_adj_exp(adj)
-        self.model.fit(embed, adj_exp, lr=self.lr, max_epochs=self.max_epochs, weight_decay=self.weight_decay,
-                       opt=self.opt, init_spa=self.init_spa, init=self.init, n_neighbors=self.n_neighbors,
-                       n_clusters=self.n_clusters, res=self.res, tol=self.tol)
+        self.model.fit(embed, adj_exp, lr=self.lr, epochs=self.epochs, weight_decay=self.weight_decay, opt=self.opt,
+                       init_spa=self.init_spa, init=self.init, n_neighbors=self.n_neighbors, n_clusters=self.n_clusters,
+                       res=self.res, tol=self.tol)
 
     def predict_proba(self, x):
         """Prediction function.

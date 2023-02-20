@@ -18,7 +18,7 @@ if __name__ == "__main__":
     parser.add_argument("--end", type=float, default=1000, help="ending value for searching l.")
     parser.add_argument("--tol", type=float, default=5e-3, help="tolerant value for searching l.")
     parser.add_argument("--max_run", type=int, default=200, help="max runs.")
-    parser.add_argument("--max_epochs", type=int, default=200, help="max epochs.")
+    parser.add_argument("--epochs", type=int, default=200, help="Number of epochs.")
     parser.add_argument("--n_clusters", type=int, default=7, help="the number of clusters")
     parser.add_argument("--step", type=float, default=0.1, help="")
     parser.add_argument("--lr", type=float, default=0.05, help="learning rate")
@@ -39,10 +39,10 @@ if __name__ == "__main__":
     l = model.search_l(args.p, adj, start=args.start, end=args.end, tol=args.tol, max_run=args.max_run)
     model.set_l(l)
     res = model.search_set_res((x, adj), l=l, target_num=args.n_clusters, start=0.4, step=args.step, tol=args.tol,
-                               lr=args.lr, max_epochs=args.max_epochs, max_run=args.max_run)
+                               lr=args.lr, epochs=args.epochs, max_run=args.max_run)
 
-    pred = model.fit_predict((x, adj), init_spa=True, init="louvain", tol=args.tol, lr=args.lr,
-                             max_epochs=args.max_epochs, res=res)
+    pred = model.fit_predict((x, adj), init_spa=True, init="louvain", tol=args.tol, lr=args.lr, epochs=args.epochs,
+                             res=res)
     score = model.default_score_func(y, pred)
     print(f"ARI: {score:.4f}")
 
