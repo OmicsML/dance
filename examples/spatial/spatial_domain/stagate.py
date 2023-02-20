@@ -17,7 +17,6 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=1000, help="epochs")
     parser.add_argument("--high_variable_genes", type=int, default=3000, help="")
     args = parser.parse_args()
-
     set_seed(args.seed)
 
     # Initialize model and get model specific preprocessing pipeline

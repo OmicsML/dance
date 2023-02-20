@@ -13,7 +13,6 @@ if __name__ == "__main__":
     parser.add_argument("--n_components", type=int, default=50, help="Number of PC components.")
     parser.add_argument("--neighbors", type=int, default=17, help="Number of neighbors.")
     args = parser.parse_args()
-
     set_seed(args.seed)
 
     # Initialize model and get model specific preprocessing pipeline
