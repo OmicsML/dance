@@ -8,7 +8,6 @@ Pham, Duy, et al. "stLearn: integrating spatial location, tissue morphology and 
 cell-cell interactions and spatial trajectories within undissociated tissues." BioRxiv (2020).
 
 """
-
 import scanpy as sc
 from sklearn.cluster import KMeans
 

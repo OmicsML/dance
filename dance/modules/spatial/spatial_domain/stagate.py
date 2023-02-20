@@ -8,7 +8,6 @@ Dong, Kangning, and Shihua Zhang. "Deciphering spatial domains from spatially re
 graph attention auto-encoder." Nature communications 13.1 (2022): 1-12.
 
 """
-
 import numpy as np
 import scanpy as sc
 import scipy.sparse as sp

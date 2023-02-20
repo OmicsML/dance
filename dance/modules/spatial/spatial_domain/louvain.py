@@ -7,7 +7,6 @@ Reference
 Blondel, V. D., et al. "Fast Unfolding of Community Hierarchies in Large Networks, 1–6 (2008)." arXiv:0803.0476.
 
 """
-
 import array
 import numbers
 import warnings

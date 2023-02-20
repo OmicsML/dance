@@ -8,9 +8,6 @@ Hu, Jian, et al. "SpaGCN: Integrating gene expression, spatial location and hist
 spatially variable genes by graph convolutional network." Nature methods 18.11 (2021): 1342-1351.
 
 """
-
-import math
-
 import numpy as np
 import pandas as pd
 import scanpy as sc
@@ -133,7 +130,7 @@ class GraphConvolution(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.weight.size(1))
+        stdv = 1. / np.sqrt(self.weight.size(1))
         self.weight.data.uniform_(-stdv, stdv)
         if self.bias is not None:
             self.bias.data.uniform_(-stdv, stdv)
