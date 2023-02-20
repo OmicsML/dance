@@ -24,7 +24,6 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=0.05, help="learning rate")
     parser.add_argument("--random_state", type=int, default=100, help="")
     args = parser.parse_args()
-
     set_seed(args.random_state)
 
     # Initialize model and get model specific preprocessing pipeline

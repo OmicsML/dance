@@ -14,10 +14,9 @@ if __name__ == "__main__":
     parser.add_argument("--hidden_dims", type=list, default=[512, 32], help="hidden dimensions")
     parser.add_argument("--rad_cutoff", type=int, default=150, help="")
     parser.add_argument("--seed", type=int, default=3, help="")
-    parser.add_argument("--n_epochs", type=int, default=1000, help="epochs")
+    parser.add_argument("--epochs", type=int, default=1000, help="epochs")
     parser.add_argument("--high_variable_genes", type=int, default=3000, help="")
     args = parser.parse_args()
-
     set_seed(args.seed)
 
     # Initialize model and get model specific preprocessing pipeline
@@ -28,13 +27,12 @@ if __name__ == "__main__":
     dataloader = SpatialLIBDDataset(data_id=args.sample_number)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
     adj, y = data.get_data(return_type="default")
+    x = data.data.X.A
+    edge_list_array = np.vstack(np.nonzero(adj))
 
+    # Train and evaluate model
     model = Stagate([args.high_variable_genes] + args.hidden_dims)
-    # TODO: extract nn model part of stagate and wrap with BaseClusteringMethod
-    # TODO: extract features from adata and directly pass to model.
-    model.fit(data.data, np.nonzero(adj), n_epochs=args.n_epochs)
-    pred = model.predict()
-    score = model.default_score_func(y.values.ravel(), pred)
+    score = model.fit_score((x, edge_list_array), y, epochs=args.epochs, random_state=args.seed)
     print(f"ARI: {score:.4f}")
 """ To reproduce Stagate on other samples, please refer to command lines belows:
 NOTE: since the stagate method is unstable, you have to run at least 5 times to get

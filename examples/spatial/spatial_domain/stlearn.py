@@ -17,7 +17,6 @@ if __name__ == "__main__":
     parser.add_argument("--n_components", type=int, default=50, help="the number of components in PCA")
     parser.add_argument("--device", type=str, default="cuda", help="device for resnet extract feature")
     args = parser.parse_args()
-
     set_seed(args.seed)
 
     # Initialize model and get model specific preprocessing pipeline
