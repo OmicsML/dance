@@ -27,9 +27,8 @@ if __name__ == "__main__":
 
     # Train and evaluate model
     model = Louvain(resolution=1)
-    model.fit(adj)
-    prediction = model.predict()
-    print(model.score(y.values.ravel()))
+    score = model.fit_score(adj, y.values.ravel())
+    print(f"ARI: {score:.4f}")
 """ To reproduce louvain on other samples, please refer to command lines belows:
 NOTE: you have to run multiple times to get best performance.
 

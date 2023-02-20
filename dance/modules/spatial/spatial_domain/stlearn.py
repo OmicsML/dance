@@ -8,18 +8,17 @@ Pham, Duy, et al. "stLearn: integrating spatial location, tissue morphology and 
 cell-cell interactions and spatial trajectories within undissociated tissues." BioRxiv (2020).
 
 """
-
 import scanpy as sc
 from sklearn.cluster import KMeans
-from sklearn.metrics.cluster import adjusted_rand_score
 
+from dance.modules.base import BaseClusteringMethod
 from dance.modules.spatial.spatial_domain.louvain import Louvain
 from dance.transforms import AnnDataTransform, CellPCA, Compose, MorphologyFeature, SetConfig, SMEFeature
 from dance.transforms.graph import NeighborGraph, SMEGraph
 from dance.typing import LogLevel, Optional
 
 
-class StKmeans:
+class StKmeans(BaseClusteringMethod):
     """StKmeans class.
 
     Parameters
@@ -98,31 +97,13 @@ class StKmeans:
         """
         self.model.fit(x)
 
-    def predict(self):
+    def predict(self, x=None):
         """Prediction function."""
-        self.predict = self.model.labels_
-        self.y_pred = self.predict
-        return self.predict
-
-    def score(self, y_true):
-        """Score function.
-
-        Parameters
-        ----------
-        y_true
-            Cluster labels.
-
-        Returns
-        -------
-        float
-            Adjusted rand index score.
-
-        """
-        score = adjusted_rand_score(y_true, self.y_pred)
-        return score
+        pred = self.model.labels_
+        return pred
 
 
-class StLouvain:
+class StLouvain(BaseClusteringMethod):
     """StLouvain class.
 
     Parameters
@@ -182,25 +163,7 @@ class StLouvain:
         """
         self.model.fit(adj, partition, weight, randomize, random_state)
 
-    def predict(self):
+    def predict(self, x=None):
         """Prediction function."""
-        self.y_pred = self.model.predict()
-        self.y_pred = [self.y_pred[i] for i in range(len(self.y_pred))]
-        return self.y_pred
-
-    def score(self, y_true):
-        """Score function.
-
-        Parameters
-        ----------
-        y_true
-            Cluster labels.
-
-        Returns
-        -------
-        float
-            Adjusted rand index score.
-
-        """
-        score = adjusted_rand_score(y_true, self.y_pred)
-        return score
+        pred = self.model.predict()
+        return pred

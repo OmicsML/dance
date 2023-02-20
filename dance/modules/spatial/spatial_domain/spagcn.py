@@ -8,10 +8,6 @@ Hu, Jian, et al. "SpaGCN: Integrating gene expression, spatial location and hist
 spatially variable genes by graph convolutional network." Nature methods 18.11 (2021): 1342-1351.
 
 """
-
-import math
-import random
-
 import numpy as np
 import pandas as pd
 import scanpy as sc
@@ -22,10 +18,54 @@ import torch.optim as optim
 from sklearn.cluster import KMeans
 from torch.nn.parameter import Parameter
 
-from dance import utils
+from dance import logger
+from dance.modules.base import BaseClusteringMethod
 from dance.transforms import AnnDataTransform, CellPCA, Compose, FilterGenesMatch, SetConfig
 from dance.transforms.graph import SpaGCNGraph, SpaGCNGraph2D
 from dance.typing import LogLevel
+
+
+def calculate_p(adj, l):
+    adj_exp = np.exp(-1 * (adj**2) / (2 * (l**2)))
+    return np.mean(np.sum(adj_exp, 1)) - 1
+
+
+def search_l(p, adj, start=0.01, end=1000, tol=0.01, max_run=100):
+    run = 0
+    p_low = calculate_p(adj, start)
+    p_high = calculate_p(adj, end)
+    if p_low > p + tol:
+        print("l not found, try smaller start point.")
+        return None
+    elif p_high < p - tol:
+        print("l not found, try bigger end point.")
+        return None
+    elif np.abs(p_low - p) <= tol:
+        print("recommended l = ", str(start))
+        return start
+    elif np.abs(p_high - p) <= tol:
+        print("recommended l = ", str(end))
+        return end
+    while (p_low + tol) < p < (p_high - tol):
+        run += 1
+        print("Run " + str(run) + ": l [" + str(start) + ", " + str(end) + "], p [" + str(p_low) + ", " + str(p_high) +
+              "]")
+        if run > max_run:
+            print("Exact l not found, closest values are:\n" + "l=" + str(start) + ": " + "p=" + str(p_low) + "\nl=" +
+                  str(end) + ": " + "p=" + str(p_high))
+            return None
+        mid = (start + end) / 2
+        p_mid = calculate_p(adj, mid)
+        if np.abs(p_mid - p) <= tol:
+            print("recommended l = ", str(mid))
+            return mid
+        if p_mid <= p:
+            start = mid
+            p_low = p_mid
+        else:
+            end = mid
+            p_high = p_mid
+    return None
 
 
 def refine(sample_id, pred, dis, shape="hexagon"):
@@ -60,7 +100,7 @@ def refine(sample_id, pred, dis, shape="hexagon"):
     elif shape == "square":
         num_nbs = 4
     else:
-        print("Shape not recognized, shape='hexagon' for Visium data, 'square' for ST data.")
+        logger.info("Shape not recognized, shape='hexagon' for Visium data, 'square' for ST data.")
     for i in range(len(sample_id)):
         index = sample_id[i]
         dis_tmp = dis_df.loc[index, :].sort_values()
@@ -86,11 +126,11 @@ class GraphConvolution(nn.Module):
         if bias:
             self.bias = Parameter(torch.FloatTensor(out_features))
         else:
-            self.register_parameter('bias', None)
+            self.register_parameter("bias", None)
         self.reset_parameters()
 
     def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.weight.size(1))
+        stdv = 1. / np.sqrt(self.weight.size(1))
         self.weight.data.uniform_(-stdv, stdv)
         if self.bias is not None:
             self.bias.data.uniform_(-stdv, stdv)
@@ -210,7 +250,7 @@ class SimpleGCDEC(nn.Module):
         features = self.gc(torch.FloatTensor(X), torch.FloatTensor(adj))
         # ---------------------------------------------------------------------
         if init == "kmeans":
-            print("Initializing cluster centers with kmeans, n_clusters known")
+            logger.info("Initializing cluster centers with kmeans, n_clusters known")
             self.n_clusters = n_clusters
             kmeans = KMeans(self.n_clusters, n_init=20)
             if init_spa:
@@ -220,16 +260,16 @@ class SimpleGCDEC(nn.Module):
                 # Kmeans using only expression information
                 y_pred = kmeans.fit_predict(X)  # use X as numpy
         elif init == "louvain":
-            print("Initializing cluster centers with louvain, resolution = ", res)
+            logger.info(f"Initializing cluster centers with louvain, resolution = {res}")
             if init_spa:
                 adata = sc.AnnData(features.detach().numpy())
             else:
                 adata = sc.AnnData(X)
             sc.pp.neighbors(adata, n_neighbors=n_neighbors)
             # sc.tl.louvain(adata,resolution=res)
-            sc.tl.leiden(adata, resolution=res, key_added='louvain')
+            sc.tl.leiden(adata, resolution=res, key_added="louvain")
 
-            y_pred = adata.obs['louvain'].astype(int).to_numpy()
+            y_pred = adata.obs["louvain"].astype(int).to_numpy()
             self.n_clusters = len(np.unique(y_pred))
         # ---------------------------------------------------------------------
         y_pred_last = y_pred
@@ -255,7 +295,7 @@ class SimpleGCDEC(nn.Module):
                 _, q = self.forward(X, adj)
                 p = self.target_distribution(q).data
             if epoch % 10 == 0:
-                print("Epoch ", epoch)
+                logger.info(f"Epoch {epoch}")
             optimizer.zero_grad()
             z, q = self(X, adj)
             loss = self.loss_function(p, q)
@@ -269,9 +309,9 @@ class SimpleGCDEC(nn.Module):
             delta_label = np.sum(y_pred != y_pred_last).astype(np.float32) / X.shape[0]
             y_pred_last = y_pred
             if epoch > 0 and (epoch - 1) % update_interval == 0 and delta_label < tol:
-                print('delta_label ', delta_label, '< tol ', tol)
-                print("Reach tolerance threshold. Stopping training.")
-                print("Total epoch:", epoch)
+                logger.info(f"delta_label {delta_label} < tol {tol}")
+                logger.info("Reach tolerance threshold. Stopping training.")
+                logger.info(f"Total epoch: {epoch}")
                 break
 
         # Recover model and data in cpu
@@ -281,7 +321,7 @@ class SimpleGCDEC(nn.Module):
 
     def fit_with_init(self, X, adj, init_y, lr=0.001, max_epochs=5000, update_interval=1, weight_decay=5e-4, opt="sgd"):
         """Initializing cluster centers with kmeans."""
-        print("Initializing cluster centers with kmeans.")
+        logger.info("Initializing cluster centers with kmeans.")
         if opt == "sgd":
             optimizer = optim.SGD(self.parameters(), lr=lr, momentum=0.9)
         elif opt == "admin":
@@ -364,7 +404,7 @@ class GC_DEC(nn.Module):
     def fit(self, X, adj, lr=0.001, max_epochs=10, update_interval=5, weight_decay=5e-4, opt="sgd", init="louvain",
             n_neighbors=10, res=0.4):
         self.trajectory = []
-        print("Initializing cluster centers with kmeans.")
+        logger.info("Initializing cluster centers with kmeans.")
         if opt == "sgd":
             optimizer = optim.SGD(self.parameters(), lr=lr, momentum=0.9)
         elif opt == "admin":
@@ -381,7 +421,7 @@ class GC_DEC(nn.Module):
             adata = sc.AnnData(features.detach().numpy())
             sc.pp.neighbors(adata, n_neighbors=n_neighbors)
             sc.tl.louvain(adata, resolution=res)
-            y_pred = adata.obs['louvain'].astype(int).to_numpy()
+            y_pred = adata.obs["louvain"].astype(int).to_numpy()
         # ---------------------------------------------------------------------
         X = torch.FloatTensor(X)
         adj = torch.FloatTensor(adj)
@@ -398,7 +438,7 @@ class GC_DEC(nn.Module):
                 _, q = self.forward(X, adj)
                 p = self.target_distribution(q).data
             if epoch % 100 == 0:
-                print("Epoch ", epoch)
+                logger.info(f"Epoch {epoch}")
             optimizer.zero_grad()
             z, q = self(X, adj)
             loss = self.loss_function(p, q)
@@ -407,7 +447,7 @@ class GC_DEC(nn.Module):
             self.trajectory.append(torch.argmax(q, dim=1).data.cpu().numpy())
 
     def fit_with_init(self, X, adj, init_y, lr=0.001, max_epochs=10, update_interval=1, weight_decay=5e-4, opt="sgd"):
-        print("Initializing cluster centers with kmeans.")
+        logger.info("Initializing cluster centers with kmeans.")
         if opt == "sgd":
             optimizer = optim.SGD(self.parameters(), lr=lr, momentum=0.9)
         elif opt == "admin":
@@ -438,7 +478,7 @@ class GC_DEC(nn.Module):
         return z, q
 
 
-class SpaGCN:
+class SpaGCN(BaseClusteringMethod):
     """SpaGCN class.
 
     Parameters
@@ -449,7 +489,6 @@ class SpaGCN:
     """
 
     def __init__(self, l=None):
-        super().__init__()
         self.l = l
         self.res = None
 
@@ -495,7 +534,7 @@ class SpaGCN:
             best l, the parameter to control percentage p.
 
         """
-        l = utils.search_l(p, adj, start, end, tol, max_run)
+        l = search_l(p, adj, start, end, tol, max_run)
         return l
 
     def set_l(self, l):
@@ -509,55 +548,47 @@ class SpaGCN:
         """
         self.l = l
 
-    def search_set_res(self, embed, adj, l, target_num, start=0.4, step=0.1, tol=5e-3, lr=0.05, max_epochs=10,
-                       r_seed=100, t_seed=100, n_seed=100, max_run=10):
+    def search_set_res(self, x, l, target_num, start=0.4, step=0.1, tol=5e-3, lr=0.05, max_epochs=10, max_run=10):
         """Search for optimal resolution parameter."""
-        random.seed(r_seed)
-        torch.manual_seed(t_seed)
-        np.random.seed(n_seed)
         res = start
-        print("Start at res = ", res, "step = ", step)
-        clf = SpaGCN()
-        clf.set_l(l)
-        clf.fit(embed, adj, init_spa=True, init="louvain", res=res, tol=tol, lr=lr, max_epochs=max_epochs)
-        y_pred, _ = clf.predict()
+        logger.info(f"Start at {res = :.4f}, {step = :.4f}")
+        clf = SpaGCN(l)
+        y_pred = clf.fit_predict(x, init_spa=True, init="louvain", res=res, tol=tol, lr=lr, max_epochs=max_epochs)
         old_num = len(set(y_pred))
-        print("Res = ", res, "Num of clusters = ", old_num)
+        logger.info(f"Res = {res:.4f}, Num of clusters = {old_num}")
         run = 0
         while old_num != target_num:
-            random.seed(r_seed)
-            torch.manual_seed(t_seed)
-            np.random.seed(n_seed)
             old_sign = 1 if (old_num < target_num) else -1
-            clf = SpaGCN()
-            clf.set_l(l)
-            clf.fit(embed, adj, init_spa=True, init="louvain", res=res + step * old_sign, tol=tol, lr=lr,
-                    max_epochs=max_epochs)
-            y_pred, _ = clf.predict()
+            clf = SpaGCN(l)
+            y_pred = clf.fit_predict(x, init_spa=True, init="louvain", res=res + step * old_sign, tol=tol, lr=lr,
+                                     max_epochs=max_epochs)
             new_num = len(set(y_pred))
-            print("Res = ", res + step * old_sign, "Num of clusters = ", new_num)
+            logger.info(f"Res = {res + step * old_sign:.3e}, Num of clusters = {new_num}")
             if new_num == target_num:
                 res = res + step * old_sign
-                print("recommended res = ", str(res))
+                logger.info(f"recommended res = {res:.4f}")
                 return res
             new_sign = 1 if (new_num < target_num) else -1
             if new_sign == old_sign:
                 res = res + step * old_sign
-                print("Res changed to", res)
+                logger.info(f"Res changed to {res}")
                 old_num = new_num
             else:
                 step = step / 2
-                print("Step changed to", step)
+                logger.info(f"Step changed to {step:.4f}")
             if run > max_run:
-                print("Exact resolution not found")
-                print("Recommended res = ", str(res))
+                logger.info(f"Exact resolution not found. Recommended res = {res:.4f}")
                 return res
             run += 1
-        print("recommended res = ", str(res))
+        logger.info("Recommended res = {res:.4f}")
         self.res = res
         return res
 
-    def fit(self, embed, adj, num_pcs=50, lr=0.005, max_epochs=2000, weight_decay=0, opt="admin", init_spa=True,
+    def calc_adj_exp(self, adj: np.ndarray) -> np.ndarray:
+        adj_exp = np.exp(-1 * (adj**2) / (2 * (self.l**2)))
+        return adj_exp
+
+    def fit(self, x, y=None, *, num_pcs=50, lr=0.005, max_epochs=2000, weight_decay=0, opt="admin", init_spa=True,
             init="louvain", n_neighbors=10, n_clusters=None, res=0.4, tol=1e-3):
         """Fit function for model training.
 
@@ -591,6 +622,7 @@ class SpaGCN:
             Oolerant value for searching l.
 
         """
+        embed, adj = x
         self.num_pcs = num_pcs
         self.res = res
         self.lr = lr
@@ -604,17 +636,15 @@ class SpaGCN:
         self.res = res
         self.tol = tol
         if self.l is None:
-            raise ValueError('l should be set before fitting the model!')
-        adj_exp = np.exp(-1 * (adj**2) / (2 * (self.l**2)))
+            raise ValueError("l should be set before fitting the model!")
 
         self.model = SimpleGCDEC(embed.shape[1], embed.shape[1])
+        adj_exp = self.calc_adj_exp(adj)
         self.model.fit(embed, adj_exp, lr=self.lr, max_epochs=self.max_epochs, weight_decay=self.weight_decay,
                        opt=self.opt, init_spa=self.init_spa, init=self.init, n_neighbors=self.n_neighbors,
                        n_clusters=self.n_clusters, res=self.res, tol=self.tol)
-        self.embed = embed
-        self.adj_exp = adj_exp
 
-    def predict(self):
+    def predict_proba(self, x):
         """Prediction function.
 
         Returns
@@ -623,27 +653,20 @@ class SpaGCN:
             The predicted labels and the predicted probabilities.
 
         """
-        z, q = self.model.predict(self.embed, self.adj_exp)
-        y_pred = torch.argmax(q, dim=1).data.cpu().numpy()
-        self.y_pred = y_pred
-        # Max probability plot
-        prob = q.detach().numpy()
-        return y_pred, prob
+        embed, adj = x
+        adj_exp = self.calc_adj_exp(adj)
+        _, pred_prob = self.model.predict(embed, adj_exp)
+        return pred_prob
 
-    def score(self, y_true):
-        """Score function to evaluate the prediction performance.
-
-        Parameters
-        ----------
-        y_true :
-            ground truth label.
+    def predict(self, x):
+        """Prediction function.
 
         Returns
         -------
-        score : float
-            metric eval score.
+        Tuple[np.ndarray, np.ndarray]
+            The predicted labels and the predicted probabilities.
 
         """
-        from sklearn.metrics.cluster import adjusted_rand_score
-        score = adjusted_rand_score(y_true, self.y_pred)
-        return score
+        pred_prob = self.predict_proba(x)
+        pred = torch.argmax(pred_prob, dim=1).data.cpu().numpy()
+        return pred

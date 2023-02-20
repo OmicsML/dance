@@ -1,9 +1,8 @@
 import argparse
 
-from sklearn.metrics import adjusted_mutual_info_score
-
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.spagcn import SpaGCN, refine
+from dance.utils import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -23,10 +22,10 @@ if __name__ == "__main__":
     parser.add_argument("--n_clusters", type=int, default=7, help="the number of clusters")
     parser.add_argument("--step", type=float, default=0.1, help="")
     parser.add_argument("--lr", type=float, default=0.05, help="learning rate")
-    parser.add_argument("--r_seed", type=int, default=100, help="")
-    parser.add_argument("--t_seed", type=int, default=100, help="")
-    parser.add_argument("--n_seed", type=int, default=100, help="")
+    parser.add_argument("--random_state", type=int, default=100, help="")
     args = parser.parse_args()
+
+    set_seed(args.random_state)
 
     # Initialize model and get model specific preprocessing pipeline
     model = SpaGCN()
@@ -40,16 +39,17 @@ if __name__ == "__main__":
     # Train and evaluate model
     l = model.search_l(args.p, adj, start=args.start, end=args.end, tol=args.tol, max_run=args.max_run)
     model.set_l(l)
-    n_clusters = args.n_clusters
-    res = model.search_set_res(x, adj, l=l, target_num=n_clusters, start=0.4, step=args.step, tol=args.tol, lr=args.lr,
-                               max_epochs=args.max_epochs, r_seed=args.r_seed, t_seed=args.t_seed, n_seed=args.n_seed,
-                               max_run=args.max_run)
-    model.fit(x, adj, init_spa=True, init="louvain", tol=args.tol, lr=args.lr, max_epochs=args.max_epochs, res=res)
-    predict = model.predict()
+    res = model.search_set_res((x, adj), l=l, target_num=args.n_clusters, start=0.4, step=args.step, tol=args.tol,
+                               lr=args.lr, max_epochs=args.max_epochs, max_run=args.max_run)
 
-    refined_pred = refine(sample_id=data.data.obs_names.tolist(), pred=predict[0].tolist(), dis=adj_2d, shape="hexagon")
-    print(model.score(y.ravel()))
-    print(adjusted_mutual_info_score(y.ravel(), refined_pred))
+    pred = model.fit_predict((x, adj), init_spa=True, init="louvain", tol=args.tol, lr=args.lr,
+                             max_epochs=args.max_epochs, res=res)
+    score = model.default_score_func(y, pred)
+    print(f"ARI: {score:.4f}")
+
+    refined_pred = refine(sample_id=data.data.obs_names.tolist(), pred=pred.tolist(), dis=adj_2d, shape="hexagon")
+    score_refined = model.default_score_func(y, refined_pred)
+    print(f"ARI (refined): {score_refined:.4f}")
 """ To reproduce SpaGCN on other samples, please refer to command lines belows:
 
 human dorsolateral prefrontal cortex sample 151673:

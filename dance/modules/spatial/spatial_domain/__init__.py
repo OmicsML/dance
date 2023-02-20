@@ -1,11 +1,11 @@
-from .louvain import Louvain
-from .spagcn import SpaGCN
-from .stagate import Stagate
-from .stlearn import StLouvain
+from dance.modules.spatial.spatial_domain.louvain import Louvain
+from dance.modules.spatial.spatial_domain.spagcn import SpaGCN
+from dance.modules.spatial.spatial_domain.stagate import Stagate
+from dance.modules.spatial.spatial_domain.stlearn import StLouvain
 
 __all__ = [
     "Louvain",
     "SpaGCN",
-    "Stagate",
     "StLouvain",
+    "Stagate",
 ]

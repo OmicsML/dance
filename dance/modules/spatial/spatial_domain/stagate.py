@@ -8,7 +8,6 @@ Dong, Kangning, and Shihua Zhang. "Deciphering spatial domains from spatially re
 graph attention auto-encoder." Nature communications 13.1 (2022): 1-12.
 
 """
-
 import numpy as np
 import scanpy as sc
 import scipy.sparse as sp
@@ -16,7 +15,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from sklearn import mixture
-from sklearn.metrics.cluster import adjusted_rand_score
 from torch import Tensor
 from torch.nn import Parameter
 from torch_geometric.data import Data
@@ -25,9 +23,10 @@ from torch_geometric.utils import add_self_loops, remove_self_loops, softmax
 from torch_sparse import SparseTensor, set_diag
 from tqdm import tqdm
 
+from dance.modules.base import BaseClusteringMethod
 from dance.transforms import AnnDataTransform, Compose, SetConfig
 from dance.transforms.graph import StagateGraph
-from dance.typing import LogLevel
+from dance.typing import Any, LogLevel, Optional
 
 
 def transfer_pytorch_data(adata, adj):
@@ -160,7 +159,7 @@ class GATConv(MessagePassing):
         return "{}({}, {}, heads={})".format(self.__class__.__name__, self.in_channels, self.out_channels, self.heads)
 
 
-class Stagate(torch.nn.Module):
+class Stagate(torch.nn.Module, BaseClusteringMethod):
     """Stagate class.
 
     Parameters
@@ -275,13 +274,11 @@ class Stagate(torch.nn.Module):
 
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
-        # loss_list = []
         for epoch in tqdm(range(1, n_epochs + 1)):
             model.train()
             optimizer.zero_grad()
             z, out = model(data.x, data.edge_index)
             loss = F.mse_loss(data.x, out)
-            # loss_list.append(loss)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clipping)
             optimizer.step()
@@ -306,23 +303,13 @@ class Stagate(torch.nn.Module):
         adata = mclust(adata, used_obsm="STAGATE", num_cluster=7)
         self.adata = adata
 
-    def predict(self):
-        """Prediction function."""
-        return self.adata.obs["mclust"].values
-
-    def score(self, y_true=None):
-        """score function to get score of prediction.
+    def predict(self, x: Optional[Any] = None):
+        """Prediction function.
 
         Parameters
         ----------
-        y_true :
-            Ground truth label.
-
-        Returns
-        -------
-        float
-            Adjusted rand index score.
+        x
+            Not used, for compatibility with :class:`BaseClusteringMethod`.
 
         """
-        score = adjusted_rand_score(y_true, self.predict())
-        return score
+        return self.adata.obs["mclust"].values
