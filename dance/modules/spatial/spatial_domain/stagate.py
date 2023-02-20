@@ -298,8 +298,6 @@ class Stagate(torch.nn.Module, BaseClusteringMethod):
             adata.layers["STAGATE_ReX"] = ReX
 
         logger.info("Start post-processing")
-        sc.pp.neighbors(adata, use_rep="STAGATE")
-        sc.tl.umap(adata)
         adata = mclust(adata, used_obsm="STAGATE", num_cluster=7)
         self.adata = adata
 
