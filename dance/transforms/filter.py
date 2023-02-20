@@ -1,9 +1,75 @@
 import numpy as np
+from anndata import AnnData
 
 from dance import logger
 from dance.exceptions import DevError
 from dance.transforms.base import BaseTransform
-from dance.typing import List, Literal, Optional
+from dance.typing import Dict, List, Literal, Optional, Union
+
+
+class FilterGenesCommon(BaseTransform):
+    """Filter genes by taking the common genes across batches or splits.
+
+    Parameters
+    ----------
+    batch_key
+        Which column in the ``.obs`` table to be used to distinguishing batches.
+    split_keys
+        A list of split names, e.g., 'train', to be used to find common gnees.
+
+    Note
+    ----
+    One and only one of :attr:`batch_key` or :attr:`split_keys` can be specified.
+
+    """
+
+    _DISPLAY_ATTRS = ("batch_key", "split_keys")
+
+    def __init__(self, batch_key: Optional[str] = None, split_keys: Optional[List[str]] = None, **kwargs):
+        super().__init__(**kwargs)
+
+        if (batch_key is not None) and (split_keys is not None):
+            raise ValueError("Either batch_key or split_keys can be specified, but not both. "
+                             f"Got {batch_key=!r}, {split_keys=!r}")
+        elif (batch_key is None) and (split_keys is None):
+            raise ValueError("Either one of batch_key or split_keys must be specified.")
+        self.batch_key = batch_key
+        self.split_keys = split_keys
+
+    def _select_by_splits(self, data) -> Dict[Union[str, int], AnnData]:
+        sliced_data_dict = {}
+        for split_key in self.split_keys:
+            idx = data.get_split_idx(split_key, error_on_miss=True)
+            sliced_data_dict[split_key] = data.data[idx]
+        return sliced_data_dict
+
+    def _select_by_batch(self, data) -> Dict[Union[str, int], AnnData]:
+        sliced_data_dict = {}
+        for batch_id, group in data.data.obs.groupby(self.batch_key):
+            sliced_data_dict[batch_id] = data.data[group.index]
+        return sliced_data_dict
+
+    def __call__(self, data):
+        if self.batch_key is None:
+            sliced_data_dict = self._select_by_splits(data)
+        elif self.split_keys is None:
+            sliced_data_dict = self._select_by_batch(data)
+        else:
+            raise DevError("Both batch_key and split_keys are not set. This should have been caught at init.")
+
+        all_genes = data.data.var_names.tolist()
+        sub_genes_list = []
+        for name, sliced_data in sliced_data_dict.items():
+            x = sliced_data.X
+            abs_sum = np.array(np.abs(x).sum(0)).ravel()
+            hits = np.where(abs_sum > 0)[0]
+            sub_genes = [all_genes[i] for i in hits]
+            sub_genes_list.append(sub_genes)
+            logger.info(f"{len(sub_genes):,} genes found in {name!r}")
+
+        common_genes = sorted(set.intersection(*map(set, sub_genes_list)))
+        logger.info(f"Found {len(common_genes):,} common genes out of {len(all_genes):,} total genes.")
+        data.data._inplace_subset_var(common_genes)
 
 
 class FilterGenesMatch(BaseTransform):
