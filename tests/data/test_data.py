@@ -5,8 +5,8 @@ from anndata import AnnData
 
 from dance.data import Data
 
-X = np.array([[0, 1], [1, 2], [2, 3]])
-Y = np.array([[0], [1], [2]])
+X = np.array([[0, 1], [1, 2], [2, 3]], dtype=np.float32)
+Y = np.array([[0], [1], [2]], dtype=np.float32)
 
 
 def test_data_basic_properties(subtests):
@@ -127,3 +127,49 @@ def test_get_data(subtests):
         (x1, x2), _ = data.get_train_data()
         assert x1.tolist() == [0, 1, 2]
         assert x2.tolist() == [2, 3]
+
+
+def test_append(subtests):
+    data1 = Data(AnnData(X=X), train_size=1)
+    data2 = Data(AnnData(X=X), train_size=2)
+    data2_split_idx = {"train": [0, 1], "test": [2]}
+
+    with subtests.test(mode="merge"):
+        data = data1.copy()
+        data.append(data2, mode="merge")
+        assert data._split_idx_dict == {"train": [0, 3, 4], "test": [1, 2, 5]}
+        # Make sure the appended data is not inplace modeified
+        assert data2._split_idx_dict == data2_split_idx
+
+    with subtests.test(mode="rename"):
+        # Missing rename_dict
+        pytest.raises(ValueError, data1.copy().append, data2, mode="rename")
+
+        # Missing value for 'test'
+        pytest.raises(KeyError, data1.copy().append, data2, mode="rename", rename_dict={"train": "new"})
+
+        # Conflicting value for 'test'
+        pytest.raises(ValueError, data1.copy().append, data2, mode="rename", rename_dict={"train": "a", "test": "test"})
+
+        data = data1.copy()
+        data.append(data2, mode="rename", rename_dict={"train": "new_train", "test": "new_test"})
+        assert data._split_idx_dict == {"train": [0], "new_train": [3, 4], "test": [1, 2], "new_test": [5]}
+        assert data2._split_idx_dict == data2_split_idx
+
+    with subtests.test(mode="new_split"):
+        # Missing new_split_name
+        pytest.raises(ValueError, data1.copy().append, data2, mode="new_split")
+
+        # Conflicting name "test"
+        pytest.raises(ValueError, data1.copy().append, data2, mode="new_split", new_split_name="test")
+
+        data = data1.copy()
+        data.append(data2, mode="new_split", new_split_name="ref")
+        assert data._split_idx_dict == {"train": [0], "test": [1, 2], "ref": [3, 4, 5]}
+        assert data2._split_idx_dict == data2_split_idx
+
+    with subtests.test(mode=None):
+        data = data1.copy()
+        data.append(data2, mode=None)
+        assert data._split_idx_dict == {"train": [0], "test": [1, 2]}
+        assert data2._split_idx_dict == data2_split_idx
