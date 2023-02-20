@@ -64,7 +64,6 @@ class BaseData(ABC):
     test_size
         Number of cells to be used for testing. If set to -1, used what's left from training and validation.
 
-
     """
 
     _FEATURE_CONFIGS: List[str] = ["feature_mod", "feature_channel", "feature_channel_type"]
@@ -72,14 +71,14 @@ class BaseData(ABC):
     _DATA_CHANNELS: List[str] = ["obs", "var", "obsm", "varm", "obsp", "varp", "layers", "uns"]
 
     def __init__(self, data: Union[AnnData, MuData], train_size: Optional[int] = None, val_size: int = 0,
-                 test_size: int = -1):
+                 test_size: int = -1, split_index_range_dict: Optional[Dict[str, Tuple[int, int]]] = None):
         super().__init__()
 
         self._data = data
 
         # TODO: move _split_idx_dict into data.uns
         self._split_idx_dict: Dict[str, Sequence[int]] = {}
-        self._setup_splits(train_size, val_size, test_size)
+        self._setup_splits(train_size, val_size, test_size, split_index_range_dict)
 
         if "dance_config" not in self._data.uns:
             self._data.uns["dance_config"] = dict()
@@ -88,7 +87,19 @@ class BaseData(ABC):
         return f"{self.__class__.__name__} object that wraps (.data):\n{self.data}"
 
     # WARNING: need to be careful about subsampling cells as the index are not automatically updated!!
-    def _setup_splits(self, train_size: Optional[Union[int, str]], val_size: int, test_size: int):
+    def _setup_splits(
+        self,
+        train_size: Optional[Union[int, str]],
+        val_size: int,
+        test_size: int,
+        split_index_range_dict: Optional[Dict[str, Tuple[int, int]]],
+    ):
+        if split_index_range_dict is None:
+            self._setup_splits_default(train_size, val_size, test_size)
+        else:
+            self._setup_splits_range(split_index_range_dict)
+
+    def _setup_splits_default(self, train_size: Optional[Union[int, str]], val_size: int, test_size: int):
         if train_size is None:
             return
         elif isinstance(train_size, str) and train_size.lower() == "all":
@@ -124,6 +135,19 @@ class BaseData(ABC):
         for i, split_name in enumerate(split_names):
             start = split_thresholds[i - 1] if i > 0 else 0
             end = split_thresholds[i]
+            if end - start > 0:  # skip empty split
+                self._split_idx_dict[split_name] = list(range(start, end))
+
+    def _setup_splits_range(self, split_index_range_dict: Dict[str, Tuple[int, int]]):
+        for split_name, index_range in split_index_range_dict.items():
+            if (not isinstance(index_range, tuple)) or (len(index_range) != 2):
+                raise TypeError("The split index range must of a two-tuple containing the start and end index. "
+                                f"Got {index_range!r} for key {split_name!r}")
+            elif any(not isinstance(i, int) for i in index_range):
+                raise TypeError("The split index range must of a two-tuple of int type. "
+                                f"Got {index_range!r} for key {split_name!r}")
+
+            start, end = index_range
             if end - start > 0:  # skip empty split
                 self._split_idx_dict[split_name] = list(range(start, end))
 

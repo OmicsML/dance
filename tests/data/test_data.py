@@ -52,6 +52,24 @@ def test_data_basic_properties(subtests):
         with pytest.raises(ValueError):  # sum of sizes exceeds data size
             Data(adata.copy(), train_size=2, test_size=2)
 
+    with subtests.test("Index range dict"):
+        split_index_range_dict = {"train": (0, 1), "ref": (0, 2), "inf": (2, 3)}
+        data = Data(adata.copy(), split_index_range_dict=split_index_range_dict)
+
+        assert data.train_idx == [0]
+        assert data.get_split_idx("ref") == [0, 1]
+        assert data.get_split_idx("inf") == [2]
+
+    with subtests.test("Index range dict errors"):
+        with pytest.raises(TypeError):  # value must be a two tuple, not three tuple
+            Data(adata.copy(), split_index_range_dict={"train": (0, 1, 2)})
+
+        with pytest.raises(TypeError):  # value must be a two tuple, not a list
+            Data(adata.copy(), split_index_range_dict={"train": [0, 1]})
+
+        with pytest.raises(TypeError):  # value must be a two tuple of int, not str
+            Data(adata.copy(), split_index_range_dict={"train": ("0", "1")})
+
 
 def test_get_data(subtests):
     adata = AnnData(X=X, obs=pd.DataFrame(X, columns=["a", "b"]), var=pd.DataFrame(X.T, columns=["x", "y", "z"]))
