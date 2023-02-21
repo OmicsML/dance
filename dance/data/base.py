@@ -493,8 +493,15 @@ class BaseData(ABC):
         else:
             raise ValueError(f"Unknown mode {mode!r}. Available options are: 'merge', 'rename', 'new_split'")
 
+        # NOTE: Manually merging uns cause AnnData is incapable of doing so, even with uns_merge set :(
+        new_uns = dict(data.data.uns)
+        new_uns.update(dict(self.data.uns))
+
         self._data = anndata.concat((self.data, data.data), **concat_kwargs)
+        self._data.uns.update(new_uns)
         self._split_idx_dict = new_split_idx_dict
+
+        return self
 
 
 class Data(BaseData):
