@@ -437,7 +437,7 @@ class BaseData(ABC):
         mode: Optional[Literal["merge", "rename", "new_split"]] = "merge",
         rename_dict: Optional[Dict[str, str]] = None,
         new_split_name: Optional[str] = None,
-        index_unique: Optional[str] = "_",
+        **concat_kwargs,
     ):
         """Append another dance data object to the current data object.
 
@@ -458,7 +458,7 @@ class BaseData(ABC):
             data to other names.
         new_split_name
             Optional argument that is only used when ``mode="new_split"``. Name of the split to assign to the new data.
-        index_unique
+        **concat_kwargs
             See :meth:`anndata.concat`.
 
         """
@@ -493,7 +493,7 @@ class BaseData(ABC):
         else:
             raise ValueError(f"Unknown mode {mode!r}. Available options are: 'merge', 'rename', 'new_split'")
 
-        self._data = anndata.concat((self.data, data.data), index_unique=index_unique)
+        self._data = anndata.concat((self.data, data.data), **concat_kwargs)
         self._split_idx_dict = new_split_idx_dict
 
 
