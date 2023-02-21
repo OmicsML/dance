@@ -8,7 +8,6 @@ Elosua-Bayes, Nieto, Mereu, Gut, and Heyn H. "SPOTlight: seeded NMF regression t
 spots with single-cell transcriptomes." Nucleic Acids Research (2021)
 
 """
-
 import numpy as np
 import torch
 from torch import nn, optim

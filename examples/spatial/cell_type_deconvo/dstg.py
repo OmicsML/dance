@@ -14,12 +14,9 @@ from dance.transforms.preprocess import pseudo_spatial_process
 from dance.utils import set_seed
 from dance.utils.matrix import normalize
 
-# TODO: make this a property of the dataset class?
-DATASETS = ["CARD_synthetic", "GSE174746", "SPOTLight_synthetic", "toy1", "toy2"]
-
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--cache", action="store_true", help="Cache processed data.")
-parser.add_argument("--dataset", default="CARD_synthetic", choices=DATASETS, help="Name of the dataset.")
+parser.add_argument("--dataset", default="CARD_synthetic", choices=CellTypeDeconvoDataset.DATASETS)
 parser.add_argument("--datadir", default="data/spatial", help="Directory to save the data.")
 parser.add_argument("--sc_ref", type=bool, default=True, help="Reference scRNA (True) or cell-mixtures (False).")
 parser.add_argument("--num_pseudo", type=int, default=500, help="Number of pseudo mixtures to generate.")

@@ -146,6 +146,7 @@ class CellTypeDeconvoDataset(BaseDataset):
         "human PDAC": "https://www.dropbox.com/sh/9py6hk9j1ygyprh/AAAOKTo-TE_eX4JJg0HIFfZ7a?dl=1",
         "mouse brain 1": "https://www.dropbox.com/sh/e2nl247v1jrd7h8/AAC1IUlk_3vXUvfk2fv9L2D3a?dl=1",
     }
+    DATASETS = sorted(url_dict)
 
     def __init__(self, data_dir="data/spatial", data_id="GSE174746", subset_common_celltypes: bool = True):
         super().__init__(data_dir)
@@ -154,6 +155,7 @@ class CellTypeDeconvoDataset(BaseDataset):
             raise ValueError(f"Unknown data_id {data_id!r}, available datasets are: {sorted(self.url_dict)}")
 
         self.data_id = data_id
+        self.data_url = self.url_dict[data_id]
         self.data_dir = osp.join(data_dir, data_id)
         self.subset_common_celltypes = subset_common_celltypes
 

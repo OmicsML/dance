@@ -4,11 +4,8 @@ from pprint import pprint
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.card import Card
 
-# TODO: make this a property of the dataset class?
-DATASETS = ["CARD_synthetic", "GSE174746", "SPOTLight_synthetic"]
-
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--dataset", default="CARD_synthetic", choices=DATASETS, help="Name of the benchmarking dataset.")
+parser.add_argument("--dataset", default="CARD_synthetic", choices=CellTypeDeconvoDataset.DATASETS)
 parser.add_argument("--datadir", default="data/spatial", help="Directory to save the data.")
 parser.add_argument("--max_iter", type=int, default=10, help="Maximum optimization iteration.")
 parser.add_argument("--epsilon", type=float, default=1e-10, help="Optimization threshold.")

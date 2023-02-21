@@ -5,11 +5,8 @@ from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.spatialdecon import SpatialDecon
 from dance.utils import set_seed
 
-# TODO: make this a property of the dataset class?
-DATASETS = ["CARD_synthetic", "GSE174746", "SPOTLight_synthetic"]
-
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--dataset", default="CARD_synthetic", choices=DATASETS, help="Name of the dataset.")
+parser.add_argument("--dataset", default="CARD_synthetic", choices=CellTypeDeconvoDataset.DATASETS)
 parser.add_argument("--datadir", default="data/spatial", help="Directory to save the data.")
 parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate.")
 parser.add_argument("--bias", type=bool, default=False, help="Include/Exclude bias term.")
