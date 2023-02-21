@@ -253,7 +253,7 @@ class Card:
         genes = list(sd_within_colMean[genes_to_select].index)
         return genes
 
-    def fit(self, x, spatial, max_iter=100, epsilon=1e-4, sigma=0.1):
+    def fit(self, x, spatial, max_iter=100, epsilon=1e-4, sigma=0.1, location_free: bool = False):
         """Fit function for model training.
 
         Parameters
@@ -268,6 +268,8 @@ class Card:
             Optimization threshold.
         sigma : float
             Spatial gaussian kernel scaling factor.
+        location_free
+            Do not use spatial location info if set to True.
 
         """
         ct_select = self.ct_select
@@ -280,7 +282,7 @@ class Card:
         Xinput_norm = Xinput / Xinput.sum(1, keepdims=True)  # TODO: use the normalize util
 
         # Spatial location
-        if (spatial == 0).all():
+        if location_free or (spatial == 0).all():
             kernel_mat = None
         else:
             # TODO: refactor this to preprocess?
@@ -331,8 +333,8 @@ class Card:
         prop_pred = optim_res["V"] / optim_res["V"].sum(axis=1, keepdims=True)
         return prop_pred
 
-    def fit_and_predict(self, x, spatial, max_iter=100, epsilon=1e-4):
-        self.fit(x, spatial, max_iter=max_iter, epsilon=epsilon)
+    def fit_and_predict(self, x, spatial, **kwargs):
+        self.fit(x, spatial, **kwargs)
         return self.predict()
 
     @staticmethod

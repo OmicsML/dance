@@ -30,7 +30,8 @@ ref_count = ref_adata.to_df()
 ref_annot = ref_adata.obs
 
 model = Card(ref_count, ref_annot, ct_varname="cellType", ct_select=cell_types)
-pred = model.fit_and_predict(x_count, x_spatial, max_iter=args.max_iter, epsilon=args.epsilon)
+pred = model.fit_and_predict(x_count, x_spatial, max_iter=args.max_iter, epsilon=args.epsilon,
+                             location_free=args.location_free)
 mse = model.score(pred, y)
 
 print(f"Predicted cell-type proportions of  sample 1: {pred[0].round(3)}")
