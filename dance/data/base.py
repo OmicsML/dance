@@ -428,9 +428,9 @@ class BaseData(ABC):
 
         # Extract specific split
         if split_name is not None:
-            if channel_type in ["obsm", "obsp", "layers"]:
+            if channel_type in ["X", "raw_X", "obsm", "obsp", "layers"]:
                 idx = self.get_split_idx(split_name, error_on_miss=True)
-                feature = feature[idx] if channel_type in ["obsm", "layers"] else feature[idx][:, idx]
+                feature = feature[idx][:, idx] if channel_type == "obsp" else feature[idx]
             elif isinstance(channel_type, str) and channel_type.startswith("var"):
                 logger.warning(f"Indexing option for {channel_type} not implemented yet.")
 
