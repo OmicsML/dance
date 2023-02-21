@@ -4,11 +4,11 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 
 import anndata
+import mudata
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 import torch
-from mudata import MuData
 
 from dance import logger
 from dance.typing import Any, Dict, FeatType, Iterator, List, Literal, Optional, Sequence, Tuple, Union
@@ -70,7 +70,7 @@ class BaseData(ABC):
     _LABEL_CONFIGS: List[str] = ["label_mod", "label_channel", "label_channel_type"]
     _DATA_CHANNELS: List[str] = ["obs", "var", "obsm", "varm", "obsp", "varp", "layers", "uns"]
 
-    def __init__(self, data: Union[anndata.AnnData, MuData], train_size: Optional[int] = None, val_size: int = 0,
+    def __init__(self, data: Union[anndata.AnnData, mudata.MuData], train_size: Optional[int] = None, val_size: int = 0,
                  test_size: int = -1, split_index_range_dict: Optional[Dict[str, Tuple[int, int]]] = None,
                  full_split_name: Optional[str] = None):
         super().__init__()
@@ -292,7 +292,7 @@ class BaseData(ABC):
 
         Parameters
         ----------
-        split_name : str
+        split_name
             Name of the split to retrieve.
         error_on_miss
             If set to True, raise KeyError if the queried split does not exit, otherwise return None.
@@ -316,9 +316,9 @@ class BaseData(ABC):
 
         Parameters
         ----------
-        split_name : str
+        split_name
             Name of the split to retrieve.
-        return_type : str
+        return_type
             Return numpy array if set to 'numpy', or torch Tensor if set to 'torch'.
 
         """
@@ -346,7 +346,7 @@ class BaseData(ABC):
 
     @staticmethod
     def _get_feature(
-        in_data: Union[anndata.AnnData, MuData],
+        in_data: Union[anndata.AnnData, mudata.MuData],
         channel: Optional[str],
         channel_type: Optional[str],
         mod: Optional[str],
@@ -354,7 +354,7 @@ class BaseData(ABC):
         # Pick modality
         if mod is None:
             data = in_data
-        elif not isinstance(in_data, MuData):
+        elif not isinstance(in_data, mudata.MuData):
             raise AttributeError("`mod` option is only available when using multimodality data.")
         elif mod not in in_data.mod:
             raise KeyError(f"Unknown modality {mod!r}, available options are {sorted(data.mod)}")
