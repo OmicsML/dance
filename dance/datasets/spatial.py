@@ -21,7 +21,7 @@ from dance.utils.download import download_file, download_unzip, unzip_file
 class SpatialLIBDDataset(BaseDataset):
 
     _DISPLAY_ATTRS = ("data_id", )
-    url_dict = {
+    URL_DICT = {
         "151510": "https://www.dropbox.com/sh/41h9brsk6my546x/AADa18mkJge-KQRTndRelTpMa?dl=1",
         "151507": "https://www.dropbox.com/sh/m3554vfrdzbwv2c/AACGsFNVKx8rjBgvF7Pcm2L7a?dl=1",
         "151508": "https://www.dropbox.com/sh/tm47u3fre8692zt/AAAJJf8-za_Lpw614ft096qqa?dl=1",
@@ -43,16 +43,16 @@ class SpatialLIBDDataset(BaseDataset):
         self.data_dir = data_dir + "/{}".format(data_id)
 
     def download_all(self):
-        logger.info(f"All data includes {len(self.url_dict)} datasets: {list(self.url_dict)}")
+        logger.info(f"All data includes {len(self.URL_DICT)} datasets: {list(self.URL_DICT)}")
         _data_id = self.data_id
-        for data_id in self.url_dict:
+        for data_id in self.URL_DICT:
             self.data_id = data_id
             self.download()
         self.data_id = _data_id
 
     def is_complete_all(self):
         _data_id = self.data_id
-        for data_id in self.url_dict:
+        for data_id in self.URL_DICT:
             self.data_id = data_id
             if not self.is_complete():
                 self.data_id = _data_id
@@ -62,7 +62,7 @@ class SpatialLIBDDataset(BaseDataset):
 
     def download(self):
         out_path = osp.join(self.data_dir, f"{self.data_id}.zip")
-        if download_file(self.url_dict[self.data_id], out_path):
+        if download_file(self.URL_DICT[self.data_id], out_path):
             unzip_file(out_path, self.data_dir)
 
     def is_complete(self):
@@ -139,23 +139,23 @@ class CellTypeDeconvoDataset(BaseDataset):
 
     _DISPLAY_ATTRS = ("data_id", "subset_common_celltypes")
     _IGNORE_FILES = ["readme.txt"]
-    url_dict = {
+    URL_DICT = {
         "CARD_synthetic": "https://www.dropbox.com/sh/v0vpv0jsnfexj7f/AADpizLGOrF7M8EesDihgbBla?dl=1",
         "GSE174746": "https://www.dropbox.com/sh/spfv06yfttetrab/AAAgORS6ocyoZEyxiRYKTymCa?dl=1",
         "SPOTLight_synthetic": "https://www.dropbox.com/sh/p1tfb0xe1yl2zpe/AAB6cF-BsdJcHToet_C-AlXAa?dl=1",
         "human PDAC": "https://www.dropbox.com/sh/9py6hk9j1ygyprh/AAAOKTo-TE_eX4JJg0HIFfZ7a?dl=1",
         "mouse brain 1": "https://www.dropbox.com/sh/e2nl247v1jrd7h8/AAC1IUlk_3vXUvfk2fv9L2D3a?dl=1",
     }
-    DATASETS = sorted(url_dict)
+    DATASETS = sorted(URL_DICT)
 
     def __init__(self, data_dir="data/spatial", data_id="GSE174746", subset_common_celltypes: bool = True):
         super().__init__(data_dir)
 
-        if data_id not in self.url_dict:
-            raise ValueError(f"Unknown data_id {data_id!r}, available datasets are: {sorted(self.url_dict)}")
+        if data_id not in self.URL_DICT:
+            raise ValueError(f"Unknown data_id {data_id!r}, available datasets are: {sorted(self.URL_DICT)}")
 
         self.data_id = data_id
-        self.data_url = self.url_dict[data_id]
+        self.data_url = self.URL_DICT[data_id]
         self.data_dir = osp.join(data_dir, data_id)
         self.subset_common_celltypes = subset_common_celltypes
 

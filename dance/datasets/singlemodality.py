@@ -26,13 +26,13 @@ from dance.utils.preprocess import cell_label_to_df
 class ScDeepSortDataset(BaseDataset):
 
     _DISPLAY_ATTRS = ("species", "tissue", "train_dataset", "test_dataset")
-    all_url_dict: Dict[str, str] = {
+    ALL_URL_DICT: Dict[str, str] = {
         "train_human_cell_atlas":   "https://www.dropbox.com/s/1itq1pokplbqxhx?dl=1",
         "test_human_test_data":     "https://www.dropbox.com/s/gpxjnnvwyblv3xb?dl=1",
         "train_mouse_cell_atlas":   "https://www.dropbox.com/s/ng8d3eujfah9ppl?dl=1",
         "test_mouse_test_data":     "https://www.dropbox.com/s/pkr28czk5g3al2p?dl=1",
     }  # yapf: disable
-    bench_url_dict: Dict[str, str] = {
+    BENCH_URL_DICT: Dict[str, str] = {
         # Mouse spleen benchmark
         "train_mouse_Spleen1970_celltype.csv":  "https://www.dropbox.com/s/3ea64vk546fjxvr?dl=1",
         "train_mouse_Spleen1970_data.csv":      "https://www.dropbox.com/s/c4te0fr1qicqki8?dl=1",
@@ -70,7 +70,7 @@ class ScDeepSortDataset(BaseDataset):
             return
 
         # Download and overwrite
-        for name, url in self.all_url_dict.items():
+        for name, url in self.ALL_URL_DICT.items():
             download_unzip(url, self.data_dir)
 
             parts = name.split("_")  # [train|test]_{species}_[cell|test]_atlas
@@ -90,7 +90,7 @@ class ScDeepSortDataset(BaseDataset):
 
         # TODO: only download missing files
         # Download training and testing data
-        for name, url in self.bench_url_dict.items():
+        for name, url in self.BENCH_URL_DICT.items():
             parts = name.split("_")  # [train|test]_{species}_{tissue}{id}_[celltype|data].csv
             filename = "_".join(parts[1:])
             filepath = osp.join(self.data_dir, *parts[:2], filename)
@@ -116,7 +116,7 @@ class ScDeepSortDataset(BaseDataset):
 
     def is_complete(self):
         """Check if benchmarking data is complete."""
-        for name in self.bench_url_dict:
+        for name in self.BENCH_URL_DICT:
             filename = name[name.find('mouse'):]
             file_i = osp.join(self.data_dir, *name.split("_")[:2], filename)
             if not osp.exists(file_i):
@@ -244,7 +244,7 @@ class ClusteringDataset(BaseDataset):
 
     """
 
-    data_url_dict: Dict[str, str] = {
+    URL_DICT: Dict[str, str] = {
         "10X_PBMC": "https://www.dropbox.com/s/pfunm27qzgfpj3u/10X_PBMC.h5?dl=1",
         "mouse_bladder_cell": "https://www.dropbox.com/s/xxtnomx5zrifdwi/mouse_bladder_cell.h5?dl=1",
         "mouse_ES_cell": "https://www.dropbox.com/s/zbuku7oznvji8jk/mouse_ES_cell.h5?dl=1",
@@ -261,7 +261,7 @@ class ClusteringDataset(BaseDataset):
         return osp.join(self.data_dir, f"{self.dataset}.h5")
 
     def download(self):
-        download_file(self.data_url_dict[self.dataset], self.data_path)
+        download_file(self.URL_DICT[self.dataset], self.data_path)
 
     def is_complete(self):
         return osp.exists(self.data_path)
