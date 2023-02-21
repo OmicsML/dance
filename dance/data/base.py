@@ -332,6 +332,18 @@ class BaseData(ABC):
         mask[split_idx] = True
         return mask
 
+    def get_split_data(self, split_name: str) -> Union[anndata.AnnData, mudata.MuData]:
+        """Obtain the underlying data of a particular split.
+
+        Parameters
+        ----------
+        split_name
+            Name of the split to retrieve.
+
+        """
+        split_idx = self.get_split_idx(split_name, error_on_miss=True)
+        return self.data[split_idx]
+
     @staticmethod
     def _get_feature(
         in_data: Union[anndata.AnnData, MuData],
