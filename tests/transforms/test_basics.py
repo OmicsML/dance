@@ -9,7 +9,8 @@ def test_reprs(subtests):
 
     with subtests.test("WeightedFeaturePCA"):
         t = WeightedFeaturePCA(n_components=100, split_name="train")
-        assert repr(t) == "WeightedFeaturePCA(n_components=100, split_name='train')"
+        assert repr(t) == ("WeightedFeaturePCA(n_components=100, split_name='train', "
+                           "feat_norm_mode=None, feat_norm_axis=0)")
 
     with subtests.test("NeighborGraph"):
         t = NeighborGraph(n_neighbors=10, n_pcs=None, knn=True, random_state=0, method="umap", metric="euclidean")
