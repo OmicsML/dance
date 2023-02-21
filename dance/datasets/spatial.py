@@ -4,26 +4,17 @@ import warnings
 from pprint import pformat
 
 import cv2
+import numpy as np
 import pandas as pd
 import scanpy as sc
+from anndata import AnnData
 
 from dance import logger
 from dance.data import Data
 from dance.datasets.base import BaseDataset
 from dance.registers import register_dataset
+from dance.typing import Tuple
 from dance.utils.download import download_file, download_unzip, unzip_file
-
-IGNORED_FILES = ["readme.txt"]
-
-cellDeconvo_dataset = {
-    "CARD_synthetic": "https://www.dropbox.com/sh/v0vpv0jsnfexj7f/AADpizLGOrF7M8EesDihgbBla?dl=1",
-    "GSE174746": "https://www.dropbox.com/sh/spfv06yfttetrab/AAAgORS6ocyoZEyxiRYKTymCa?dl=1",
-    "SPOTLight_synthetic": "https://www.dropbox.com/sh/p1tfb0xe1yl2zpe/AAB6cF-BsdJcHToet_C-AlXAa?dl=1",
-    "human PDAC": "https://www.dropbox.com/sh/9py6hk9j1ygyprh/AAAOKTo-TE_eX4JJg0HIFfZ7a?dl=1",
-    "mouse brain 1": "https://www.dropbox.com/sh/e2nl247v1jrd7h8/AAC1IUlk_3vXUvfk2fv9L2D3a?dl=1",
-    "toy1": "https://www.dropbox.com/sh/quvjz6pzltio43u/AAC8vd8-H-4S58-b1pGz3DLRa?dl=1",
-    "toy2": "https://www.dropbox.com/sh/eqkcm344p5d1akr/AAAPs0Z0S7yFC5ML8Kcd5eU9a?dl=1",
-}
 
 
 @register_dataset("spatiallibd")
@@ -45,7 +36,7 @@ class SpatialLIBDDataset(BaseDataset):
         "151676": "https://www.dropbox.com/sh/jos5jjurezy5zp1/AAB2uaVm3-Us1a4mDkS1Q-iAa?dl=1",
     }
 
-    def __init__(self, root=".", full_download=False, data_id="151673", data_dir="data/spot"):
+    def __init__(self, root=".", full_download=False, data_id="151673", data_dir="data/spatial"):
         super().__init__(root, full_download)
 
         self.data_id = data_id
@@ -134,56 +125,70 @@ class SpatialLIBDDataset(BaseDataset):
         return data
 
 
-class CellTypeDeconvoDatasetLite:
+@register_dataset("celltypedeconvo")
+class CellTypeDeconvoDataset(BaseDataset):
+    """Load raw data.
 
-    def __init__(self, data_id="GSE174746", data_dir="data/spatial", build_graph_fn="default"):
-        if data_id not in cellDeconvo_dataset:
-            raise ValueError(f"Unknown data_id {data_id!r}, available datasets are: {sorted(cellDeconvo_dataset)}")
+    Parameters
+    ----------
+    subset_common_celltypes
+        If set to True, then subset both the reference and the real data to contain only cell types that are
+        present in both reference and real.
+
+    """
+
+    _DISPLAY_ATTRS = ("data_id", "subset_common_celltypes")
+    _IGNORE_FILES = ["readme.txt"]
+    url_dict = {
+        "CARD_synthetic": "https://www.dropbox.com/sh/v0vpv0jsnfexj7f/AADpizLGOrF7M8EesDihgbBla?dl=1",
+        "GSE174746": "https://www.dropbox.com/sh/spfv06yfttetrab/AAAgORS6ocyoZEyxiRYKTymCa?dl=1",
+        "SPOTLight_synthetic": "https://www.dropbox.com/sh/p1tfb0xe1yl2zpe/AAB6cF-BsdJcHToet_C-AlXAa?dl=1",
+        "human PDAC": "https://www.dropbox.com/sh/9py6hk9j1ygyprh/AAAOKTo-TE_eX4JJg0HIFfZ7a?dl=1",
+        "mouse brain 1": "https://www.dropbox.com/sh/e2nl247v1jrd7h8/AAC1IUlk_3vXUvfk2fv9L2D3a?dl=1",
+    }
+
+    def __init__(self, data_dir="data/spatial", data_id="GSE174746", subset_common_celltypes: bool = True):
+        super().__init__(data_dir)
+
+        if data_id not in self.url_dict:
+            raise ValueError(f"Unknown data_id {data_id!r}, available datasets are: {sorted(self.url_dict)}")
 
         self.data_id = data_id
         self.data_dir = osp.join(data_dir, data_id)
-        self.data_url = cellDeconvo_dataset[data_id]
-        self._load_data()
+        self.subset_common_celltypes = subset_common_celltypes
 
-    def _load_data(self):
-        if not osp.exists(self.data_dir):
-            download_unzip(self.data_url, self.data_dir)
+    def download(self):
+        download_unzip(self.data_url, self.data_dir)
 
-        self.data = {}
+    def is_complete(self):
+        return osp.exists(self.data_dir)
+
+    def _load_raw_data(self) -> Tuple[pd.DataFrame, ...]:
+        raw_data_dict = {}
         for f in os.listdir(self.data_dir):
             filepath = osp.join(self.data_dir, f)
             filename, ext = osp.splitext(f)
-            if f in IGNORED_FILES:
+            if f in self._IGNORE_FILES:
                 continue
             elif ext == ".csv":
-                self.data[filename] = pd.read_csv(filepath, header=0, index_col=0)
+                raw_data_dict[filename] = pd.read_csv(filepath, header=0, index_col=0)
             elif ext == ".h5ad":
-                self.data[filename] = sc.read_h5ad(filepath).to_df()
+                raw_data_dict[filename] = sc.read_h5ad(filepath).to_df()
             else:
-                warnings.warn(f"Unsupported file type {ext!r}. Use csv or h5ad file types.")
+                warnings.warn(f"Unsupported file type {ext!r}. Only csv or h5ad are supported now.")
 
-    def load_data(self, subset_common_celltypes: bool = True):
-        """Load raw data.
-
-        Parameters
-        ----------
-        subset_common_celltypes
-            If set to True, then subset both the reference and the real data to contain only cell types that are
-            present in both reference and real.
-
-        """
-        ref_count = self.data["ref_sc_count"]
-        ref_annot = self.data["ref_sc_annot"]
-        count_matrix = self.data["mix_count"]
-        cell_type_portion = self.data["true_p"]
-        if (spatial := self.data.get("spatial_location")) is None:
+        ref_count = raw_data_dict["ref_sc_count"]
+        ref_annot = raw_data_dict["ref_sc_annot"]
+        count_matrix = raw_data_dict["mix_count"]
+        cell_type_portion = raw_data_dict["true_p"]
+        if (spatial := raw_data_dict.get("spatial_location")) is None:
             spatial = pd.DataFrame(0, index=count_matrix.index, columns=["x", "y"])
 
         # Obtain cell type info and subset to common cell types between ref and real if needed
         ref_celltypes = set(ref_annot["cellType"].unique().tolist())
         real_celltypes = set(cell_type_portion.columns.tolist())
         logger.info(f"Number of cell types: reference = {len(ref_celltypes)}, real = {len(real_celltypes)}")
-        if subset_common_celltypes:
+        if self.subset_common_celltypes:
             common_celltypes = sorted(ref_celltypes & real_celltypes)
             logger.info(f"Subsetting to common cell types (n={len(common_celltypes)}):\n{pformat(common_celltypes)}")
 
@@ -194,3 +199,29 @@ class CellTypeDeconvoDatasetLite:
             cell_type_portion = cell_type_portion[common_celltypes]
 
         return ref_count, ref_annot, count_matrix, cell_type_portion, spatial
+
+    def _raw_to_dance(self, raw_data: Tuple[pd.DataFrame, ...]):
+        ref_count, ref_annot, count_matrix, cell_type_portion, spatial = raw_data
+
+        adata_inf = AnnData(
+            count_matrix.values,
+            dtype=np.float32,
+            obs=pd.DataFrame(index=count_matrix.index.tolist()),
+            var=pd.DataFrame(index=count_matrix.columns.tolist()),
+        )
+        adata_inf.obsm["cell_type_portion"] = cell_type_portion
+        adata_inf.obsm["spatial"] = spatial
+        adata_ref = AnnData(
+            ref_count.values,
+            dtype=np.float32,
+            obs=ref_annot,
+            var=pd.DataFrame(index=ref_count.columns.tolist()),
+        )
+
+        # FIX: If we switch the order of the append bewlo, i.e., append inf to ref, we get the following error
+        # ValueError: Length mismatch: Expected axis has 520 elements, new values have 10454 elements
+        # This is possibly a BUG in the anndata package.
+        data = Data(adata_inf, full_split_name="test")
+        data.append(Data(adata_ref, full_split_name="ref"), join="outer")
+
+        return data

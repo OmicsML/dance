@@ -231,6 +231,7 @@ class ScDeepSortDataset(BaseDataset):
         return dict(map_dict)
 
 
+@register_dataset("clustering")
 class ClusteringDataset(BaseDataset):
     """Data downloading and loading for clustering.
 
