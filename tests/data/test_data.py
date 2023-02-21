@@ -70,6 +70,12 @@ def test_data_basic_properties(subtests):
         with pytest.raises(TypeError):  # value must be a two tuple of int, not str
             Data(adata.copy(), split_index_range_dict={"train": ("0", "1")})
 
+    with subtests.test("Full split"):
+        data = Data(adata.copy(), full_split_name="inference")
+
+        assert data.train_idx is None
+        assert data.get_split_idx("inference") == [0, 1, 2]
+
 
 def test_get_data(subtests):
     adata = AnnData(X=X, obs=pd.DataFrame(X, columns=["a", "b"]), var=pd.DataFrame(X.T, columns=["x", "y", "z"]))

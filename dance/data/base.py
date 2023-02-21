@@ -71,14 +71,15 @@ class BaseData(ABC):
     _DATA_CHANNELS: List[str] = ["obs", "var", "obsm", "varm", "obsp", "varp", "layers", "uns"]
 
     def __init__(self, data: Union[anndata.AnnData, MuData], train_size: Optional[int] = None, val_size: int = 0,
-                 test_size: int = -1, split_index_range_dict: Optional[Dict[str, Tuple[int, int]]] = None):
+                 test_size: int = -1, split_index_range_dict: Optional[Dict[str, Tuple[int, int]]] = None,
+                 full_split_name: Optional[str] = None):
         super().__init__()
 
         self._data = data
 
         # TODO: move _split_idx_dict into data.uns
         self._split_idx_dict: Dict[str, Sequence[int]] = {}
-        self._setup_splits(train_size, val_size, test_size, split_index_range_dict)
+        self._setup_splits(train_size, val_size, test_size, split_index_range_dict, full_split_name)
 
         if "dance_config" not in self._data.uns:
             self._data.uns["dance_config"] = dict()
@@ -93,11 +94,16 @@ class BaseData(ABC):
         val_size: int,
         test_size: int,
         split_index_range_dict: Optional[Dict[str, Tuple[int, int]]],
+        full_split_name: Optional[str],
     ):
-        if split_index_range_dict is None:
-            self._setup_splits_default(train_size, val_size, test_size)
-        else:
+        if (split_index_range_dict is not None) and (full_split_name is not None):
+            raise ValueError("Only one of split_index_range_dict, full_split_name can be specified, but not both")
+        elif split_index_range_dict is not None:
             self._setup_splits_range(split_index_range_dict)
+        elif full_split_name is not None:
+            self._setup_splits_full(full_split_name)
+        else:
+            self._setup_splits_default(train_size, val_size, test_size)
 
     def _setup_splits_default(self, train_size: Optional[Union[int, str]], val_size: int, test_size: int):
         if train_size is None:
@@ -150,6 +156,9 @@ class BaseData(ABC):
             start, end = index_range
             if end - start > 0:  # skip empty split
                 self._split_idx_dict[split_name] = list(range(start, end))
+
+    def _setup_splits_full(self, full_split_name: str):
+        self._split_idx_dict[full_split_name] = list(range(self.shape[0]))
 
     def __getitem__(self, idx: Sequence[int]) -> Any:
         return self.data[idx]
