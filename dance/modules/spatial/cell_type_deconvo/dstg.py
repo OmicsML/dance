@@ -17,6 +17,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn.parameter import Parameter
 
+from dance.utils import get_device
+
 
 class GraphConvolution(nn.Module):
     """Simple GCN layer, similar to https://arxiv.org/abs/1609.02907.
@@ -147,7 +149,7 @@ class DSTG:
         self.nhid = nhid
         self.bias = bias
         self.dropout = dropout
-        self.device = device
+        self.device = get_device(device)
 
     def _init_model(self, dim_in, dim_out):
         """Initialize GCN model."""
