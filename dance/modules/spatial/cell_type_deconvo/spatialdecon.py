@@ -13,6 +13,7 @@ import torch
 import torch.nn as nn
 from torch import optim
 
+from dance.utils import get_device
 from dance.utils.matrix import normalize
 
 
@@ -101,10 +102,10 @@ class SpatialDecon:
     """
 
     def __init__(self, sc_count, sc_annot, ct_varname, ct_select, sc_profile=None, bias=False, init_bias=None,
-                 device="cpu"):
+                 device="auto"):
         super().__init__()
 
-        self.device = device
+        self.device = get_device(device)
 
         # TODO: extract to preprocessing transformation and remove ct_select from input
         # Subset sc samples on selected cell types (mutual between sc and mix cell data)

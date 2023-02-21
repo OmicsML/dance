@@ -8,11 +8,12 @@ Elosua-Bayes, Nieto, Mereu, Gut, and Heyn H. "SPOTlight: seeded NMF regression t
 spots with single-cell transcriptomes." Nucleic Acids Research (2021)
 
 """
-
 import numpy as np
 import torch
 from torch import nn, optim
 from torchnmf.nmf import NMF
+
+from dance.utils import get_device
 
 
 def cell_topic_profile(x, groups, ct_select, axis=0, method="median"):
@@ -62,12 +63,12 @@ class NNLS(nn.Module):
 
     """
 
-    def __init__(self, in_dim, out_dim, bias=False, init_bias=None, device="cpu"):
+    def __init__(self, in_dim, out_dim, bias=False, init_bias=None, device="auto"):
         super().__init__()
-        self.device = device
+        self.device = get_device(device)
         self.model = nn.Linear(in_features=in_dim, out_features=out_dim, bias=bias)
         self.model.bias = init_bias
-        self.model = self.model.to(device)
+        self.model = self.model.to(self.device)
 
     def forward(self, x: torch.Tensor):
         out = self.model(x)
@@ -144,9 +145,9 @@ class SPOTlight:
     """
 
     def __init__(self, ref_count, ref_annot, ct_varname, ct_select, rank=2, sc_profile=None, bias=False, init_bias=None,
-                 init="random", device="cpu"):
+                 init="random", device="auto"):
         super().__init__()
-        self.device = device
+        self.device = get_device(device)
         self.bias = bias
         self.ct_select = ct_select
         self.rank = rank

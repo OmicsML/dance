@@ -4,11 +4,11 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 
 import anndata
+import mudata
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 import torch
-from mudata import MuData
 
 from dance import logger
 from dance.typing import Any, Dict, FeatType, Iterator, List, Literal, Optional, Sequence, Tuple, Union
@@ -70,15 +70,16 @@ class BaseData(ABC):
     _LABEL_CONFIGS: List[str] = ["label_mod", "label_channel", "label_channel_type"]
     _DATA_CHANNELS: List[str] = ["obs", "var", "obsm", "varm", "obsp", "varp", "layers", "uns"]
 
-    def __init__(self, data: Union[anndata.AnnData, MuData], train_size: Optional[int] = None, val_size: int = 0,
-                 test_size: int = -1, split_index_range_dict: Optional[Dict[str, Tuple[int, int]]] = None):
+    def __init__(self, data: Union[anndata.AnnData, mudata.MuData], train_size: Optional[int] = None, val_size: int = 0,
+                 test_size: int = -1, split_index_range_dict: Optional[Dict[str, Tuple[int, int]]] = None,
+                 full_split_name: Optional[str] = None):
         super().__init__()
 
         self._data = data
 
         # TODO: move _split_idx_dict into data.uns
         self._split_idx_dict: Dict[str, Sequence[int]] = {}
-        self._setup_splits(train_size, val_size, test_size, split_index_range_dict)
+        self._setup_splits(train_size, val_size, test_size, split_index_range_dict, full_split_name)
 
         if "dance_config" not in self._data.uns:
             self._data.uns["dance_config"] = dict()
@@ -93,11 +94,16 @@ class BaseData(ABC):
         val_size: int,
         test_size: int,
         split_index_range_dict: Optional[Dict[str, Tuple[int, int]]],
+        full_split_name: Optional[str],
     ):
-        if split_index_range_dict is None:
-            self._setup_splits_default(train_size, val_size, test_size)
-        else:
+        if (split_index_range_dict is not None) and (full_split_name is not None):
+            raise ValueError("Only one of split_index_range_dict, full_split_name can be specified, but not both")
+        elif split_index_range_dict is not None:
             self._setup_splits_range(split_index_range_dict)
+        elif full_split_name is not None:
+            self._setup_splits_full(full_split_name)
+        else:
+            self._setup_splits_default(train_size, val_size, test_size)
 
     def _setup_splits_default(self, train_size: Optional[Union[int, str]], val_size: int, test_size: int):
         if train_size is None:
@@ -150,6 +156,9 @@ class BaseData(ABC):
             start, end = index_range
             if end - start > 0:  # skip empty split
                 self._split_idx_dict[split_name] = list(range(start, end))
+
+    def _setup_splits_full(self, full_split_name: str):
+        self._split_idx_dict[full_split_name] = list(range(self.shape[0]))
 
     def __getitem__(self, idx: Sequence[int]) -> Any:
         return self.data[idx]
@@ -206,8 +215,8 @@ class BaseData(ABC):
         if (unknown_options := set(config_dict).difference(all_configs)):
             raise KeyError(f"Unknown config option(s): {unknown_options}, available options are: {all_configs}")
 
-        feature_configs = [j for i, j in config_dict.items() if i in self._FEATURE_CONFIGS]
-        label_configs = [j for i, j in config_dict.items() if i in self._LABEL_CONFIGS]
+        feature_configs = [j for i, j in config_dict.items() if i in self._FEATURE_CONFIGS and j is not None]
+        label_configs = [j for i, j in config_dict.items() if i in self._LABEL_CONFIGS and j is not None]
 
         # Check type and length consistencies for feature and label configs
         for i in (feature_configs, label_configs):
@@ -283,7 +292,7 @@ class BaseData(ABC):
 
         Parameters
         ----------
-        split_name : str
+        split_name
             Name of the split to retrieve.
         error_on_miss
             If set to True, raise KeyError if the queried split does not exit, otherwise return None.
@@ -307,9 +316,9 @@ class BaseData(ABC):
 
         Parameters
         ----------
-        split_name : str
+        split_name
             Name of the split to retrieve.
-        return_type : str
+        return_type
             Return numpy array if set to 'numpy', or torch Tensor if set to 'torch'.
 
         """
@@ -323,9 +332,21 @@ class BaseData(ABC):
         mask[split_idx] = True
         return mask
 
+    def get_split_data(self, split_name: str) -> Union[anndata.AnnData, mudata.MuData]:
+        """Obtain the underlying data of a particular split.
+
+        Parameters
+        ----------
+        split_name
+            Name of the split to retrieve.
+
+        """
+        split_idx = self.get_split_idx(split_name, error_on_miss=True)
+        return self.data[split_idx]
+
     @staticmethod
     def _get_feature(
-        in_data: Union[anndata.AnnData, MuData],
+        in_data: Union[anndata.AnnData, mudata.MuData],
         channel: Optional[str],
         channel_type: Optional[str],
         mod: Optional[str],
@@ -333,7 +354,7 @@ class BaseData(ABC):
         # Pick modality
         if mod is None:
             data = in_data
-        elif not isinstance(in_data, MuData):
+        elif not isinstance(in_data, mudata.MuData):
             raise AttributeError("`mod` option is only available when using multimodality data.")
         elif mod not in in_data.mod:
             raise KeyError(f"Unknown modality {mod!r}, available options are {sorted(data.mod)}")
@@ -407,9 +428,9 @@ class BaseData(ABC):
 
         # Extract specific split
         if split_name is not None:
-            if channel_type in ["obsm", "obsp", "layers"]:
+            if channel_type in ["X", "raw_X", "obsm", "obsp", "layers"]:
                 idx = self.get_split_idx(split_name, error_on_miss=True)
-                feature = feature[idx] if channel_type in ["obsm", "layers"] else feature[idx][:, idx]
+                feature = feature[idx][:, idx] if channel_type == "obsp" else feature[idx]
             elif isinstance(channel_type, str) and channel_type.startswith("var"):
                 logger.warning(f"Indexing option for {channel_type} not implemented yet.")
 
@@ -428,7 +449,7 @@ class BaseData(ABC):
         mode: Optional[Literal["merge", "rename", "new_split"]] = "merge",
         rename_dict: Optional[Dict[str, str]] = None,
         new_split_name: Optional[str] = None,
-        index_unique: Optional[str] = "_",
+        **concat_kwargs,
     ):
         """Append another dance data object to the current data object.
 
@@ -449,7 +470,7 @@ class BaseData(ABC):
             data to other names.
         new_split_name
             Optional argument that is only used when ``mode="new_split"``. Name of the split to assign to the new data.
-        index_unique
+        **concat_kwargs
             See :meth:`anndata.concat`.
 
         """
@@ -484,8 +505,15 @@ class BaseData(ABC):
         else:
             raise ValueError(f"Unknown mode {mode!r}. Available options are: 'merge', 'rename', 'new_split'")
 
-        self._data = anndata.concat((self.data, data.data), index_unique=index_unique)
+        # NOTE: Manually merging uns cause AnnData is incapable of doing so, even with uns_merge set :(
+        new_uns = dict(data.data.uns)
+        new_uns.update(dict(self.data.uns))
+
+        self._data = anndata.concat((self.data, data.data), **concat_kwargs)
+        self._data.uns.update(new_uns)
         self._split_idx_dict = new_split_idx_dict
+
+        return self
 
 
 class Data(BaseData):

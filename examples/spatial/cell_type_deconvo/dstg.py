@@ -7,17 +7,16 @@ import torch
 from anndata import AnnData
 
 from dance.data import Data
-from dance.datasets.spatial import CellTypeDeconvoDatasetLite
+from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo import DSTG
 from dance.transforms.graph import DSTGraph
 from dance.transforms.preprocess import pseudo_spatial_process
+from dance.utils import set_seed
 from dance.utils.matrix import normalize
 
-# TODO: make this a property of the dataset class?
-DATASETS = ["CARD_synthetic", "GSE174746", "SPOTLight_synthetic", "toy1", "toy2"]
-
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--dataset", default="CARD_synthetic", choices=DATASETS, help="Name of the dataset.")
+parser.add_argument("--cache", action="store_true", help="Cache processed data.")
+parser.add_argument("--dataset", default="CARD_synthetic", choices=CellTypeDeconvoDataset.DATASETS)
 parser.add_argument("--datadir", default="data/spatial", help="Directory to save the data.")
 parser.add_argument("--sc_ref", type=bool, default=True, help="Reference scRNA (True) or cell-mixtures (False).")
 parser.add_argument("--num_pseudo", type=int, default=500, help="Number of pseudo mixtures to generate.")
@@ -33,19 +32,20 @@ parser.add_argument("--epochs", type=int, default=25, help="Number of epochs to 
 parser.add_argument("--seed", type=int, default=17, help="Random seed.")
 parser.add_argument("--device", default="auto", help="Computation device.")
 args = parser.parse_args()
+set_seed(args.seed)
 pprint(vars(args))
 
-# Set torch variables
-torch.manual_seed(args.seed)
-if args.device == "auto":
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-else:
-    device = torch.device(args.device)
-
 # Load dataset
-dataset = CellTypeDeconvoDatasetLite(data_id=args.dataset, data_dir=args.datadir)
+dataset = CellTypeDeconvoDataset(data_dir=args.datadir, data_id=args.dataset)
+data = dataset.load_data()
 
-ref_count, ref_annot, count_matrix, cell_type_portion, _ = dataset.load_data()
+ref_adata = data.get_split_data("ref")
+ref_count = ref_adata.to_df()
+ref_annot = ref_adata.obs
+
+test_adata = data.get_split_data("test")
+count_matrix = test_adata.to_df()
+cell_type_portion = test_adata.obsm["cell_type_portion"]
 
 # Set adata objects for sc ref and cell mixtures
 sc_adata = AnnData(ref_count, obs=ref_annot, dtype=np.float32)
@@ -75,7 +75,7 @@ adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolis
 train_mask = data.get_split_mask("train", return_type="torch")
 
 # Train and evaluate model
-model = DSTG(nhid=args.nhid, bias=args.bias, dropout=args.dropout, device=device)
+model = DSTG(nhid=args.nhid, bias=args.bias, dropout=args.dropout, device=args.device)
 pred = model.fit_and_predict(x, adj, y, train_mask, lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
 mse = model.score(pred[data.test_idx], y[data.test_idx], "mse")
 print(f"mse = {mse:7.4f}")

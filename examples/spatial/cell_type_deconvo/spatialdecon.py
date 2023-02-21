@@ -1,19 +1,12 @@
 import argparse
 from pprint import pprint
 
-import numpy as np
-import torch
-from anndata import AnnData
-
-from dance.data import Data
-from dance.datasets.spatial import CellTypeDeconvoDatasetLite
+from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.spatialdecon import SpatialDecon
-
-# TODO: make this a property of the dataset class?
-DATASETS = ["CARD_synthetic", "GSE174746", "SPOTLight_synthetic"]
+from dance.utils import set_seed
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--dataset", default="CARD_synthetic", choices=DATASETS, help="Name of the dataset.")
+parser.add_argument("--dataset", default="CARD_synthetic", choices=CellTypeDeconvoDataset.DATASETS)
 parser.add_argument("--datadir", default="data/spatial", help="Directory to save the data.")
 parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate.")
 parser.add_argument("--bias", type=bool, default=False, help="Include/Exclude bias term.")
@@ -21,28 +14,24 @@ parser.add_argument("--max_iter", type=int, default=10000, help="Maximum optimiz
 parser.add_argument("--seed", type=int, default=17, help="Random seed.")
 parser.add_argument("--device", default="auto", help="Computation device.")
 args = parser.parse_args()
+set_seed(args.seed)
 pprint(vars(args))
 
-# Set torch variables
-torch.manual_seed(args.seed)
-if args.device == "auto":
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-else:
-    device = torch.device(args.device)
-
 # Load dataset
-dataset = CellTypeDeconvoDatasetLite(data_id=args.dataset, data_dir=args.datadir)
+dataset = CellTypeDeconvoDataset(data_dir=args.datadir, data_id=args.dataset)
+data = dataset.load_data()
 
-ref_count, ref_annot, count_matrix, cell_type_portion, spatial = dataset.load_data()
-adata = AnnData(X=count_matrix, obsm={"spatial": spatial, "cell_type_portion": cell_type_portion}, dtype=np.float32)
+data.set_config(feature_channel=None, feature_channel_type="X", label_channel="cell_type_portion")
+x, y = data.get_data(split_name="test", return_type="numpy")
+cell_types = data.data.obsm["cell_type_portion"].columns.tolist()
 
-data = Data(adata)
-data.set_config(label_channel="cell_type_portion")
-x, y = data.get_data(return_type="numpy")
+ref_adata = data.get_split_data("ref")
+ref_count = ref_adata.to_df()
+ref_annot = ref_adata.obs
 
 # Initialize and train model
-spaDecon = SpatialDecon(ref_count, ref_annot, ct_varname="cellType", ct_select=cell_type_portion.columns.tolist(),
-                        bias=args.bias, device=device)
+spaDecon = SpatialDecon(ref_count, ref_annot, ct_varname="cellType", ct_select=cell_types, bias=args.bias,
+                        device=args.device)
 pred = spaDecon.fit_and_predict(x, lr=args.lr, max_iter=args.max_iter, print_period=100)
 
 # Compute score
