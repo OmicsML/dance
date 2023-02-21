@@ -123,8 +123,6 @@ class Card:
         Name of the cell-types column.
     ct_select : str, optional
         Selected cell-types to be considered for deconvolution.
-    cell_varname : str, optional
-        Name of the cells column.
     sample_varname : str, optional
         Name of the samples column.
     minCountGene : int
@@ -138,23 +136,18 @@ class Card:
 
     """
 
-    def __init__(self, sc_count, sc_meta, ct_varname=None, ct_select=None, cell_varname=None, sample_varname=None,
-                 minCountGene=100, minCountSpot=5, basis=None, markers=None):
+    def __init__(self, sc_count, sc_meta, ct_varname=None, ct_select=None, sample_varname=None, minCountGene=100,
+                 minCountSpot=5, basis=None, markers=None):
         self.sc_count = sc_count
         self.sc_meta = sc_meta
         self.ct_varname = ct_varname
         self.ct_select = ct_select
-        self.cell_varname = cell_varname
         self.sample_varname = sample_varname
         self.minCountGene = minCountGene
         self.minCountSpot = minCountSpot
         self.basis = basis
         self.marker = markers
         self.info_parameters = {}
-
-        if self.cell_varname is None:
-            self.cell_varname = "auto_cell_index"
-            self.sc_meta[self.cell_varname] = self.sc_meta.index
 
         self.createscRef()  # create basis
         all_genes = sc_count.columns.tolist()
@@ -238,7 +231,6 @@ class Card:
 
         """
         ct_varname = self.ct_varname
-        cell_varname = self.cell_varname
         Basis = self.basis.copy()
         sc_count = self.sc_count.copy()
         sc_meta = self.sc_meta.copy()
@@ -251,8 +243,8 @@ class Card:
         counts = sc_count[gene1]
         sd_within = pd.DataFrame(columns=counts.columns)
         for ict in Basis.index:
-            series = (counts.loc[list(sc_meta[sc_meta[ct_varname] == ict][cell_varname])].var(axis=0).divide(
-                counts.loc[list(sc_meta[sc_meta[ct_varname] == ict][cell_varname])].mean(axis=0)))
+            series = (counts.loc[list(sc_meta[sc_meta[ct_varname] == ict].index)].var(axis=0).divide(counts.loc[list(
+                sc_meta[sc_meta[ct_varname] == ict].index)].mean(axis=0)))
             series.name = ict
             sd_within = pd.concat((sd_within, pd.DataFrame(series).T))
 
