@@ -215,8 +215,8 @@ class BaseData(ABC):
         if (unknown_options := set(config_dict).difference(all_configs)):
             raise KeyError(f"Unknown config option(s): {unknown_options}, available options are: {all_configs}")
 
-        feature_configs = [j for i, j in config_dict.items() if i in self._FEATURE_CONFIGS]
-        label_configs = [j for i, j in config_dict.items() if i in self._LABEL_CONFIGS]
+        feature_configs = [j for i, j in config_dict.items() if i in self._FEATURE_CONFIGS and j is not None]
+        label_configs = [j for i, j in config_dict.items() if i in self._LABEL_CONFIGS and j is not None]
 
         # Check type and length consistencies for feature and label configs
         for i in (feature_configs, label_configs):
