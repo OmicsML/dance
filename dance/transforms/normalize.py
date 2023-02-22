@@ -34,7 +34,7 @@ class ScaleFeature(BaseTransform):
     def __init__(
         self,
         *,
-        axis: int = 1,
+        axis: int = 0,
         split_names: Optional[Union[Literal["ALL"], List[str]]] = None,
         batch_key: Optional[str] = None,
         mode: NormMode = "normalize",
