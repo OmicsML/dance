@@ -160,54 +160,23 @@ class Card:
 
     def createscRef(self):
         """CreatescRef - create reference basis matrix from reference scRNA-seq."""
-        countMat = self.sc_count.copy()  # cell by gene matrix
+        count_mat = self.sc_count.copy()
         sc_meta = self.sc_meta.copy()
         ct_varname = self.ct_varname
-        sample_varname = self.sample_varname
-        if sample_varname is None:
+        batch_varname = self.sample_varname
+        if batch_varname is None:
             sc_meta["sampleID"] = "Sample"
-            sample_varname = "sampleID"
-        sample_id = sc_meta[sample_varname].astype(str)
-        ct_sample_id = sc_meta[ct_varname] + "$*$" + sample_id
-        rowSums_countMat = countMat.sum(axis=1)
-        sc_meta["rowSums"] = rowSums_countMat
-        rowSums_countMat_Ct = sc_meta.groupby([ct_varname, sample_varname])["rowSums"].agg("sum").to_frame()
-        rowSums_countMat_Ct_Wide = rowSums_countMat_Ct.pivot_table(index=sample_varname, columns=ct_varname,
-                                                                   values="rowSums", aggfunc="sum")
+            batch_varname = "sampleID"
+        var_names = [ct_varname, batch_varname]
 
-        # create count table by sampleID and cellType
-        tab = sc_meta.groupby([sample_varname, ct_varname]).size()
-        tbl = tab.unstack()
+        count_mat_ct_batch = count_mat.join(sc_meta[var_names]).groupby(var_names).mean(numeric_only=True)
+        lib_size_ct_batch = count_mat_ct_batch.sum(1)
+        ct_batch_profile = count_mat_ct_batch.div(lib_size_ct_batch, axis=0)
+        ct_batch_profile["lib_size"] = lib_size_ct_batch
 
-        # match column and row names
-        rowSums_countMat_Ct_Wide = rowSums_countMat_Ct_Wide.reindex_like(tbl)
-        rowSums_countMat_Ct_Wide = rowSums_countMat_Ct_Wide.reindex(tbl.index)
-
-        # Compute total expression count by sample and cell type
-        S_JK = rowSums_countMat_Ct_Wide.div(tbl)
-        S_JK = S_JK.replace(0, np.nan)
-        S_JK = S_JK.replace([np.inf, -np.inf], np.nan)
-        S = S_JK.mean(axis=0).to_frame().unstack().droplevel(0)
-        S = S[sc_meta[ct_varname].unique()]
-        countMat["ct_sample_id"] = ct_sample_id
-        Theta_S_colMean = countMat.groupby(ct_sample_id).mean(numeric_only=True)
-        tbl_sample = countMat.groupby([ct_sample_id]).size()
-        tbl_sample = tbl_sample.reindex_like(Theta_S_colMean)
-        tbl_sample = tbl_sample.reindex(Theta_S_colMean.index)
-        Theta_S_colSums = countMat.groupby(ct_sample_id).sum(numeric_only=True)
-        Theta_S = Theta_S_colSums.copy()
-        Theta_S["sum"] = Theta_S_colSums.sum(axis=1)
-        Theta_S = Theta_S[list(Theta_S.columns)[:-1]].div(Theta_S["sum"], axis=0)
-        grp = []
-        for ind in Theta_S.index:
-            grp.append(ind.split("$*$")[0])
-        Theta_S["grp"] = grp
-        Theta = Theta_S.groupby(grp).mean(numeric_only=True)
-        Theta = Theta.reindex(sc_meta[ct_varname].unique())
-        S = S[Theta.index]
-        Theta["S"] = S.iloc[0]
-        basis = Theta[list(Theta.columns)[:-1]].mul(Theta["S"], axis=0)
-        self.basis = basis
+        ct_profile = ct_batch_profile.droplevel(batch_varname).reset_index().groupby(ct_varname).mean(numeric_only=True)
+        ct_profile = ct_profile.loc[:, ct_profile.columns != "lib_size"].mul(ct_profile["lib_size"], axis=0)
+        self.basis = ct_profile
 
     def select_ct_marker(self, ict):
         Basis = self.basis.copy()
