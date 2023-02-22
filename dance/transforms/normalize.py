@@ -31,6 +31,8 @@ class ScaleFeature(BaseTransform):
 
     """
 
+    _DISPLAY_ATTRS = ("axis", "mode", "eps", "split_names", "batch_key")
+
     def __init__(
         self,
         *,

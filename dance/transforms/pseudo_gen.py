@@ -12,6 +12,8 @@ from dance.typing import Dict, List, Literal, Logger, Optional, Tuple, Union
 
 class PseudoMixture(BaseTransform):
 
+    _DISPLAY_ATTRS = ("n_pseudo", "nc_min", "nc_max", "ct_select")
+
     def __init__(
         self,
         *,
