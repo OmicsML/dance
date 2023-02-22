@@ -2,6 +2,8 @@ import itertools
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
+from functools import partial
+from operator import is_not
 
 import anndata
 import mudata
@@ -508,7 +510,7 @@ class BaseData(ABC):
         else:
             raise ValueError(f"Unknown mode {mode!r}. Available options are: 'merge', 'rename', 'new_split'")
 
-        # NOTE: Manually merging uns cause AnnData is incapable of doing so, even with uns_merge set :(
+        # NOTE: Manually merging uns cause AnnData is incapable of doing so, even with uns_merge set
         new_uns = dict(data.data.uns)
         new_uns.update(dict(self.data.uns))
 
@@ -527,6 +529,22 @@ class BaseData(ABC):
             self._data.obs["batch"] = pd.Series(batch, dtype="category", index=self._data.obs.index)
 
         return self
+
+    def pop(self, *, split_name: str):
+        # TODO: ass more option, e.g., index
+        index_to_pop = self.get_split_idx(split_name, error_on_miss=True)
+        index_to_preserve = sorted(set(range(self.shape[0])) - set(index_to_pop))
+
+        oldidx_to_newidx = {j: i for i, j in enumerate(index_to_preserve)}
+        new_split_idx_dict = {}
+        for split_name, split_idx in self._split_idx_dict.items():
+            new_split_idx = sorted(filter(partial(is_not, None), map(oldidx_to_newidx.get, split_idx)))
+            if len(new_split_idx) > 0:
+                new_split_idx_dict[split_name] = new_split_idx
+                logger.info(f"Updating split index for {split_name!r}. {len(split_idx):,} -> {len(new_split_idx):,}")
+
+        self._data = self._data[index_to_preserve]
+        self._split_idx_dict = new_split_idx_dict
 
 
 class Data(BaseData):
