@@ -23,7 +23,9 @@ dataset = CellTypeDeconvoDataset(data_dir=args.datadir, data_id=args.dataset)
 data = dataset.load_data()
 cell_types = data.data.obsm["cell_type_portion"].columns.tolist()
 
-data.set_config(label_channel="cell_type_portion")
+preprocessing_pipeline = SPOTlight.preprocessing_pipeline()
+preprocessing_pipeline(data)
+
 x, y = data.get_data(split_name="test", return_type="torch")
 ref_count = data.get_feature(split_name="ref", return_type="numpy")
 ref_annot = data.get_feature(split_name="ref", return_type="numpy", channel="cellType", channel_type="obs")

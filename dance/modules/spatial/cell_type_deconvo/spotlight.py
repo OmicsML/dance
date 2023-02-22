@@ -12,7 +12,9 @@ import torch
 from torch import nn, optim
 from torchnmf.nmf import NMF
 
+from dance.transforms import SetConfig
 from dance.transforms.pseudo_gen import get_ct_profile
+from dance.typing import LogLevel
 from dance.utils import get_device
 from dance.utils.wrappers import CastOutputType
 
@@ -120,6 +122,10 @@ class SPOTlight:
         self.bias = bias
         self.ct_select = ct_select
         self.rank = rank
+
+    @staticmethod
+    def preprocessing_pipeline(log_level: LogLevel = "INFO"):
+        return SetConfig({"label_channel": "cell_type_portion"}, log_level=log_level)
 
     def _init_model(self, dim_out, ref_count, ref_annot):
         hid_dim = len(self.ct_select)

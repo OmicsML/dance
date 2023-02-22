@@ -12,6 +12,8 @@ import torch
 import torch.nn as nn
 from torch import optim
 
+from dance.transforms import CellTopicProfile, Compose, SetConfig
+from dance.typing import LogLevel
 from dance.utils import get_device
 from dance.utils.matrix import normalize
 
@@ -74,6 +76,14 @@ class SpatialDecon:
         self.bias = bias
         self.init_bias = init_bias
         self.model = None
+
+    @staticmethod
+    def preprocessing_pipeline(ct_select, ct_profile_split: str = "ref", log_level: LogLevel = "INFO"):
+        return Compose(
+            CellTopicProfile(ct_select=ct_select, split_name="ref"),
+            SetConfig({"label_channel": "cell_type_portion"}),
+            log_level=log_level,
+        )
 
     def _init_model(self, num_cells: int, bias: bool = True):
         num_cell_types = len(self.ct_select)
