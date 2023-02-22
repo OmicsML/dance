@@ -179,3 +179,16 @@ def test_append(subtests):
         data.append(data2, mode=None)
         assert data._split_idx_dict == {"train": [0], "test": [1, 2]}
         assert data2._split_idx_dict == data2_split_idx
+        assert data2._split_idx_dict == data2_split_idx
+        assert "batch" not in data.data.obs
+
+    with subtests.test(label_batch=True):
+        data = data1.copy()
+        data.append(data2, mode=None, label_batch=True)
+        assert data._split_idx_dict == {"train": [0], "test": [1, 2]}
+        assert data2._split_idx_dict == data2_split_idx
+        assert "batch" in data.data.obs
+        assert data.data.obs["batch"].tolist() == [0, 0, 0, 1, 1, 1]
+
+        data.append(data2, mode=None, label_batch=True)
+        assert data.data.obs["batch"].tolist() == [0, 0, 0, 1, 1, 1, 2, 2, 2]

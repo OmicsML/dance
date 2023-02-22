@@ -449,6 +449,7 @@ class BaseData(ABC):
         mode: Optional[Literal["merge", "rename", "new_split"]] = "merge",
         rename_dict: Optional[Dict[str, str]] = None,
         new_split_name: Optional[str] = None,
+        label_batch: bool = False,
         **concat_kwargs,
     ):
         """Append another dance data object to the current data object.
@@ -470,6 +471,8 @@ class BaseData(ABC):
             data to other names.
         new_split_name
             Optional argument that is only used when ``mode="new_split"``. Name of the split to assign to the new data.
+        label_batch
+            Add "batch" column to ``.obs`` when set to True.
         **concat_kwargs
             See :meth:`anndata.concat`.
 
@@ -509,9 +512,19 @@ class BaseData(ABC):
         new_uns = dict(data.data.uns)
         new_uns.update(dict(self.data.uns))
 
+        if label_batch:
+            if "batch" in self.data.obs.columns:
+                old_batch = self.data.obs["batch"].values.copy()
+            else:
+                old_batch = np.zeros(self.shape[0])
+            new_batch = np.ones(data.shape[0]) * (old_batch.max() + 1)
+            batch = old_batch.tolist() + new_batch.tolist()
+
         self._data = anndata.concat((self.data, data.data), **concat_kwargs)
         self._data.uns.update(new_uns)
         self._split_idx_dict = new_split_idx_dict
+        if label_batch:
+            self._data.obs["batch"] = batch
 
         return self
 
