@@ -84,9 +84,9 @@ class PseudoMixture(BaseTransform):
         index_list = [f"{self.prefix}{i}" for i in range(self.n_pseudo)]
         ct_portion_df = pd.DataFrame(ct_counts_dict_list, columns=ct_select, index=index_list)
         obs = pd.DataFrame(ps_info_dict_list, index=index_list)
-        pseudo_adata = ad.AnnData(mix_x, obs=obs, var=data.data.var, obsm={"cell_type_portion": ct_portion_df})
 
-        data.append(Data(pseudo_adata), join="outer", mode="new_split", new_split_name=self.out_split_name)
+        pseudo_data = Data(ad.AnnData(mix_x, obs=obs, var=data.data.var, obsm={"cell_type_portion": ct_portion_df}))
+        data.append(pseudo_data, join="outer", mode="new_split", new_split_name=self.out_split_name, label_batch=True)
 
 
 class CellTopicProfile(BaseTransform):

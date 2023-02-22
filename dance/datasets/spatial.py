@@ -224,6 +224,6 @@ class CellTypeDeconvoDataset(BaseDataset):
         # ValueError: Length mismatch: Expected axis has 520 elements, new values have 10454 elements
         # This is possibly a BUG in the anndata package.
         data = Data(adata_inf, full_split_name="test")
-        data.append(Data(adata_ref, full_split_name="ref"), join="outer")
+        data.append(Data(adata_ref, full_split_name="ref"), join="outer", label_batch=True)
 
         return data
