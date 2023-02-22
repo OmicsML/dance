@@ -514,17 +514,17 @@ class BaseData(ABC):
 
         if label_batch:
             if "batch" in self.data.obs.columns:
-                old_batch = self.data.obs["batch"].values.copy()
+                old_batch = self.data.obs["batch"].tolist()
             else:
-                old_batch = np.zeros(self.shape[0])
-            new_batch = np.ones(data.shape[0]) * (old_batch.max() + 1)
-            batch = old_batch.tolist() + new_batch.tolist()
+                old_batch = np.zeros(self.shape[0]).tolist()
+            new_batch = (np.ones(data.shape[0]) * (max(old_batch) + 1)).tolist()
+            batch = list(map(int, old_batch + new_batch))
 
         self._data = anndata.concat((self.data, data.data), **concat_kwargs)
         self._data.uns.update(new_uns)
         self._split_idx_dict = new_split_idx_dict
         if label_batch:
-            self._data.obs["batch"] = batch
+            self._data.obs["batch"] = pd.Series(batch, dtype="category", index=self._data.obs.index)
 
         return self
 
