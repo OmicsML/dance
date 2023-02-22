@@ -1,8 +1,6 @@
 import argparse
 from pprint import pprint
 
-import torch
-
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.spotlight import SPOTlight
 from dance.utils import set_seed
@@ -26,13 +24,13 @@ data = dataset.load_data()
 cell_types = data.data.obsm["cell_type_portion"].columns.tolist()
 
 data.set_config(label_channel="cell_type_portion")
-x, y = data.get_data(split_name="test", return_type="numpy")
+x, y = data.get_data(split_name="test", return_type="torch")
 ref_count = data.get_feature(split_name="ref", return_type="numpy")
 ref_annot = data.get_feature(split_name="ref", return_type="numpy", channel="cellType", channel_type="obs")
 
 model = SPOTlight(cell_types, rank=args.rank, bias=args.bias, device=args.device)
 pred = model.fit_and_predict(x, ref_count, ref_annot, lr=args.lr, max_iter=args.max_iter)
-mse = model.score(pred, torch.FloatTensor(y))
+mse = model.score(pred, y)
 print(f"mse = {mse:7.4f}")
 """To reproduce SpatialDecon benchmarks, please refer to command lines belows:
 

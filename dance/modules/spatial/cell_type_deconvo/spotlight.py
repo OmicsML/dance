@@ -165,7 +165,7 @@ class SPOTlight:
 
         """
         self._init_model(x.shape[0], ref_count, ref_annot)
-        x = torch.FloatTensor(x.T).to(self.device)
+        x = x.T.to(self.device)
         y = torch.FloatTensor(ref_count.T).to(self.device)
 
         # Run NMF on scRNA X

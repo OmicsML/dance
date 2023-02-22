@@ -25,8 +25,8 @@ cell_types = data.data.obsm["cell_type_portion"].columns.tolist()
 
 CellTopicProfile(ct_select=cell_types, split_name="ref")(data)
 data.set_config(feature_channel=None, feature_channel_type="X", label_channel="cell_type_portion")
-x, y = data.get_data(split_name="test", return_type="numpy")
-ct_profile = data.get_feature(split_name="ref", return_type="numpy", channel="CellTopicProfile", channel_type="varm")
+x, y = data.get_data(split_name="test", return_type="torch")
+ct_profile = data.get_feature(split_name="ref", return_type="torch", channel="CellTopicProfile", channel_type="varm")
 
 # Initialize and train model
 spaDecon = SpatialDecon(ct_select=cell_types, bias=args.bias, device=args.device)

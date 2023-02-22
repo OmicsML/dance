@@ -116,8 +116,8 @@ class SpatialDecon:
             Indicates number of iterations until training results print.
 
         """
-        ref_ct_profile = torch.FloatTensor(ct_profile).to(self.device)
-        mix_count = torch.FloatTensor(x.T).to(self.device)
+        ref_ct_profile = ct_profile.to(self.device)
+        mix_count = x.T.to(self.device)
         self._init_model(x.shape[0])
 
         criterion = MSLELoss()
