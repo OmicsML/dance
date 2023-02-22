@@ -14,8 +14,8 @@ class CellTopicProfile(BaseTransform):
 
     def __init__(
         self,
-        ct_select: Union[Literal["auto"], List[str]] = "auto",
         *,
+        ct_select: Union[Literal["auto"], List[str]] = "auto",
         ct_key: str = "cellType",
         split_name: Optional[str] = None,
         channel: Optional[str] = None,
@@ -32,26 +32,26 @@ class CellTopicProfile(BaseTransform):
         self.channel_type = channel_type
         self.method = method
 
-    @staticmethod
-    def get_cell_types(ct_select: Union[Literal["auto"], List[str]], annot: np.ndarray) -> List[str]:
-        all_cts = sorted(np.unique(annot))
-        if ct_select == "auto":
-            ct_select = all_cts
-        elif len(missed := sorted(set(ct_select) - set(all_cts))) > 0:
-            raise ValueError(f"Unknown cell types selected: {missed}. Available options are: {all_cts}")
-        return ct_select
-
     def __call__(self, data):
         x = data.get_feature(split_name=self.split_name, channel=self.channel, channel_type=self.channel_type,
                              return_type="numpy")
         annot = data.get_feature(split_name=self.split_name, channel=self.ct_key, channel_type="obs",
                                  return_type="numpy")
 
-        ct_select = self.get_cell_types(self.ct_select, annot)
+        ct_select = get_cell_types(self.ct_select, annot)
         ct_profile = get_ct_profile(x, annot, ct_select, self.method, self.logger)
         ct_profile_df = pd.DataFrame(ct_profile, index=data.data.var_names, columns=ct_select)
 
         data.data.varm[self.out] = ct_profile_df
+
+
+def get_cell_types(ct_select: Union[Literal["auto"], List[str]], annot: np.ndarray) -> List[str]:
+    all_cts = sorted(np.unique(annot))
+    if ct_select == "auto":
+        ct_select = all_cts
+    elif len(missed := sorted(set(ct_select) - set(all_cts))) > 0:
+        raise ValueError(f"Unknown cell types selected: {missed}. Available options are: {all_cts}")
+    return ct_select
 
 
 def get_ct_profile(
@@ -64,7 +64,7 @@ def get_ct_profile(
 ) -> np.ndarray:
     """Return the cell-topic profile matrix (gene x cell-type)."""
     logger = logger or native_logger
-    ct_select = CellTopicProfile.get_cell_types(ct_select, annot)
+    ct_select = get_cell_types(ct_select, annot)
 
     # Get aggregation function
     if method == "median":
