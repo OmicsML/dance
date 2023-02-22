@@ -112,3 +112,17 @@ class SaveRaw(BaseTransform):
                 raise AttributeError(f"Raw data attribute already exist and cannot be overwritten.\n{data}"
                                      f"If you wish to overwrite, set 'exist_ok' to True.")
         data.data.raw = data.data
+
+
+class RemoveSplit(BaseTransform):
+    """Remove a particular split from the data."""
+
+    _DISPLAY_ATTRS = ("split_name", )
+
+    def __init__(self, *, split_name: str, **kwargs):
+        super().__init__(**kwargs)
+        self.split_name = split_name
+
+    def __call__(self, data):
+        self.logger.info("Popping split: {self.split_name!r}")
+        data.pop(split_name=self.split_name)

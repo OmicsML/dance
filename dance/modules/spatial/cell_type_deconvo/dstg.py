@@ -11,12 +11,17 @@ Briefings in Bioinformatics (2021)
 import time
 
 import numpy as np
+import scanpy as sc
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn.parameter import Parameter
 
+from dance.transforms import (AnnDataTransform, Compose, FilterGenesCommon, PseudoMixture, RemoveSplit, ScaleFeature,
+                              SetConfig)
+from dance.transforms.graph import DSTGraph
+from dance.typing import LogLevel
 from dance.utils import get_device
 
 
@@ -150,6 +155,33 @@ class DSTG:
         self.bias = bias
         self.dropout = dropout
         self.device = get_device(device)
+
+    @staticmethod
+    def preprocessing_pipeline(
+        n_pseudo: int = 500,
+        n_top_genes: int = 2000,
+        hvg_flavor: str = "seurat",
+        k_filter: int = 200,
+        num_cc: int = 30,
+        log_level: LogLevel = "INFO",
+    ):
+        return Compose(
+            FilterGenesCommon(split_keys=["ref", "test"], log_level="INFO"),
+            PseudoMixture(n_pseudo=n_pseudo, out_split_name="pseudo"),
+            RemoveSplit(split_name="ref", log_level="INFO"),
+            AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
+            AnnDataTransform(sc.pp.log1p),
+            AnnDataTransform(sc.pp.highly_variable_genes, flavor=hvg_flavor, n_top_genes=n_top_genes, batch_key="batch",
+                             subset=True),
+            ScaleFeature(split_names="ALL", mode="standardize"),
+            DSTGraph(k_filter=k_filter, num_cc=num_cc, ref_split="pseudo", inf_split="test"),
+            SetConfig({
+                "feature_channel": [None, "DSTGraph"],
+                "feature_channel_type": ["X", "obsp"],
+                "label_channel": "cell_type_portion",
+            }),
+            log_level=log_level,
+        )
 
     def _init_model(self, dim_in, dim_out):
         """Initialize GCN model."""

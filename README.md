@@ -349,7 +349,7 @@ Note: the data split modality of DeepImpute is different from ScGNN and GraphSCI
 
 | Model        | Evaluation Metric | GSE174746 (current/reported) | CARD Synthetic (current/reported) | SPOTlight Synthetic (current/reported) |
 | ------------ | ----------------- | ---------------------------- | --------------------------------- | -------------------------------------- |
-| DSTG         | MSE               | .172 / N/A                   | .0247 / N/A                       | .042 / N/A                             |
+| DSTG         | MSE               | .1722 / N/A                  | .0239 / N/A                       | .0315 / N/A                            |
 | SpatialDecon | MSE               | .0014 / .009                 | .0077 / N/A                       | .0055 / N/A                            |
 | SPOTlight    | MSE               | .0098 / N/A                  | .0246 / 0.118                     | .0109 / .16                            |
 | CARD         | MSE               | .0012 / N/A                  | .0078 / 0.0062                    | .0076 / N/A                            |

@@ -1,7 +1,6 @@
 import numpy as np
 from anndata import AnnData
 
-from dance import logger
 from dance.exceptions import DevError
 from dance.transforms.base import BaseTransform
 from dance.typing import Dict, List, Literal, Optional, Union
@@ -65,10 +64,10 @@ class FilterGenesCommon(BaseTransform):
             hits = np.where(abs_sum > 0)[0]
             sub_genes = [all_genes[i] for i in hits]
             sub_genes_list.append(sub_genes)
-            logger.info(f"{len(sub_genes):,} genes found in {name!r}")
+            self.logger.info(f"{len(sub_genes):,} genes found in {name!r}")
 
         common_genes = sorted(set.intersection(*map(set, sub_genes_list)))
-        logger.info(f"Found {len(common_genes):,} common genes out of {len(all_genes):,} total genes.")
+        self.logger.info(f"Found {len(common_genes):,} common genes out of {len(all_genes):,} total genes.")
         data.data._inplace_subset_var(common_genes)
 
 
@@ -108,12 +107,12 @@ class FilterGenesMatch(BaseTransform):
                     ids = ids.upper().str
 
                 new_indicator = ids.startswith(item) if name == "prefix" else ids.endswith(item)
-                logger.info(f"{new_indicator.sum()} number of genes will be removed due to {name} {item!r}")
+                self.logger.info(f"{new_indicator.sum()} number of genes will be removed due to {name} {item!r}")
 
                 indicator = np.logical_or(indicator, new_indicator)
 
-        logger.info(f"Removing {indicator.sum()} genes in total")
-        logger.debug(f"Removing genes: {data.data.var_names[indicator]}")
+        self.logger.info(f"Removing {indicator.sum()} genes in total")
+        self.logger.debug(f"Removing genes: {data.data.var_names[indicator]}")
         data.data._inplace_subset_var(data.data.var_names[~indicator])
 
         return data

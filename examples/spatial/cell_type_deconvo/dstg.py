@@ -2,17 +2,11 @@ import argparse
 from pprint import pprint
 
 import numpy as np
-import pandas as pd
 import torch
-from anndata import AnnData
 
-from dance.data import Data
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo import DSTG
-from dance.transforms.graph import DSTGraph
-from dance.transforms.preprocess import pseudo_spatial_process
 from dance.utils import set_seed
-from dance.utils.matrix import normalize
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--cache", action="store_true", help="Cache processed data.")
@@ -39,40 +33,19 @@ pprint(vars(args))
 dataset = CellTypeDeconvoDataset(data_dir=args.datadir, data_id=args.dataset)
 data = dataset.load_data()
 
-ref_adata = data.get_split_data("ref")
-ref_count = ref_adata.to_df()
-ref_annot = ref_adata.obs
-
-test_adata = data.get_split_data("test")
-count_matrix = test_adata.to_df()
-cell_type_portion = test_adata.obsm["cell_type_portion"]
-
-# Set adata objects for sc ref and cell mixtures
-sc_adata = AnnData(ref_count, obs=ref_annot, dtype=np.float32)
-mix_adata = AnnData(count_matrix, dtype=np.float32)
-
-# pre-process: get variable genes --> normalize --> log1p --> standardize --> out
-# set scRNA to false if already using pseudo spot data with real spot data
-# set to true if the reference data is scRNA (to be used for generating pseudo spots)
-mix_counts, mix_labels, hvgs = pseudo_spatial_process([sc_adata, mix_adata], [ref_annot, cell_type_portion], "cellType",
-                                                      args.sc_ref, args.n_hvg, args.num_pseudo)
-
-# WARNING: features appear to have negative values, normalization does not make sense, need to check more
-features = np.vstack((mix_counts[0].X, mix_counts[1].X)).astype(np.float32)
-normalized_features = normalize(features, axis=1, mode="normalize")
-adata = AnnData(X=normalized_features, dtype=np.float32)
-adata.obsm["cell_type_portion"] = pd.concat(mix_labels).astype(np.float32).set_index(adata.obs_names)
-
-data = Data(adata, train_size=mix_counts[0].shape[0])
-DSTGraph(k_filter=args.k_filter, num_cc=args.num_cc)(data)
-data.set_config(feature_channel=[None, "DSTGraph"], feature_channel_type=[None, "obsp"],
-                label_channel="cell_type_portion")
+preprocessing_pipeline = DSTG.preprocessing_pipeline(
+    n_pseudo=args.num_pseudo,
+    n_top_genes=args.n_hvg,
+    k_filter=args.k_filter,
+    num_cc=args.num_cc,
+)
+preprocessing_pipeline(data)
 
 (x, adj), y = data.get_data(return_type="default")
 x, y = torch.FloatTensor(x), torch.FloatTensor(y.values)
 adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
                                torch.FloatTensor(adj.data.astype(np.int32)))
-train_mask = data.get_split_mask("train", return_type="torch")
+train_mask = data.get_split_mask("pseudo", return_type="torch")
 
 # Train and evaluate model
 model = DSTG(nhid=args.nhid, bias=args.bias, dropout=args.dropout, device=args.device)
