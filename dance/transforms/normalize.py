@@ -2,7 +2,7 @@ import numpy as np
 import scipy.sparse as sp
 
 from dance.transforms.base import BaseTransform
-from dance.typing import Dict, List, Literal, NormMode, Optional
+from dance.typing import Dict, List, Literal, NormMode, Optional, Union
 from dance.utils.matrix import normalize
 
 
@@ -35,7 +35,7 @@ class ScaleFeature(BaseTransform):
         self,
         *,
         axis: int = 1,
-        split_names: Optional[Literal["ALL"], List[str]] = None,
+        split_names: Optional[Union[Literal["ALL"], List[str]]] = None,
         batch_key: Optional[str] = None,
         mode: NormMode = "normalize",
         eps: float = -1,
