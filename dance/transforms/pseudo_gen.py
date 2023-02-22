@@ -26,6 +26,7 @@ class PseudoMixture(BaseTransform):
         prefix: str = "ps_mix_",
         in_split_name: str = "ref",
         out_split_name: Optional[str] = "pseudo",
+        label_batch: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -43,6 +44,7 @@ class PseudoMixture(BaseTransform):
         self.prefix = prefix
         self.in_split_name = in_split_name
         self.out_split_name = out_split_name
+        self.label_batch = label_batch
 
     @staticmethod
     def gen_mix(
@@ -86,7 +88,8 @@ class PseudoMixture(BaseTransform):
         obs = pd.DataFrame(ps_info_dict_list, index=index_list)
 
         pseudo_data = Data(ad.AnnData(mix_x, obs=obs, var=data.data.var, obsm={"cell_type_portion": ct_portion_df}))
-        data.append(pseudo_data, join="outer", mode="new_split", new_split_name=self.out_split_name, label_batch=True)
+        data.append(pseudo_data, join="outer", mode="new_split", new_split_name=self.out_split_name,
+                    label_batch=self.label_batch)
 
 
 class CellTopicProfile(BaseTransform):
