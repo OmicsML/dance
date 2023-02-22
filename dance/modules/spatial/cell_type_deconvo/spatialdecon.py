@@ -12,12 +12,8 @@ import torch
 import torch.nn as nn
 from torch import optim
 
-from dance.transforms.pseudo_gen import get_ct_profile
 from dance.utils import get_device
 from dance.utils.matrix import normalize
-from dance.utils.wrappers import CastOutputType
-
-get_ct_profile_tensor = CastOutputType(torch.FloatTensor)(get_ct_profile)
 
 
 class MSLELoss(nn.Module):
@@ -103,7 +99,7 @@ class SpatialDecon:
         proportion_preds = normalize(weights, mode="normalize", axis=1)
         return proportion_preds
 
-    def fit(self, x, ref_count, ref_annot, lr=1e-4, max_iter=500, print_res=False, print_period=100):
+    def fit(self, x, ct_profile, lr=1e-4, max_iter=500, print_res=False, print_period=100):
         """fit function for model training.
 
         Parameters
@@ -120,7 +116,7 @@ class SpatialDecon:
             Indicates number of iterations until training results print.
 
         """
-        ref_ct_profile = get_ct_profile_tensor(ref_count, ref_annot, self.ct_select).T.to(self.device)
+        ref_ct_profile = torch.FloatTensor(ct_profile).to(self.device)
         mix_count = torch.FloatTensor(x.T).to(self.device)
         self._init_model(x.shape[0])
 

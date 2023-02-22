@@ -125,7 +125,7 @@ class SPOTlight:
         hid_dim = len(self.ct_select)
         self.nmf_model = NMF(Vshape=ref_count.T.shape, rank=self.rank).to(self.device)
         if self.rank == len(self.ct_select):  # initialize basis as cell profile
-            self.nmf_model.H = nn.Parameter(get_ct_profile_tensor(ref_count, ref_annot, self.ct_select).T)
+            self.nmf_model.H = nn.Parameter(get_ct_profile_tensor(ref_count, ref_annot, self.ct_select))
 
         self.nnls_reg1 = NNLS(in_dim=self.rank, out_dim=dim_out, bias=self.bias, device=self.device)
         self.nnls_reg2 = NNLS(in_dim=hid_dim, out_dim=dim_out, bias=self.bias, device=self.device)
@@ -139,7 +139,7 @@ class SPOTlight:
 
         # Get cell-topic and mix-topic profiles
         # Get cell-topic profiles H_profile: cell-type group medians of coef H (topic x cells)
-        H_profile = get_ct_profile_tensor(H.cpu().numpy().T, ref_annot, self.ct_select).T
+        H_profile = get_ct_profile_tensor(H.cpu().numpy().T, ref_annot, self.ct_select)
         H_profile = H_profile.to(self.device)
 
         # Get mix-topic profiles B: NNLS of basis W onto mix expression Y -- y ~ W*b
@@ -177,7 +177,7 @@ class SPOTlight:
 
         # Get cell-topic and mix-topic profiles
         # Get cell-topic profiles H_profile: cell-type group medians of coef H (topic x cells)
-        self.H_profile = get_ct_profile_tensor(self.H.cpu().numpy().T, ref_annot, self.ct_select).T
+        self.H_profile = get_ct_profile_tensor(self.H.cpu().numpy().T, ref_annot, self.ct_select)
         self.H_profile = self.H_profile.to(self.device)
 
         # Get mix-topic profiles B: NNLS of basis W onto mix expression X ~ W*b

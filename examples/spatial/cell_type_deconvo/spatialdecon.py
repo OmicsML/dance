@@ -3,6 +3,7 @@ from pprint import pprint
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.spatialdecon import SpatialDecon
+from dance.transforms import CellTopicProfile
 from dance.utils import set_seed
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -22,14 +23,14 @@ dataset = CellTypeDeconvoDataset(data_dir=args.datadir, data_id=args.dataset)
 data = dataset.load_data()
 cell_types = data.data.obsm["cell_type_portion"].columns.tolist()
 
+CellTopicProfile(ct_select=cell_types, split_name="ref")(data)
 data.set_config(feature_channel=None, feature_channel_type="X", label_channel="cell_type_portion")
 x, y = data.get_data(split_name="test", return_type="numpy")
-ref_count = data.get_feature(split_name="ref", return_type="numpy")
-ref_annot = data.get_feature(split_name="ref", return_type="numpy", channel="cellType", channel_type="obs")
+ct_profile = data.get_feature(split_name="ref", return_type="numpy", channel="CellTopicProfile", channel_type="varm")
 
 # Initialize and train model
 spaDecon = SpatialDecon(ct_select=cell_types, bias=args.bias, device=args.device)
-pred = spaDecon.fit_and_predict(x, ref_count, ref_annot, lr=args.lr, max_iter=args.max_iter, print_period=100)
+pred = spaDecon.fit_and_predict(x, ct_profile, lr=args.lr, max_iter=args.max_iter, print_period=100)
 
 # Compute score
 mse = spaDecon.score(pred, y)
