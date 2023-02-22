@@ -84,7 +84,8 @@ class PseudoMixture(BaseTransform):
 
         ct_select = get_cell_types(self.ct_select, annot)
         index_list = [f"{self.prefix}{i}" for i in range(self.n_pseudo)]
-        ct_portion_df = pd.DataFrame(ct_counts_dict_list, columns=ct_select, index=index_list)
+        ct_counts_df = pd.DataFrame(ct_counts_dict_list, columns=ct_select, index=index_list).fillna(0)
+        ct_portion_df = ct_counts_df.div(ct_counts_df.sum(axis=1), axis=0)  # normalize to portions
         obs = pd.DataFrame(ps_info_dict_list, index=index_list)
 
         pseudo_data = Data(ad.AnnData(mix_x, obs=obs, var=data.data.var, obsm={"cell_type_portion": ct_portion_df}))
