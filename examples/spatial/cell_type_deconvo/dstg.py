@@ -2,13 +2,10 @@ import argparse
 from pprint import pprint
 
 import numpy as np
-import scanpy as sc
 import torch
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo import DSTG
-from dance.transforms import AnnDataTransform, FilterGenesCommon, PseudoMixture, RemoveSplit, SetConfig
-from dance.transforms.graph import DSTGraph
 from dance.utils import set_seed
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -36,20 +33,13 @@ pprint(vars(args))
 dataset = CellTypeDeconvoDataset(data_dir=args.datadir, data_id=args.dataset)
 data = dataset.load_data()
 
-FilterGenesCommon(split_keys=["ref", "test"], log_level="INFO")(data)
-PseudoMixture(n_pseudo=args.num_pseudo, out_split_name="pseudo")(data)
-RemoveSplit(split_name="ref", log_level="INFO")(data)
-AnnDataTransform(sc.pp.normalize_total, target_sum=1e4)(data)
-AnnDataTransform(sc.pp.log1p)(data)
-AnnDataTransform(sc.pp.highly_variable_genes, flavor="seurat", n_top_genes=args.n_hvg, batch_key="batch",
-                 subset=True)(data)
-AnnDataTransform(sc.pp.normalize_total, target_sum=1)(data)
-DSTGraph(k_filter=args.k_filter, num_cc=args.num_cc, ref_split="pseudo", inf_split="test")(data)
-SetConfig({
-    "feature_channel": [None, "DSTGraph"],
-    "feature_channel_type": ["X", "obsp"],
-    "label_channel": "cell_type_portion"
-})(data)
+preprocessing_pipeline = DSTG.preprocessing_pipeline(
+    n_pseudo=args.num_pseudo,
+    n_top_genes=args.n_hvg,
+    k_filter=args.k_filter,
+    num_cc=args.num_cc,
+)
+preprocessing_pipeline(data)
 
 (x, adj), y = data.get_data(return_type="default")
 x, y = torch.FloatTensor(x), torch.FloatTensor(y.values)
