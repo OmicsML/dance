@@ -18,7 +18,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn.parameter import Parameter
 
-from dance.transforms import AnnDataTransform, Compose, FilterGenesCommon, PseudoMixture, RemoveSplit, SetConfig
+from dance.transforms import (AnnDataTransform, Compose, FilterGenesCommon, PseudoMixture, RemoveSplit, ScaleFeature,
+                              SetConfig)
 from dance.transforms.graph import DSTGraph
 from dance.typing import LogLevel
 from dance.utils import get_device
@@ -172,7 +173,7 @@ class DSTG:
             AnnDataTransform(sc.pp.log1p),
             AnnDataTransform(sc.pp.highly_variable_genes, flavor=hvg_flavor, n_top_genes=n_top_genes, batch_key="batch",
                              subset=True),
-            AnnDataTransform(sc.pp.normalize_total, target_sum=1),
+            ScaleFeature(split_names="ALL", mode="standardize"),
             DSTGraph(k_filter=k_filter, num_cc=num_cc, ref_split="pseudo", inf_split="test"),
             SetConfig({
                 "feature_channel": [None, "DSTGraph"],
