@@ -20,19 +20,17 @@ pprint(vars(args))
 # Load dataset
 dataset = CellTypeDeconvoDataset(data_dir=args.datadir, data_id=args.dataset)
 data = dataset.load_data()
-
-data.set_config(feature_channel=None, feature_channel_type="X", label_channel="cell_type_portion")
-x, y = data.get_data(split_name="test", return_type="numpy")
 cell_types = data.data.obsm["cell_type_portion"].columns.tolist()
 
-ref_adata = data.get_split_data("ref")
-ref_count = ref_adata.to_df()
-ref_annot = ref_adata.obs
+preprocessing_pipeline = SpatialDecon.preprocessing_pipeline(cell_types)
+preprocessing_pipeline(data)
+
+x, y = data.get_data(split_name="test", return_type="torch")
+ct_profile = data.get_feature(split_name="ref", return_type="torch", channel="CellTopicProfile", channel_type="varm")
 
 # Initialize and train model
-spaDecon = SpatialDecon(ref_count, ref_annot, ct_varname="cellType", ct_select=cell_types, bias=args.bias,
-                        device=args.device)
-pred = spaDecon.fit_and_predict(x, lr=args.lr, max_iter=args.max_iter, print_period=100)
+spaDecon = SpatialDecon(ct_select=cell_types, bias=args.bias, device=args.device)
+pred = spaDecon.fit_and_predict(x, ct_profile, lr=args.lr, max_iter=args.max_iter, print_period=100)
 
 # Compute score
 mse = spaDecon.score(pred, y)

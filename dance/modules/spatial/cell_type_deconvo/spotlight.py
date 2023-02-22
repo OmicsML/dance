@@ -8,45 +8,17 @@ Elosua-Bayes, Nieto, Mereu, Gut, and Heyn H. "SPOTlight: seeded NMF regression t
 spots with single-cell transcriptomes." Nucleic Acids Research (2021)
 
 """
-import numpy as np
 import torch
 from torch import nn, optim
 from torchnmf.nmf import NMF
 
+from dance.transforms import SetConfig
+from dance.transforms.pseudo_gen import get_ct_profile
+from dance.typing import LogLevel
 from dance.utils import get_device
+from dance.utils.wrappers import CastOutputType
 
-
-def cell_topic_profile(x, groups, ct_select, axis=0, method="median"):
-    """Cell topic profile.
-
-    Parameters
-    ----------
-    x : torch.Tensor
-        Gene expression matrix (gene x cells).
-    groups : int
-        Cell-type labels of each sample cell in x.
-    ct_select:
-        Cell-types to profile.
-    method : str
-         Method for reduction of cell-types for cell profile, default median.
-
-    Returns
-    -------
-    x_profile : torch 2-d tensor
-         cell profile matrix from scRNA-seq reference.
-
-    """
-    if method == "median":
-        x_profile = np.array([
-            np.median(x[[i for i in range(len(groups)) if groups[i] == ct_select[j]], :], axis=0)
-            for j in range(len(ct_select))
-        ]).T
-    else:
-        x_profile = np.array([
-            np.mean(x[[i for i in range(len(groups)) if groups[i] == ct_select[j]], :], axis=0)
-            for j in range(len(ct_select))
-        ]).T
-    return torch.Tensor(x_profile)
+get_ct_profile_tensor = CastOutputType(torch.FloatTensor)(get_ct_profile)
 
 
 class NNLS(nn.Module):
@@ -144,46 +116,36 @@ class SPOTlight:
 
     """
 
-    def __init__(self, ref_count, ref_annot, ct_varname, ct_select, rank=2, sc_profile=None, bias=False, init_bias=None,
-                 init="random", device="auto"):
+    def __init__(self, ct_select, rank=2, sc_profile=None, bias=False, init_bias=None, init="random", device="auto"):
         super().__init__()
         self.device = get_device(device)
         self.bias = bias
         self.ct_select = ct_select
         self.rank = rank
 
-        # TODO: extract to preprocessing transformation and remove ct_select from input
-        # Subset sc samples on selected cell types (mutual between sc and mix cell data)
-        ct_select_ix = ref_annot[ref_annot[ct_varname].isin(ct_select)].index
-        self.ref_annot = ref_annot.loc[ct_select_ix]
-        self.ref_count = ref_count.loc[ct_select_ix]
-        self.ref_annot = self.ref_annot[ct_varname].values.tolist()
+    @staticmethod
+    def preprocessing_pipeline(log_level: LogLevel = "INFO"):
+        return SetConfig({"label_channel": "cell_type_portion"}, log_level=log_level)
 
-        # Construct a cell profile matrix if not profided
-        if sc_profile is None:
-            self.ref_sc_profile = cell_topic_profile(self.ref_count.values, self.ref_annot, ct_select, method="median")
-        else:
-            self.ref_sc_profile = sc_profile
-
-    def _init_model(self, dim_out):
+    def _init_model(self, dim_out, ref_count, ref_annot):
         hid_dim = len(self.ct_select)
-        self.nmf_model = NMF(Vshape=self.ref_count.T.shape, rank=self.rank).to(self.device)
+        self.nmf_model = NMF(Vshape=ref_count.T.shape, rank=self.rank).to(self.device)
         if self.rank == len(self.ct_select):  # initialize basis as cell profile
-            self.nmf_model.H = nn.Parameter(torch.Tensor(self.ref_sc_profile))
+            self.nmf_model.H = nn.Parameter(get_ct_profile_tensor(ref_count, ref_annot, self.ct_select))
 
         self.nnls_reg1 = NNLS(in_dim=self.rank, out_dim=dim_out, bias=self.bias, device=self.device)
         self.nnls_reg2 = NNLS(in_dim=hid_dim, out_dim=dim_out, bias=self.bias, device=self.device)
 
         self.model = nn.Sequential(self.nmf_model, self.nnls_reg1, self.nnls_reg2)
 
-    def forward(self):
+    def forward(self, ref_annot):
         # Get NMF decompositions
         W = self.nmf_model.H.clone()
         H = self.nmf_model.W.clone().T
 
         # Get cell-topic and mix-topic profiles
         # Get cell-topic profiles H_profile: cell-type group medians of coef H (topic x cells)
-        H_profile = cell_topic_profile(H.cpu().numpy().T, self.ref_annot, self.ct_select, method="median")
+        H_profile = get_ct_profile_tensor(H.cpu().numpy().T, ref_annot, self.ct_select)
         H_profile = H_profile.to(self.device)
 
         # Get mix-topic profiles B: NNLS of basis W onto mix expression Y -- y ~ W*b
@@ -195,7 +157,7 @@ class SPOTlight:
 
         return (W, H_profile, B, P)
 
-    def fit(self, x, lr=1e-3, max_iter=1000):
+    def fit(self, x, ref_count, ref_annot, lr=1e-3, max_iter=1000):
         """Fit function for model training.
 
         Parameters
@@ -208,9 +170,9 @@ class SPOTlight:
             Maximum iterations allowed for matrix factorization solver.
 
         """
-        self._init_model(x.shape[0])
-        x = torch.FloatTensor(x.T).to(self.device)
-        y = torch.FloatTensor(self.ref_count.values.T).to(self.device)
+        self._init_model(x.shape[0], ref_count, ref_annot)
+        x = x.T.to(self.device)
+        y = torch.FloatTensor(ref_count.T).to(self.device)
 
         # Run NMF on scRNA X
         self.nmf_model.fit(y, max_iter=max_iter)
@@ -221,7 +183,7 @@ class SPOTlight:
 
         # Get cell-topic and mix-topic profiles
         # Get cell-topic profiles H_profile: cell-type group medians of coef H (topic x cells)
-        self.H_profile = cell_topic_profile(self.H.cpu().numpy().T, self.ref_annot, self.ct_select, method="median")
+        self.H_profile = get_ct_profile_tensor(self.H.cpu().numpy().T, ref_annot, self.ct_select)
         self.H_profile = self.H_profile.to(self.device)
 
         # Get mix-topic profiles B: NNLS of basis W onto mix expression X ~ W*b
@@ -244,8 +206,7 @@ class SPOTlight:
             Predicted cell-type proportions (cell x cell-type).
 
         """
-        W, H_profile, B, P = self.forward()
-        pred = P / torch.sum(P, axis=0, keepdims=True).clamp(min=1e-6)
+        pred = self.P / torch.sum(self.P, axis=0, keepdims=True).clamp(min=1e-6)
         return pred.T
 
     def fit_and_predict(self, *args, **kwargs):

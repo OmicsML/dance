@@ -1,4 +1,5 @@
-from typing import Any, Dict, Iterator, List, Literal, Mapping, Optional, Sequence, Set, Tuple, Union
+from logging import Logger
+from typing import Any, Callable, Dict, Iterator, List, Literal, Mapping, Optional, Sequence, Set, Tuple, Union
 
 import numpy as np
 from anndata import AnnData
@@ -14,6 +15,7 @@ ReturnedFeat = Union[np.ndarray, Tensor, AnnData]
 
 __all__ = [
     "Any",
+    "Callable",
     "CellIdxType",
     "Dict",
     "FeatType",
@@ -21,6 +23,7 @@ __all__ = [
     "LOGLEVELS",
     "List",
     "LogLevel",
+    "Logger",
     "Mapping",
     "NormMode",
     "Optional",

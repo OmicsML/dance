@@ -6,20 +6,44 @@ import numpy as np
 import torch
 
 from dance import logger
+from dance.typing import Any, Callable
+
+
+class CastOutputType:
+    """Decorator to cast the output of a function to a certain type.
+
+    Parameters
+    ----------
+    target_type
+        Target type to cast the output to.
+
+    """
+
+    def __init__(self, cast_func: Callable[[Any], Any]):
+        self.cast_func = cast_func
+
+    def __call__(self, func):
+
+        @functools.wraps(func)
+        def wrapped_func(*args, **kwargs):
+            res = func(*args, **kwargs)
+            typed_res = self.cast_func(res)
+            return typed_res
+
+        return wrapped_func
 
 
 class TimeIt:
-    """Decorator to record and show the elapsed time for a function call."""
+    """Decorator to record and show the elapsed time for a function call.
+
+    Parameters
+    ----------
+    name
+        Description of the function.
+
+    """
 
     def __init__(self, name: str):
-        """Initialize TimeIt decorator.
-
-        Parameters
-        ----------
-        name
-            Description of the function.
-
-        """
         self.name = name
 
     def __call__(self, func):

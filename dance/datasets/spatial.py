@@ -211,8 +211,8 @@ class CellTypeDeconvoDataset(BaseDataset):
             obs=pd.DataFrame(index=count_matrix.index.tolist()),
             var=pd.DataFrame(index=count_matrix.columns.tolist()),
         )
-        adata_inf.obsm["cell_type_portion"] = cell_type_portion
-        adata_inf.obsm["spatial"] = spatial
+        adata_inf.obsm["cell_type_portion"] = cell_type_portion.astype(np.float32)
+        adata_inf.obsm["spatial"] = spatial.astype(np.float32)
         adata_ref = AnnData(
             ref_count.values,
             dtype=np.float32,

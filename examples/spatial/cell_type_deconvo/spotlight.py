@@ -1,8 +1,6 @@
 import argparse
 from pprint import pprint
 
-import torch
-
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.spotlight import SPOTlight
 from dance.utils import set_seed
@@ -23,22 +21,18 @@ pprint(vars(args))
 # Load dataset
 dataset = CellTypeDeconvoDataset(data_dir=args.datadir, data_id=args.dataset)
 data = dataset.load_data()
-
-data.set_config(feature_channel=None, feature_channel_type="X", label_channel="cell_type_portion")
-# data.set_config(label_channel="cell_type_portion")
-x, y = data.get_data(split_name="test", return_type="numpy")
 cell_types = data.data.obsm["cell_type_portion"].columns.tolist()
 
-ref_adata = data.get_split_data("ref")
-ref_count = ref_adata.to_df()
-ref_annot = ref_adata.obs
+preprocessing_pipeline = SPOTlight.preprocessing_pipeline()
+preprocessing_pipeline(data)
 
-model = SPOTlight(ref_count, ref_annot, "cellType", cell_types, rank=args.rank, bias=args.bias, device=args.device)
-pred = model.fit_and_predict(x, lr=args.lr, max_iter=args.max_iter)
-mse = model.score(pred, torch.FloatTensor(y))
+x, y = data.get_data(split_name="test", return_type="torch")
+ref_count = data.get_feature(split_name="ref", return_type="numpy")
+ref_annot = data.get_feature(split_name="ref", return_type="numpy", channel="cellType", channel_type="obs")
 
-print(f"Predicted cell-type proportions of  sample 1: {pred[0].clone().cpu().numpy().round(3)}")
-print(f"True cell-type proportions of  sample 1: {y[0].round(3)}")
+model = SPOTlight(cell_types, rank=args.rank, bias=args.bias, device=args.device)
+pred = model.fit_and_predict(x, ref_count, ref_annot, lr=args.lr, max_iter=args.max_iter)
+mse = model.score(pred, y)
 print(f"mse = {mse:7.4f}")
 """To reproduce SpatialDecon benchmarks, please refer to command lines belows:
 
