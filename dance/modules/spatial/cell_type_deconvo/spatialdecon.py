@@ -50,30 +50,19 @@ class SpatialDecon(BaseRegressionMethod):
 
     Parameters
     ----------
-    sc_count : pd.DataFrame
-        Reference single cell RNA-seq counts data.
-    sc_annot : pd.DataFrame
-        Reference cell-type label information.
-    mix_count : pd.DataFrame
-        Target mixed-cell RNA-seq counts data to be deconvoluted.
-    ct_varname : str, optional
-        Name of the cell-types column.
-    ct_select : str, optional
+    ct_profile
+        Cell type characteristic profiles (cell-type x gene).
+    ct_select
         Selected cell-types to be considered for deconvolution.
-    bias : boolean optional
+    bias
         Include bias term, default False.
-    init_bias: numpy array optional
-        Initial bias term (background estimate).
 
     """
 
-    def __init__(self, ct_profile, ct_select, bias=False, init_bias=None, device="auto"):
+    def __init__(self, ct_profile, ct_select, bias=False, device="auto"):
         self.ct_profile = ct_profile
         self.ct_select = ct_select
-
         self.bias = bias
-        self.init_bias = init_bias
-
         self.device = get_device(device)
 
     @staticmethod
@@ -101,27 +90,31 @@ class SpatialDecon(BaseRegressionMethod):
 
         Returns
         -------
-        proportion_preds : torch.Tensor
+        proportion_preds
             Predictions of cell-type proportions (cell x cell-type).
 
         """
         weights = self.model.weight.clone().detach().cpu()
         return nn.functional.normalize(weights, dim=1, p=1)
 
-    def fit(self, x, lr=1e-4, max_iter=500, print_res=False, print_period=100):
+    def fit(
+        self,
+        x: torch.Tensor,
+        lr: float = 1e-4,
+        max_iter: int = 500,
+        print_period: int = 100,
+    ):
         """fit function for model training.
 
         Parameters
         ----------
         x
             Input expression matrix (cell x gene).
-        max_iter : int
-            Maximum number of iterations for optimizat.
-        lr : float
+        lr
             Learning rate.
-        print_res : bool optional
-            Indicates to print live training results, default False.
-        print_period : int optional
+        max_iter
+            Maximum number of iterations for optimizat.
+        print_period
             Indicates number of iterations until training results print.
 
         """
