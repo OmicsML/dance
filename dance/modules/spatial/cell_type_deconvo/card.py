@@ -199,27 +199,20 @@ class Card:
             List of informative genes.
 
         """
-        ct_varname = self.ct_varname
-        Basis = self.basis.copy()
-        sc_count = self.sc_count.copy()
-        sc_meta = self.sc_meta.copy()
-        gene1_list = list()
-        for ict in Basis.index:
-            gene1_list.append(self.select_ct_marker(ict))
-        gene1 = set(chain(*gene1_list))
-        gene1 = list(gene1)
-        gene1 = [gene for gene in gene1 if gene in common_gene]  # intersect with common_gene
-        counts = sc_count[gene1]
-        sd_within = pd.DataFrame(columns=counts.columns)
-        for ict in Basis.index:
-            series = (counts.loc[list(sc_meta[sc_meta[ct_varname] == ict].index)].var(axis=0).divide(counts.loc[list(
-                sc_meta[sc_meta[ct_varname] == ict].index)].mean(axis=0)))
-            series.name = ict
-            sd_within = pd.concat((sd_within, pd.DataFrame(series).T))
+        # Select marker genes from common genes
+        gene1 = set()
+        for ict in self.ct_select:
+            gene1.update(self.select_ct_marker(ict))
+        gene1 = sorted(gene1 & set(common_gene))
 
-        sd_within_colMean = sd_within.mean(axis=0).index.to_frame()
-        genes_to_select = sd_within.mean(axis=0) < sd_within.mean(axis=0).quantile(.99)
-        genes = list(sd_within_colMean[genes_to_select].index)
+        # Compute coefficient of variation for each gene within each cell type
+        counts = self.sc_count[gene1].join(self.sc_meta[self.ct_varname])
+        cov_mean = (counts.groupby(self.ct_varname).var() / counts.groupby(self.ct_varname).mean()).mean()
+
+        # Remove genes that have high cov
+        ind = cov_mean < cov_mean.quantile(.99)
+        genes = sorted(cov_mean[ind].index)
+
         return genes
 
     def fit(self, x, spatial, max_iter=100, epsilon=1e-4, sigma=0.1, location_free: bool = False):
