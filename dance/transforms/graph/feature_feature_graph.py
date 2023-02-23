@@ -35,14 +35,6 @@ class FeatureFeatureGraph(BaseTransform):
             norm_edge_weight = norm(g, g.edata["weight"])
             g.edata["weight"] = norm_edge_weight.float()
         
-        # Get weighted adjacency matrix
-        u, v = graph_data
-        adj = torch.zeros((g.num_nodes(), g.num_nodes()))
-        adj_norm = torch.zeros((g.num_nodes(), g.num_nodes()))
-        adj[u, v] = torch.ones(g.num_edges()).float()
-        adj_norm[u, v] = g.edata['weight']
-
         data.data.uns[self.out] = g
-        data.data.uns["adj"] = adj
 
         return data

@@ -5,6 +5,7 @@ from pprint import pprint
 import numpy as np
 import torch
 
+from dance.utils import set_seed
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.graphsci import GraphSCI
 
@@ -30,27 +31,30 @@ if __name__ == '__main__':
     parser.add_argument("--weight_decay", type=float, default=1e-5, help="Weight decay for exponential LR decay.")
     parser.add_argument("--gene_corr", type=float, default=.3,
                         help="Lower bound for correlation between genes to determine edges in graph.")
+    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     params = parser.parse_args()
 
-    random.seed(params.random_seed)
-    np.random.seed(params.random_seed)
-    torch.manual_seed(params.random_seed)
-    torch.cuda.manual_seed(params.random_seed)
+    set_seed(params.random_seed)
 
-    dataloader = ImputationDataset(random_seed=params.random_seed, gpu=params.gpu, data_dir=params.data_dir,
-                                   train_dataset=params.train_dataset, filetype=params.filetype)
-    dataloader.download_all_data()
-    dataloader.load_data(params, model='GraphSCI')
-    dl_params = dataloader.params
+    dataloader = ImputationDataset(data_dir=params.data_dir, train_dataset=params.train_dataset, filetype=params.filetype)
+    preprocessing_pipeline = GraphSCI.preprocessing_pipeline()
+    data = dataloader.load_data(transform=preprocessing_pipeline, cache=params.cache)
 
-    model = GraphSCI(num_cells=dl_params.train_data.shape[1], num_genes=dl_params.num_genes,
-                     train_dataset=params.train_dataset, lr=params.lr, dropout=params.dropout,
-                     weight_decay=params.weight_decay, n_epochs=params.n_epochs, gpu=params.gpu)
-    model.fit(dl_params.train_data, dl_params.train_data_raw, dl_params.adj_train, dl_params.train_size_factors,
-              dl_params.adj_norm_train, le=params.le, la=params.la, ke=params.ke, ka=params.la)
-    imputed_data = model.predict(dl_params.test_data, dl_params.test_data_raw, dl_params.adj_norm_test,
-                                 dl_params.adj_test, dl_params.test_size_factors)
-    mse_cells, mse_genes = model.score(dl_params.test_data_raw, imputed_data, dl_params.test_idx, metric='MSE')
+    device = "cpu" if params.gpu == -1 else f"cuda:{params.gpu}"
+    X, X_raw, n_counts, g = data.get_x(return_type="default")
+    label, label_raw = data.get_y(return_type="torch")
+    X = torch.tensor(X.toarray()).T.to(device)
+    X_raw = torch.tensor(X_raw.toarray()).T.to(device)
+    label = label.T.to(device)
+    label_raw = label_raw.T.to(device)
+
+    model = GraphSCI(num_cells=X.shape[1], num_genes=X.shape[0], train_dataset=params.train_dataset, 
+                     dropout=params.dropout, gpu=params.gpu)
+    model.fit(X, X_raw, n_counts, g, params.le, params.la, params.ke, params.la,
+              params.n_epochs, params.lr, params.weight_decay)
+    imputed_data = model.predict(params.test_data, params.test_data_raw, params.adj_norm_test,
+                                 params.adj_test, params.test_size_factors)
+    mse_cells, mse_genes = model.score(params.test_data_raw, imputed_data, params.test_idx, metric='MSE')
     score = mse_cells.mean(axis=0).item()
     print("MSE: %.4f" % score)
 """To reproduce GraphSCI benchmarks, please refer to command lines belows:

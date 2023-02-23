@@ -8,6 +8,7 @@ from dance.transforms.pseudo_gen import CellTopicProfile, PseudoMixture
 from dance.transforms.scn_feature import SCNFeature
 from dance.transforms.spatial_feature import MorphologyFeature, SMEFeature
 from dance.transforms.stats import GeneStats
+from dance.transforms.mask import CellwiseMaskData, MaskData
 
 __all__ = [
     "AnnDataTransform",
@@ -29,4 +30,6 @@ __all__ = [
     "SetConfig",
     "WeightedFeaturePCA",
     "graph",
+    "CellwiseMaskData",
+    "MaskData"
 ]  # yapf: disable

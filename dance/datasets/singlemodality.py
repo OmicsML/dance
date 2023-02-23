@@ -280,31 +280,17 @@ class ClusteringDataset(BaseDataset):
         return data
 
 
-@dataclass
-class ImputationDatasetParams:
-    data_dir = None
-    random_seed = None
-    min_counts = None
-    train_dataset = None
-    test_dataset = None
-    gpu = None
-    filetype = None
+@register_dataset("imputation")
+class ImputationDataset(BaseDataset):
 
+    def __init__(self, filetype=None, data_dir="data", train_dataset="human_stemcell", test_dataset="pbmc"):
 
-class ImputationDataset():
+        self.data_dir = data_dir
+        self.train_dataset = train_dataset
+        self.test_dataset = test_dataset
+        self.filetype = filetype
 
-    def __init__(self, random_seed=10, gpu=-1, filetype=None, data_dir="data", train_dataset="human_stemcell",
-                 test_dataset="pbmc", min_counts=1):
-        self.params = ImputationDatasetParams
-        self.params.data_dir = data_dir
-        self.params.random_seed = random_seed
-        self.params.min_counts = min_counts
-        self.params.train_dataset = train_dataset
-        self.params.test_dataset = test_dataset
-        self.params.gpu = gpu
-        self.params.filetype = filetype
-
-    def download_all_data(self):
+    def download(self):
 
         gene_class = ["pbmc_data", "mouse_brain_data", "mouse_embryo_data", "human_stemcell_data"]
 
@@ -330,62 +316,59 @@ class ImputationDataset():
         }
 
         dataset_to_file = {
-            "pbmc_data":
-            "5k_pbmc_protein_v3_filtered_feature_bc_matrix.h5",
+            "pbmc_data": "5k_pbmc_protein_v3_filtered_feature_bc_matrix.h5",
             "mouse_embryo_data":
-            list(
-                map(lambda x: "GSE65525/" + x, [
-                    "GSM1599494_ES_d0_main.csv", "GSM1599497_ES_d2_LIFminus.csv", "GSM1599498_ES_d4_LIFminus.csv",
-                    "GSM1599499_ES_d7_LIFminus.csv"
-                ])),
-            "mouse_brain_data":
-            "neuron_10k_v3_filtered_feature_bc_matrix.h5",
-            "human_stemcell_data":
-            "GSE75748/GSE75748_sc_time_course_ec.csv.gz"
+                list(
+                    map(lambda x: "GSE65525/" + x, [
+                        "GSM1599494_ES_d0_main.csv", "GSM1599497_ES_d2_LIFminus.csv", "GSM1599498_ES_d4_LIFminus.csv",
+                        "GSM1599499_ES_d7_LIFminus.csv"
+                    ])),
+            "mouse_brain_data": "neuron_10k_v3_filtered_feature_bc_matrix.h5",
+            "human_stemcell_data": "GSE75748/GSE75748_sc_time_course_ec.csv.gz"
         }
-        self.params.dataset_to_file = dataset_to_file
+        self.dataset_to_file = dataset_to_file
         if sys.platform != 'win32':
-            if not osp.exists(self.params.data_dir):
-                os.system("mkdir " + self.params.data_dir)
-            if not osp.exists(self.params.data_dir + "/train"):
-                os.system("mkdir " + self.params.data_dir + "/train")
+            if not osp.exists(self.data_dir):
+                os.system("mkdir " + self.data_dir)
+            if not osp.exists(self.data_dir + "/train"):
+                os.system("mkdir " + self.data_dir + "/train")
 
             for class_name in gene_class:
                 if not any(
                         list(
                             map(osp.exists,
-                                glob.glob(self.params.data_dir + "/train/" + class_name + "/" +
+                                glob.glob(self.data_dir + "/train/" + class_name + "/" +
                                           dl_files[class_name])))):
-                    os.system("mkdir " + self.params.data_dir + "/train/" + class_name)
+                    os.system("mkdir " + self.data_dir + "/train/" + class_name)
                     os.system("wget " + url[class_name])  # assumes linux... mac needs to install
                     os.system("unzip " + file_name[class_name])
                     os.system("rm " + file_name[class_name])
-                    os.system("mv " + dl_files[class_name] + " " + self.params.data_dir + "/train/" + class_name + "/")
-            os.system("cp -r " + self.params.data_dir + "/train/ " + self.params.data_dir + "/test")
+                    os.system("mv " + dl_files[class_name] + " " + self.data_dir + "/train/" + class_name + "/")
+            os.system("cp -r " + self.data_dir + "/train/ " + self.data_dir + "/test")
         if sys.platform == 'win32':
-            if not osp.exists(self.params.data_dir):
-                os.system("mkdir " + self.params.data_dir)
-            if not osp.exists(self.params.data_dir + "/train"):
-                os.mkdir(self.params.data_dir + "/train")
+            if not osp.exists(self.data_dir):
+                os.system("mkdir " + self.data_dir)
+            if not osp.exists(self.data_dir + "/train"):
+                os.mkdir(self.data_dir + "/train")
             for class_name in gene_class:
                 if not any(
                         list(
                             map(osp.exists,
-                                glob.glob(self.params.data_dir + "/train/" + class_name + "/" +
+                                glob.glob(self.data_dir + "/train/" + class_name + "/" +
                                           dl_files[class_name])))):
-                    os.mkdir(self.params.data_dir + "/train/" + class_name)
+                    os.mkdir(self.data_dir + "/train/" + class_name)
                     os.system("curl " + url[class_name])
                     os.system("tar -xf " + file_name[class_name])
                     os.system("del -R " + file_name[class_name])
-                    os.system("move " + dl_files[class_name] + " " + self.params.data_dir + "/train/" + class_name +
+                    os.system("move " + dl_files[class_name] + " " + self.data_dir + "/train/" + class_name +
                               "/")
-            os.system("copy /r " + self.params.data_dir + "/train/ " + self.params.data_dir + "/test")
+            os.system("copy /r " + self.data_dir + "/train/ " + self.data_dir + "/test")
 
     def is_complete(self):
         # check whether data is complete or not
         check = [
-            self.params.data_dir + "/train",
-            self.params.data_dir + "/test",
+            self.data_dir + "/train",
+            self.data_dir + "/test",
         ]
 
         for i in check:
@@ -393,49 +376,63 @@ class ImputationDataset():
                 logger.info("file {} doesn't exist".format(i))
                 return False
         return True
-
-    def load_data(self, model_params, model='GraphSCI'):
-        # Load data from existing h5ad files, or download files and load data.
-        if self.is_complete():
-            pass
+    
+    def _load_raw_data(self) -> ad.AnnData:
+        if self.train_dataset == 'mouse_embryo' or self.train_dataset == 'mouse_embryo_data':
+            if self.train_dataset[-5:] != '_data':
+                train_dataset = self.train_dataset + '_data'
+            else:
+                train_dataset = self.train_dataset
+            for i in range(len(self.dataset_to_file[train_dataset])):
+                fname = self.dataset_to_file[train_dataset][i]
+                data_path = f'{self.data_dir}/train/{train_dataset}/{fname}'
+                if i == 0:
+                    counts = pd.read_csv(data_path, header=None, index_col=0)
+                    time = pd.Series(np.zeros(counts.shape[1]))
+                else:
+                    x = pd.read_csv(data_path, header=None, index_col=0)
+                    time = pd.concat([time, pd.Series(np.zeros(x.shape[1])) + i])
+                    counts = pd.concat([counts, x], axis=1)
+            time = pd.DataFrame(time)
+            time.columns = ['time']
+            counts = counts[counts.sum(axis=1) != 0]
+            counts = counts.T
+            counts.index = [i for i in range(counts.shape[0])]
+            adata = ad.AnnData(counts.values)
+            adata.var_names = counts.columns.tolist()
+            adata.obs['time'] = time.to_numpy()
         else:
-            self.download_all_data()
-            assert self.is_complete()
+            if self.train_dataset[-5:] != '_data':
+                train_dataset = self.train_dataset + '_data'
+            else:
+                train_dataset = self.train_dataset
+            data_path = f'{self.data_dir}/train/{train_dataset}/{self.dataset_to_file[train_dataset]}'
+            if not os.path.exists(data_path):
+                raise NotImplementedError
 
-        data_dict = load_imputation_data_internal(self.params, model_params, model=model)
-        self.params.num_cells = data_dict['num_cells']
-        self.params.num_genes = data_dict['num_genes']
-        self.params.train_data = data_dict['train_data']
-        self.params.test_data = data_dict['test_data']
-        self.params.adata = data_dict['adata']
+            if self.filetype == 'csv' or self.dataset_to_file[train_dataset][-3:] == 'csv':
+                counts = pd.read_csv(data_path, index_col=0, header=None)
+                counts = counts[counts.sum(axis=1) != 0]
+                counts = counts.T
+                adata = ad.AnnData(counts.values)
+                # adata.obs_names = ["%d"%i for i in range(adata.shape[0])]
+                adata.obs_names = counts.index.tolist()
+                adata.var_names = counts.columns.tolist()
+            if self.filetype == 'gz' or self.dataset_to_file[train_dataset][-2:] == 'gz':
+                counts = pd.read_csv(data_path, index_col=0, compression='gzip', header=0)
+                counts = counts[counts.sum(axis=1) != 0]
+                counts = counts.T
+                adata = ad.AnnData(counts.values)
+                # adata.obs_names = ["%d" % i for i in range(adata.shape[0])]
+                adata.obs_names = counts.index.tolist()
+                adata.var_names = counts.columns.tolist()
+            elif self.filetype == 'h5' or self.dataset_to_file[train_dataset][-2:] == 'h5':
+                adata = ad.read_10x_h5(data_path)
+                adata.var_names_make_unique()
 
-        if model == 'GraphSCI':
-            self.params.train_data_raw = data_dict['train_data_raw']
-            self.params.test_data_raw = data_dict['test_data_raw']
-            self.params.adj_train = data_dict['adj_train']
-            self.params.adj_test = data_dict['adj_test']
-            self.params.adj_train_false = data_dict['adj_train_false']
-            self.params.adj_norm_train = data_dict['adj_norm_train']
-            self.params.adj_norm_test = data_dict['adj_norm_test']
-            self.params.size_factors = data_dict['size_factors']
-            self.params.train_size_factors = data_dict['train_size_factors']
-            self.params.test_size_factors = data_dict['test_size_factors']
-            self.params.train_size_factors = data_dict['train_size_factors']
-            self.params.test_size_factors = data_dict['test_size_factors']
-            self.params.test_idx = data_dict['test_idx']
-        if model == 'DeepImpute':
-            self.params.X_train = self.params.train_data[0]
-            self.params.Y_train = self.params.train_data[1]
-            self.params.X_test = self.params.test_data[0]
-            self.params.Y_test = self.params.test_data[1]
-            self.params.inputgenes = data_dict['predictors']
-            self.params.targetgenes = data_dict['targets']
-            self.params.total_counts = data_dict['total_counts']
-            self.params.true_counts = data_dict['true_counts']
-            self.params.genes_to_impute = data_dict['genes_to_impute']
-        if model == 'scGNN':
-            self.params.genelist = data_dict['genelist']
-            self.params.celllist = data_dict['celllist']
-            self.params.test_idx = data_dict['test_idx']
+        return adata
 
-        return self
+    def _raw_to_dance(self, raw_data: ad.AnnData):
+        adata = raw_data
+        data = Data(adata, train_size="all")
+        return data
