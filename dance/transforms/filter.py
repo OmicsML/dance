@@ -196,7 +196,7 @@ class FilterGenesPercentile(BaseTransform):
         whitelist_gene_set = set()
         if self.whitelist_indicators is not None:
             columns = self.whitelist_indicators
-            columns = columns if isinstance(columns, str) else columns
+            columns = [columns] if isinstance(columns, str) else columns
             indicators = data.data.var[columns]
             # Genes that satisfy any one of the whitelist conditions will be selected as whitelist genes
             whitelist_gene_set.update(indicators[indicators.max(1)].index.tolist())
@@ -211,9 +211,9 @@ class FilterGenesPercentile(BaseTransform):
         # Exclude whitelisted genes
         if len(whitelist_gene_set) > 0:
             orig_num_selected = len(selected_genes)
-            selected_genes = sorted(set(selected_genes) - whitelist_gene_set)
-            num_excluded = orig_num_selected - len(selected_genes)
-            self.logger.info(f"{num_excluded:,} genes originally selected for filtering excluded due to whitelist")
+            selected_genes = sorted(set(selected_genes) | whitelist_gene_set)
+            num_added = len(selected_genes) - orig_num_selected
+            self.logger.info(f"{num_added:,} genes originally unselected are being added due to whitelist")
 
         # Update data
         num_removed = mask.size - len(selected_genes)
@@ -262,7 +262,7 @@ class FilterGenesMarker(BaseTransform):
 
     @staticmethod
     def get_marker_genes(
-        ct_profile: np.ndarray,
+        ct_profile: np.ndarray,  # gene x cell
         cell_types: List[str],
         genes: List[str],
         *,
@@ -277,7 +277,7 @@ class FilterGenesMarker(BaseTransform):
         marker_gene_ind_df = pd.DataFrame(False, index=genes, columns=cell_types)
         for i, ct in enumerate(cell_types):
             others = [j for j in range(num_cts) if j != i]
-            log_fc = np.log(ct_profile[i] + eps) - np.log(ct_profile[others].mean(0) + eps)
+            log_fc = np.log(ct_profile[:, i] + eps) - np.log(ct_profile[:, others].mean(1) + eps)
             markers_idx = np.where(log_fc > threshold)[0]
 
             if markers_idx.size > 0:
@@ -299,8 +299,8 @@ class FilterGenesMarker(BaseTransform):
     def __call__(self, data):
         ct_profile_df = data.get_feature(channel=self.ct_profile_channel, channel_type="varm", return_type="default")
         ct_profile = ct_profile_df.values
-        cell_types = ct_profile_df.index.tolist()
-        genes = ct_profile_df.columns.tolist()
+        cell_types = ct_profile_df.columns.tolist()
+        genes = ct_profile_df.index.tolist()
         marker_genes, marker_gene_ind_df = self.get_marker_genes(ct_profile, cell_types, genes, eps=self.eps,
                                                                  threshold=self.threshold, logger=self.logger)
 
