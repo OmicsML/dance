@@ -135,8 +135,8 @@ class FilterGenesPercentile(BaseTransform):
     max_val
         Maximum percentile of the summarized expression value above which the genes will be discarded.
     mode
-        Summarization mode. Available options are ``[sum|cv]``. ``sum`` calculates the sum of expression values, ``cv``
-        uses the coefficient of variation (std / mean).
+        Summarization mode. Available options are ``[sum|cv|rv]``. ``sum`` calculates the sum of expression values,
+        ``cv`` uses the coefficient of variation (std / mean), and ``rv`` uses the relative variance (var / mean).
     channel
         Which channel, more specificailly, ``layers``, to use. Use the default ``.X`` if not set. If ``channel`` is
         specified, then need to specify ``channel_type`` to be ``layers`` as well.
@@ -151,13 +151,13 @@ class FilterGenesPercentile(BaseTransform):
     """
 
     _DISPLAY_ATTRS = ("min_val", "max_val", "mode")
-    _MODES = ["sum", "cv"]
+    _MODES = ["sum", "cv", "rv"]
 
     def __init__(
         self,
         min_val: Optional[float] = 1,
         max_val: Optional[float] = 99,
-        mode: Literal["sum", "cv"] = "sum",
+        mode: Literal["sum", "cv", "rv"] = "sum",
         *,
         channel: Optional[str] = None,
         channel_type: Optional[str] = None,
@@ -187,6 +187,8 @@ class FilterGenesPercentile(BaseTransform):
             gene_summary = np.array(x.sum(0)).ravel()
         elif self.mode == "cv":
             gene_summary = np.nan_to_num(np.array(x.std(0) / x.mean(0)), posinf=0, neginf=0).ravel()
+        elif self.mode == "rv":
+            gene_summary = np.nan_to_num(np.array(x.var(0) / x.mean(0)), posinf=0, neginf=0).ravel()
         else:
             raise DevError(f"{self.mode!r} not expected, please inform dev to fix this error.")
 
