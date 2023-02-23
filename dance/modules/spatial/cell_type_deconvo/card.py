@@ -11,6 +11,10 @@ Nature Biotechnology (2022): 1-11.
 import numpy as np
 import pandas as pd
 
+from dance import logger
+from dance.transforms import (CellTopicProfile, Compose, FilterGenesCommon, FilterGenesMarker, FilterGenesMatch,
+                              FilterGenesPercentile, SetConfig)
+from dance.typing import LogLevel
 from dance.utils.matrix import normalize, pairwise_distance
 
 
@@ -21,6 +25,7 @@ def obj_func(trac_xxt, UtXV, UtU, VtV, mGene, nSample, b, Lambda, beta, vecOne, 
     temp = (V.T - b @ vecOne.T) @ L @ (V - vecOne @ b.T)
     logV = -(nSample) * 0.5 * np.sum(np.log(Lambda)) - 0.5 * (np.sum(np.diag(temp) / Lambda))
     logSigmaL2 = -(alpha + 1.0) * np.sum(np.log(Lambda)) - np.sum(beta / Lambda)
+    logger.debug(f"{logX=:5.2e}, {logV=:5.2e}, {logSigmaL2=:5.2e}")
     return logX + logV + logSigmaL2
 
 
@@ -93,11 +98,10 @@ def CARDref(Xinput, U, W, phi, max_iter, epsilon, V, b, sigma_e2, Lambda):
         obj = obj_func(trac_xxt, UtXV, UtU, VtV, mGene, nSample, b, Lambda, beta, vecOne, V, L, alpha)
 
         logicalLogL = (obj > obj_old) & ((abs(obj - obj_old) * 2.0 / abs(obj + obj_old)) < epsilon)
-        # TODO: setup logging and make this debug or info
-        # print(f"{i=:<4}, {obj=:.5e}, {logX=:5.2e}, {logV=:5.2e}, {logSigmaL2=:5.2e}")
+        logger.debug(f"{i=:<4}, {obj=:.5e}")
         if (np.isnan(obj) | (np.sqrt(np.sum((V - V_old) * (V - V_old)) / (nSample * k)) < epsilon) | logicalLogL):
             if (i > 5):  # // run at least 5 iterations
-                # print(f"Exiting at {i=}")
+                logger.info(f"Exiting at {i=}")
                 iter_converge = i
                 break
         else:
@@ -121,6 +125,22 @@ class Card:
     def __init__(self, basis: pd.DataFrame):
         self.basis = basis
         self.info_parameters = {}
+
+    @staticmethod
+    def preprocessing_pipeline(log_level: LogLevel = "INFO"):
+        return Compose(
+            CellTopicProfile(ct_select="auto", ct_key="cellType", batch_key=None, split_name="ref", method="mean"),
+            FilterGenesMatch(prefixes=["mt-"], case_sensitive=False),
+            FilterGenesCommon(split_keys=["ref", "test"]),
+            FilterGenesMarker(ct_profile_channel="CellTopicProfile", threshold=1.25),
+            FilterGenesPercentile(min_val=1, max_val=99, mode="rv"),
+            SetConfig({
+                "feature_channel": [None, "spatial"],
+                "feature_channel_type": ["X", "obsm"],
+                "label_channel": "cell_type_portion",
+            }),
+            log_level=log_level,
+        )
 
     def fit(self, x, spatial, max_iter=100, epsilon=1e-4, sigma=0.1, location_free: bool = False):
         """Fit function for model training.
@@ -177,7 +197,7 @@ class Card:
         Optimal_ix = np.where(Obj == Obj.max())[0][-1]  # in case if there are two equal objective function values
         OptimalPhi = phi[Optimal_ix]
         OptimalRes = ResList[str(Optimal_ix)]
-        print("## Deconvolution Finish! ...\n")
+        logger.info("Deconvolution finished")
 
         self.info_parameters["phi"] = OptimalPhi
         self.algorithm_matrix = {"B": b_mat, "Xinput_norm": x_norm, "Res": OptimalRes}
