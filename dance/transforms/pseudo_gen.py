@@ -7,7 +7,7 @@ import pandas as pd
 from dance import logger as native_logger
 from dance.data import Data
 from dance.transforms.base import BaseTransform
-from dance.typing import Dict, List, Literal, Logger, Optional, Tuple, Union
+from dance.typing import Callable, Dict, List, Literal, Logger, Optional, Tuple, Union
 
 
 class PseudoMixture(BaseTransform):
@@ -104,6 +104,7 @@ class CellTopicProfile(BaseTransform):
         *,
         ct_select: Union[Literal["auto"], List[str]] = "auto",
         ct_key: str = "cellType",
+        batch_key: Optional[str] = None,
         split_name: Optional[str] = None,
         channel: Optional[str] = None,
         channel_type: str = "X",
@@ -114,7 +115,9 @@ class CellTopicProfile(BaseTransform):
 
         self.ct_select = ct_select
         self.ct_key = ct_key
+        self.batch_key = batch_key
         self.split_name = split_name
+
         self.channel = channel
         self.channel_type = channel_type
         self.method = method
@@ -124,9 +127,15 @@ class CellTopicProfile(BaseTransform):
                              return_type="numpy")
         annot = data.get_feature(split_name=self.split_name, channel=self.ct_key, channel_type="obs",
                                  return_type="numpy")
+        if self.batch_key is None:
+            batch_index = None
+        else:
+            batch_index = data.get_feature(split_name=self.split_name, channel=self.batch_key, channel_type="obs",
+                                           return_type="numpy")
 
         ct_select = get_cell_types(self.ct_select, annot)
-        ct_profile = get_ct_profile(x, annot, ct_select, self.method, self.logger)
+        ct_profile = get_ct_profile(x, annot, batch_index=batch_index, ct_select=ct_select, method=self.method,
+                                    logger=self.logger)
         ct_profile_df = pd.DataFrame(ct_profile, index=data.data.var_names, columns=ct_select)
 
         data.data.varm[self.out] = ct_profile_df
@@ -141,33 +150,62 @@ def get_cell_types(ct_select: Union[Literal["auto"], List[str]], annot: np.ndarr
     return ct_select
 
 
+def get_agg_func(name: str, *, default: Optional[str] = None) -> Callable[[np.ndarray], np.ndarray]:
+    if name == "default":
+        if default is None:
+            raise ValueError("Aggregation function name set to 'default' but default option not set")
+        name = default
+
+    if name == "median":
+        agg_func = partial(np.median, axis=0)
+    elif name == "mean":
+        agg_func = partial(np.mean, axis=0)
+    else:
+        raise ValueError(f"Unknown aggregation method {name!r}. Available options are: 'median', 'mena'")
+
+    return agg_func
+
+
 def get_ct_profile(
     x: np.ndarray,
     annot: np.ndarray,
-    /,
+    *,
+    batch_index: Optional[np.ndarray] = None,
     ct_select: Union[Literal["auto"], List[str]] = "auto",
-    method: Literal["median", "mean"] = "median",
+    method: Literal["median", "mean"] = "mean",
     logger: Optional[Logger] = None,
 ) -> np.ndarray:
-    """Return the cell-topic profile matrix (gene x cell-type)."""
     logger = logger or native_logger
     ct_select = get_cell_types(ct_select, annot)
-
-    # Get aggregation function
-    if method == "median":
-        agg_func = partial(np.median, axis=0)
-    elif method == "mean":
-        agg_func = partial(np.mean, axis=0)
-    else:
-        raise ValueError(f"Unknown aggregation method {method!r}. Available options are: 'median', 'mena'")
+    agg_func = get_agg_func(method, default="mean")
+    if batch_index is None:
+        batch_index = np.zeros(x.shape[0], dtype=int)
 
     # Aggregate profile for each selected cell types
     logger.info(f"Generating cell-type profiles ({method!r} aggregation) for {ct_select}")
-    ct_profile = np.zeros((x.shape[1], len(ct_select)), dtype=np.float32)
+    ct_profile = np.zeros((x.shape[1], len(ct_select)), dtype=np.float32)  # gene x cell
+
     for i, ct in enumerate(ct_select):
         ct_index = np.where(annot == ct)[0]
         logger.info(f"Aggregating {ct!r} profiles over {ct_index.size:,} samples")
-        ct_profile[:, i] = agg_func(x[ct_index])
+
+        # Get features within a cell type
+        sub_batch_index = batch_index[ct_index]
+        batches = np.unique(sub_batch_index)
+
+        # Aggregate cell type profile for each batch
+        sub_ct_profile = np.zeros((batches.size, x.shape[1]), dtype=np.float32)  # cell x gene
+        sub_ct_mean_lib_sizes = np.zeros(batches.size, dtype=np.float32)
+        for j, batch_id in enumerate(batches):
+            idx = np.where(sub_batch_index == batch_id)[0]
+            sub_ct_profile[j] = agg_func(x[ct_index][idx])
+            sub_ct_mean_lib_sizes[j] = sub_ct_profile[j].sum()
+            sub_ct_profile[j] /= sub_ct_mean_lib_sizes[j]
+            logger.info(f"Number of {ct!r} cells in batch {batch_id!r}: {idx.size:,}")
+
+        # Aggregate cell type profile over batches
+        ct_profile[:, i] = agg_func(sub_ct_profile) * agg_func(sub_ct_mean_lib_sizes)
+
     logger.info("Cell-type profile generated")
 
     return ct_profile

@@ -17,16 +17,13 @@ pprint(vars(args))
 dataset = CellTypeDeconvoDataset(data_dir=args.datadir, data_id=args.dataset)
 data = dataset.load_data()
 
-data.set_config(feature_channel=[None, "spatial"], feature_channel_type=["X", "obsm"],
-                label_channel="cell_type_portion")
+preprocessing_pipeline = Card.preprocessing_pipeline()
+preprocessing_pipeline(data)
+
 (x_count, x_spatial), y = data.get_data(split_name="test", return_type="numpy")
-cell_types = data.data.obsm["cell_type_portion"].columns.tolist()
+basis = data.get_feature(return_type="default", channel="CellTopicProfile", channel_type="varm")
 
-ref_adata = data.get_split_data("ref")
-ref_count = ref_adata.to_df()
-ref_annot = ref_adata.obs
-
-model = Card(ref_count, ref_annot, ct_varname="cellType", ct_select=cell_types)
+model = Card(basis)
 pred = model.fit_and_predict(x_count, x_spatial, max_iter=args.max_iter, epsilon=args.epsilon,
                              location_free=args.location_free)
 mse = model.score(pred, y)
