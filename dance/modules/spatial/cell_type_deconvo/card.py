@@ -53,7 +53,6 @@ def CARDref(Xinput, U, W, phi, max_iter, epsilon, V, b, sigma_e2, Lambda):
     updateV_den_k = np.zeros(k)
     vecOne = np.ones((nSample, 1))
     diag_UtU = np.zeros(k)
-    logicalLogL = False
     alpha = 1.0
     beta = nSample / 2.0
     accu_L = 0.0
@@ -73,12 +72,12 @@ def CARDref(Xinput, U, W, phi, max_iter, epsilon, V, b, sigma_e2, Lambda):
         colsum_W = colsum_W.reshape(nSample, 1)
         accu_L = np.sum(L)
 
-    obj_old = obj_func(trac_xxt, UtXV, UtU, VtV, mGene, nSample, b, Lambda, beta, vecOne, V, L, alpha, sigma_e2)
-    V_old = V.copy()
-
     # Iteration starts
+    obj = obj_func(trac_xxt, UtXV, UtU, VtV, mGene, nSample, b, Lambda, beta, vecOne, V, L, alpha, sigma_e2)
     for i in range(max_iter):
-        # logV = 0.0
+        obj_old = obj
+        V_old = V.copy()
+
         Lambda = (np.diag(temp) / 2.0 + beta) / (nSample / 2.0 + alpha + 1.0)
         if W is not None:
             b = np.sum(V.T @ L, axis=1, keepdims=True) / accu_L
@@ -96,15 +95,14 @@ def CARDref(Xinput, U, W, phi, max_iter, epsilon, V, b, sigma_e2, Lambda):
         VtV = V.T @ V
         obj = obj_func(trac_xxt, UtXV, UtU, VtV, mGene, nSample, b, Lambda, beta, vecOne, V, L, alpha)
 
-        logicalLogL = (obj > obj_old) & ((abs(obj - obj_old) * 2.0 / abs(obj + obj_old)) < epsilon)
+        logic1 = (obj > obj_old) & ((abs(obj - obj_old) * 2.0 / abs(obj + obj_old)) < epsilon)
+        logic2 = np.sqrt(np.sum((V - V_old) * (V - V_old)) / (nSample * k)) < epsilon
+        stop_logic = np.isnan(obj) or logic1 or logic2
         logger.debug(f"{i=:<4}, {obj=:.5e}")
-        if (np.isnan(obj) | (np.sqrt(np.sum((V - V_old) * (V - V_old)) / (nSample * k)) < epsilon) | logicalLogL):
-            if (i > 5):  # // run at least 5 iterations
-                logger.info(f"Exiting at {i=}")
-                break
-        else:
-            obj_old = obj
-            V_old = V.copy()
+        if stop_logic and i > 5:
+            logger.info(f"Exiting at {i=}")
+            break
+
     pred = V / V.sum(axis=1, keepdims=True)
 
     return pred, obj
