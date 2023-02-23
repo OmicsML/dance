@@ -3,6 +3,8 @@ from pprint import pprint
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.card import Card
+from dance.transforms import (CellTopicProfile, FilterGenesCommon, FilterGenesMarker, FilterGenesMatch,
+                              FilterGenesPercentile)
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--dataset", default="CARD_synthetic", choices=CellTypeDeconvoDataset.DATASETS)
@@ -16,17 +18,23 @@ pprint(vars(args))
 # Load dataset
 dataset = CellTypeDeconvoDataset(data_dir=args.datadir, data_id=args.dataset)
 data = dataset.load_data()
+cell_types = data.data.obsm["cell_type_portion"].columns.tolist()
+
+CellTopicProfile(ct_select=cell_types, ct_key="cellType", batch_key=None, split_name="ref", method="mean",
+                 log_level="INFO")(data)
+FilterGenesMatch(prefixes=["mt-"], case_sensitive=False, log_level="INFO")(data)
+FilterGenesCommon(split_keys=["ref", "test"], log_level="INFO")(data)
+FilterGenesMarker(ct_profile_channel="CellTopicProfile", threshold=1.25, log_level="INFO")(data)
+FilterGenesPercentile(min_val=1, max_val=99, mode="rv", log_level="INFO")(data)
 
 data.set_config(feature_channel=[None, "spatial"], feature_channel_type=["X", "obsm"],
                 label_channel="cell_type_portion")
 (x_count, x_spatial), y = data.get_data(split_name="test", return_type="numpy")
-cell_types = data.data.obsm["cell_type_portion"].columns.tolist()
+# TODO: adapt card to use basis.T
+# TODO: use "auto"/None option for ct_select
+basis = data.get_feature(return_type="default", channel="CellTopicProfile", channel_type="varm").T
 
-ref_adata = data.get_split_data("ref")
-ref_count = ref_adata.to_df()
-ref_annot = ref_adata.obs
-
-model = Card(ref_count, ref_annot, ct_varname="cellType", ct_select=cell_types)
+model = Card(basis)
 pred = model.fit_and_predict(x_count, x_spatial, max_iter=args.max_iter, epsilon=args.epsilon,
                              location_free=args.location_free)
 mse = model.score(pred, y)
