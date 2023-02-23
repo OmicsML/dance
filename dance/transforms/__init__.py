@@ -1,6 +1,6 @@
 from dance.transforms import graph
 from dance.transforms.cell_feature import CellPCA, WeightedFeaturePCA
-from dance.transforms.filter import FilterGenesCommon, FilterGenesMatch, FilterGenesPercentile
+from dance.transforms.filter import FilterGenesCommon, FilterGenesMarker, FilterGenesMatch, FilterGenesPercentile
 from dance.transforms.interface import AnnDataTransform
 from dance.transforms.misc import Compose, RemoveSplit, SaveRaw, SetConfig
 from dance.transforms.normalize import ScaleFeature
@@ -15,6 +15,7 @@ __all__ = [
     "CellTopicProfile",
     "Compose",
     "FilterGenesCommon",
+    "FilterGenesMarker",
     "FilterGenesMatch",
     "FilterGenesPercentile",
     "GeneStats",

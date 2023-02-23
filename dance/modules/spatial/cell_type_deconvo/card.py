@@ -11,6 +11,7 @@ Nature Biotechnology (2022): 1-11.
 import numpy as np
 import pandas as pd
 
+from dance.transforms import FilterGenesMarker
 from dance.transforms.pseudo_gen import get_ct_profile
 from dance.utils.matrix import pairwise_distance
 
@@ -175,13 +176,6 @@ class Card:
         basis = pd.DataFrame(ct_profile, index=self.ct_select, columns=self.sc_count.columns)
         self.basis = basis
 
-    def select_ct_marker(self, ict):
-        Basis = self.basis.copy()
-        rest = Basis[Basis.index != ict].to_numpy().mean(axis=0)
-        FC = np.log(Basis[Basis.index == ict].to_numpy().mean(axis=0) + 1e-6) - np.log(rest + 1e-6)
-        markers = list(Basis.columns[np.logical_and(FC > 1.25, Basis[Basis.index == ict].to_numpy().mean(axis=0) > 0)])
-        return markers
-
     def selectInfo(self, common_gene):
         """Select Informative Genes used in the deconvolution.
 
@@ -197,13 +191,12 @@ class Card:
 
         """
         # Select marker genes from common genes
-        gene1 = set()
-        for ict in self.ct_select:
-            gene1.update(self.select_ct_marker(ict))
-        gene1 = sorted(gene1 & set(common_gene))
+        markers, _ = FilterGenesMarker.get_marker_genes(self.basis.values, self.basis.index.tolist(),
+                                                        self.basis.columns.tolist())
+        selected_genes = sorted(set(markers) & set(common_gene))
 
         # Compute coefficient of variation for each gene within each cell type
-        counts = self.sc_count[gene1].join(self.sc_meta[self.ct_varname])
+        counts = self.sc_count[selected_genes].join(self.sc_meta[self.ct_varname])
         cov_mean = (counts.groupby(self.ct_varname).var() / counts.groupby(self.ct_varname).mean()).mean()
 
         # Remove genes that have high cov

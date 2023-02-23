@@ -1,9 +1,11 @@
 import numpy as np
+import pandas as pd
 from anndata import AnnData
 
+from dance import logger as default_logger
 from dance.exceptions import DevError
 from dance.transforms.base import BaseTransform
-from dance.typing import Dict, List, Literal, Optional, Union
+from dance.typing import Dict, List, Literal, Logger, Optional, Tuple, Union
 
 
 class FilterGenesCommon(BaseTransform):
@@ -175,3 +177,75 @@ class FilterGenesPercentile(BaseTransform):
         self.logger.info(f"{mask.size - mask.sum()} genes removed ({percentile_lo=:.2e}, {percentile_hi=:.2e})")
 
         data._data = data.data[:, mask].copy()
+
+
+class FilterGenesMarker(BaseTransform):
+
+    _DISPLAY_ATTRS = ("ct_profile_channel", "subset", "threshold", "eps")
+
+    def __init__(
+        self,
+        *,
+        ct_profile_channel: str = "CellTopicProfile",
+        subset: bool = True,
+        threshold: float = 1.25,
+        eps: float = 1e-6,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.ct_profile_channel = ct_profile_channel
+        self.subset = subset
+        self.threshold = threshold
+        self.eps = eps
+
+    @staticmethod
+    def get_marker_genes(
+        ct_profile: np.ndarray,
+        cell_types: List[str],
+        genes: List[str],
+        *,
+        threshold: float = 1.25,
+        eps: float = 1e-6,
+        logger: Logger = default_logger,
+    ) -> Tuple[List[str], pd.DataFrame]:
+        if (num_cts := len(cell_types)) < 2:
+            raise ValueError(f"Need at least two cell types to find marker genes, got {num_cts}:\n{cell_types}")
+
+        # Find marker genes for each cell type
+        marker_gene_ind_df = pd.DataFrame(False, index=genes, columns=cell_types)
+        for i, ct in enumerate(cell_types):
+            others = [j for j in range(num_cts) if j != i]
+            log_fc = np.log(ct_profile[i] + eps) - np.log(ct_profile[others].mean(0) + eps)
+            markers_idx = np.where(log_fc > threshold)[0]
+
+            if markers_idx.size > 0:
+                marker_gene_ind_df.iloc[markers_idx, i] = True
+                markers = marker_gene_ind_df.iloc[markers_idx].index.tolist()
+                logger.info(f"Found {len(markers):,} marker genes for cell type {ct!r}")
+                logger.debug(f"{markers=}")
+            else:
+                logger.info(f"No marker genes found for cell type {ct!r}")
+
+        # Combine all marker genes
+        is_marker = marker_gene_ind_df.max(1)
+        marker_genes = is_marker[is_marker].index.tolist()
+        logger.info(f"Total number of marker genes found: {len(marker_genes):,}")
+        logger.debug(f"{marker_genes=}")
+
+        return marker_genes, marker_gene_ind_df
+
+    def __call__(self, data):
+        ct_profile_df = data.get_feature(channel=self.ct_profile_channel, channel_type="varm", return_type="default")
+        ct_profile = ct_profile_df.values
+        cell_types = ct_profile_df.index.tolist()
+        genes = ct_profile_df.columns.tolist()
+        marker_genes, marker_gene_ind_df = self.get_marker_genes(ct_profile, cell_types, genes, eps=self.eps,
+                                                                 threshold=self.threshold, logger=self.logger)
+
+        # Save marker gene info to data
+        data.data.varm[self.out] = marker_gene_ind_df
+        if self.label is not None:
+            data.data.var[self.label] = marker_gene_ind_df.max(1)
+
+        if self.subset:  # inplace subset the variables
+            data.data._inplace_subset_var(marker_genes)
