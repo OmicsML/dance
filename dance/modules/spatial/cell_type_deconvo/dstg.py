@@ -31,13 +31,13 @@ class GraphConvolution(nn.Module):
 
     Parameters
     ----------
-    in_features : int
+    in_features
         Input dimension.
-    out_features : int
+    out_features
         Output dimension.
-    support :
+    support
         Support for graph convolution.
-    bias : boolean optional
+    bias
         Include bias term, default False.
 
     """
@@ -120,7 +120,7 @@ class GCN(nn.Module):
 
         Returns
         -------
-        output : float
+        output
             Output of graph convolution network.
 
         """
@@ -139,18 +139,18 @@ class DSTG(BaseRegressionMethod):
 
     Parameters
     ----------
-    nhid : int
+    nhid
         Number of units in the hidden layer (graph convolution).
-    bias : boolean optional
+    bias
         Include bias term, default False.
-    dropout : float optional
+    dropout
         Dropout rate, default 0.
-    device : str
+    device
         Computation device.
 
     """
 
-    def __init__(self, nhid=32, bias=False, dropout=0, device="cpu"):
+    def __init__(self, nhid: int = 32, bias: bool = False, dropout: float = 0, device: str = "auto"):
         self.nhid = nhid
         self.bias = bias
         self.dropout = dropout
@@ -202,12 +202,13 @@ class DSTG(BaseRegressionMethod):
         inputs
             A tuple containing (1) the DSTG adjacency matrix, (2) the gene expression feature matrix, (3) the
             training mask indicating the training samples.
-        y : torch.Tensor
-        lr : float optional
+        y
+            Cell type portions label.
+        lr
             Learning rate.
-        max_epochs : int optional
+        max_epochs
             Maximum number of epochs to train.
-        weight_decay : float optional
+        weight_decay
             Weight decay parameter for optimization (Adam).
 
         """
@@ -248,7 +249,7 @@ class DSTG(BaseRegressionMethod):
 
         Returns
         -------
-        pred : torch tensor
+        pred
             Predictions of cell-type proportions.
 
         """
@@ -262,12 +263,12 @@ def dropout_layer(x, dropout):
     ----------
     x
         input to dropout layer.
-    dropout : float
+    dropout
         dropout rate (between 0 and 1).
 
     Returns
     -------
-    out : torch tensor
+    out
         dropout output.
 
     """
@@ -286,7 +287,7 @@ def sparse_dropout(x, dropout):
     ----------
     x
         Input to dropout layer.
-    dropout : float
+    dropout
         Dropout rate (between 0 and 1).
 
     """
@@ -311,14 +312,14 @@ def masked_softmax_cross_entropy(preds, labels, mask):
     ----------
     preds:
         Cell-type proportion predictions from dstg model.
-    labels :
+    labels
         True cell-type proportion labels.
-    mask :
+    mask
         Mask to indicate which samples to use in computing loss.
 
     Returns
     -------
-    loss : float
+    loss
         Cross entropy loss between true and predicted cell-type proportions (mean reduced).
 
     """
