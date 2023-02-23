@@ -8,11 +8,10 @@ Ma, Ying, and Xiang Zhou. "Spatially informed cell-type deconvolution for spatia
 Nature Biotechnology (2022): 1-11.
 
 """
-from itertools import chain
-
 import numpy as np
 import pandas as pd
 
+from dance.transforms.pseudo_gen import get_ct_profile
 from dance.utils.matrix import pairwise_distance
 
 
@@ -160,23 +159,21 @@ class Card:
 
     def createscRef(self):
         """CreatescRef - create reference basis matrix from reference scRNA-seq."""
-        count_mat = self.sc_count.copy()
         sc_meta = self.sc_meta.copy()
         ct_varname = self.ct_varname
         batch_varname = self.sample_varname
         if batch_varname is None:
             sc_meta["sampleID"] = "Sample"
             batch_varname = "sampleID"
-        var_names = [ct_varname, batch_varname]
 
-        count_mat_ct_batch = count_mat.join(sc_meta[var_names]).groupby(var_names).mean(numeric_only=True)
-        lib_size_ct_batch = count_mat_ct_batch.sum(1)
-        ct_batch_profile = count_mat_ct_batch.div(lib_size_ct_batch, axis=0)
-        ct_batch_profile["lib_size"] = lib_size_ct_batch
-
-        ct_profile = ct_batch_profile.droplevel(batch_varname).reset_index().groupby(ct_varname).mean(numeric_only=True)
-        ct_profile = ct_profile.loc[:, ct_profile.columns != "lib_size"].mul(ct_profile["lib_size"], axis=0)
-        self.basis = ct_profile
+        ct_profile = get_ct_profile(
+            self.sc_count.values,
+            sc_meta[ct_varname].values,
+            ct_select=self.ct_select,
+            batch_index=sc_meta[batch_varname].values,
+        ).T
+        basis = pd.DataFrame(ct_profile, index=self.ct_select, columns=self.sc_count.columns)
+        self.basis = basis
 
     def select_ct_marker(self, ict):
         Basis = self.basis.copy()
