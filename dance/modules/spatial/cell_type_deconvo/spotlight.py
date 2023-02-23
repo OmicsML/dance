@@ -122,8 +122,6 @@ class SPOTlight(BaseRegressionMethod):
         init_bias=None,
         device="auto",
     ):
-        super().__init__()
-
         self.ref_count = ref_count
         self.ref_annot = ref_annot
         self.ct_select = ct_select
@@ -148,25 +146,6 @@ class SPOTlight(BaseRegressionMethod):
 
         self.model = nn.Sequential(self.nmf_model, self.nnls_reg1, self.nnls_reg2)
 
-    def forward(self, ref_annot):
-        # Get NMF decompositions
-        W = self.nmf_model.H.clone()
-        H = self.nmf_model.W.clone().T
-
-        # Get cell-topic and mix-topic profiles
-        # Get cell-topic profiles H_profile: cell-type group medians of coef H (topic x cells)
-        H_profile = get_ct_profile_tensor(H.cpu().numpy().T, ref_annot, ct_select=self.ct_select)
-        H_profile = H_profile.to(self.device)
-
-        # Get mix-topic profiles B: NNLS of basis W onto mix expression Y -- y ~ W*b
-        # nnls ran for each spot
-        B = self.nnls_reg1.model.weight.detach().T
-
-        # Get cell-type proportions P: NNLS of cell-topic profile H_profile onoto mix-topic profile B -- b ~ h_profile*p
-        P = self.nnls_reg2.model.weight.detach().T
-
-        return (W, H_profile, B, P)
-
     def fit(
         self,
         x: torch.Tensor,
@@ -185,21 +164,22 @@ class SPOTlight(BaseRegressionMethod):
             Maximum iterations allowed for matrix factorization solver.
 
         """
-        self._init_model(x.shape[0], self.ref_count, self.ref_annot)
-        x = x.T.to(self.device)
-        x_ref = torch.FloatTensor(self.ref_count.T).to(self.device)
+        ref_annot = self.ref_annot
+        ct_select = self.ct_select
+        device = self.device
+
+        self._init_model(x.shape[0], self.ref_count, ref_annot)
+        x = x.T.to(device)
+        x_ref = torch.FloatTensor(self.ref_count.T).to(device)
 
         # Run NMF on scRNA X
         self.nmf_model.fit(x_ref, max_iter=max_iter)
         self.nmf_model.requires_grad_(False)
-
         self.W = self.nmf_model.H.clone()
         self.H = self.nmf_model.W.clone().T
 
-        # Get cell-topic and mix-topic profiles
         # Get cell-topic profiles H_profile: cell-type group medians of coef H (topic x cells)
-        self.H_profile = get_ct_profile_tensor(self.H.cpu().numpy().T, self.ref_annot, ct_select=self.ct_select)
-        self.H_profile = self.H_profile.to(self.device)
+        self.H_profile = get_ct_profile_tensor(self.H.cpu().numpy().T, ref_annot, ct_select=ct_select).to(device)
 
         # Get mix-topic profiles B: NNLS of basis W onto mix expression X ~ W*b
         # nnls ran for each spot
