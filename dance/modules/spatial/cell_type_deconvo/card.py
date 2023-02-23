@@ -77,7 +77,6 @@ def CARDref(Xinput, U, W, phi, max_iter, epsilon, V, b, sigma_e2, Lambda):
     V_old = V.copy()
 
     # Iteration starts
-    iter_converge = 0
     for i in range(max_iter):
         # logV = 0.0
         Lambda = (np.diag(temp) / 2.0 + beta) / (nSample / 2.0 + alpha + 1.0)
@@ -102,14 +101,13 @@ def CARDref(Xinput, U, W, phi, max_iter, epsilon, V, b, sigma_e2, Lambda):
         if (np.isnan(obj) | (np.sqrt(np.sum((V - V_old) * (V - V_old)) / (nSample * k)) < epsilon) | logicalLogL):
             if (i > 5):  # // run at least 5 iterations
                 logger.info(f"Exiting at {i=}")
-                iter_converge = i
                 break
         else:
             obj_old = obj
             V_old = V.copy()
+    pred = V / V.sum(axis=1, keepdims=True)
 
-    res = {"V": V, "sigma_e2": sigma_e2, "Lambda": Lambda, "b": b, "Obj": obj, "iter_converge": iter_converge}
-    return res
+    return pred, obj
 
 
 class Card:
@@ -124,7 +122,8 @@ class Card:
 
     def __init__(self, basis: pd.DataFrame):
         self.basis = basis
-        self.info_parameters = {}
+        self.best_phi = None
+        self.best_obj = -np.inf
 
     @staticmethod
     def preprocessing_pipeline(log_level: LogLevel = "INFO"):
@@ -180,29 +179,20 @@ class Card:
         Vint1 = rng.dirichlet(np.repeat(10, basis.shape[1], axis=0), x_norm.shape[0])
         phi = [0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99]
 
-        # scale the Xinput_norm and B to speed up the convergence.
+        # Scale the Xinput_norm and B to speed up the convergence.
         x_norm = x_norm * 0.1 / x_norm.sum()
         b_mat = basis * 0.1 / basis.mean()
 
         # Optimization
-        ResList = {}
-        Obj = np.array([])
         for iphi in range(len(phi)):
-            res = CARDref(Xinput=x_norm.T, U=b_mat, W=kernel_mat, phi=phi[iphi], max_iter=max_iter, epsilon=epsilon,
-                          V=Vint1, b=np.repeat(0, b_mat.shape[1]).reshape(b_mat.shape[1], 1), sigma_e2=0.1,
-                          Lambda=np.repeat(10, basis.shape[1]))
-            ResList[str(iphi)] = res
-            Obj = np.append(Obj, res["Obj"])
-        self.Obj_hist = Obj
-        Optimal_ix = np.where(Obj == Obj.max())[0][-1]  # in case if there are two equal objective function values
-        OptimalPhi = phi[Optimal_ix]
-        OptimalRes = ResList[str(Optimal_ix)]
+            res, obj = CARDref(Xinput=x_norm.T, U=b_mat, W=kernel_mat, phi=phi[iphi], max_iter=max_iter,
+                               epsilon=epsilon, V=Vint1, b=np.repeat(0, b_mat.shape[1]).reshape(b_mat.shape[1], 1),
+                               sigma_e2=0.1, Lambda=np.repeat(10, basis.shape[1]))
+            if obj > self.best_obj:
+                self.res = res
+                self.best_obj = obj
+                self.best_phi = phi
         logger.info("Deconvolution finished")
-
-        self.info_parameters["phi"] = OptimalPhi
-        self.algorithm_matrix = {"B": b_mat, "Xinput_norm": x_norm, "Res": OptimalRes}
-
-        return self
 
     def predict(self):
         """Prediction function.
@@ -213,9 +203,7 @@ class Card:
             Predictions of cell-type proportions.
 
         """
-        optim_res = self.algorithm_matrix["Res"]
-        prop_pred = optim_res["V"] / optim_res["V"].sum(axis=1, keepdims=True)
-        return prop_pred
+        return self.res
 
     def fit_and_predict(self, x, spatial, **kwargs):
         self.fit(x, spatial, **kwargs)
