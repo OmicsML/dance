@@ -183,13 +183,15 @@ class FilterGenesPercentile(BaseTransform):
         else:
             raise DevError(f"{self.mode!r} not expected, please inform dev to fix this error.")
 
+        self.logger.info(f"Filtering genes based on {self.mode} expression percentiles in layer {self.channel!r}")
         percentile_lo = np.percentile(gene_summary, self.min_val)
         percentile_hi = np.percentile(gene_summary, self.max_val)
         mask = np.logical_and(gene_summary >= percentile_lo, gene_summary <= percentile_hi)
-        self.logger.info(f"Filtering genes based on {self.mode} expression percentiles in layer {self.channel!r}")
-        self.logger.info(f"{mask.size - mask.sum()} genes removed ({percentile_lo=:.2e}, {percentile_hi=:.2e})")
+        selected_genes = data.data.var_names[mask].tolist()
+        num_removed = mask.size - len(selected_genes)
+        self.logger.info(f"{num_removed:,} genes removed ({percentile_lo=:.2e}, {percentile_hi=:.2e})")
 
-        data._data = data.data[:, mask].copy()
+        data.data._inplace_subset_var(selected_genes)
 
 
 class FilterGenesMarker(BaseTransform):
