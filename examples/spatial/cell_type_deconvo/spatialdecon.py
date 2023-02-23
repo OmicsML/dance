@@ -29,12 +29,9 @@ x, y = data.get_data(split_name="test", return_type="torch")
 ct_profile = data.get_feature(split_name="ref", return_type="torch", channel="CellTopicProfile", channel_type="varm")
 
 # Initialize and train model
-spaDecon = SpatialDecon(ct_select=cell_types, bias=args.bias, device=args.device)
-pred = spaDecon.fit_and_predict(x, ct_profile, lr=args.lr, max_iter=args.max_iter, print_period=100)
-
-# Compute score
-mse = spaDecon.score(pred, y)
-print(f"mse = {mse:7.4f}")
+spaDecon = SpatialDecon(ct_profile, ct_select=cell_types, bias=args.bias, device=args.device)
+score = spaDecon.fit_score(x, y, lr=args.lr, max_iter=args.max_iter, print_period=100)
+print(f"MSE: {score:7.4f}")
 """To reproduce SpatialDecon benchmarks, please refer to command lines belows:
 
 CARD synthetic

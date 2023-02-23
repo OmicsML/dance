@@ -12,10 +12,10 @@ import torch
 import torch.nn as nn
 from torch import optim
 
+from dance.modules.base import BaseRegressionMethod
 from dance.transforms import CellTopicProfile, Compose, SetConfig
-from dance.typing import LogLevel
+from dance.typing import Any, LogLevel, Optional
 from dance.utils import get_device
-from dance.utils.matrix import normalize
 
 
 class MSLELoss(nn.Module):
@@ -45,7 +45,7 @@ class MSLELoss(nn.Module):
         return loss
 
 
-class SpatialDecon:
+class SpatialDecon(BaseRegressionMethod):
     """SpatialDecon.
 
     Parameters
@@ -60,8 +60,6 @@ class SpatialDecon:
         Name of the cell-types column.
     ct_select : str, optional
         Selected cell-types to be considered for deconvolution.
-    sc_profile: numpy array optional
-        Pre-constructed cell profile matrix.
     bias : boolean optional
         Include bias term, default False.
     init_bias: numpy array optional
@@ -69,13 +67,14 @@ class SpatialDecon:
 
     """
 
-    def __init__(self, ct_select, sc_profile=None, bias=False, init_bias=None, device="auto"):
-        super().__init__()
-        self.device = get_device(device)
+    def __init__(self, ct_profile, ct_select, bias=False, init_bias=None, device="auto"):
+        self.ct_profile = ct_profile
         self.ct_select = ct_select
+
         self.bias = bias
         self.init_bias = init_bias
-        self.model = None
+
+        self.device = get_device(device)
 
     @staticmethod
     def preprocessing_pipeline(ct_select, ct_profile_split: str = "ref", log_level: LogLevel = "INFO"):
@@ -92,12 +91,13 @@ class SpatialDecon:
             model.bias = nn.Parameter(torch.Tensor(self.init_bias.values.T.copy()))
         self.model = model.to(self.device)
 
-    def forward(self, x: torch.Tensor):
-        out = self.model(x)
-        return (out)
-
-    def predict(self):
+    def predict(self, x: Optional[Any] = None):
         """Return fiited parameters as cell-type portion predictions.
+
+        Parameters
+        ----------
+        x
+            Not used, for compatibility with the BaseRegressionMethod class.
 
         Returns
         -------
@@ -106,10 +106,9 @@ class SpatialDecon:
 
         """
         weights = self.model.weight.clone().detach().cpu()
-        proportion_preds = normalize(weights, mode="normalize", axis=1)
-        return proportion_preds
+        return nn.functional.normalize(weights, dim=1, p=1)
 
-    def fit(self, x, ct_profile, lr=1e-4, max_iter=500, print_res=False, print_period=100):
+    def fit(self, x, lr=1e-4, max_iter=500, print_res=False, print_period=100):
         """fit function for model training.
 
         Parameters
@@ -126,7 +125,7 @@ class SpatialDecon:
             Indicates number of iterations until training results print.
 
         """
-        ref_ct_profile = ct_profile.to(self.device)
+        ref_ct_profile = self.ct_profile.to(self.device)
         mix_count = x.T.to(self.device)
         self._init_model(x.shape[0])
 
@@ -149,30 +148,3 @@ class SpatialDecon:
                 self.model.weight.copy_(self.model.weight.data.clamp(min=0))
             if iteration % print_period == 0:
                 print(f"Epoch: {iteration:02}/{max_iter} Loss: {loss.item():.5e}")
-
-    def fit_and_predict(self, *args, **kwargs):
-        """Fit parameters and return cell-type portion predictions."""
-        self.fit(*args, **kwargs)
-        pred = self.predict()
-        return pred
-
-    def score(self, pred, true):
-        """Evaluate predictions.
-
-        Parameters
-        ----------
-        pred
-            Predicted cell-type proportions.
-        true
-            True cell-type proportions.
-
-        Returns
-        -------
-        loss : float
-            MSE loss between predicted and true cell-type proportions.
-
-        """
-        true = torch.FloatTensor(true).to(self.device)
-        pred = torch.FloatTensor(pred).to(self.device)
-        loss = nn.MSELoss()(pred, true)
-        return loss.item()
