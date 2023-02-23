@@ -87,8 +87,13 @@ class FilterGenesMatch(BaseTransform):
 
     _DISPLAY_ATTRS = ("prefixes", "suffixes")
 
-    def __init__(self, prefixes: Optional[List[str]] = None, suffixes: Optional[List[str]] = None,
-                 case_sensitive: bool = False, **kwargs):
+    def __init__(
+        self,
+        prefixes: Optional[List[str]] = None,
+        suffixes: Optional[List[str]] = None,
+        case_sensitive: bool = False,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
 
         self.prefixes = prefixes or []
@@ -144,8 +149,16 @@ class FilterGenesPercentile(BaseTransform):
     _DISPLAY_ATTRS = ("min_val", "max_val", "mode")
     _MODES = ["sum", "cv"]
 
-    def __init__(self, min_val: Optional[float] = 1, max_val: Optional[float] = 99, mode: Literal["sum", "cv"] = "sum",
-                 *, channel: Optional[str] = None, channel_type: Optional[str] = None, **kwargs):
+    def __init__(
+        self,
+        min_val: Optional[float] = 1,
+        max_val: Optional[float] = 99,
+        mode: Literal["sum", "cv"] = "sum",
+        *,
+        channel: Optional[str] = None,
+        channel_type: Optional[str] = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
 
         if (channel is not None) and (channel_type != "layers"):
