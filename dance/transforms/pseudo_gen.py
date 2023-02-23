@@ -104,6 +104,7 @@ class CellTopicProfile(BaseTransform):
         *,
         ct_select: Union[Literal["auto"], List[str]] = "auto",
         ct_key: str = "cellType",
+        batch_key: Optional[str] = None,
         split_name: Optional[str] = None,
         channel: Optional[str] = None,
         channel_type: str = "X",
@@ -114,7 +115,9 @@ class CellTopicProfile(BaseTransform):
 
         self.ct_select = ct_select
         self.ct_key = ct_key
+        self.batch_key = batch_key
         self.split_name = split_name
+
         self.channel = channel
         self.channel_type = channel_type
         self.method = method
@@ -124,9 +127,15 @@ class CellTopicProfile(BaseTransform):
                              return_type="numpy")
         annot = data.get_feature(split_name=self.split_name, channel=self.ct_key, channel_type="obs",
                                  return_type="numpy")
+        if self.batch_key is None:
+            batch_index = None
+        else:
+            batch_index = data.get_feature(split_name=self.split_name, channel=self.batch_key, channel_type="obs",
+                                           return_type="numpy")
 
         ct_select = get_cell_types(self.ct_select, annot)
-        ct_profile = get_ct_profile(x, annot, ct_select, self.method, self.logger)
+        ct_profile = get_ct_profile(x, annot, batch_index=batch_index, ct_select=ct_select, method=self.method,
+                                    logger=self.logger)
         ct_profile_df = pd.DataFrame(ct_profile, index=data.data.var_names, columns=ct_select)
 
         data.data.varm[self.out] = ct_profile_df
