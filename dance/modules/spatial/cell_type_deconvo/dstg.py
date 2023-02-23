@@ -18,6 +18,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn.parameter import Parameter
 
+from dance import logger
 from dance.modules.base import BaseRegressionMethod
 from dance.transforms import (AnnDataTransform, Compose, FilterGenesCommon, PseudoMixture, RemoveSplit, ScaleFeature,
                               SetConfig)
@@ -230,7 +231,7 @@ class DSTG(BaseRegressionMethod):
             loss = masked_softmax_cross_entropy(y_pred, y, train_mask)
 
             if (epoch + 1) % 5 == 0:
-                print(f"Epoch: {epoch + 1:04d}, train_loss={loss:.5f}, time={time.time() - t:.5f}")
+                logger.info(f"Epoch: {epoch + 1:04d}, train_loss={loss:.5f}, time={time.time() - t:.5f}")
 
             optimizer.zero_grad()
             loss.backward()

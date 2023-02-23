@@ -15,6 +15,7 @@ import torch
 from torch import nn, optim
 from torchnmf.nmf import NMF
 
+from dance import logger
 from dance.modules.base import BaseRegressionMethod
 from dance.transforms import SetConfig
 from dance.transforms.pseudo_gen import get_ct_profile
@@ -89,7 +90,7 @@ class NNLS(nn.Module):
                 self.model.weight.copy_(self.model.weight.data.clamp(min=0))
 
             if iteration % print_period == 0:
-                print(f"Epoch: {iteration:02}/{max_iter} Loss: {loss.item():.5e}")
+                logger.info(f"Epoch: {iteration:02}/{max_iter} Loss: {loss.item():.5e}")
 
 
 class SPOTlight(BaseRegressionMethod):

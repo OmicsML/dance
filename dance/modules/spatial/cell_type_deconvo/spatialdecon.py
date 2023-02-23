@@ -12,6 +12,7 @@ import torch
 import torch.nn as nn
 from torch import optim
 
+from dance import logger
 from dance.modules.base import BaseRegressionMethod
 from dance.transforms import CellTopicProfile, Compose, SetConfig
 from dance.typing import Any, LogLevel, Optional
@@ -140,4 +141,4 @@ class SpatialDecon(BaseRegressionMethod):
             with torch.no_grad():
                 self.model.weight.copy_(self.model.weight.data.clamp(min=0))
             if iteration % print_period == 0:
-                print(f"Epoch: {iteration:02}/{max_iter} Loss: {loss.item():.5e}")
+                logger.info(f"Epoch: {iteration:02}/{max_iter} Loss: {loss.item():.5e}")
