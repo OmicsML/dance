@@ -49,7 +49,6 @@ inputs = (adj, x, train_mask)
 # Train and evaluate model
 model = DSTG(nhid=args.nhid, bias=args.bias, dropout=args.dropout, device=args.device)
 pred = model.fit_predict(inputs, y, lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
-
 test_mask = data.get_split_mask("test", return_type="torch")
 score = model.default_score_func(y[test_mask], pred[test_mask])
 print(f"MSE: {score:7.4f}")

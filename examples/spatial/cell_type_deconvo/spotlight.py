@@ -29,6 +29,7 @@ x, y = data.get_data(split_name="test", return_type="torch")
 ref_count = data.get_feature(split_name="ref", return_type="numpy")
 ref_annot = data.get_feature(split_name="ref", return_type="numpy", channel="cellType", channel_type="obs")
 
+# Train and evaluate model
 model = SPOTlight(ref_count, ref_annot, cell_types, rank=args.rank, bias=args.bias, device=args.device)
 score = model.fit_score(x, y, lr=args.lr, max_iter=args.max_iter)
 print(f"MSE: {score:7.4f}")
