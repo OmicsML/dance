@@ -67,7 +67,7 @@ class SpatialDecon(BaseRegressionMethod):
         self.device = get_device(device)
 
     @staticmethod
-    def preprocessing_pipeline(ct_select, ct_profile_split: str = "ref", log_level: LogLevel = "INFO"):
+    def preprocessing_pipeline(ct_select: str = "auto", ct_profile_split: str = "ref", log_level: LogLevel = "INFO"):
         return Compose(
             CellTopicProfile(ct_select=ct_select, split_name="ref"),
             SetConfig({"label_channel": "cell_type_portion"}),
@@ -77,8 +77,6 @@ class SpatialDecon(BaseRegressionMethod):
     def _init_model(self, num_cells: int, bias: bool = True):
         num_cell_types = len(self.ct_select)
         model = nn.Linear(in_features=num_cell_types, out_features=num_cells, bias=self.bias)
-        if self.init_bias is not None:
-            model.bias = nn.Parameter(torch.Tensor(self.init_bias.values.T.copy()))
         self.model = model.to(self.device)
 
     def predict(self, x: Optional[Any] = None):

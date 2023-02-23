@@ -30,16 +30,14 @@ set_seed(args.seed)
 pprint(vars(args))
 
 # Load dataset
-dataset = CellTypeDeconvoDataset(data_dir=args.datadir, data_id=args.dataset)
-data = dataset.load_data()
-
 preprocessing_pipeline = DSTG.preprocessing_pipeline(
     n_pseudo=args.num_pseudo,
     n_top_genes=args.n_hvg,
     k_filter=args.k_filter,
     num_cc=args.num_cc,
 )
-preprocessing_pipeline(data)
+dataset = CellTypeDeconvoDataset(data_dir=args.datadir, data_id=args.dataset)
+data = dataset.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
 (adj, x), y = data.get_data(return_type="default")
 x, y = torch.FloatTensor(x), torch.FloatTensor(y.values)
