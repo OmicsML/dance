@@ -160,7 +160,7 @@ class BaseClassificationMethod(BaseMethod):
 
 class BaseRegressionMethod(BaseMethod):
 
-    _DEFAULT_METRIC = "rmse"
+    _DEFAULT_METRIC = "mse"
 
 
 class BaseClusteringMethod(BaseMethod):
