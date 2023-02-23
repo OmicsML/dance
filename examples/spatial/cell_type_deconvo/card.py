@@ -30,9 +30,8 @@ FilterGenesPercentile(min_val=1, max_val=99, mode="rv", log_level="INFO")(data)
 data.set_config(feature_channel=[None, "spatial"], feature_channel_type=["X", "obsm"],
                 label_channel="cell_type_portion")
 (x_count, x_spatial), y = data.get_data(split_name="test", return_type="numpy")
-# TODO: adapt card to use basis.T
 # TODO: use "auto"/None option for ct_select
-basis = data.get_feature(return_type="default", channel="CellTopicProfile", channel_type="varm").T
+basis = data.get_feature(return_type="default", channel="CellTopicProfile", channel_type="varm")
 
 model = Card(basis)
 pred = model.fit_and_predict(x_count, x_spatial, max_iter=args.max_iter, epsilon=args.epsilon,

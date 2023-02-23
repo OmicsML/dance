@@ -157,7 +157,7 @@ class Card:
 
         # Initialize the proportion matrix
         rng = np.random.default_rng(20200107)
-        Vint1 = rng.dirichlet(np.repeat(10, basis.shape[0], axis=0), x_norm.shape[0])
+        Vint1 = rng.dirichlet(np.repeat(10, basis.shape[1], axis=0), x_norm.shape[0])
         phi = [0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99]
 
         # scale the Xinput_norm and B to speed up the convergence.
@@ -168,9 +168,9 @@ class Card:
         ResList = {}
         Obj = np.array([])
         for iphi in range(len(phi)):
-            res = CARDref(Xinput=x_norm.T, U=b_mat.T, W=kernel_mat, phi=phi[iphi], max_iter=max_iter, epsilon=epsilon,
-                          V=Vint1, b=np.repeat(0, b_mat.T.shape[1]).reshape(b_mat.T.shape[1], 1), sigma_e2=0.1,
-                          Lambda=np.repeat(10, basis.shape[0]))
+            res = CARDref(Xinput=x_norm.T, U=b_mat, W=kernel_mat, phi=phi[iphi], max_iter=max_iter, epsilon=epsilon,
+                          V=Vint1, b=np.repeat(0, b_mat.shape[1]).reshape(b_mat.shape[1], 1), sigma_e2=0.1,
+                          Lambda=np.repeat(10, basis.shape[1]))
             ResList[str(iphi)] = res
             Obj = np.append(Obj, res["Obj"])
         self.Obj_hist = Obj
