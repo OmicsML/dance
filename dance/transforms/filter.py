@@ -143,6 +143,10 @@ class FilterGenesPercentile(BaseTransform):
     channel_type
         Type of channels specified. Only allow ``None`` (the default setting) or ``layers`` (when ``channel`` is
         specified).
+    whitelist_indicators
+        A list of (or a single) :obj:`.var` columns that indicates the genes to be excluded from the filtering process.
+        Note that these genes will still be used in the summary stats computation, and thus will still contribute to the
+        threshold percentile. If not set, then no genes will be excluded from the filtering process.
 
     """
 
@@ -157,6 +161,7 @@ class FilterGenesPercentile(BaseTransform):
         *,
         channel: Optional[str] = None,
         channel_type: Optional[str] = None,
+        whitelist_indicators: Optional[Union[str, List[str]]] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -172,10 +177,12 @@ class FilterGenesPercentile(BaseTransform):
         self.mode = mode
         self.channel = channel
         self.channel_type = channel_type
+        self.whitelist_indicators = whitelist_indicators
 
     def __call__(self, data):
         x = data.get_feature(return_type="default", channel=self.channel, channel_type=self.channel_type)
 
+        # Compute gene summary stats for filtering
         if self.mode == "sum":
             gene_summary = np.array(x.sum(0)).ravel()
         elif self.mode == "cv":
@@ -183,14 +190,32 @@ class FilterGenesPercentile(BaseTransform):
         else:
             raise DevError(f"{self.mode!r} not expected, please inform dev to fix this error.")
 
+        # Get whitelist genes to be excluded from the filtering process
+        whitelist_gene_set = set()
+        if self.whitelist_indicators is not None:
+            columns = self.whitelist_indicators
+            columns = columns if isinstance(columns, str) else columns
+            indicators = data.data.var[columns]
+            # Genes that satisfy any one of the whitelist conditions will be selected as whitelist genes
+            whitelist_gene_set.update(indicators[indicators.max(1)].index.tolist())
+
+        # Select genes to be filtered
         self.logger.info(f"Filtering genes based on {self.mode} expression percentiles in layer {self.channel!r}")
         percentile_lo = np.percentile(gene_summary, self.min_val)
         percentile_hi = np.percentile(gene_summary, self.max_val)
         mask = np.logical_and(gene_summary >= percentile_lo, gene_summary <= percentile_hi)
-        selected_genes = data.data.var_names[mask].tolist()
+        selected_genes = sorted(data.data.var_names[mask])
+
+        # Exclude whitelisted genes
+        if len(whitelist_gene_set) > 0:
+            orig_num_selected = len(selected_genes)
+            selected_genes = sorted(set(selected_genes) - whitelist_gene_set)
+            num_excluded = orig_num_selected - len(selected_genes)
+            self.logger.info(f"{num_excluded:,} genes originally selected for filtering excluded due to whitelist")
+
+        # Update data
         num_removed = mask.size - len(selected_genes)
         self.logger.info(f"{num_removed:,} genes removed ({percentile_lo=:.2e}, {percentile_hi=:.2e})")
-
         data.data._inplace_subset_var(selected_genes)
 
 
