@@ -12,10 +12,11 @@ import torch
 import torch.nn as nn
 from torch import optim
 
+from dance import logger
+from dance.modules.base import BaseRegressionMethod
 from dance.transforms import CellTopicProfile, Compose, SetConfig
-from dance.typing import LogLevel
+from dance.typing import Any, LogLevel, Optional
 from dance.utils import get_device
-from dance.utils.matrix import normalize
 
 
 class MSLELoss(nn.Module):
@@ -45,40 +46,28 @@ class MSLELoss(nn.Module):
         return loss
 
 
-class SpatialDecon:
+class SpatialDecon(BaseRegressionMethod):
     """SpatialDecon.
 
     Parameters
     ----------
-    sc_count : pd.DataFrame
-        Reference single cell RNA-seq counts data.
-    sc_annot : pd.DataFrame
-        Reference cell-type label information.
-    mix_count : pd.DataFrame
-        Target mixed-cell RNA-seq counts data to be deconvoluted.
-    ct_varname : str, optional
-        Name of the cell-types column.
-    ct_select : str, optional
+    ct_profile
+        Cell type characteristic profiles (cell-type x gene).
+    ct_select
         Selected cell-types to be considered for deconvolution.
-    sc_profile: numpy array optional
-        Pre-constructed cell profile matrix.
-    bias : boolean optional
+    bias
         Include bias term, default False.
-    init_bias: numpy array optional
-        Initial bias term (background estimate).
 
     """
 
-    def __init__(self, ct_select, sc_profile=None, bias=False, init_bias=None, device="auto"):
-        super().__init__()
-        self.device = get_device(device)
+    def __init__(self, ct_profile, ct_select, bias=False, device="auto"):
+        self.ct_profile = ct_profile
         self.ct_select = ct_select
         self.bias = bias
-        self.init_bias = init_bias
-        self.model = None
+        self.device = get_device(device)
 
     @staticmethod
-    def preprocessing_pipeline(ct_select, ct_profile_split: str = "ref", log_level: LogLevel = "INFO"):
+    def preprocessing_pipeline(ct_select: str = "auto", ct_profile_split: str = "ref", log_level: LogLevel = "INFO"):
         return Compose(
             CellTopicProfile(ct_select=ct_select, split_name="ref"),
             SetConfig({"label_channel": "cell_type_portion"}),
@@ -88,45 +77,47 @@ class SpatialDecon:
     def _init_model(self, num_cells: int, bias: bool = True):
         num_cell_types = len(self.ct_select)
         model = nn.Linear(in_features=num_cell_types, out_features=num_cells, bias=self.bias)
-        if self.init_bias is not None:
-            model.bias = nn.Parameter(torch.Tensor(self.init_bias.values.T.copy()))
         self.model = model.to(self.device)
 
-    def forward(self, x: torch.Tensor):
-        out = self.model(x)
-        return (out)
-
-    def predict(self):
+    def predict(self, x: Optional[Any] = None):
         """Return fiited parameters as cell-type portion predictions.
+
+        Parameters
+        ----------
+        x
+            Not used, for compatibility with the BaseRegressionMethod class.
 
         Returns
         -------
-        proportion_preds : torch.Tensor
+        proportion_preds
             Predictions of cell-type proportions (cell x cell-type).
 
         """
         weights = self.model.weight.clone().detach().cpu()
-        proportion_preds = normalize(weights, mode="normalize", axis=1)
-        return proportion_preds
+        return nn.functional.normalize(weights, dim=1, p=1)
 
-    def fit(self, x, ct_profile, lr=1e-4, max_iter=500, print_res=False, print_period=100):
+    def fit(
+        self,
+        x: torch.Tensor,
+        lr: float = 1e-4,
+        max_iter: int = 500,
+        print_period: int = 100,
+    ):
         """fit function for model training.
 
         Parameters
         ----------
         x
             Input expression matrix (cell x gene).
-        max_iter : int
-            Maximum number of iterations for optimizat.
-        lr : float
+        lr
             Learning rate.
-        print_res : bool optional
-            Indicates to print live training results, default False.
-        print_period : int optional
+        max_iter
+            Maximum number of iterations for optimizat.
+        print_period
             Indicates number of iterations until training results print.
 
         """
-        ref_ct_profile = ct_profile.to(self.device)
+        ref_ct_profile = self.ct_profile.to(self.device)
         mix_count = x.T.to(self.device)
         self._init_model(x.shape[0])
 
@@ -148,31 +139,4 @@ class SpatialDecon:
             with torch.no_grad():
                 self.model.weight.copy_(self.model.weight.data.clamp(min=0))
             if iteration % print_period == 0:
-                print(f"Epoch: {iteration:02}/{max_iter} Loss: {loss.item():.5e}")
-
-    def fit_and_predict(self, *args, **kwargs):
-        """Fit parameters and return cell-type portion predictions."""
-        self.fit(*args, **kwargs)
-        pred = self.predict()
-        return pred
-
-    def score(self, pred, true):
-        """Evaluate predictions.
-
-        Parameters
-        ----------
-        pred
-            Predicted cell-type proportions.
-        true
-            True cell-type proportions.
-
-        Returns
-        -------
-        loss : float
-            MSE loss between predicted and true cell-type proportions.
-
-        """
-        true = torch.FloatTensor(true).to(self.device)
-        pred = torch.FloatTensor(pred).to(self.device)
-        loss = nn.MSELoss()(pred, true)
-        return loss.item()
+                logger.info(f"Epoch: {iteration:02}/{max_iter} Loss: {loss.item():.5e}")

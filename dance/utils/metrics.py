@@ -3,7 +3,7 @@ import torch
 from networkx.algorithms import bipartite
 from scipy import sparse
 from sklearn.cluster import KMeans
-from sklearn.metrics import adjusted_rand_score
+from sklearn.metrics import adjusted_rand_score, mean_squared_error
 from sklearn.metrics.cluster import normalized_mutual_info_score
 
 from dance import logger
@@ -64,6 +64,17 @@ def ari(true: Union[torch.Tensor, np.ndarray], pred: Union[torch.Tensor, np.ndar
 
     """
     return adjusted_rand_score(true, pred)
+
+
+@register_metric_func("mse")
+@torch_to_numpy
+def mse(true: Union[torch.Tensor, np.ndarray], pred: Union[torch.Tensor, np.ndarray]) -> float:
+    """Mean squared error score.
+
+    See :func:`sklearn.metrics.mean_squared_error`
+
+    """
+    return mean_squared_error(true, pred)
 
 
 def get_bipartite_matching_adjacency_matrix_mk3(raw_logits, threshold_quantile=0.995, copy=False):

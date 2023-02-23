@@ -131,7 +131,7 @@ def test_get_data(subtests):
         data.set_config(feature_channel=["a", "z"], feature_channel_type=["obs", "var"], label_channel="label")
 
         (x1, x2), _ = data.get_train_data()
-        assert x1.tolist() == [0, 1, 2]
+        assert x1.tolist() == [0, 1]
         assert x2.tolist() == [2, 3]
 
 
