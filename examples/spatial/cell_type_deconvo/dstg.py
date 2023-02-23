@@ -41,17 +41,20 @@ preprocessing_pipeline = DSTG.preprocessing_pipeline(
 )
 preprocessing_pipeline(data)
 
-(x, adj), y = data.get_data(return_type="default")
+(adj, x), y = data.get_data(return_type="default")
 x, y = torch.FloatTensor(x), torch.FloatTensor(y.values)
 adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
                                torch.FloatTensor(adj.data.astype(np.int32)))
 train_mask = data.get_split_mask("pseudo", return_type="torch")
+inputs = (adj, x, train_mask)
 
 # Train and evaluate model
 model = DSTG(nhid=args.nhid, bias=args.bias, dropout=args.dropout, device=args.device)
-pred = model.fit_and_predict(x, adj, y, train_mask, lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
-mse = model.score(pred[data.test_idx], y[data.test_idx], "mse")
-print(f"mse = {mse:7.4f}")
+pred = model.fit_predict(inputs, y, lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
+
+test_mask = data.get_split_mask("test", return_type="torch")
+score = model.default_score_func(y[test_mask], pred[test_mask])
+print(f"MSE: {score:7.4f}")
 """To reproduce DSTG benchmarks, please refer to command lines belows:
 
 CARD synthetic

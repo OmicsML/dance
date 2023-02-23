@@ -18,10 +18,11 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn.parameter import Parameter
 
+from dance.modules.base import BaseRegressionMethod
 from dance.transforms import (AnnDataTransform, Compose, FilterGenesCommon, PseudoMixture, RemoveSplit, ScaleFeature,
                               SetConfig)
 from dance.transforms.graph import DSTGraph
-from dance.typing import LogLevel
+from dance.typing import Any, LogLevel, Optional, Tuple
 from dance.utils import get_device
 
 
@@ -133,7 +134,7 @@ class GCN(nn.Module):
         return x
 
 
-class DSTG:
+class DSTG(BaseRegressionMethod):
     """DSTG cell-type deconvolution model.
 
     Parameters
@@ -150,7 +151,6 @@ class DSTG:
     """
 
     def __init__(self, nhid=32, bias=False, dropout=0, device="cpu"):
-        super().__init__()
         self.nhid = nhid
         self.bias = bias
         self.dropout = dropout
@@ -176,8 +176,8 @@ class DSTG:
             ScaleFeature(split_names="ALL", mode="standardize"),
             DSTGraph(k_filter=k_filter, num_cc=num_cc, ref_split="pseudo", inf_split="test"),
             SetConfig({
-                "feature_channel": [None, "DSTGraph"],
-                "feature_channel_type": ["X", "obsp"],
+                "feature_channel": ["DSTGraph", None],
+                "feature_channel_type": ["obsp", "X"],
                 "label_channel": "cell_type_portion",
             }),
             log_level=log_level,
@@ -187,19 +187,22 @@ class DSTG:
         """Initialize GCN model."""
         self.model = GCN(dim_in, self.nhid, dim_out, self.bias, self.dropout).to(self.device)
 
-    def fit(self, x, adj, y, train_mask, lr=0.005, max_epochs=50, weight_decay=0):
+    def fit(
+        self,
+        inputs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        y: torch.Tensor,
+        lr: float = 0.005,
+        max_epochs: int = 50,
+        weight_decay: float = 0,
+    ):
         """Fit function for model training.
 
         Parameters
         ----------
-        x : torch.Tensor
-            Gene expression feature (spot x gene).
-        adj : torch.Tensor
-            Spot similarity graph.
+        inputs
+            A tuple containing (1) the DSTG adjacency matrix, (2) the gene expression feature matrix, (3) the
+            training mask indicating the training samples.
         y : torch.Tensor
-            Cell-type portions (spot x cell-type).
-        train_mask : torch.Tensor
-            Mask indicating which spots (rows) should be used for training.
         lr : float optional
             Learning rate.
         max_epochs : int optional
@@ -208,11 +211,12 @@ class DSTG:
             Weight decay parameter for optimization (Adam).
 
         """
+        adj, x, train_mask = inputs
         x = x.to(self.device)
         adj = adj.to(self.device)
         y = y.to(self.device)
         train_mask = train_mask.to(self.device)
-        self._init_model(x.shape[1], y.shape[1])
+        self.model = GCN(x.shape[1], self.nhid, y.shape[1], self.bias, self.dropout).to(self.device)
 
         model = self.model
         model.train()
@@ -234,8 +238,13 @@ class DSTG:
         model.eval()
         self.pred = F.softmax(self.model(x, adj), dim=-1)
 
-    def predict(self):
+    def predict(self, x: Optional[Any]):
         """Prediction function.
+
+        Parameters
+        ----------
+        x
+            Not used, for compatibility with the BaseRegressionMethod class.
 
         Returns
         -------
@@ -244,37 +253,6 @@ class DSTG:
 
         """
         return self.pred
-
-    def fit_and_predict(self, *args, **kwargs):
-        self.fit(*args, **kwargs)
-        return self.predict()
-
-    def score(self, pred, true_prop, score_metric="ce"):
-        """Model performance score.
-
-        Parameters
-        ----------
-        pred
-            Predicted cell-type proportions.
-        true_prop
-            True cell-type proportions.
-        score_metric
-            Metric used to assess prediction performance.
-
-        Returns
-        -------
-        loss : float
-            Loss between predicted and true labels.
-
-        """
-        true_prop = true_prop.to(self.device)
-        self.model.eval()
-        if score_metric == "ce":
-            loss = F.cross_entropy(pred, true_prop)
-        elif score_metric == "mse":
-            loss = ((pred / torch.sum(pred, 1, keepdims=True) -
-                     true_prop / torch.sum(true_prop, 1, keepdims=True))**2).mean()
-        return loss.detach().item()
 
 
 def dropout_layer(x, dropout):
