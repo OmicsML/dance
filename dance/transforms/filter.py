@@ -180,6 +180,24 @@ class FilterGenesPercentile(BaseTransform):
 
 
 class FilterGenesMarker(BaseTransform):
+    """Select marker genes based on log fold-change.
+
+    Parameters
+    ----------
+    ct_profile_channel
+        Name of the ``.varm`` channel that contains the cell-topic profile which will be used to compute the log
+        fold-changes for each cell-topic (e.g., cell type).
+    subset
+        If set to :obj:`True`, then inplace subset the variables to only contain the markers.
+    label
+        If set, e.g., to :obj:`'marker'`, then save the marker indicator to the :obj:`.obs` column named as
+        :obj:`marker`.
+    threshold
+        Threshold value of the log fol-change above which the gene will be considered as a marker.
+    eps
+        A small value that prevents taking log of zeros.
+
+    """
 
     _DISPLAY_ATTRS = ("ct_profile_channel", "subset", "threshold", "eps")
 
@@ -188,6 +206,7 @@ class FilterGenesMarker(BaseTransform):
         *,
         ct_profile_channel: str = "CellTopicProfile",
         subset: bool = True,
+        label: Optional[str] = None,
         threshold: float = 1.25,
         eps: float = 1e-6,
         **kwargs,
@@ -195,6 +214,7 @@ class FilterGenesMarker(BaseTransform):
         super().__init__(**kwargs)
         self.ct_profile_channel = ct_profile_channel
         self.subset = subset
+        self.label = label
         self.threshold = threshold
         self.eps = eps
 
