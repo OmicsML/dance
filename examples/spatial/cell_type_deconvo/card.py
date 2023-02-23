@@ -20,17 +20,16 @@ data = dataset.load_data()
 preprocessing_pipeline = Card.preprocessing_pipeline()
 preprocessing_pipeline(data)
 
-(x_count, x_spatial), y = data.get_data(split_name="test", return_type="numpy")
+# inputs: x_count, x_spatial
+inputs, y = data.get_data(split_name="test", return_type="numpy")
 basis = data.get_feature(return_type="default", channel="CellTopicProfile", channel_type="varm")
 
 model = Card(basis)
-pred = model.fit_and_predict(x_count, x_spatial, max_iter=args.max_iter, epsilon=args.epsilon,
-                             location_free=args.location_free)
-mse = model.score(pred, y)
-
-print(f"Predicted cell-type proportions of  sample 1: {pred[0].round(3)}")
-print(f"True cell-type proportions of  sample 1: {y[0].round(3)}")
-print(f"mse = {mse:7.4f}")
+score, pred = model.fit_score(inputs, y, max_iter=args.max_iter, epsilon=args.epsilon, location_free=args.location_free,
+                              return_pred=True)
+print(f"Predicted cell-type proportions of sample 1: {pred[0].round(3)}")
+print(f"True cell-type proportions of sample 1: {y[0].round(3)}")
+print(f"MSE: {score:7.4f}")
 """To reproduce CARD benchmarks, please refer to command lines belows:
 
 CARD synthetic

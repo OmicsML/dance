@@ -12,9 +12,10 @@ import numpy as np
 import pandas as pd
 
 from dance import logger
+from dance.modules.base import BaseRegressionMethod
 from dance.transforms import (CellTopicProfile, Compose, FilterGenesCommon, FilterGenesMarker, FilterGenesMatch,
                               FilterGenesPercentile, SetConfig)
-from dance.typing import LogLevel
+from dance.typing import Any, LogLevel, Optional, Tuple
 from dance.utils.matrix import normalize, pairwise_distance
 
 
@@ -108,7 +109,7 @@ def CARDref(Xinput, U, W, phi, max_iter, epsilon, V, b, sigma_e2, Lambda):
     return pred, obj
 
 
-class Card:
+class Card(BaseRegressionMethod):
     """The CARD cell-type deconvolution model.
 
     Parameters
@@ -139,26 +140,36 @@ class Card:
             log_level=log_level,
         )
 
-    def fit(self, x, spatial, max_iter=100, epsilon=1e-4, sigma=0.1, location_free: bool = False):
+    def fit(
+        self,
+        inputs: Tuple[np.ndarray, np.ndarray],
+        y: Optional[Any] = None,
+        max_iter: int = 100,
+        epsilon: float = 1e-4,
+        sigma: float = 0.1,
+        location_free: bool = False,
+    ):
         """Fit function for model training.
 
         Parameters
         ----------
-        x : np.ndarray
-            Target spatial RNA-seq counts data to be deconvoluted.
-        spatial : np.ndarray
-            2-D array of the spatial locations of each spot (spots x 2). If all zeros, then do not use spatial info.
-        max_iter : int
+        inputs
+            A tuple containing (1) the input features encoding the scRNA-seq counts to be deconvoluted, and (2) a 2-d
+            array of spatial location of each spot (spots x 2). If the spatial location information is all zero, or the
+            ``location_free`` option is set to :obj:`True`, then do not use the spatial location information.
+        y
+            Not used, for compatibility with the BaseRegressionMethod class.
+        max_iter
             Maximum number of iterations for optimization.
-        epsilon : float
+        epsilon
             Optimization threshold.
-        sigma : float
+        sigma
             Spatial gaussian kernel scaling factor.
         location_free
             Do not use spatial location info if set to True.
 
         """
-        basis = self.basis.values.copy()
+        x, spatial = inputs
         x_norm = normalize(x, axis=1, mode="normalize")
 
         # Spatial location
@@ -172,14 +183,15 @@ class Card:
             kernel_mat = np.exp(-euclidean_distances**2 / (2 * sigma**2))
             np.fill_diagonal(kernel_mat, 0)
 
+        # Scale the Xinput_norm and B to speed up the convergence.
+        basis = self.basis.values.copy()
+        x_norm = x_norm * 0.1 / x_norm.sum()
+        b_mat = basis * 0.1 / basis.mean()
+
         # Initialize the proportion matrix
         rng = np.random.default_rng(20200107)
         Vint1 = rng.dirichlet(np.repeat(10, basis.shape[1], axis=0), x_norm.shape[0])
         phi = [0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99]
-
-        # Scale the Xinput_norm and B to speed up the convergence.
-        x_norm = x_norm * 0.1 / x_norm.sum()
-        b_mat = basis * 0.1 / basis.mean()
 
         # Optimization
         for iphi in range(len(phi)):
@@ -192,8 +204,13 @@ class Card:
                 self.best_phi = phi
         logger.info("Deconvolution finished")
 
-    def predict(self):
+    def predict(self, x: Optional[Any] = None) -> np.ndarray:
         """Prediction function.
+
+        Parameters
+        ----------
+        x
+            Not used, for compatibility with the BaseRegressionMethod class.
 
         Returns
         -------
@@ -202,27 +219,3 @@ class Card:
 
         """
         return self.res
-
-    def fit_and_predict(self, x, spatial, **kwargs):
-        self.fit(x, spatial, **kwargs)
-        return self.predict()
-
-    @staticmethod
-    def score(x, y):
-        """Model performance score measured by mean square error.
-
-        Parameters
-        ----------
-        x : np.ndarray
-            Predicted cell-type proportion matrix (# spots x # cell-types)
-        y : np.ndarray
-            True cell-type proportion matrix (# spots x # cell-types)
-
-        Returns
-        -------
-        float
-            Mean square error.
-
-        """
-        mse = ((x - y / y.sum(1, keepdims=True))**2).mean()
-        return mse
