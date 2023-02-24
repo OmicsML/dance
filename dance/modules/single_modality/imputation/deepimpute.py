@@ -24,6 +24,9 @@ import torch.optim as optim
 from sklearn.metrics import adjusted_rand_score
 from torch.utils.data import DataLoader, Dataset
 
+from dance.modules.base import BaseRegressionMethod
+from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig, CellwiseMaskData
+from dance.typing import Any, List, LogLevel, Optional, Tuple
 
 class NeuralNetworkModel(nn.Module):
     """ model class.
@@ -51,7 +54,7 @@ class NeuralNetworkModel(nn.Module):
         return (x)
 
 
-class DeepImpute():
+class DeepImpute(nn.Module, BaseRegressionMethod):
     """DeepImpute class.
     Parameters
     ----------
@@ -112,22 +115,57 @@ class DeepImpute():
         self.policy = policy
         self.seed = seed
         self.batch_size = batch_size
-        self.X_train = dl_params.X_train
-        self.Y_train = dl_params.Y_train
-        self.X_test = dl_params.X_test
-        self.Y_test = dl_params.Y_test
-        self.targetgenes = dl_params.targetgenes
-        self.inputgenes = dl_params.inputgenes
-        self.total_counts = dl_params.total_counts
-        self.true_counts = dl_params.true_counts
-        self.genes_to_impute = dl_params.genes_to_impute
-        self.prj_path = Path(
-            __file__).parent.resolve().parent.resolve().parent.resolve().parent.resolve().parent.resolve()
-        self.save_path = self.prj_path / 'example' / 'single_modality' / 'imputation' / 'pretrained' / dl_params.train_dataset / 'models'
+        # self.X_train = dl_params.X_train
+        # self.Y_train = dl_params.Y_train
+        # self.X_test = dl_params.X_test
+        # self.Y_test = dl_params.Y_test
+        # self.targetgenes = dl_params.targetgenes
+        # self.inputgenes = dl_params.inputgenes
+        # self.total_counts = dl_params.total_counts
+        # self.true_counts = dl_params.true_counts
+        # self.genes_to_impute = dl_params.genes_to_impute
+        self.prj_path = Path(__file__).parent.resolve()
+        self.save_path = self.prj_path / "deepimpute" / dataset / "models"
         if not self.save_path.exists():
             self.save_path.mkdir(parents=True)
         self.dl_params = dl_params
         self.device = torch.device('cuda' if self.gpu != -1 and torch.cuda.is_available() else 'cpu')
+    
+    @staticmethod
+    def preprocessing_pipeline(mask: bool = True, distr: str = "exp", mask_rate: float = 0.1, seed: int = 1, log_level: LogLevel = "INFO"):
+        
+        transforms = [
+            AnnDataTransform(sc.pp.filter_genes, min_counts=1),
+            AnnDataTransform(sc.pp.filter_cells, min_counts=1),
+            SaveRaw(),
+            AnnDataTransform(sc.pp.normalize_total),
+            AnnDataTransform(sc.pp.log1p),
+        ]
+        if mask:
+            transforms.extend([
+                CellwiseMaskData(distr=distr, mask_rate=mask_rate, seed=seed),
+                SetConfig({
+                    "feature_channel": [None, None, "n_counts", "train_mask"],
+                    "feature_channel_type": ["X", "raw_X", "obs", "layers"],
+                    "label_channel": [None, None], 
+                    "label_channel_type": ["X", "raw_X"], 
+                })
+            ])
+        else:
+            transforms.extend([
+                SetConfig({
+                    "feature_channel": [None, None, "n_counts"],
+                    "feature_channel_type": ["X", "raw_X", "obs"],
+                    "label_channel": [None, None], 
+                    "label_channel_type": ["X", "raw_X"], 
+                })
+            ])
+            
+        return Compose(*transforms, log_level=log_level)
+    
+    def init_model(self, mask):
+        if mask is not None:
+            return 0
 
     def loadDefaultArchitecture(self):
         """load default model architecture.
@@ -204,7 +242,7 @@ class DeepImpute():
 
         return models
 
-    def fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, inputgenes=None):
+    def fit(self, X_train, Y_train, X_test, Y_test, inputgenes=None):
         """Train model.
         Parameters
         ----------
@@ -295,7 +333,7 @@ class DeepImpute():
         model_string = 'model_' + str(i)
         opt_string = 'optimizer_' + str(i)
         state = {model_string: model.state_dict(), opt_string: optimizer.state_dict()}
-        torch.save(state, self.save_path / f"{self.dl_params.train_dataset}_{i}.pt")
+        torch.save(state, self.save_path / f"{self.dl_params.dataset}_{i}.pt")
 
     def load_model(self, model, i):
         """load model.
@@ -312,7 +350,7 @@ class DeepImpute():
             loaded model
         """
 
-        model_path = self.save_path / f"{self.dl_params.train_dataset}_{i}.pt"
+        model_path = self.save_path / f"{self.dl_params.dataset}_{i}.pt"
         state = torch.load(model_path, map_location=self.device)
         model_string = 'model_' + str(i)
         model.load_state_dict(state[model_string])

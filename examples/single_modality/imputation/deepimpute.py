@@ -5,6 +5,7 @@ import tempfile
 import numpy as np
 import torch
 
+from dance.utils import set_seed
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.deepimpute import DeepImpute
 
@@ -35,8 +36,7 @@ if __name__ == '__main__':
     parser.add_argument("--save_dir", type=str, default='result', help='save directory')
     parser.add_argument("--filetype", type=str, default='h5', choices=['csv', 'gz', 'h5'],
                         help='data file type, csv, csv.gz, or h5')
-    parser.add_argument("--train_dataset", default='mouse_brain_data', type=str, help="dataset id")
-    parser.add_argument("--test_dataset", default='pbmc_data', type=str, help="dataset id")
+    parser.add_argument("--dataset", default='mouse_brain_data', type=str, help="dataset id")
     parser.add_argument("--hiddem_dim", type=float, default=256, help="number of neurons in the dense layer")
     parser.add_argument("--minVMR", type=float, default=0.5, help="Minimum variance to mean ratio.")
     parser.add_argument("--ntop", type=int, default=5, help="Number of predictors.")
@@ -45,30 +45,25 @@ if __name__ == '__main__':
     parser.add_argument("--n_pred", type=float, default=None, help="Number of predictors for covariance.")
     parser.add_argument("--mode", type=str, default='random',
                         help='Mode for setting gene targets: - progressive or random')
-
+    parser.add_argument("--train_size", type=float, default=0.9, help="proportion of testing set")
+    parser.add_argument("--mask_rate", type=float, default=.1, help="Masking rate.")
+    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
+    parser.add_argument("--mask", action="store_true", help="Mask data for validation.")
     # parser.add_argument("--genes_to_impute", type=)
     params = parser.parse_args()
     print(vars(params))
     params.genes_to_impute = None
+    set_seed(params.random_seed)
 
-    dataloader = ImputationDataset(
-        random_seed=params.random_seed,
-        gpu=params.gpu,
-        # evaluate = params.evaluate,
-        data_dir=params.data_dir,
-        train_dataset='pbmc_data',
-        test_dataset=params.test_dataset,
-        filetype='h5')
-    dataloader.download_all_data()
-    # dataloader.download_pretrained_data()
+    dataloader = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset, train_size=params.train_size)
+    preprocessing_pipeline = DeepImpute.preprocessing_pipeline(mask=params.mask, seed=params.random_seed, 
+                                                               mask_rate=params.mask_rate)
+    data = dataloader.load_data(transform=preprocessing_pipeline, cache=params.cache)
+    # dataloader.download_all_data()
+    # # dataloader.download_pretrained_data()
 
-    random.seed(params.random_seed)
-    np.random.seed(params.random_seed)
-    torch.manual_seed(params.random_seed)
-    torch.cuda.manual_seed(params.random_seed)
-
-    dataloader.load_data(params, model='DeepImpute')
-    dl_params = dataloader.params
+    # dataloader.load_data(params, model='DeepImpute')
+    # dl_params = dataloader.params
 
     model = DeepImpute(
         dl_params,

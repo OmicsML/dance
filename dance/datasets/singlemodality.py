@@ -7,6 +7,7 @@ import shutil
 import sys
 from dataclasses import dataclass
 
+import scanpy as sc
 import anndata as ad
 import h5py
 import numpy as np
@@ -25,7 +26,7 @@ from dance.utils.preprocess import cell_label_to_df
 @register_dataset("scdeepsort")
 class ScDeepSortDataset(BaseDataset):
 
-    _DISPLAY_ATTRS = ("species", "tissue", "train_dataset", "test_dataset")
+    _DISPLAY_ATTRS = ("species", "tissue", "dataset", "test_dataset")
     ALL_URL_DICT: Dict[str, str] = {
         "train_human_cell_atlas":   "https://www.dropbox.com/s/1itq1pokplbqxhx?dl=1",
         "test_human_test_data":     "https://www.dropbox.com/s/gpxjnnvwyblv3xb?dl=1",
@@ -52,12 +53,12 @@ class ScDeepSortDataset(BaseDataset):
         "test_mouse_Kidney203_data.csv":        "https://www.dropbox.com/s/kmos1ceubumgmpj?dl=1",
     }  # yapf: disable
 
-    def __init__(self, full_download=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
+    def __init__(self, full_download=False, dataset=None, test_dataset=None, species=None, tissue=None,
                  train_dir="train", test_dir="test", map_path="map", data_dir="./"):
         super().__init__(data_dir, full_download)
 
         self.data_dir = data_dir
-        self.train_dataset = train_dataset
+        self.dataset = dataset
         self.test_dataset = test_dataset
         self.species = species
         self.tissue = tissue
@@ -138,7 +139,7 @@ class ScDeepSortDataset(BaseDataset):
     def _load_raw_data(self, ct_col: str = "Cell_type") -> Tuple[ad.AnnData, List[Set[str]], List[str], int]:
         species = self.species
         tissue = self.tissue
-        train_dataset_ids = self.train_dataset
+        dataset_ids = self.dataset
         test_dataset_ids = self.test_dataset
         data_dir = self.data_dir
         train_dir = osp.join(data_dir, self.train_dir)
@@ -146,7 +147,7 @@ class ScDeepSortDataset(BaseDataset):
         map_path = osp.join(data_dir, self.map_path, self.species)
 
         # Load raw data
-        train_feat_paths, train_label_paths = self._get_data_paths(train_dir, species, tissue, train_dataset_ids)
+        train_feat_paths, train_label_paths = self._get_data_paths(train_dir, species, tissue, dataset_ids)
         test_feat_paths, test_label_paths = self._get_data_paths(test_dir, species, tissue, test_dataset_ids)
         train_feat, test_feat = (self._load_dfs(paths, transpose=True) for paths in (train_feat_paths, test_feat_paths))
         train_label, test_label = (self._load_dfs(paths) for paths in (train_label_paths, test_label_paths))
@@ -283,23 +284,36 @@ class ClusteringDataset(BaseDataset):
 @register_dataset("imputation")
 class ImputationDataset(BaseDataset):
 
-    def __init__(self, filetype=None, data_dir="data", train_dataset="human_stemcell", test_dataset="pbmc"):
+    URL = {
+        "pbmc_data": "https://www.dropbox.com/s/brj3orsjbhnhawa/5k.zip?dl=0",
+        "mouse_embryo_data": "https://www.dropbox.com/s/8ftx1bydoy7kn6p/GSE65525.zip?dl=0",
+        "mouse_brain_data": "https://www.dropbox.com/s/zzpotaayy2i29hk/neuron_10k.zip?dl=0",
+        "human_stemcell_data": "https://www.dropbox.com/s/g2qua2j3rqcngn6/GSE75748.zip?dl=0"
+    }
 
+    DATASET_TO_FILE = {
+        "pbmc_data": "5k_pbmc_protein_v3_filtered_feature_bc_matrix.h5",
+        "mouse_embryo_data":
+            list(
+                map(lambda x: "GSE65525/" + x, [
+                    "GSM1599494_ES_d0_main.csv", "GSM1599497_ES_d2_LIFminus.csv", "GSM1599498_ES_d4_LIFminus.csv",
+                    "GSM1599499_ES_d7_LIFminus.csv"
+                ])),
+        "mouse_brain_data": "neuron_10k_v3_filtered_feature_bc_matrix.h5",
+        "human_stemcell_data": "GSE75748/GSE75748_sc_time_course_ec.csv.gz"
+    }
+
+    def __init__(self, data_dir="data", dataset="human_stemcell", train_size=0.1):
+        super().__init__(data_dir, full_download=False)
         self.data_dir = data_dir
-        self.train_dataset = train_dataset
-        self.test_dataset = test_dataset
-        self.filetype = filetype
+        self.dataset = dataset
+        self.train_size = train_size
 
     def download(self):
 
         gene_class = ["pbmc_data", "mouse_brain_data", "mouse_embryo_data", "human_stemcell_data"]
 
-        url = {
-            "pbmc_data": "https://www.dropbox.com/s/brj3orsjbhnhawa/5k.zip?dl=0",
-            "mouse_embryo_data": "https://www.dropbox.com/s/8ftx1bydoy7kn6p/GSE65525.zip?dl=0",
-            "mouse_brain_data": "https://www.dropbox.com/s/zzpotaayy2i29hk/neuron_10k.zip?dl=0",
-            "human_stemcell_data": "https://www.dropbox.com/s/g2qua2j3rqcngn6/GSE75748.zip?dl=0"
-        }
+        
 
         file_name = {
             "pbmc_data": "5k.zip?dl=0",
@@ -315,18 +329,7 @@ class ImputationDataset(BaseDataset):
             "human_stemcell_data": "GSE75748"
         }
 
-        dataset_to_file = {
-            "pbmc_data": "5k_pbmc_protein_v3_filtered_feature_bc_matrix.h5",
-            "mouse_embryo_data":
-                list(
-                    map(lambda x: "GSE65525/" + x, [
-                        "GSM1599494_ES_d0_main.csv", "GSM1599497_ES_d2_LIFminus.csv", "GSM1599498_ES_d4_LIFminus.csv",
-                        "GSM1599499_ES_d7_LIFminus.csv"
-                    ])),
-            "mouse_brain_data": "neuron_10k_v3_filtered_feature_bc_matrix.h5",
-            "human_stemcell_data": "GSE75748/GSE75748_sc_time_course_ec.csv.gz"
-        }
-        self.dataset_to_file = dataset_to_file
+        
         if sys.platform != 'win32':
             if not osp.exists(self.data_dir):
                 os.system("mkdir " + self.data_dir)
@@ -340,7 +343,7 @@ class ImputationDataset(BaseDataset):
                                 glob.glob(self.data_dir + "/train/" + class_name + "/" +
                                           dl_files[class_name])))):
                     os.system("mkdir " + self.data_dir + "/train/" + class_name)
-                    os.system("wget " + url[class_name])  # assumes linux... mac needs to install
+                    os.system("wget " + self.URL[class_name])  # assumes linux... mac needs to install
                     os.system("unzip " + file_name[class_name])
                     os.system("rm " + file_name[class_name])
                     os.system("mv " + dl_files[class_name] + " " + self.data_dir + "/train/" + class_name + "/")
@@ -357,7 +360,7 @@ class ImputationDataset(BaseDataset):
                                 glob.glob(self.data_dir + "/train/" + class_name + "/" +
                                           dl_files[class_name])))):
                     os.mkdir(self.data_dir + "/train/" + class_name)
-                    os.system("curl " + url[class_name])
+                    os.system("curl " + self.URL[class_name])
                     os.system("tar -xf " + file_name[class_name])
                     os.system("del -R " + file_name[class_name])
                     os.system("move " + dl_files[class_name] + " " + self.data_dir + "/train/" + class_name +
@@ -378,14 +381,14 @@ class ImputationDataset(BaseDataset):
         return True
     
     def _load_raw_data(self) -> ad.AnnData:
-        if self.train_dataset == 'mouse_embryo' or self.train_dataset == 'mouse_embryo_data':
-            if self.train_dataset[-5:] != '_data':
-                train_dataset = self.train_dataset + '_data'
+        if self.dataset == 'mouse_embryo' or self.dataset == 'mouse_embryo_data':
+            if self.dataset[-5:] != '_data':
+                dataset = self.dataset + '_data'
             else:
-                train_dataset = self.train_dataset
-            for i in range(len(self.dataset_to_file[train_dataset])):
-                fname = self.dataset_to_file[train_dataset][i]
-                data_path = f'{self.data_dir}/train/{train_dataset}/{fname}'
+                dataset = self.dataset
+            for i in range(len(self.DATASET_TO_FILE[dataset])):
+                fname = self.DATASET_TO_FILE[dataset][i]
+                data_path = f'{self.data_dir}/train/{dataset}/{fname}'
                 if i == 0:
                     counts = pd.read_csv(data_path, header=None, index_col=0)
                     time = pd.Series(np.zeros(counts.shape[1]))
@@ -402,15 +405,15 @@ class ImputationDataset(BaseDataset):
             adata.var_names = counts.columns.tolist()
             adata.obs['time'] = time.to_numpy()
         else:
-            if self.train_dataset[-5:] != '_data':
-                train_dataset = self.train_dataset + '_data'
+            if self.dataset[-5:] != '_data':
+                dataset = self.dataset + '_data'
             else:
-                train_dataset = self.train_dataset
-            data_path = f'{self.data_dir}/train/{train_dataset}/{self.dataset_to_file[train_dataset]}'
+                dataset = self.dataset
+            data_path = f'{self.data_dir}/train/{dataset}/{self.DATASET_TO_FILE[dataset]}'
             if not os.path.exists(data_path):
                 raise NotImplementedError
 
-            if self.filetype == 'csv' or self.dataset_to_file[train_dataset][-3:] == 'csv':
+            if self.DATASET_TO_FILE[dataset][-3:] == 'csv':
                 counts = pd.read_csv(data_path, index_col=0, header=None)
                 counts = counts[counts.sum(axis=1) != 0]
                 counts = counts.T
@@ -418,7 +421,7 @@ class ImputationDataset(BaseDataset):
                 # adata.obs_names = ["%d"%i for i in range(adata.shape[0])]
                 adata.obs_names = counts.index.tolist()
                 adata.var_names = counts.columns.tolist()
-            if self.filetype == 'gz' or self.dataset_to_file[train_dataset][-2:] == 'gz':
+            if self.DATASET_TO_FILE[dataset][-2:] == 'gz':
                 counts = pd.read_csv(data_path, index_col=0, compression='gzip', header=0)
                 counts = counts[counts.sum(axis=1) != 0]
                 counts = counts.T
@@ -426,13 +429,13 @@ class ImputationDataset(BaseDataset):
                 # adata.obs_names = ["%d" % i for i in range(adata.shape[0])]
                 adata.obs_names = counts.index.tolist()
                 adata.var_names = counts.columns.tolist()
-            elif self.filetype == 'h5' or self.dataset_to_file[train_dataset][-2:] == 'h5':
-                adata = ad.read_10x_h5(data_path)
+            elif self.DATASET_TO_FILE[dataset][-2:] == 'h5':
+                adata = sc.read_10x_h5(data_path)
                 adata.var_names_make_unique()
 
         return adata
 
     def _raw_to_dance(self, raw_data: ad.AnnData):
         adata = raw_data
-        data = Data(adata, train_size="all")
+        data = Data(adata, train_size=int(adata.n_obs * self.train_size))
         return data

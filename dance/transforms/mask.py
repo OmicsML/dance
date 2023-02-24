@@ -114,9 +114,5 @@ class MaskData(BaseTransform):
         
         data.data.layers["train_mask"] = trainMask
         data.data.layers["valid_mask"] = ~trainMask
-        # data.data.layers["X"] = feat[row[train_data_idx], col[train_data_idx]]
-        # data.data.layers["X_raw"] = feat_raw[row[train_data_idx], col[train_data_idx]]
-        # data.data.layers["label"] = feat[row[valid_data_idx], col[valid_data_idx]]
-        # data.data.layers["label_raw"] = feat_raw[row[valid_data_idx], col[valid_data_idx]]
 
         return data
