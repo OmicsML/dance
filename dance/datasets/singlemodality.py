@@ -12,6 +12,7 @@ import anndata as ad
 import h5py
 import numpy as np
 import pandas as pd
+from scipy.sparse import csr_matrix
 
 from dance import logger
 from dance.data import Data
@@ -381,11 +382,12 @@ class ImputationDataset(BaseDataset):
         return True
     
     def _load_raw_data(self) -> ad.AnnData:
+        if self.dataset[-5:] != '_data':
+            dataset = self.dataset + '_data'
+        else:
+            dataset = self.dataset
+
         if self.dataset == 'mouse_embryo' or self.dataset == 'mouse_embryo_data':
-            if self.dataset[-5:] != '_data':
-                dataset = self.dataset + '_data'
-            else:
-                dataset = self.dataset
             for i in range(len(self.DATASET_TO_FILE[dataset])):
                 fname = self.DATASET_TO_FILE[dataset][i]
                 data_path = f'{self.data_dir}/train/{dataset}/{fname}'
@@ -398,34 +400,27 @@ class ImputationDataset(BaseDataset):
                     counts = pd.concat([counts, x], axis=1)
             time = pd.DataFrame(time)
             time.columns = ['time']
-            counts = counts[counts.sum(axis=1) != 0]
             counts = counts.T
             counts.index = [i for i in range(counts.shape[0])]
-            adata = ad.AnnData(counts.values)
+            adata = ad.AnnData(csr_matrix(counts.values))
             adata.var_names = counts.columns.tolist()
             adata.obs['time'] = time.to_numpy()
         else:
-            if self.dataset[-5:] != '_data':
-                dataset = self.dataset + '_data'
-            else:
-                dataset = self.dataset
             data_path = f'{self.data_dir}/train/{dataset}/{self.DATASET_TO_FILE[dataset]}'
             if not os.path.exists(data_path):
                 raise NotImplementedError
 
             if self.DATASET_TO_FILE[dataset][-3:] == 'csv':
                 counts = pd.read_csv(data_path, index_col=0, header=None)
-                counts = counts[counts.sum(axis=1) != 0]
                 counts = counts.T
-                adata = ad.AnnData(counts.values)
+                adata = ad.AnnData(csr_matrix(counts.values))
                 # adata.obs_names = ["%d"%i for i in range(adata.shape[0])]
                 adata.obs_names = counts.index.tolist()
                 adata.var_names = counts.columns.tolist()
             if self.DATASET_TO_FILE[dataset][-2:] == 'gz':
                 counts = pd.read_csv(data_path, index_col=0, compression='gzip', header=0)
-                counts = counts[counts.sum(axis=1) != 0]
                 counts = counts.T
-                adata = ad.AnnData(counts.values)
+                adata = ad.AnnData(csr_matrix(counts.values))
                 # adata.obs_names = ["%d" % i for i in range(adata.shape[0])]
                 adata.obs_names = counts.index.tolist()
                 adata.var_names = counts.columns.tolist()

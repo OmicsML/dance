@@ -9,6 +9,7 @@ from dance.transforms.scn_feature import SCNFeature
 from dance.transforms.spatial_feature import MorphologyFeature, SMEFeature
 from dance.transforms.stats import GeneStats
 from dance.transforms.mask import CellwiseMaskData, MaskData
+from dance.transforms.gene_holdout import GeneHoldout
 
 __all__ = [
     "AnnDataTransform",
@@ -31,5 +32,6 @@ __all__ = [
     "WeightedFeaturePCA",
     "graph",
     "CellwiseMaskData",
-    "MaskData"
+    "MaskData",
+    "GeneHoldout",
 ]  # yapf: disable

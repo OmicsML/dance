@@ -39,8 +39,7 @@ class CellwiseMaskData(BaseTransform):
 
     def __call__(self, data):
         rng = np.random.default_rng(self.seed)
-        feat = data.get_feature(return_type="default")
-        feat_raw = data.get_feature(return_type="default", channel_type="raw_X")
+        feat = data.get_feature(return_type="numpy")
         trainMask = np.ones_like(feat).astype(bool)
         for c in range(feat.shape[0]):
             cells_c = feat[c, :]
@@ -95,7 +94,6 @@ class MaskData(BaseTransform):
     def __call__(self, data):
         rng = np.random.default_rng(self.seed)
         feat = data.get_feature(return_type="default")
-        feat_raw = data.get_feature(return_type="default", channel_type="raw_X")
         trainMask = np.ones_like(feat).astype(bool)
 
         row, col = np.nonzero(feat)

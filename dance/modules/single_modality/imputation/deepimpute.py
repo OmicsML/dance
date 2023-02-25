@@ -25,7 +25,7 @@ from sklearn.metrics import adjusted_rand_score
 from torch.utils.data import DataLoader, Dataset
 
 from dance.modules.base import BaseRegressionMethod
-from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig, CellwiseMaskData
+from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig, CellwiseMaskData, GeneHoldout
 from dance.typing import Any, List, LogLevel, Optional, Tuple
 
 class NeuralNetworkModel(nn.Module):
@@ -58,8 +58,6 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
     """DeepImpute class.
     Parameters
     ----------
-    dl_params :
-        parameters including input information
     learning_rate : float optional
         learning rate
     batch_size : int optional
@@ -95,58 +93,39 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         imputation policy
     """
 
-    def __init__(self, dl_params, learning_rate=1e-5, batch_size=64, max_epochs=500, patience=5, gpu=-1, loss="wMSE",
-                 output_prefix=tempfile.mkdtemp(), sub_outputdim=512, hidden_dim=None, verbose=1, seed=1234,
-                 architecture=None, imputed_only=False, policy='restore'):
-        self.NN_parameters = {
-            "learning_rate": learning_rate,
-            "batch_size": batch_size,
-            "loss": loss,
-            "architecture": architecture,
-            "max_epochs": max_epochs,
-            "patience": patience
-        }
-        self.gpu = gpu
-        self.sub_outputdim = sub_outputdim
-        self.hidden_dim = hidden_dim
-        self.outputdir = output_prefix
-        self.verbose = verbose
-        self.imputed_only = imputed_only
-        self.policy = policy
+    def __init__(self, predictors, targets, sub_outputdim=512, hidden_dim=256, dropout=0.2, seed=1, gpu=-1):
+        super().__init__()
         self.seed = seed
-        self.batch_size = batch_size
-        # self.X_train = dl_params.X_train
-        # self.Y_train = dl_params.Y_train
-        # self.X_test = dl_params.X_test
-        # self.Y_test = dl_params.Y_test
-        # self.targetgenes = dl_params.targetgenes
-        # self.inputgenes = dl_params.inputgenes
-        # self.total_counts = dl_params.total_counts
-        # self.true_counts = dl_params.true_counts
-        # self.genes_to_impute = dl_params.genes_to_impute
+        self.predictors = predictors
+        self.targets = targets
+        self.sub_outputdim = sub_outputdim
+        self.dropout = dropout
+        self.hidden_dim = hidden_dim
         self.prj_path = Path(__file__).parent.resolve()
-        self.save_path = self.prj_path / "deepimpute" / dataset / "models"
+        self.save_path = self.prj_path / "deepimpute"
         if not self.save_path.exists():
             self.save_path.mkdir(parents=True)
-        self.dl_params = dl_params
-        self.device = torch.device('cuda' if self.gpu != -1 and torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(f'cuda{gpu}' if gpu != -1 and torch.cuda.is_available() else 'cpu')
+        self.models = self.build([len(genes) for genes in predictors], self.device)
     
     @staticmethod
-    def preprocessing_pipeline(mask: bool = True, distr: str = "exp", mask_rate: float = 0.1, seed: int = 1, log_level: LogLevel = "INFO"):
+    def preprocessing_pipeline(min_cells: int = 10, n_top: int = 5, sub_outputdim: int = 512, mask: bool = True, distr: str = "exp", 
+                               mask_rate: float = 0.1, seed: int = 1, log_level: LogLevel = "INFO"):
         
         transforms = [
-            AnnDataTransform(sc.pp.filter_genes, min_counts=1),
+            AnnDataTransform(sc.pp.filter_genes, min_cells=min_cells),
             AnnDataTransform(sc.pp.filter_cells, min_counts=1),
             SaveRaw(),
             AnnDataTransform(sc.pp.normalize_total),
             AnnDataTransform(sc.pp.log1p),
+            GeneHoldout(n_top=n_top, batch_size=sub_outputdim),
         ]
         if mask:
             transforms.extend([
                 CellwiseMaskData(distr=distr, mask_rate=mask_rate, seed=seed),
                 SetConfig({
-                    "feature_channel": [None, None, "n_counts", "train_mask"],
-                    "feature_channel_type": ["X", "raw_X", "obs", "layers"],
+                    "feature_channel": [None, None, "n_counts", "targets", "predictors", "train_mask"],
+                    "feature_channel_type": ["X", "raw_X", "obs", "uns", "uns", "layers"],
                     "label_channel": [None, None], 
                     "label_channel_type": ["X", "raw_X"], 
                 })
@@ -154,44 +133,14 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         else:
             transforms.extend([
                 SetConfig({
-                    "feature_channel": [None, None, "n_counts"],
-                    "feature_channel_type": ["X", "raw_X", "obs"],
+                    "feature_channel": [None, None, "n_counts", "targets", "predictors"],
+                    "feature_channel_type": ["X", "raw_X", "obs", "uns", "uns"],
                     "label_channel": [None, None], 
                     "label_channel_type": ["X", "raw_X"], 
                 })
             ])
             
         return Compose(*transforms, log_level=log_level)
-    
-    def init_model(self, mask):
-        if mask is not None:
-            return 0
-
-    def loadDefaultArchitecture(self):
-        """load default model architecture.
-        Parameters
-        ----------
-        None
-        Returns
-        -------
-        None
-        """
-
-        if (self.hidden_dim is None):
-            hidden_dim = self.sub_outputdim // 2
-        else:
-            hidden_dim = self.hidden_dim
-        self.NN_parameters['architecture'] = [
-            {
-                "type": "dense",
-                "neurons": hidden_dim,
-                "activation": "relu"
-            },
-            {
-                "type": "dropout",
-                "rate": 0.2
-            },
-        ]
 
     def wMSE(self, y_true, y_pred, binary=False):
         """weighted MSE.
@@ -217,7 +166,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         val = torch.mean(weights * torch.square(y_true - y_pred))
         return val
 
-    def build(self, inputdims):
+    def build(self, inputdims, device="cpu"):
         """build model.
         Parameters
         ----------
@@ -228,21 +177,25 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         models : array
             array of subnetworks
         """
-
-        if self.NN_parameters['architecture'] is None:
-            self.loadDefaultArchitecture()
-
-        print(self.NN_parameters['architecture'])
-
         models = []
         for dim in inputdims:
             models.append(
                 NeuralNetworkModel(dim, self.sub_outputdim, hidden_dim=self.hidden_dim,
-                                   dropout=self.NN_parameters['architecture'][1]['rate']))
+                                   dropout=self.dropout).to(device))
 
         return models
 
-    def fit(self, X_train, Y_train, X_test, Y_test, inputgenes=None):
+    def maskdata(self, X, mask, idx=None):
+        if idx is None:
+            idx = range(len(X))
+        submask = mask[idx]
+        X_masked = torch.zeros_like(X).to(X.device)
+        X_masked[submask] = X[submask]
+        counter_submask = ~submask
+
+        return X_masked, submask, counter_submask
+
+    def fit(self, X, Y, train_idx, mask=None, batch_size=64, lr=1e-3, n_epochs=100, patience=5):
         """Train model.
         Parameters
         ----------
@@ -250,68 +203,80 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
             Training data including input genes
         Y_train: optional
             Training data including target genes to be inputed
-        X_test:  optional
+        X_valid:  optional
             Validation data including input predictor genes
-        Y_test:  optional
+        Y_valid:  optional
             Validation data including target genes to be inputed
-        inputgenes: array optional
+        predictors: array optional
             input genes as predictors for target genes
         Returns
         -------
         None
         """
-
-        if (X_train is None):
-            X_train = self.X_train
-        if (Y_train is None):
-            Y_train = self.Y_train
-        if (X_test is None):
-            X_test = self.X_test
-        if (Y_test is None):
-            Y_test = self.Y_test
-        if (inputgenes is None):
-            inputgenes = self.inputgenes
-
+        predictors = self.predictors
+        targets = self.targets
         device = self.device
-        print("Building network")
-        self.models = self.build([len(genes) for genes in inputgenes])
 
-        data = [torch.cat((torch.Tensor(X_train[i]), torch.Tensor(Y_train[i])), dim=1) for i in range(len(X_train))]
-        train_loaders = [DataLoader(data[i], batch_size=self.batch_size, shuffle=True) for i in range(len(data))]
+        # Specify train validation split
+        if mask is not None:
+            X_train, _, valid_mask = self.maskdata(X, mask, train_idx)
+            X_valid = X_train
+            Y_valid = Y_train = Y
+        else:
+            rng = np.random.default_rng(self.seed)
+            train_data_masked = train_data
+            train_idx_permuted = rng.permutation(range(len(X)))
+            train_idx = train_idx_permuted[:int(len(train_idx_permuted) * 0.9)]
+            valid_idx = train_idx_permuted[int(len(train_idx_permuted) * 0.9):]
+            X_train = X[train_idx]
+            X_valid = X[valid_idx]
+            Y_train = Y[train_idx]
+            Y_valid = Y[valid_idx]
+            valid_mask = np.ones_like(X_valid.cpu()).astype(bool)
+        
+        X_train_list, X_valid_list, Y_train_list, Y_valid_list, valid_mask_list = [], [], [], [], []
+        for j, inputgenes in enumerate(predictors):
+            X_train_list.append(X_train[:,:inputgenes])
+            X_valid_list.append(X_valid[:,:inputgenes])
+            Y_train_list.append(Y_train[:,:targets[j]])
+            Y_valid_list.append(Y_valid[:,:targets[j]])
+            valid_mask_list.append(valid_mask[:,:targets[j]])
+
+        data = [Dataset(X_train_list[i], Y_train_list[i]) for i in range(len(predictors))]
+        train_loaders = [DataLoader(data[i], batch_size=batch_size, shuffle=True) for i in range(len(data))]
+        optimizers = [optim.Adam(model.parameters(), lr=lr) for model in self.models]
+        
         for i, model in enumerate(self.models):
-            optimizer = optim.Adam(model.parameters(), lr=self.NN_parameters['learning_rate'])
+            optimizer = optimizers[i] 
+            train_loader = train_loaders[i]
             val_losses = []
-            for epoch in range(self.NN_parameters['max_epochs']):
-                epoch_loss = 0
-                train_loader = train_loaders[i]
-                model.train()
-                for batch_idx, data in enumerate(train_loader):
-                    X_batch = data[:, :(data.shape[1] - self.sub_outputdim)].to(device)
-                    Y_batch = data[:, (data.shape[1] - self.sub_outputdim):].to(device)
-                    model.to(device)
-                    y_pred = model.forward(X_batch)
-                    loss = self.wMSE(Y_batch, y_pred)
+            counter = 0
+            for epoch in range(n_epochs):
+                model.train()    
+                train_loss = 0
+                for batch_idx, (x_batch, y_batch) in enumerate(train_loader):
+                    y_pred = model(x_batch.to(device))
+                    loss = self.wMSE(y_batch.to(device), y_pred)
                     loss.backward()
                     optimizer.step()
-                    epoch_loss += loss.item()
+                    train_loss += loss.item() * len(x_batch)
+                train_loss = train_loss / len(X_train_list[i])
 
-                average_epoch_loss = epoch_loss / len(train_loader)
-                X_test_i = torch.Tensor(X_test[i])
-                Y_test_i = torch.Tensor(Y_test[i])
-                val_loss, _ = self.eval(X_test_i, Y_test_i, model)
-                val_losses.append(val_loss.item())
+                model.eval()
+                with toch.no_grad():
+                    y_pred = model(torch.Tensor(X_valid_list[i]).to(device))
+                    val_loss = F.mse_loss(pred[valid_mask_list[i]], Y_valid_list[i].to(device)[valid_mask_list[i]]).item()
+                print("Model {:d}, epoch {:d}, train loss: {:f}, valid loss: {:f}.".format(i, epoch, train_loss, val_loss))
+
+                val_losses.append(val_loss)
                 min_val = min(val_losses)
-                patience = self.NN_parameters['patience']
-                if val_loss == min_val:
-                    #self.save_model(model, optimizer, i)
-                    self.models[i] = model
-                    print('Saving model %s.' % i)
-                print("Average epoch loss: {:f}, epoch eval loss: {:f}.".format(average_epoch_loss, val_loss))
-                # if epoch >= patience and min(val_losses[-patience:]) > min_val:
-                #     print("Early stopping on epoch %s." % epoch)
-                #     model = self.load_model(model, i)
-                #     break
-            #self.models[i] = model
+                if val_loss == min_val: 
+                    self.save_model(model, optimizer, i)
+                else:
+                    counter += 1
+                    if counter == patience:
+                        print("Early stopped")
+                        break
 
     def save_model(self, model, optimizer, i):
         """save model.
@@ -333,7 +298,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         model_string = 'model_' + str(i)
         opt_string = 'optimizer_' + str(i)
         state = {model_string: model.state_dict(), opt_string: optimizer.state_dict()}
-        torch.save(state, self.save_path / f"{self.dl_params.dataset}_{i}.pt")
+        torch.save(state, self.save_path / f"{self.dataset}_{i}.pt")
 
     def load_model(self, model, i):
         """load model.
@@ -350,13 +315,13 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
             loaded model
         """
 
-        model_path = self.save_path / f"{self.dl_params.dataset}_{i}.pt"
+        model_path = self.save_path / f"{self.dataset}_{i}.pt"
         state = torch.load(model_path, map_location=self.device)
         model_string = 'model_' + str(i)
         model.load_state_dict(state[model_string])
         return model
 
-    def predict(self, targetgenes=None):
+    def predict(self, X_test, test_idx, mask=None):
         """Get predictions from the trained model.
         Parameters
         ----------
@@ -367,127 +332,63 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         imputed : DataFrame
             imputed gene expression
         """
+        predictors = self.predictors
+        targets = self.targets
 
-        if (targetgenes is None):
-            targetgenes = self.targetgenes
+        if mask is not None:
+            X_test, _, _ = self.maskdata(X_test, mask, test_idx)
+        X_test_list = []
+        for j, inputgenes in enumerate(predictors):
+            X_test_list.append(X_test[:,:inputgenes])
 
-        device = self.device
-
-        norm_data = np.log1p(self.total_counts)  # is norm_raw a saved variable?
-
-        # select input data
-        X_data = [torch.Tensor(norm_data.loc[:, inputgenes].values).to(device) for inputgenes in self.inputgenes]
-        # inputs = [norm_raw.loc[:, predictors].values.astype(np.float32)
-        #          for predictors in self.inputgenes]
-        # model = self.load_model()
-        # predicted = model.predict(inputs)
-
-        # make predictions using each subnetwork
+        # Make predictions using each subnetwork
         Y_pred_lst = []
         for i, model in enumerate(self.models):
+            model = load_model(model, i)
             model.eval()
             with torch.no_grad():
-                Y_pred_lst.append(model.forward(X_data[i]))
-        # concatenate predicted values
-        Y_pred = torch.cat(Y_pred_lst, dim=1)
-        # convert to pd
-        Y_pred = pd.DataFrame(Y_pred.cpu().numpy(), index=self.total_counts.index, columns=targetgenes.flatten())
+                Y_pred_lst.append(model.forward(X_test_list[i].to(self.device)))
+        # Concatenate predicted values
+        Y_pred = torch.cat(Y_pred_lst, 1)
+        gene_order = np.concatenate(targets)
+        Y_pred = Y_pred[:,gene_order]
 
-        # create imputed matrix
-        predicted = Y_pred.groupby(by=Y_pred.columns, axis=1).mean()
-        not_predicted = norm_data.drop(targetgenes.flatten(), axis=1)
-        imputed = (pd.concat([predicted, not_predicted], axis=1).loc[self.total_counts.index,
-                                                                     self.total_counts.columns].values)
-
-        # To prevent overflow
-        imputed[(imputed > 2 * norm_data.values.max()) | (np.isnan(imputed))] = 0
         # Convert back to counts
-        imputed = np.expm1(imputed)
+        # Y_pred = np.expm1(Y_pred)
 
-        if self.policy == "restore":
-            print("Filling zeros")
-            mask = (self.total_counts.values > 0)
-            imputed[mask] = self.total_counts.values[mask]
-        elif self.policy == "max":
-            print("Imputing data with 'max' policy")
-            mask = (self.total_counts.values > imputed)
-            imputed[mask] = self.total_counts.values[mask]
+        return Y_pred
 
-        imputed = pd.DataFrame(imputed, index=self.total_counts.index, columns=self.total_counts.columns)
 
-        if self.imputed_only:
-            return imputed.loc[:, predicted.columns]
-        else:
-            return imputed
-
-    def score(self, true_expr, true_labels=None, n_neighbors=None, n_pcs=None, clu_resolution=1, targetgenes=None):
-        """Evaluate the trained model.
+    def score(self, true_expr, imputed_expr, metric="MSE"):
+        """ Scoring function of model
         Parameters
         ----------
-        true_expr : DataFrame
-            true expression
-        true_labels : array optional
-            provided cell labels
-        n_neighbors : int optional
-            number of neighbors tp cluster imputed data
-        n_pcs: int optional
-            number of principal components for neighbor detection
-        clu_resolution : int optional
-            resolution for Leiden cluster
-        targetgenes: array optional
-            genes to be imputed
+        true_expr :
+            True underlying expression values
+        imputed_expr :
+            Imputed expression values
+        test_idx :
+            index of testing cells
+        metric :
+            Choice of scoring metric - 'MSE' or 'ARI'
+
         Returns
         -------
-        ari : float
-            adjusted Rand index.
-        MSE_cells :
-            mean squared errors averaged across genes per cell
-        MSE_genes :
-            mean squared errors averaged across cellss per gene
+        score : 
+            evaluation score
         """
+        allowd_metrics = {"MSE", "PCC"}
+        if metric not in allowd_metrics:
+            raise ValueError("scoring metric %r." % allowd_metrics)
+        
+        true_target = true_expr
+        imputed_target = imputed_expr
+        if (metric == 'MSE'):
+            mse_cells = ((true_target.cpu() - imputed_target.cpu())**2).mean(axis=1)
+            mse_genes = ((true_target.cpu() - imputed_target.cpu())**2).mean(axis=0)
+            return (mse_cells, mse_genes)
+            # return F.mse_loss(true_target, imputed_target).item()
+        elif (metric == 'PCC'):
+            corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
+            return corr_cells
 
-        if (targetgenes == None):  # set target genes
-            targetgenes = self.targetgenes
-        imputed_expr = self.predict(targetgenes=targetgenes)  # prediction
-
-        # subset target genes only
-        targetgenes = targetgenes.flatten()  # flatten target genes list
-        imputed_expr = imputed_expr.loc[:, targetgenes]
-        imputed_expr = imputed_expr.groupby(by=imputed_expr.columns, axis=1).mean()
-
-        true_expr = self.true_counts
-        masked_expr = self.total_counts
-        mask = (masked_expr != true_expr)
-        df_deepImpute = np.log1p(imputed_expr)
-        gene_subset = df_deepImpute.columns
-        true_expr = np.log1p(true_expr.reindex(columns=gene_subset))
-        masked_expr = np.log1p(masked_expr.reindex(columns=gene_subset))
-        mask = mask.reindex(columns=gene_subset)
-        MSE_cells = pd.DataFrame(((df_deepImpute[mask] - true_expr[mask])**2).mean(axis=1)).dropna()
-        MSE_genes = pd.DataFrame(((df_deepImpute[mask] - true_expr[mask])**2).mean(axis=0)).dropna()
-        return MSE_cells, MSE_genes
-
-    def eval(self, X_test, Y_test, model):
-        """evaluate model.
-        Parameters
-        ----------
-        X_test:
-            Validation data including input predictor genes
-        Y_test:
-            Validation data including target genes to be inputed
-
-        model:
-            model to be evaluated
-        Returns
-        -------
-        loss : float
-            weighted MSE as loss
-        y_pred:
-            predicted expression
-        """
-        device = torch.device('cuda' if self.gpu != -1 and torch.cuda.is_available() else 'cpu')
-        model.eval()
-        with torch.no_grad():
-            y_pred = model.forward(X_test.to(device))
-            loss = self.wMSE(Y_test.to(device), y_pred)
-        return loss, y_pred

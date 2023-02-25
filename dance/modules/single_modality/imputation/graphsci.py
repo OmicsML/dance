@@ -143,7 +143,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.dataset = dataset
         self.seed = seed
         self.prj_path = Path(__file__).parent.resolve()
-        self.save_path = self.prj_path / "graphsci" / dataset / "models"
+        self.save_path = self.prj_path / "graphsci"
         if not self.save_path.exists():
             self.save_path.mkdir(parents=True)
         self.device = torch.device('cpu' if gpu == -1 else f'cuda:{gpu}')
@@ -153,11 +153,11 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.to(self.device)
     
     @staticmethod
-    def preprocessing_pipeline(threshold: float = 0.3, normalize_edges: bool = True, mask: bool = True, distr: str = "exp",
-                               mask_rate: float = 0.1, seed: int = 1, log_level: LogLevel = "INFO"):
+    def preprocessing_pipeline(min_cells: int = 10, threshold: float = 0.3, normalize_edges: bool = True, mask: bool = True, 
+                               distr: str = "exp", mask_rate: float = 0.1, seed: int = 1, log_level: LogLevel = "INFO"):
         
         transforms = [
-            AnnDataTransform(sc.pp.filter_genes, min_counts=1),
+            AnnDataTransform(sc.pp.filter_genes, min_cells=min_cells),
             AnnDataTransform(sc.pp.filter_cells, min_counts=1),
             SaveRaw(),
             AnnDataTransform(sc.pp.normalize_total),
@@ -185,6 +185,12 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             ])
             
         return Compose(*transforms, log_level=log_level)
+    
+    def maskdata(self, X, mask):
+        X_masked = torch.zeros_like(X).to(X.device)
+        X_masked[mask] = X[mask]
+
+        return X_masked
 
     def fit(self, train_data, train_data_raw, n_counts, graph, train_idx, mask=None, le=1, la=1, ke=1, ka=1, n_epochs=100, lr=1e-3, weight_decay=1e-5):
         """ Data fitting function
@@ -223,26 +229,31 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         rng = np.random.default_rng(self.seed)
         # Specify train validation split
         if mask is not None:
-            train_data_masked = torch.zeros_like(train_data).to(self.device)
-            train_data_masked[mask] = train_data[mask]
+            train_data_masked = self.maskdata(train_data, mask)
             graph.ndata["feat"] = train_data_masked.float().T
-            train_mask = np.ones_like(train_data.cpu()).astype(bool)
+            train_mask = np.copy(mask)
+            test_idx = [i for i in range(len(train_data)) if i not in train_idx]
+            train_mask[test_idx] = False
             valid_mask = ~mask
+            valid_mask[test_idx] = False
         else:
             train_data_masked = train_data
             train_idx_permuted = rng.permutation(train_idx)
             train_idx = train_idx_permuted[:int(len(train_idx_permuted) * 0.9)]
             valid_idx = train_idx_permuted[int(len(train_idx_permuted) * 0.9):]
-            train_mask = np.ones_like(train_data.cpu()).astype(bool)
-            train_mask[valid_idx] = False
-            valid_mask = ~train_mask
-        
+            train_mask = np.zeros_like(train_data.cpu()).astype(bool)
+            train_mask[train_idx] = True
+            valid_mask = np.zeros_like(train_data.cpu()).astype(bool)
+            valid_mask[valid_idx] = True
+
         self.train_data_masked = train_data_masked
-        self.size_factors = torch.tensor(n_counts / np.median(n_counts))
+        self.size_factors = torch.tensor(n_counts / np.median(n_counts)).to(self.device)
         self.weight_decay = weight_decay
         self.optimizer = torch.optim.Adam(self.model_params, lr=lr, weight_decay=weight_decay)
+
         for epoch in range(n_epochs):
-            self.train(train_data_masked, train_data_raw, graph, train_mask, valid_mask, le, la, ke, ka)
+            self.train(train_data_masked, train_data_raw, graph, 
+                       train_mask, valid_mask, le, la, ke, ka)
             if not epoch:
                 min_valid_loss = self.valid_loss
             elif min_valid_loss >= self.valid_loss:
@@ -330,7 +341,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         """
 
         if mask is None:
-            mask = np.ones_like(features_raw).astype(bool)
+            mask = np.ones_like(features_raw.cpu()).astype(bool)
         
         self.aemodel.eval()
         self.gnnmodel.eval()
@@ -352,7 +363,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
 
         torch.save(state, self.save_path / f"{self.dataset}.pt")
     
-    def predict(self, data, data_raw, graph):
+    def predict(self, data, data_raw, graph, mask=None):
         """ Predict function
         Parameters
         ----------
@@ -372,7 +383,9 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         z_exp :
             reconstructed expression data
         """
-        _, _, z_exp = self.evaluate(self.train_data_masked, data_raw, graph)
+        if mask is not None:
+            data = self.maskdata(data, mask)
+        _, _, z_exp = self.evaluate(data, data_raw, graph)
         return z_exp
 
     def get_loss(self, batch, adj_orig, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean, 
@@ -423,25 +436,26 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
 
         pos_weight = (adj_orig.shape[0]**2 - adj_orig.sum(axis=1)) / (adj_orig.sum(axis=1))
         norm_adj = adj_orig.shape[0] * adj_orig.shape[0] / float((adj_orig.shape[0] * adj_orig.shape[0] - adj_orig.sum()) * 2)
-        loss_adj = la * norm_adj * torch.mean(F.cross_entropy(z_adj, adj_orig, pos_weight, reduction="none")[mask])
+        loss_adj = la * norm_adj * torch.mean(F.cross_entropy(z_adj, adj_orig, pos_weight))
 
         eps = 1e-10
+        mean = mean * torch.reshape(self.size_factors, (-1,1))
         disp = torch.clamp(disp, max=1e6)
         t1 = torch.lgamma(disp + eps) + torch.lgamma(batch + 1) - torch.lgamma(batch + disp + eps)
-        t2 = (disp + batch) * torch.log(1.0 + (z_exp / (disp + eps))) + (batch *
-                                                                        (torch.log(disp + eps) - torch.log(z_exp + eps)))
+        t2 = (disp + batch) * torch.log(1.0 + (mean / (disp + eps))) + (batch *
+                                                                        (torch.log(disp + eps) - torch.log(mean + eps)))
         nb_loss = t1 + t2
         nb_loss = torch.where(torch.isnan(nb_loss),
                               torch.zeros([nb_loss.shape[0], nb_loss.shape[1]]).to(self.device) + np.inf, nb_loss)
-        zero_nb = torch.pow(disp / (disp + z_exp + eps), disp)
+        zero_nb = torch.pow(disp / (disp + mean + eps), disp)
         zero_case = -torch.log(pi + ((1 - pi) * zero_nb) + eps)
         loss_exp = torch.where(torch.lt(batch, 1e-8), zero_case, nb_loss)
         loss_exp = le * torch.mean(loss_exp[mask])
         log_lik = loss_exp + loss_adj
 
         kl_adj = ( 0.5 / batch.shape[0]) * torch.mean(
-            torch.sum(1 + 2 * z_adj_log_std - torch.square(z_adj_mean) - torch.square(torch.exp(z_adj_log_std)), 1)[mask])
-        kl_exp = self.weight_decay * 0.5 / batch.shape[1] * torch.mean(F.mse_loss(z_exp, batch, reduction="none")[mask])
+            torch.sum(1 + 2 * z_adj_log_std - torch.square(z_adj_mean) - torch.square(torch.exp(z_adj_log_std)), 1))
+        kl_exp = 0.5 / batch.shape[1] * torch.mean(F.mse_loss(z_exp, batch, reduction="none")[mask])
         kl = ka * kl_adj - ke * kl_exp
         loss = log_lik - kl
         return loss_adj, loss_exp, log_lik, kl, loss
@@ -462,14 +476,14 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         imputed_expr :
             Imputed expression values
         test_idx :
-            index of testing genes
-        metric : str optional
+            index of testing cells
+        metric :
             Choice of scoring metric - 'MSE' or 'ARI'
 
         Returns
         -------
-        mse_error : float
-            mean square error
+        score : 
+            evaluation score
         """
         allowd_metrics = {"MSE", "PCC"}
         if metric not in allowd_metrics:
@@ -481,6 +495,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             mse_cells = ((true_target.cpu() - imputed_target.cpu())**2).mean(axis=1)
             mse_genes = ((true_target.cpu() - imputed_target.cpu())**2).mean(axis=0)
             return (mse_cells, mse_genes)
+            # return F.mse_loss(true_target, imputed_target).item()
         elif (metric == 'PCC'):
             corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
             return corr_cells
