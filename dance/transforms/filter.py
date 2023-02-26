@@ -70,8 +70,11 @@ class FilterScanpy(BaseTransform):
 
         min_counts = self.min_counts
         max_counts = self.max_counts
-        min_genes_or_cells = get_count(self.min_genes_or_cells, total_features)
-        max_genes_or_cells = get_count(self.max_genes_or_cells, total_features)
+
+        # Determine whether we are dealing with cells or genes
+        basis = total_cells if self._SUBSETTING_FUNC_NAME == "_inplace_subset_obs" else total_features
+        min_genes_or_cells = get_count(self.min_genes_or_cells, basis)
+        max_genes_or_cells = get_count(self.max_genes_or_cells, basis)
 
         subset_ind, _ = self._FILTERING_FUNC(x, inplace=False, min_counts=min_counts, max_counts=max_counts,
                                              min_genes_or_cells=min_genes_or_cells,
