@@ -35,8 +35,7 @@ def get_count(count_or_ratio: Optional[Union[float, int]], total: int) -> Option
 class FilterScanpy(BaseTransform):
     """Scanpy filtering transformation with additional options."""
 
-    _FILTERING_FUNC = None
-    _SUBSETTING_FUNC_NAME = None
+    _FILTER_TARGET: Optional[Literal["cells", "genes"]] = None
 
     def __init__(
         self,
@@ -51,9 +50,6 @@ class FilterScanpy(BaseTransform):
     ):
         super().__init__(**kwargs)
 
-        if (self._FILTERING_FUNC is None) or (self._SUBSETTING_FUNC_NAME is None):
-            raise NotImplementedError("Use FilterCellsScanpy or FilterGenesScanpy instead")
-
         self.min_counts = min_counts
         self.min_genes_or_cells = min_genes_or_cells
         self.max_counts = max_counts
@@ -63,25 +59,42 @@ class FilterScanpy(BaseTransform):
         self.channel = channel
         self.channel_type = channel_type
 
+        if self._FILTER_TARGET is None:
+            raise NotImplementedError("Use FilterCellsScanpy or FilterGenesScanpy instead")
+        elif self._FILTER_TARGET == "cells":
+            self._subsetting_func_name = "_inplace_subset_obs"
+            self._filter_func = sc.pp.filter_cells
+            self.min_genes = min_genes_or_cells
+            self.max_genes = max_genes_or_cells
+        elif self._FILTER_TARGET == "genes":
+            self._subsetting_func_name = "_inplace_subset_var"
+            self._filter_func = sc.pp.filter_genes
+            self.min_cells = min_genes_or_cells
+            self.max_cells = max_genes_or_cells
+        else:
+            raise ValueError(f"Unknown filter target {self._FILTER_TARGET!r}")
+
     def __call__(self, data):
         x = data.get_feature(return_type="default", split_name=self.split_name, channel=self.channel,
-                             channels_type=self.channel_type)
+                             channel_type=self.channel_type)
         total_cells, total_features = x.shape
 
         min_counts = self.min_counts
         max_counts = self.max_counts
 
         # Determine whether we are dealing with cells or genes
-        basis = total_cells if self._SUBSETTING_FUNC_NAME == "_inplace_subset_obs" else total_features
-        min_genes_or_cells = get_count(self.min_genes_or_cells, basis)
-        max_genes_or_cells = get_count(self.max_genes_or_cells, basis)
-
-        subset_ind, _ = self._FILTERING_FUNC(x, inplace=False, min_counts=min_counts, max_counts=max_counts,
-                                             min_genes_or_cells=min_genes_or_cells,
-                                             max_genes_or_cells=max_genes_or_cells)
+        basis = total_cells if self._FILTER_TARGET == "cells" else total_features
+        other_name = "cells" if self._FILTER_TARGET == "genes" else "genes"
+        opts = {
+            "min_counts": min_counts,
+            "max_counts": max_counts,
+            f"min_{other_name}": get_count(self.min_genes_or_cells, basis),
+            f"max_{other_name}": get_count(self.max_genes_or_cells, basis),
+        }
+        subset_ind, _ = self._filter_func(x, inplace=False, **opts)
 
         if not subset_ind.all():
-            subset_func = getattr(data, self._SUBSETTING_FUNC_NAME)
+            subset_func = getattr(data.data, self._subsetting_func_name)
             self.logger.info(f"Subsetting cells ({~subset_ind.sum():,} removed) due to {self}")
             subset_func(subset_ind)
 
@@ -111,8 +124,7 @@ class FilterCellsScanpy(FilterScanpy):
     """
 
     _DISPLAY_ATTRS = ("min_counts", "min_genes", "max_counts", "max_genes", "split_name")
-    _FILTERING_FUNC = sc.pp.filter_cells
-    _SUBSETTING_FUNC_NAME = "_inplace_subset_obs"
+    _FILTER_TARGET = "cells"
 
     def __init__(
         self,
@@ -160,8 +172,7 @@ class FilterGenesScanpy(FilterScanpy):
     """
 
     _DISPLAY_ATTRS = ("min_counts", "min_cells", "max_counts", "max_cells", "split_name")
-    _FILTERING_FUNC = sc.pp.filter_genes
-    _SUBSETTING_FUNC_NAME = "_inplace_subset_var"
+    _FILTER_TARGET = "genes"
 
     def __init__(
         self,
