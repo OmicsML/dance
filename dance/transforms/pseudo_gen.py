@@ -52,7 +52,6 @@ class PseudoMixture(BaseTransform):
     def gen_mix(
         x: np.ndarray,
         annot: np.ndarray,
-        # ct_select: List[str],
         nc_min: int = 2,
         nc_max: int = 10,
         clust_vr: str = "cellType",
