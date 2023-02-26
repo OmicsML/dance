@@ -7,7 +7,6 @@ from anndata import AnnData
 from matplotlib import pyplot as plt
 from scipy.special import expit
 from sklearn.linear_model import LogisticRegression, SGDClassifier
-from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 
 from dance import logger
