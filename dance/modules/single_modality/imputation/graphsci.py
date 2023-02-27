@@ -22,7 +22,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dance.modules.base import BaseRegressionMethod
-from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig, CellwiseMaskData
+from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig, CellwiseMaskData, FilterGenesScanpy, FilterCellsScanpy
 from dance.transforms.graph import FeatureFeatureGraph
 from dance.typing import Any, List, LogLevel, Optional, Tuple
 
@@ -153,14 +153,13 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.to(self.device)
     
     @staticmethod
-    def preprocessing_pipeline(min_cells: int = 10, threshold: float = 0.3, normalize_edges: bool = True, mask: bool = True, 
+    def preprocessing_pipeline(min_cells: float = 0.1, min_genes: float = 0.1, threshold: float = 0.3, normalize_edges: bool = True, mask: bool = True, 
                                distr: str = "exp", mask_rate: float = 0.1, seed: int = 1, log_level: LogLevel = "INFO"):
         
         transforms = [
-            AnnDataTransform(sc.pp.filter_genes, min_cells=min_cells),
-            AnnDataTransform(sc.pp.filter_cells, min_counts=1),
+            AnnDataTransform(FilterGenesScanpy, min_cells=min_cells),
+            AnnDataTransform(FilterCellsScanpy, min_genes=min_genes),
             SaveRaw(),
-            AnnDataTransform(sc.pp.normalize_total),
             AnnDataTransform(sc.pp.log1p),
             FeatureFeatureGraph(threshold=threshold, normalize_edges=normalize_edges),
         ]
@@ -467,7 +466,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.aemodel.load_state_dict(state['aemodel'])
         self.gnnmodel.load_state_dict(state['gnnmodel'])
 
-    def score(self, true_expr, imputed_expr, test_idx, metric="MSE"):
+    def score(self, true_expr, imputed_expr, test_idx, mask=None, metric="MSE"):
         """ Scoring function of model
         Parameters
         ----------
@@ -491,11 +490,12 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         
         true_target = true_expr[test_idx]
         imputed_target = imputed_expr[test_idx]
-        if (metric == 'MSE'):
-            mse_cells = ((true_target.cpu() - imputed_target.cpu())**2).mean(axis=1)
-            mse_genes = ((true_target.cpu() - imputed_target.cpu())**2).mean(axis=0)
-            return (mse_cells, mse_genes)
-            # return F.mse_loss(true_target, imputed_target).item()
-        elif (metric == 'PCC'):
+        if mask is not None: # and metric == 'MSE':
+            # true_target = true_target[~mask[test_idx]]
+            # imputed_target = imputed_target[~mask[test_idx]]
+            imputed_target[mask[test_idx]] = true_target[mask[test_idx]]
+        if metric == 'MSE':
+            return F.mse_loss(true_target, imputed_target).item()
+        elif metric == 'PCC':
             corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
             return corr_cells

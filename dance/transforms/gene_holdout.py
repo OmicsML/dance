@@ -20,7 +20,7 @@ class GeneHoldout(BaseTransform):
 
     """
 
-    _DISPLAY_ATTRS = ("batch_size", "seed")
+    _DISPLAY_ATTRS = ("batch_size", "n_top")
 
     def __init__(self, n_top: int = 5, batch_size: int = 512, **kwargs):
         super().__init__(**kwargs)
@@ -32,17 +32,17 @@ class GeneHoldout(BaseTransform):
         batch_loader = DataLoader(range(feat.shape[1]), batch_size=self.batch_size)
         targets = []
         for _, batch in enumerate(batch_loader):
-            targets.append(batch.numpy())
+            targets.append(batch.int().numpy())
         
         # Use covariance to select predictors
         covariance_matrix = np.cov(feat, rowvar=False)
         predictors = []
         for i, targs in enumerate(targets):
             genes_not_in_target = np.setdiff1d(range(feat.shape[1]), targs)
-            subMatrix = covariance_matrix[targs, genes_not_in_target]
+            subMatrix = covariance_matrix[targs][:, genes_not_in_target]
             sorted_idx = np.argsort(-subMatrix, axis=1)
             preds = genes_not_in_target[sorted_idx[:, :self.n_top].flatten()]
-            predictors.append(preds.unique())
+            predictors.append(np.unique(preds).astype(int))
 
         data.data.uns["targets"] = targets
         data.data.uns["predictors"] = predictors

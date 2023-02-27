@@ -56,7 +56,7 @@ class CellwiseMaskData(BaseTransform):
 
             # Get masking probability of each value
             if cells_c_pos.size > self.min_gene_counts:
-                prob = self._get_probs(cells_c_pos)
+                prob = self._get_probs(cells_c_pos.toarray()[0])
                 n_masked = int(np.floor(cells_c_pos.size * self.mask_rate))
                 if n_masked >= cells_c_pos.size:
                     self.logger.warning(f"Too many genes masked for cell {c} ({n_masked}/{cells_c_pos.size})")
