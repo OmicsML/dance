@@ -155,7 +155,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
     @staticmethod
     def preprocessing_pipeline(min_cells: float = 0.1, min_genes: float = 0.1, threshold: float = 0.3, normalize_edges: bool = True, mask: bool = True, 
                                distr: str = "exp", mask_rate: float = 0.1, seed: int = 1, log_level: LogLevel = "INFO"):
-        
+        # TODO add n_counts
         transforms = [
             AnnDataTransform(FilterGenesScanpy, min_cells=min_cells),
             AnnDataTransform(FilterCellsScanpy, min_genes=min_genes),
@@ -167,8 +167,8 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             transforms.extend([
                 CellwiseMaskData(distr=distr, mask_rate=mask_rate, seed=seed),
                 SetConfig({
-                    "feature_channel": [None, None, "n_counts", "FeatureFeatureGraph", "train_mask"],
-                    "feature_channel_type": ["X", "raw_X", "obs", "uns", "layers"],
+                    "feature_channel": [None, None, "FeatureFeatureGraph", "train_mask"],
+                    "feature_channel_type": ["X", "raw_X", "uns", "layers"],
                     "label_channel": [None, None], 
                     "label_channel_type": ["X", "raw_X"], 
                 })
@@ -176,8 +176,8 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         else:
             transforms.extend([
                 SetConfig({
-                    "feature_channel": [None, None, "n_counts", "FeatureFeatureGraph"],
-                    "feature_channel_type": ["X", "raw_X", "obs", "uns"],
+                    "feature_channel": [None, None, "FeatureFeatureGraph"],
+                    "feature_channel_type": ["X", "raw_X", "uns"],
                     "label_channel": [None, None], 
                     "label_channel_type": ["X", "raw_X"], 
                 })
@@ -191,7 +191,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
 
         return X_masked
 
-    def fit(self, train_data, train_data_raw, n_counts, graph, train_idx, mask=None, le=1, la=1, ke=1, ka=1, n_epochs=100, lr=1e-3, weight_decay=1e-5):
+    def fit(self, train_data, train_data_raw, graph, train_idx, mask=None, le=1, la=1, ke=1, ka=1, n_epochs=100, lr=1e-3, weight_decay=1e-5):
         """ Data fitting function
         Parameters
         ----------
@@ -246,7 +246,8 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             valid_mask[valid_idx] = True
 
         self.train_data_masked = train_data_masked
-        self.size_factors = torch.tensor(n_counts / np.median(n_counts)).to(self.device)
+        n_counts = train_data_raw.sum(1)
+        self.size_factors = n_counts / torch.median(n_counts)
         self.weight_decay = weight_decay
         self.optimizer = torch.optim.Adam(self.model_params, lr=lr, weight_decay=weight_decay)
 

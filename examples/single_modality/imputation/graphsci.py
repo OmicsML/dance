@@ -45,10 +45,10 @@ if __name__ == '__main__':
 
     device = "cpu" if params.gpu == -1 else f"cuda:{params.gpu}"
     if params.mask:
-        X, X_raw, n_counts, g, mask = data.get_x(return_type="default")
+        X, X_raw, g, mask = data.get_x(return_type="default")
     else:
         mask = None
-        X, X_raw, n_counts, g = data.get_x(return_type="default")
+        X, X_raw, g = data.get_x(return_type="default")
     X = torch.tensor(X.toarray()).to(device)
     X_raw = torch.tensor(X_raw.toarray()).to(device)
     g = g.to(device)
@@ -57,7 +57,7 @@ if __name__ == '__main__':
 
     model = GraphSCI(num_cells=X.shape[0], num_genes=X.shape[1], dataset=params.dataset, 
                      dropout=params.dropout, gpu=params.gpu, seed=params.random_seed)
-    model.fit(X, X_raw, n_counts, g, train_idx, mask, params.le, params.la, params.ke, params.ka,
+    model.fit(X, X_raw, g, train_idx, mask, params.le, params.la, params.ke, params.ka,
               params.n_epochs, params.lr, params.weight_decay)
     model.load_model()
     imputed_data = model.predict(X, X_raw, g, mask)
