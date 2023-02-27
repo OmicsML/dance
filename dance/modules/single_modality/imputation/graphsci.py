@@ -160,7 +160,6 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             AnnDataTransform(FilterGenesScanpy, min_cells=min_cells),
             AnnDataTransform(FilterCellsScanpy, min_genes=min_genes),
             SaveRaw(),
-            AnnDataTransform(sc.pp.normalize_total),
             AnnDataTransform(sc.pp.log1p),
             FeatureFeatureGraph(threshold=threshold, normalize_edges=normalize_edges),
         ]
