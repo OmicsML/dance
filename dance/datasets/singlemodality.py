@@ -1,24 +1,22 @@
 import collections
-import glob
 import os
 import os.path as osp
 import pprint
 import shutil
 import sys
-from dataclasses import dataclass
+from glob import glob
 
-import scanpy as sc
 import anndata as ad
 import h5py
 import numpy as np
 import pandas as pd
+import scanpy as sc
 from scipy.sparse import csr_matrix
 
 from dance import logger
 from dance.data import Data
 from dance.datasets.base import BaseDataset
 from dance.registers import register_dataset
-from dance.transforms.preprocess import load_imputation_data_internal
 from dance.typing import Dict, List, Optional, Set, Tuple
 from dance.utils.download import download_file, download_unzip
 from dance.utils.preprocess import cell_label_to_df
@@ -294,15 +292,18 @@ class ImputationDataset(BaseDataset):
 
     DATASET_TO_FILE = {
         "pbmc_data": "5k_pbmc_protein_v3_filtered_feature_bc_matrix.h5",
-        "mouse_embryo_data":
-            list(
-                map(lambda x: "GSE65525/" + x, [
-                    "GSM1599494_ES_d0_main.csv", "GSM1599497_ES_d2_LIFminus.csv", "GSM1599498_ES_d4_LIFminus.csv",
-                    "GSM1599499_ES_d7_LIFminus.csv"
-                ])),
+        "mouse_embryo_data": [
+            osp.join("GSE65525", i)
+            for i in [
+                "GSM1599494_ES_d0_main.csv",
+                "GSM1599497_ES_d2_LIFminus.csv",
+                "GSM1599498_ES_d4_LIFminus.csv",
+                "GSM1599499_ES_d7_LIFminus.csv",
+            ]
+        ],
         "mouse_brain_data": "neuron_10k_v3_filtered_feature_bc_matrix.h5",
         "human_stemcell_data": "GSE75748/GSE75748_sc_time_course_ec.csv.gz"
-    }
+    }  # yapf: disable
 
     def __init__(self, data_dir="data", dataset="human_stemcell", train_size=0.1):
         super().__init__(data_dir, full_download=False)
@@ -313,8 +314,6 @@ class ImputationDataset(BaseDataset):
     def download(self):
 
         gene_class = ["pbmc_data", "mouse_brain_data", "mouse_embryo_data", "human_stemcell_data"]
-
-        
 
         file_name = {
             "pbmc_data": "5k.zip?dl=0",
@@ -330,7 +329,6 @@ class ImputationDataset(BaseDataset):
             "human_stemcell_data": "GSE75748"
         }
 
-        
         if sys.platform != 'win32':
             if not osp.exists(self.data_dir):
                 os.system("mkdir " + self.data_dir)
@@ -338,11 +336,7 @@ class ImputationDataset(BaseDataset):
                 os.system("mkdir " + self.data_dir + "/train")
 
             for class_name in gene_class:
-                if not any(
-                        list(
-                            map(osp.exists,
-                                glob.glob(self.data_dir + "/train/" + class_name + "/" +
-                                          dl_files[class_name])))):
+                if not any(map(osp.exists, glob(osp.join(self.data_dir, "train", class_name, dl_files[class_name])))):
                     os.system("mkdir " + self.data_dir + "/train/" + class_name)
                     os.system("wget " + self.URL[class_name])  # assumes linux... mac needs to install
                     os.system("unzip " + file_name[class_name])
@@ -355,17 +349,12 @@ class ImputationDataset(BaseDataset):
             if not osp.exists(self.data_dir + "/train"):
                 os.mkdir(self.data_dir + "/train")
             for class_name in gene_class:
-                if not any(
-                        list(
-                            map(osp.exists,
-                                glob.glob(self.data_dir + "/train/" + class_name + "/" +
-                                          dl_files[class_name])))):
+                if not any(map(osp.exists, glob(osp.join(self.data_dir, "train", class_name, dl_files[class_name])))):
                     os.mkdir(self.data_dir + "/train/" + class_name)
                     os.system("curl " + self.URL[class_name])
                     os.system("tar -xf " + file_name[class_name])
                     os.system("del -R " + file_name[class_name])
-                    os.system("move " + dl_files[class_name] + " " + self.data_dir + "/train/" + class_name +
-                              "/")
+                    os.system("move " + dl_files[class_name] + " " + self.data_dir + "/train/" + class_name + "/")
             os.system("copy /r " + self.data_dir + "/train/ " + self.data_dir + "/test")
 
     def is_complete(self):
@@ -380,7 +369,7 @@ class ImputationDataset(BaseDataset):
                 logger.info("file {} doesn't exist".format(i))
                 return False
         return True
-    
+
     def _load_raw_data(self) -> ad.AnnData:
         if self.dataset[-5:] != '_data':
             dataset = self.dataset + '_data'
