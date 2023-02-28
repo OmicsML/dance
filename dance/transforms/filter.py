@@ -23,6 +23,8 @@ def get_count(count_or_ratio: Optional[Union[float, int]], total: int) -> Option
     if count_or_ratio is None:
         return None
     elif isinstance(count_or_ratio, float):
+        if count_or_ratio > 1.:
+            raise ValueError(f"{count_or_ratio=} is greater than 1. Ratio cannot be greater than 1.")
         return int(count_or_ratio * total)
     elif isinstance(count_or_ratio, int):
         if count_or_ratio > total:
