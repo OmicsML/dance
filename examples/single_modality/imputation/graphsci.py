@@ -1,11 +1,11 @@
 import argparse
+
 import numpy as np
 import torch
 
-from dance.utils import set_seed
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.graphsci import GraphSCI
-
+from dance.utils import set_seed
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -28,7 +28,7 @@ if __name__ == '__main__':
     parser.add_argument("--threshold", type=float, default=.3,
                         help="Lower bound for correlation between genes to determine edges in graph.")
     parser.add_argument("--mask_rate", type=float, default=.1, help="Masking rate.")
-    parser.add_argument("--min_cells", type=float, default=.05, 
+    parser.add_argument("--min_cells", type=float, default=.05,
                         help="Minimum proportion of cells expressed required for a gene to pass filtering")
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--mask", type=bool, default=True, help="Mask data for validation.")
@@ -37,8 +37,9 @@ if __name__ == '__main__':
     set_seed(params.random_seed)
 
     dataloader = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset, train_size=params.train_size)
-    preprocessing_pipeline = GraphSCI.preprocessing_pipeline(min_cells=params.min_cells, threshold=params.threshold, mask=params.mask, 
-                                                             seed=params.random_seed, mask_rate=params.mask_rate)
+    preprocessing_pipeline = GraphSCI.preprocessing_pipeline(min_cells=params.min_cells, threshold=params.threshold,
+                                                             mask=params.mask, seed=params.random_seed,
+                                                             mask_rate=params.mask_rate)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=params.cache)
 
     device = "cpu" if params.gpu == -1 else f"cuda:{params.gpu}"
@@ -53,10 +54,10 @@ if __name__ == '__main__':
     train_idx = data.train_idx
     test_idx = data.test_idx
 
-    model = GraphSCI(num_cells=X.shape[0], num_genes=X.shape[1], dataset=params.dataset, 
-                     dropout=params.dropout, gpu=params.gpu, seed=params.random_seed)
-    model.fit(X, X_raw, g, train_idx, mask, params.le, params.la, params.ke, params.ka,
-              params.n_epochs, params.lr, params.weight_decay)
+    model = GraphSCI(num_cells=X.shape[0], num_genes=X.shape[1], dataset=params.dataset, dropout=params.dropout,
+                     gpu=params.gpu, seed=params.random_seed)
+    model.fit(X, X_raw, g, train_idx, mask, params.le, params.la, params.ke, params.ka, params.n_epochs, params.lr,
+              params.weight_decay)
     model.load_model()
     imputed_data = model.predict(X, X_raw, g, mask)
     score = model.score(X_raw, imputed_data, test_idx, mask, metric='RMSE')
@@ -64,7 +65,7 @@ if __name__ == '__main__':
 """To reproduce GraphSCI benchmarks, please refer to command lines belows:
 
 Mouse Brain:
-$ python graphsci.py --dataset mouse_brain_data 
+$ python graphsci.py --dataset mouse_brain_data
 
 Mouse Embryo:
 $ python graphsci.py --dataset mouse_embryo_data

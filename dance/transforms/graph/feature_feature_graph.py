@@ -1,8 +1,8 @@
 import dgl
 import dgl.nn as dglnn
 import torch
-from torch.nn import functional as F
 from scipy.sparse import coo_matrix
+from torch.nn import functional as F
 
 from dance.transforms.base import BaseTransform
 
@@ -29,12 +29,12 @@ class FeatureFeatureGraph(BaseTransform):
         g.ndata["feat"] = feat.T
         g.edata["weight"] = torch.ones(g.num_edges()).float()
 
-        # Normalize edges 
+        # Normalize edges
         if self.normalize_edges:
             norm = dglnn.EdgeWeightNorm()
             norm_edge_weight = norm(g, g.edata["weight"])
             g.edata["weight"] = norm_edge_weight.float()
-        
+
         data.data.uns[self.out] = g
 
         return data

@@ -8,7 +8,7 @@ from dance.typing import Optional
 class GeneHoldout(BaseTransform):
     """Progressively hold out genes for DeepImpute
 
-    Split genes into target batches. For every target gene in one batch, refer to the genes that are not in 
+    Split genes into target batches. For every target gene in one batch, refer to the genes that are not in
     this batch and select predictor genes with high covariance with target gene.
 
     Parameters
@@ -33,7 +33,7 @@ class GeneHoldout(BaseTransform):
         targets = []
         for _, batch in enumerate(batch_loader):
             targets.append(batch.int().numpy())
-        
+
         # Use covariance to select predictors
         covariance_matrix = np.cov(feat, rowvar=False)
         predictors = []

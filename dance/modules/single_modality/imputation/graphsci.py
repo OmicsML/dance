@@ -12,17 +12,18 @@ Iscience 24.5 (2021): 102393.
 import time
 from pathlib import Path
 
-import scanpy as sc
-import numpy as np
-import pandas as pd
 import dgl
 import dgl.nn as dglnn
+import numpy as np
+import pandas as pd
+import scanpy as sc
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from dance.modules.base import BaseRegressionMethod
-from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig, CellwiseMaskData, FilterGenesScanpy, FilterCellsScanpy
+from dance.transforms import (AnnDataTransform, CellwiseMaskData, Compose, FilterCellsScanpy, FilterGenesScanpy,
+                              SaveRaw, SetConfig)
 from dance.transforms.graph import FeatureFeatureGraph
 from dance.typing import Any, List, LogLevel, Optional, Tuple
 
@@ -39,6 +40,7 @@ def buildNetwork(layers, dropout=0., activation=nn.ReLU()):
 
 
 class DispActivation(nn.Module):
+
     def __init__(self):
         super().__init__()
 
@@ -47,17 +49,18 @@ class DispActivation(nn.Module):
 
 
 class MeanActivation(nn.Module):
+
     def __init__(self):
         super().__init__()
 
     def forward(self, input):
         return torch.clamp(torch.exp(input), 1e-5, 1e6)
-    
+
 
 class MultiplyLayer(nn.Module):
 
     def __init__(self, num_nodes, dropout=0., act=nn.ReLU(), bias=True):
-        super(MultiplyLayer, self).__init__()
+        super().__init__()
         self.num_nodes = num_nodes
         self.dropout = dropout
         self.act = act
@@ -66,7 +69,7 @@ class MultiplyLayer(nn.Module):
         self.bias_flag = bias
         if bias:
             self.bias = nn.Parameter(torch.zeros(num_nodes))
-    
+
     def forward(self, X, adj):
         z = self.fc_layer(adj)
         z = torch.matmul(self.dp(X), z)
@@ -91,7 +94,7 @@ class AEModel(nn.Module):
         pi = self.dec_pi(h)
         disp = self.dec_disp(h)
         mean = self.dec_mean(h)
-        x_exp = mean * torch.reshape(size_factors, (-1,1))
+        x_exp = mean * torch.reshape(size_factors, (-1, 1))
         return x_exp, mean, disp, pi
 
 
@@ -151,10 +154,11 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.aemodel = AEModel(in_feats=num_genes, dropout=dropout)
         self.model_params = list(self.aemodel.parameters()) + list(self.gnnmodel.parameters())
         self.to(self.device)
-    
+
     @staticmethod
-    def preprocessing_pipeline(min_cells: float = 0.1, threshold: float = 0.3, normalize_edges: bool = True, mask: bool = True, 
-                               distr: str = "exp", mask_rate: float = 0.1, seed: int = 1, log_level: LogLevel = "INFO"):
+    def preprocessing_pipeline(min_cells: float = 0.1, threshold: float = 0.3, normalize_edges: bool = True,
+                               mask: bool = True, distr: str = "exp", mask_rate: float = 0.1, seed: int = 1,
+                               log_level: LogLevel = "INFO"):
         transforms = [
             FilterGenesScanpy(min_cells=min_cells),
             FilterCellsScanpy(min_counts=1),
@@ -168,8 +172,8 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
                 SetConfig({
                     "feature_channel": [None, None, "FeatureFeatureGraph", "train_mask"],
                     "feature_channel_type": ["X", "raw_X", "uns", "layers"],
-                    "label_channel": [None, None], 
-                    "label_channel_type": ["X", "raw_X"], 
+                    "label_channel": [None, None],
+                    "label_channel_type": ["X", "raw_X"],
                 })
             ])
         else:
@@ -177,20 +181,21 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
                 SetConfig({
                     "feature_channel": [None, None, "FeatureFeatureGraph"],
                     "feature_channel_type": ["X", "raw_X", "uns"],
-                    "label_channel": [None, None], 
-                    "label_channel_type": ["X", "raw_X"], 
+                    "label_channel": [None, None],
+                    "label_channel_type": ["X", "raw_X"],
                 })
             ])
-            
+
         return Compose(*transforms, log_level=log_level)
-    
+
     def maskdata(self, X, mask):
         X_masked = torch.zeros_like(X).to(X.device)
         X_masked[mask] = X[mask]
 
         return X_masked
 
-    def fit(self, train_data, train_data_raw, graph, train_idx, mask=None, le=1, la=1, ke=1, ka=1, n_epochs=100, lr=1e-3, weight_decay=1e-5):
+    def fit(self, train_data, train_data_raw, graph, train_idx, mask=None, le=1, la=1, ke=1, ka=1, n_epochs=100,
+            lr=1e-3, weight_decay=1e-5):
         """ Data fitting function
         Parameters
         ----------
@@ -251,8 +256,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.optimizer = torch.optim.Adam(self.model_params, lr=lr, weight_decay=weight_decay)
 
         for epoch in range(n_epochs):
-            self.train(train_data_masked, train_data_raw, graph, 
-                       train_mask, valid_mask, le, la, ke, ka)
+            self.train(train_data_masked, train_data_raw, graph, train_mask, valid_mask, le, la, ke, ka)
             if not epoch:
                 min_valid_loss = self.valid_loss
             elif min_valid_loss >= self.valid_loss:
@@ -296,8 +300,9 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.optimizer.zero_grad()
         z_adj, z_adj_log_std, z_adj_mean = self.gnnmodel.forward(graph)
         z_exp, mean, disp, pi = self.aemodel.forward(train_data, z_adj, self.size_factors)
-        loss_adj, loss_exp, log_lik, kl, train_loss = self.get_loss(train_data_raw, self.adj, z_adj, z_adj_log_std, z_adj_mean,
-                                                                    z_exp, mean, disp, pi, train_mask, le, la, ke, ka)
+        loss_adj, loss_exp, log_lik, kl, train_loss = self.get_loss(train_data_raw, self.adj, z_adj, z_adj_log_std,
+                                                                    z_adj_mean, z_exp, mean, disp, pi, train_mask, le,
+                                                                    la, ke, ka)
         valid_loss, _, _ = self.evaluate(train_data, train_data_raw, graph, valid_mask, le, la, ke, ka)
         self.loss_adj = loss_adj.item()
         self.loss_exp = loss_exp.item()
@@ -341,14 +346,14 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
 
         if mask is None:
             mask = np.ones_like(features_raw.cpu()).astype(bool)
-        
+
         self.aemodel.eval()
         self.gnnmodel.eval()
         with torch.no_grad():
             z_adj, z_adj_log_std, z_adj_mean = self.gnnmodel.forward(graph)
             z_exp, mean, disp, pi = self.aemodel.forward(features, z_adj, self.size_factors)
-            _, _, _, _, loss = self.get_loss(features_raw, self.adj, z_adj, z_adj_log_std, z_adj_mean,
-                                             z_exp, mean, disp, pi, mask, le, la, ke, ka)
+            _, _, _, _, loss = self.get_loss(features_raw, self.adj, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean,
+                                             disp, pi, mask, le, la, ke, ka)
 
         return loss, z_adj, z_exp
 
@@ -361,7 +366,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         }
 
         torch.save(state, self.save_path / f"{self.dataset}.pt")
-    
+
     def predict(self, data, data_raw, graph, mask=None):
         """ Predict function
         Parameters
@@ -387,8 +392,8 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         _, _, z_exp = self.evaluate(data, data_raw, graph)
         return z_exp
 
-    def get_loss(self, batch, adj_orig, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean, 
-                 disp, pi, mask, le=1, la=1, ke=1, ka=1):
+    def get_loss(self, batch, adj_orig, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean, disp, pi, mask, le=1, la=1, ke=1,
+                 ka=1):
         """ Loss function for GraphSCI
         Parameters
         ----------
@@ -434,11 +439,12 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         """
 
         pos_weight = (adj_orig.shape[0]**2 - adj_orig.sum(axis=1)) / (adj_orig.sum(axis=1))
-        norm_adj = adj_orig.shape[0] * adj_orig.shape[0] / float((adj_orig.shape[0] * adj_orig.shape[0] - adj_orig.sum()) * 2)
+        norm_adj = adj_orig.shape[0] * adj_orig.shape[0] / float(
+            (adj_orig.shape[0] * adj_orig.shape[0] - adj_orig.sum()) * 2)
         loss_adj = la * norm_adj * torch.mean(F.cross_entropy(z_adj, adj_orig, pos_weight))
 
         eps = 1e-10
-        mean = mean * torch.reshape(self.size_factors, (-1,1))
+        mean = mean * torch.reshape(self.size_factors, (-1, 1))
         disp = torch.clamp(disp, max=1e6)
         t1 = torch.lgamma(disp + eps) + torch.lgamma(batch + 1) - torch.lgamma(batch + disp + eps)
         t2 = (disp + batch) * torch.log(1.0 + (mean / (disp + eps))) + (batch *
@@ -452,7 +458,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         loss_exp = le * torch.mean(loss_exp[mask])
         log_lik = loss_exp + loss_adj
 
-        kl_adj = ( 0.5 / batch.shape[0]) * torch.mean(
+        kl_adj = (0.5 / batch.shape[0]) * torch.mean(
             torch.sum(1 + 2 * z_adj_log_std - torch.square(z_adj_mean) - torch.square(torch.exp(z_adj_log_std)), 1))
         kl_exp = 0.5 / batch.shape[1] * torch.mean(F.mse_loss(z_exp, batch, reduction="none")[mask])
         kl = ka * kl_adj - ke * kl_exp
@@ -481,16 +487,16 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
 
         Returns
         -------
-        score : 
+        score :
             evaluation score
         """
         allowd_metrics = {"RMSE", "PCC"}
         if metric not in allowd_metrics:
             raise ValueError("scoring metric %r." % allowd_metrics)
-        
+
         true_target = true_expr[test_idx]
         imputed_target = imputed_expr[test_idx]
-        if mask is not None: # and metric == 'MSE':
+        if mask is not None:  # and metric == 'MSE':
             # true_target = true_target[~mask[test_idx]]
             # imputed_target = imputed_target[~mask[test_idx]]
             imputed_target[mask[test_idx]] = true_target[mask[test_idx]]

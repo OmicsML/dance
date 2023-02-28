@@ -200,10 +200,9 @@ pip install -e .
 | NN + TF             | Saver-X      | Transfer learning in single-cell transcriptomics improves data denoising and pattern discovery               | 2019 | P1      |
 
 | Model      | Evaluation Metric | Mouse Brain (current/reported) | Mouse Embryo (current/reported) | PBMC (current/reported) |
-| ---------- | ------------------ | ------------------------------ | ---------------------- | ------------------------------- |
-| DeepImpute | RMSE               | 0.87 / N/A                     | 1.20 / N/A                      | 2.30 / N/A                      |
-| GraphSCI   | RMSE               | 1.55 / N/A                     | 1.81 / N/A                      | 3.68 / N/A                      |
-
+| ---------- | ----------------- | ------------------------------ | ------------------------------- | ----------------------- |
+| DeepImpute | RMSE              | 0.87 / N/A                     | 1.20 / N/A                      | 2.30 / N/A              |
+| GraphSCI   | RMSE              | 1.55 / N/A                     | 1.81 / N/A                      | 3.68 / N/A              |
 
 #### 2）Cell Type Annotation
 

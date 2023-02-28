@@ -25,7 +25,8 @@ from sklearn.metrics import adjusted_rand_score
 from torch.utils.data import DataLoader, TensorDataset
 
 from dance.modules.base import BaseRegressionMethod
-from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig, CellwiseMaskData, GeneHoldout, FilterGenesScanpy, FilterCellsScanpy
+from dance.transforms import (AnnDataTransform, CellwiseMaskData, Compose, FilterCellsScanpy, FilterGenesScanpy,
+                              GeneHoldout, SaveRaw, SetConfig)
 from dance.typing import Any, List, LogLevel, Optional, Tuple
 
 
@@ -108,11 +109,11 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
             self.save_path.mkdir(parents=True)
         self.device = torch.device(f'cuda:{gpu}' if gpu != -1 and torch.cuda.is_available() else 'cpu')
         self.models = self.build([len(genes) for genes in predictors], [len(genes) for genes in targets], self.device)
-    
+
     @staticmethod
-    def preprocessing_pipeline(min_cells: float = 0.1, n_top: int = 5, sub_outputdim: int = 512, mask: bool = True, distr: str = "exp", 
-                               mask_rate: float = 0.1, seed: int = 1, log_level: LogLevel = "INFO"):
-        
+    def preprocessing_pipeline(min_cells: float = 0.1, n_top: int = 5, sub_outputdim: int = 512, mask: bool = True,
+                               distr: str = "exp", mask_rate: float = 0.1, seed: int = 1, log_level: LogLevel = "INFO"):
+
         transforms = [
             FilterGenesScanpy(min_cells=min_cells),
             FilterCellsScanpy(min_counts=1),
@@ -126,8 +127,8 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
                 SetConfig({
                     "feature_channel": [None, None, "targets", "predictors", "train_mask"],
                     "feature_channel_type": ["X", "raw_X", "uns", "uns", "layers"],
-                    "label_channel": [None, None], 
-                    "label_channel_type": ["X", "raw_X"], 
+                    "label_channel": [None, None],
+                    "label_channel_type": ["X", "raw_X"],
                 })
             ])
         else:
@@ -135,11 +136,11 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
                 SetConfig({
                     "feature_channel": [None, None, "targets", "predictors"],
                     "feature_channel_type": ["X", "raw_X", "uns", "uns"],
-                    "label_channel": [None, None], 
-                    "label_channel_type": ["X", "raw_X"], 
+                    "label_channel": [None, None],
+                    "label_channel_type": ["X", "raw_X"],
                 })
             ])
-            
+
         return Compose(*transforms, log_level=log_level)
 
     def wMSE(self, y_true, y_pred, binary=False):
@@ -233,26 +234,26 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
             Y_train = Y[train_idx]
             Y_valid = Y[valid_idx]
             valid_mask = np.ones_like(X_valid.cpu()).astype(bool)
-        
+
         X_train_list, X_valid_list, Y_train_list, Y_valid_list, valid_mask_list = [], [], [], [], []
         for j, inputgenes in enumerate(predictors):
-            X_train_list.append(X_train[:,inputgenes])
-            X_valid_list.append(X_valid[:,inputgenes])
-            Y_train_list.append(Y_train[:,targets[j]])
-            Y_valid_list.append(Y_valid[:,targets[j]])
-            valid_mask_list.append(valid_mask[:,targets[j]])
+            X_train_list.append(X_train[:, inputgenes])
+            X_valid_list.append(X_valid[:, inputgenes])
+            Y_train_list.append(Y_train[:, targets[j]])
+            Y_valid_list.append(Y_valid[:, targets[j]])
+            valid_mask_list.append(valid_mask[:, targets[j]])
 
         data = [TensorDataset(X_train_list[i], Y_train_list[i]) for i in range(len(predictors))]
         train_loaders = [DataLoader(data[i], batch_size=batch_size, shuffle=True) for i in range(len(data))]
         optimizers = [optim.Adam(model.parameters(), lr=lr) for model in self.models]
-        
+
         for i, model in enumerate(self.models):
-            optimizer = optimizers[i] 
+            optimizer = optimizers[i]
             train_loader = train_loaders[i]
             val_losses = []
             counter = 0
             for epoch in range(n_epochs):
-                model.train()    
+                model.train()
                 train_loss = 0
                 for batch_idx, (x_batch, y_batch) in enumerate(train_loader):
                     y_pred = model(x_batch.to(device))
@@ -265,12 +266,14 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
                 model.eval()
                 with torch.no_grad():
                     y_pred = model(torch.Tensor(X_valid_list[i]).to(device))
-                    val_loss = F.mse_loss(y_pred[valid_mask_list[i]], Y_valid_list[i].to(device)[valid_mask_list[i]]).item()
-                print("Model {:d}, epoch {:d}, train loss: {:f}, valid loss: {:f}.".format(i, epoch, train_loss, val_loss))
+                    val_loss = F.mse_loss(y_pred[valid_mask_list[i]],
+                                          Y_valid_list[i].to(device)[valid_mask_list[i]]).item()
+                print("Model {:d}, epoch {:d}, train loss: {:f}, valid loss: {:f}.".format(
+                    i, epoch, train_loss, val_loss))
 
                 val_losses.append(val_loss)
                 min_val = min(val_losses)
-                if val_loss == min_val: 
+                if val_loss == min_val:
                     self.save_model(model, optimizer, i)
                 else:
                     counter += 1
@@ -339,7 +342,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
             X_test, _, _ = self.maskdata(X_test, mask, test_idx)
         X_test_list = []
         for j, inputgenes in enumerate(predictors):
-            X_test_list.append(X_test[:,inputgenes])
+            X_test_list.append(X_test[:, inputgenes])
 
         # Make predictions using each subnetwork
         Y_pred_lst = []
@@ -351,13 +354,12 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         # Concatenate predicted values
         Y_pred = torch.cat(Y_pred_lst, 1)
         gene_order = np.concatenate(targets)
-        Y_pred = Y_pred[:,gene_order]
+        Y_pred = Y_pred[:, gene_order]
 
         # Convert back to counts
         Y_pred = torch.expm1(Y_pred)
 
         return Y_pred
-
 
     def score(self, true_expr, imputed_expr, test_idx, mask=None, metric="MSE"):
         """ Scoring function of model
@@ -374,16 +376,16 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
 
         Returns
         -------
-        score : 
+        score :
             evaluation score
         """
         allowd_metrics = {"RMSE", "PCC"}
         if metric not in allowd_metrics:
             raise ValueError("scoring metric %r." % allowd_metrics)
-        
+
         true_target = true_expr.to(self.device)
         imputed_target = imputed_expr.to(self.device)
-        if mask is not None: # and metric == 'MSE':
+        if mask is not None:  # and metric == 'MSE':
             # true_target = true_target[~mask[test_idx]]
             # imputed_target = imputed_target[~mask[test_idx]]
             imputed_target[mask[test_idx]] = true_target[mask[test_idx]]
@@ -392,4 +394,3 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         elif metric == 'PCC':
             corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
             return corr_cells
-

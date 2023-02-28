@@ -1,10 +1,11 @@
 import argparse
+
 import numpy as np
 import torch
 
-from dance.utils import set_seed
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.deepimpute import DeepImpute
+from dance.utils import set_seed
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -19,7 +20,7 @@ if __name__ == '__main__':
     parser.add_argument("--hidden_dim", type=int, default=256,
                         help="Hidden layer dimension - number of neurons in the dense layer.")
     parser.add_argument("--patience", type=int, default=20, help="Early stopping patience")
-    parser.add_argument("--min_cells", type=float, default=.05, 
+    parser.add_argument("--min_cells", type=float, default=.05,
                         help="Minimum proportion of cells expressed required for a gene to pass filtering")
     parser.add_argument("--data_dir", type=str, default='data', help='test directory')
     parser.add_argument("--dataset", default='mouse_brain_data', type=str, help="dataset id")
@@ -33,10 +34,11 @@ if __name__ == '__main__':
     set_seed(params.random_seed)
 
     dataloader = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset, train_size=params.train_size)
-    preprocessing_pipeline = DeepImpute.preprocessing_pipeline(min_cells=params.min_cells, n_top=params.n_top, sub_outputdim=params.sub_outputdim,
-                                                               mask=params.mask, seed=params.random_seed, mask_rate=params.mask_rate)
+    preprocessing_pipeline = DeepImpute.preprocessing_pipeline(min_cells=params.min_cells, n_top=params.n_top,
+                                                               sub_outputdim=params.sub_outputdim, mask=params.mask,
+                                                               seed=params.random_seed, mask_rate=params.mask_rate)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=params.cache)
-    
+
     if params.mask:
         X, X_raw, targets, predictors, mask = data.get_x(return_type="default")
     else:
@@ -47,8 +49,10 @@ if __name__ == '__main__':
     train_idx = data.train_idx
     test_idx = data.test_idx
 
-    model = DeepImpute(predictors, targets, params.dataset, params.sub_outputdim, params.hidden_dim, params.dropout, params.random_seed, params.gpu)
-    model.fit(X[train_idx], X[train_idx], train_idx, mask, params.batch_size, params.lr, params.n_epochs, params.patience)
+    model = DeepImpute(predictors, targets, params.dataset, params.sub_outputdim, params.hidden_dim, params.dropout,
+                       params.random_seed, params.gpu)
+    model.fit(X[train_idx], X[train_idx], train_idx, mask, params.batch_size, params.lr, params.n_epochs,
+              params.patience)
     imputed_data = model.predict(X[test_idx], test_idx, mask)
     score = model.score(X_raw[test_idx], imputed_data, test_idx, mask, metric='RMSE')
     print("RMSE: %.4f" % score)
