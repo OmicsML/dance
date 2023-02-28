@@ -1,15 +1,16 @@
 import argparse
 import pprint
+from typing import get_args
 
 from dance import logger
 from dance.datasets.singlemodality import ScDeepSortDataset
 from dance.modules.single_modality.cell_type_annotation.singlecellnet import SingleCellNet
-from dance.typing import LOGLEVELS
+from dance.typing import LogLevel
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
-    parser.add_argument("--log_level", type=str, default="INFO", choices=LOGLEVELS)
+    parser.add_argument("--log_level", type=str, default="INFO", choices=get_args(LogLevel))
     parser.add_argument(
         "--normalize", action="store_true", help="Whether to perform the normalization for SingleCellNet. "
         "Disabled by default since the scDeepSort data is already normalized")

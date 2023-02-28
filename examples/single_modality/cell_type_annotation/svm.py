@@ -1,17 +1,18 @@
 import argparse
 import pprint
+from typing import get_args
 
 from dance import logger
 from dance.datasets.singlemodality import ScDeepSortDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
-from dance.typing import LOGLEVELS
+from dance.typing import LogLevel
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--dense_dim", type=int, default=400, help="dim of PCA")
     parser.add_argument("--gpu", type=int, default=-1, help="GPU id, set to -1 for CPU")
-    parser.add_argument("--log_level", type=str, default="INFO", choices=LOGLEVELS)
+    parser.add_argument("--log_level", type=str, default="INFO", choices=get_args(LogLevel))
     parser.add_argument("--random_seed", type=int, default=10)
     parser.add_argument("--species", default="mouse")
     parser.add_argument("--test_dataset", nargs="+", default=[1759], type=int, help="list of dataset id")

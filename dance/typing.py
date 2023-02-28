@@ -5,12 +5,11 @@ import numpy as np
 from anndata import AnnData
 from torch import Tensor
 
-LOGLEVELS: List[str] = ["NOTSET", "DEBUG", "INFO", "WARNING", "ERROR"]
-
 CellIdxType = Union[int, str]
 FeatType = Literal["anndata", "default", "numpy", "torch"]
 NormMode = Literal["normalize", "standardize", "minmax", "l2"]
-LogLevel = Literal[LOGLEVELS]
+GeneSummaryMode = Literal["sum", "cv", "rv", "var"]
+LogLevel = Literal["NOTSET", "DEBUG", "INFO", "WARNING", "ERROR"]
 ReturnedFeat = Union[np.ndarray, Tensor, AnnData]
 
 __all__ = [
@@ -19,8 +18,8 @@ __all__ = [
     "CellIdxType",
     "Dict",
     "FeatType",
+    "GeneSummaryMode",
     "Iterator",
-    "LOGLEVELS",
     "List",
     "LogLevel",
     "Logger",
