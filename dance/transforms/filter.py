@@ -97,7 +97,7 @@ class FilterScanpy(BaseTransform):
 
         if not subset_ind.all():
             subset_func = getattr(data.data, self._subsetting_func_name)
-            self.logger.info(f"Subsetting cells ({~subset_ind.sum():,} removed) due to {self}")
+            self.logger.info(f"Subsetting {self._FILTER_TARGET} ({~subset_ind.sum():,} removed) due to {self}")
             subset_func(subset_ind)
 
 
