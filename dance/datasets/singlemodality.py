@@ -25,7 +25,7 @@ from dance.utils.preprocess import cell_label_to_df
 @register_dataset("scdeepsort")
 class ScDeepSortDataset(BaseDataset):
 
-    _DISPLAY_ATTRS = ("species", "tissue", "dataset", "test_dataset")
+    _DISPLAY_ATTRS = ("species", "tissue", "train_dataset", "test_dataset")
     ALL_URL_DICT: Dict[str, str] = {
         "train_human_cell_atlas":   "https://www.dropbox.com/s/1itq1pokplbqxhx?dl=1",
         "test_human_test_data":     "https://www.dropbox.com/s/gpxjnnvwyblv3xb?dl=1",
@@ -52,12 +52,12 @@ class ScDeepSortDataset(BaseDataset):
         "test_mouse_Kidney203_data.csv":        "https://www.dropbox.com/s/kmos1ceubumgmpj?dl=1",
     }  # yapf: disable
 
-    def __init__(self, full_download=False, dataset=None, test_dataset=None, species=None, tissue=None,
+    def __init__(self, full_download=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
                  train_dir="train", test_dir="test", map_path="map", data_dir="./"):
         super().__init__(data_dir, full_download)
 
         self.data_dir = data_dir
-        self.dataset = dataset
+        self.train_dataset = train_dataset
         self.test_dataset = test_dataset
         self.species = species
         self.tissue = tissue
@@ -138,7 +138,7 @@ class ScDeepSortDataset(BaseDataset):
     def _load_raw_data(self, ct_col: str = "Cell_type") -> Tuple[ad.AnnData, List[Set[str]], List[str], int]:
         species = self.species
         tissue = self.tissue
-        dataset_ids = self.dataset
+        train_dataset_ids = self.train_dataset
         test_dataset_ids = self.test_dataset
         data_dir = self.data_dir
         train_dir = osp.join(data_dir, self.train_dir)
@@ -146,7 +146,7 @@ class ScDeepSortDataset(BaseDataset):
         map_path = osp.join(data_dir, self.map_path, self.species)
 
         # Load raw data
-        train_feat_paths, train_label_paths = self._get_data_paths(train_dir, species, tissue, dataset_ids)
+        train_feat_paths, train_label_paths = self._get_data_paths(train_dir, species, tissue, train_dataset_ids)
         test_feat_paths, test_label_paths = self._get_data_paths(test_dir, species, tissue, test_dataset_ids)
         train_feat, test_feat = (self._load_dfs(paths, transpose=True) for paths in (train_feat_paths, test_feat_paths))
         train_label, test_label = (self._load_dfs(paths) for paths in (train_label_paths, test_label_paths))
