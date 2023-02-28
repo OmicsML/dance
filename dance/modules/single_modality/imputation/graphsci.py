@@ -12,159 +12,112 @@ Iscience 24.5 (2021): 102393.
 import time
 from pathlib import Path
 
+import dgl
+import dgl.nn as dglnn
 import numpy as np
 import pandas as pd
+import scanpy as sc
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from dance.modules.base import BaseRegressionMethod
+from dance.transforms import (AnnDataTransform, CellwiseMaskData, Compose, FilterCellsScanpy, FilterGenesScanpy,
+                              SaveRaw, SetConfig)
+from dance.transforms.graph import FeatureFeatureGraph
+from dance.typing import Any, List, LogLevel, Optional, Tuple
+
+
+def buildNetwork(layers, dropout=0., activation=nn.ReLU()):
+    net = []
+    for i in range(1, len(layers)):
+        net.append(nn.Dropout(dropout))
+        net.append(nn.Linear(layers[i - 1], layers[i]))
+        net.append(nn.BatchNorm1d(layers[i]))
+        net.append(activation)
+    net = nn.Sequential(*net)
+    return net
+
+
+class DispActivation(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, input):
+        return torch.clamp(F.softplus(input), 1e-4, 1e4)
+
+
+class MeanActivation(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, input):
+        return torch.clamp(torch.exp(input), 1e-5, 1e6)
+
+
+class MultiplyLayer(nn.Module):
+
+    def __init__(self, num_nodes, dropout=0., act=nn.ReLU(), bias=True):
+        super().__init__()
+        self.num_nodes = num_nodes
+        self.dropout = dropout
+        self.act = act
+        self.fc_layer = nn.Linear(num_nodes, num_nodes, bias=False)
+        self.dp = nn.Dropout(dropout)
+        self.bias_flag = bias
+        if bias:
+            self.bias = nn.Parameter(torch.zeros(num_nodes))
+
+    def forward(self, X, adj):
+        z = self.fc_layer(adj)
+        z = torch.matmul(self.dp(X), z)
+        if self.bias_flag:
+            z = z + self.bias
+        return self.act(z)
+
 
 class AEModel(nn.Module):
-    """GraphSCI Autoencoder class.
 
-    Parameters
-    ----------
-    in_feats : int
-        dimension of encoder input.
-    activation : str optional
-        activation function.
-    n_hidden1 : int
-        dimension of first hidden layer
-    n_hidden2 : int
-        dimension of second hidden layer
-
-    """
-
-    def __init__(self, in_feats, activation=None, n_hidden1=256, n_hidden2=256):
+    def __init__(self, in_feats, dropout=0., n_hidden1=256, n_hidden2=256):
         super().__init__()
-        if activation != None:
-            self.act1 = activation
-        else:
-            self.act1 = nn.Tanh()
-        self.act2 = nn.ReLU()
-        self.linear0 = nn.Linear(in_feats, in_feats)
-        self.linear1 = nn.Linear(in_feats, n_hidden1)
-        self.bn1 = nn.BatchNorm1d(n_hidden1)
-        self.linear2 = nn.Linear(n_hidden1, n_hidden2)
-        self.bn2 = nn.BatchNorm1d(n_hidden2)
-        self.linear3 = nn.Linear(n_hidden2, in_feats)
-        self.linear4 = nn.Linear(n_hidden2, in_feats)
-        self.linear5 = nn.Linear(n_hidden2, in_feats)
+        self.mul_layer = MultiplyLayer(in_feats, dropout)
+        self.enc = buildNetwork([in_feats, n_hidden1, n_hidden2], dropout)
+        self.dec_pi = buildNetwork([n_hidden2, in_feats], dropout, nn.Sigmoid())
+        self.dec_disp = buildNetwork([n_hidden2, in_feats], dropout, DispActivation())
+        self.dec_mean = buildNetwork([n_hidden2, in_feats], dropout, MeanActivation())
 
-    def forward(self, x, z_adj, size_factors):
-        """Forward propagation.
-
-        Parameters
-        ----------
-        x :
-            input gene expression features.
-        z_adj:
-            adjacency matrix, usually generated from gnn model.
-        size_factors:
-            cell specific size factors for transforming mean of ZINB to x_exp
-
-        Returns
-        -------
-        x_exp:
-            recreation of input gene expression.
-        pi :
-            data dropout probability from ZINB.
-        disp :
-            data dispersion from ZINB.
-
-        """
-        x = self.linear0(x)
-        x = torch.matmul(z_adj, x)
-        x = self.act1(x)
-        h = self.linear1(x)
-        h = self.bn1(h)
-        h = self.act2(h)
-        h = self.linear2(h)
-        h = self.bn2(h)
-        h = self.act2(h)
-        pi = torch.sigmoid(self.linear3(h))
-        disp = torch.clamp(F.softplus(self.linear4(h)), 1e-4, 1e4)
-        mean = torch.clamp(torch.exp(self.linear5(h)), 1e-5, 1e6)
-        size_diag = torch.diag(size_factors).to(mean.device)
-        x_exp = torch.matmul(size_diag, mean)
+    def forward(self, X, adj, size_factors):
+        h = self.mul_layer(X, adj)
+        h = self.enc(h)
+        pi = self.dec_pi(h)
+        disp = self.dec_disp(h)
+        mean = self.dec_mean(h)
+        x_exp = mean * torch.reshape(size_factors, (-1, 1))
         return x_exp, mean, disp, pi
 
 
 class GNNModel(nn.Module):
-    """GraphSCI graphical neural network class.
 
-    Parameters
-    ----------
-    in_feats : int
-        dimension of GNN module input.
-    out_feats : int
-        dimension of GNN module input.
-    n_hidden1 : int optional
-        dimension of first hidden layer
-    n_hidden2 : int optional
-        dimension of second hidden layer
-    activation : str optional
-        activation function.
-    dropout : float optional
-        probability of weight dropout for training.
-
-    """
-
-    def __init__(self, in_feats, out_feats, n_hidden1=256, n_hidden2=256, activation=None, dropout=0.0):
-        self.in_feats = in_feats
-        self.out_feats = out_feats
+    def __init__(self, in_feats, out_feats, dropout=0., n_hidden1=256, n_hidden2=256):
         super().__init__()
-        if dropout != 0:
-            self.dropout = nn.Dropout(p=dropout)
-        else:
-            self.dropout = None
-        self.linear1 = nn.Linear(in_feats, n_hidden1)
-        self.linear2 = nn.Linear(n_hidden1, n_hidden2)
-        self.linear3 = nn.Linear(n_hidden2, out_feats)
-        self.linear4 = nn.Linear(n_hidden2, out_feats)
-        if activation != None:
-            self.act = activation
-        else:
-            self.act = nn.ReLU()
+        self.dp = nn.Dropout(dropout)
+        self.conv1 = dglnn.GraphConv(in_feats, n_hidden1, activation=nn.Tanh())
+        self.conv2 = dglnn.GraphConv(n_hidden1, n_hidden2, activation=nn.ReLU())
+        self.dec_mean = dglnn.GraphConv(n_hidden2, out_feats)
+        self.dec_log_std = dglnn.GraphConv(n_hidden2, out_feats)
 
-    def forward(self, x, adj):
-        """Forward propagation.
-        Parameters
-        ----------
-        x :
-            input gene expression features.
-        adj:
-            gene graph adjacency matrix
-        Returns
-        -------
-        z_adj :
-            recreation of adjacency matrix
-        z_adj_std :
-            standard deviation parameter of normal distribution
-        z_adj_mean :
-            data dispersion from ZINB.
-        """
-        x = self.dropout(x)
-        x = self.linear1(x)
-        x = torch.matmul(adj, x)
-        h1 = self.act(x)
-        h1 = self.dropout(h1)
-        h1 = self.linear2(h1)
-        h1 = torch.matmul(adj, h1)
-        h2 = self.act(h1)
-        z_adj_mean = self.dropout(h2)
-        z_adj_mean = self.linear3(z_adj_mean)
-        z_adj_mean = torch.matmul(adj, z_adj_mean)
-        z_adj_mean = torch.matmul(z_adj_mean, z_adj_mean.t())
-        z_adj_std = self.dropout(h2)
-        z_adj_std = self.linear4(z_adj_std)
-        z_adj_std = torch.matmul(adj, z_adj_std)
-        z_adj_std = torch.matmul(z_adj_std, z_adj_std.t())
-        z_adj = z_adj_mean + torch.normal(z_adj_std, torch.ones(x.shape[0], x.shape[0]).to(z_adj_std.device))
-        return z_adj, z_adj_std, z_adj_mean
+    def forward(self, g):
+        h = self.conv1(g, self.dp(g.ndata["feat"]))
+        h = self.conv2(g, self.dp(h))
+        z_adj_mean = self.dec_mean(g, self.dp(h))
+        z_adj_log_std = self.dec_mean(g, self.dp(h))
+        z_adj = torch.normal(z_adj_mean, torch.exp(z_adj_log_std))
+        return z_adj, z_adj_log_std, z_adj_mean
 
 
-class GraphSCI:
+class GraphSCI(nn.Module, BaseRegressionMethod):
     """GraphSCI model, combination AE and GNN.
 
     Parameters
@@ -173,7 +126,7 @@ class GraphSCI:
         number of cells in expression data
     num_genes : int
         number of genes in expression data
-    train_dataset : str
+    dataset : str
         name of training dataset
     n_epochs : int optional
         number of training epochs
@@ -188,31 +141,61 @@ class GraphSCI:
 
     """
 
-    def __init__(self, num_cells, num_genes, train_dataset, n_epochs=100, lr=1e-3, weight_decay=1e-5, dropout=0.1,
-                 gpu=-1):
-        # self.params = params
-        self.postfix = time.strftime('%d_%m_%Y') + '_' + time.strftime('%H:%M:%S')
-        self.prj_path = Path(
-            __file__).parent.resolve().parent.resolve().parent.resolve().parent.resolve().parent.resolve()
-        self.train_dataset = train_dataset
-        self.save_path = self.prj_path / 'example' / 'single_modality' / 'imputation' / 'pretrained' / train_dataset / 'models'
+    def __init__(self, num_cells, num_genes, dataset, dropout=0.1, gpu=-1, seed=1):
+        super().__init__()
+        self.dataset = dataset
+        self.seed = seed
+        self.prj_path = Path(__file__).parent.resolve()
+        self.save_path = self.prj_path / "graphsci"
         if not self.save_path.exists():
             self.save_path.mkdir(parents=True)
         self.device = torch.device('cpu' if gpu == -1 else f'cuda:{gpu}')
-        self.dropout = dropout
-        self.n_epochs = n_epochs
-        self.lr = lr
-        self.weight_decay = weight_decay
-        self.num_cells = num_cells
-        self.num_genes = num_genes
-        self.gnnmodel = GNNModel(in_feats=self.num_cells, out_feats=self.num_cells,
-                                 dropout=self.dropout).to(self.device)
-        self.aemodel = AEModel(in_feats=self.num_cells, ).to(self.device)
+        self.gnnmodel = GNNModel(in_feats=num_cells, out_feats=num_genes, dropout=dropout)
+        self.aemodel = AEModel(in_feats=num_genes, dropout=dropout)
         self.model_params = list(self.aemodel.parameters()) + list(self.gnnmodel.parameters())
-        self.optimizer = torch.optim.Adam(self.model_params, lr=self.lr, weight_decay=self.weight_decay)
+        self.to(self.device)
 
-    def fit(self, train_data, train_data_raw, adj_train, train_size_factors, adj_norm_train, le=1, la=1, ke=1, ka=1):
-        min_train_loss, _train_loss, _epoch = 1000, 1000, 1
+    @staticmethod
+    def preprocessing_pipeline(min_cells: float = 0.1, threshold: float = 0.3, normalize_edges: bool = True,
+                               mask: bool = True, distr: str = "exp", mask_rate: float = 0.1, seed: int = 1,
+                               log_level: LogLevel = "INFO"):
+        transforms = [
+            FilterGenesScanpy(min_cells=min_cells),
+            FilterCellsScanpy(min_counts=1),
+            SaveRaw(),
+            AnnDataTransform(sc.pp.log1p),
+            FeatureFeatureGraph(threshold=threshold, normalize_edges=normalize_edges),
+        ]
+        if mask:
+            transforms.extend([
+                CellwiseMaskData(distr=distr, mask_rate=mask_rate, seed=seed),
+                SetConfig({
+                    "feature_channel": [None, None, "FeatureFeatureGraph", "train_mask"],
+                    "feature_channel_type": ["X", "raw_X", "uns", "layers"],
+                    "label_channel": [None, None],
+                    "label_channel_type": ["X", "raw_X"],
+                })
+            ])
+        else:
+            transforms.extend([
+                SetConfig({
+                    "feature_channel": [None, None, "FeatureFeatureGraph"],
+                    "feature_channel_type": ["X", "raw_X", "uns"],
+                    "label_channel": [None, None],
+                    "label_channel_type": ["X", "raw_X"],
+                })
+            ])
+
+        return Compose(*transforms, log_level=log_level)
+
+    def maskdata(self, X, mask):
+        X_masked = torch.zeros_like(X).to(X.device)
+        X_masked[mask] = X[mask]
+
+        return X_masked
+
+    def fit(self, train_data, train_data_raw, graph, train_idx, mask=None, le=1, la=1, ke=1, ka=1, n_epochs=100,
+            lr=1e-3, weight_decay=1e-5):
         """ Data fitting function
         Parameters
         ----------
@@ -239,21 +222,50 @@ class GraphSCI:
         -------
         None
         """
+        # Get weighted adjacency matrix
+        u, v = graph.edges()
+        self.adj = torch.zeros((graph.num_nodes(), graph.num_nodes())).to(self.device)
+        self.adj_norm = torch.zeros((graph.num_nodes(), graph.num_nodes())).to(self.device)
+        self.adj[u.long(), v.long()] = torch.ones(graph.num_edges()).float().to(self.device)
+        self.adj_norm[u.long(), v.long()] = graph.edata['weight']
 
-        for epoch in range(self.n_epochs):
-            total_loss = self.train(train_data, train_data_raw, adj_train, train_size_factors, adj_norm_train, le, la,
-                                    ke, ka)
-            train_loss, z_adj_train, z_exp_train = self.evaluate(train_data, train_data_raw, adj_norm_train, adj_train,
-                                                                 train_size_factors, le, la, ke, ka)
-            if min_train_loss <= train_loss:
-                min_train_loss = train_loss
-                _train_loss = train_loss
-                _epoch = epoch
+        rng = np.random.default_rng(self.seed)
+        # Specify train validation split
+        if mask is not None:
+            train_data_masked = self.maskdata(train_data, mask)
+            graph.ndata["feat"] = train_data_masked.float().T
+            train_mask = np.copy(mask)
+            test_idx = [i for i in range(len(train_data)) if i not in train_idx]
+            train_mask[test_idx] = False
+            valid_mask = ~mask
+            valid_mask[test_idx] = False
+        else:
+            train_data_masked = train_data
+            train_idx_permuted = rng.permutation(train_idx)
+            train_idx = train_idx_permuted[:int(len(train_idx_permuted) * 0.9)]
+            valid_idx = train_idx_permuted[int(len(train_idx_permuted) * 0.9):]
+            train_mask = np.zeros_like(train_data.cpu()).astype(bool)
+            train_mask[train_idx] = True
+            valid_mask = np.zeros_like(train_data.cpu()).astype(bool)
+            valid_mask[valid_idx] = True
+
+        self.train_data_masked = train_data_masked
+        n_counts = train_data_raw.sum(1)
+        self.size_factors = n_counts / torch.median(n_counts)
+        self.weight_decay = weight_decay
+        self.optimizer = torch.optim.Adam(self.model_params, lr=lr, weight_decay=weight_decay)
+
+        for epoch in range(n_epochs):
+            self.train(train_data_masked, train_data_raw, graph, train_mask, valid_mask, le, la, ke, ka)
+            if not epoch:
+                min_valid_loss = self.valid_loss
+            elif min_valid_loss >= self.valid_loss:
+                min_valid_loss = self.valid_loss
                 self.save_model()
-            print(f"[Epoch%d], train_loss %.6f, adj_loss %.6f, express_loss %.6f, kl loss %.6f" \
-                  % (epoch, self.loss, self.loss_adj, self.loss_exp, abs(self.kl)))
+            print(f"[Epoch%d], train_loss %.6f, adj_loss %.6f, express_loss %.6f, kl_loss %.6f, valid_loss %.6f" \
+                  % (epoch, self.train_loss, self.loss_adj, self.loss_exp, abs(self.kl), self.valid_loss))
 
-    def train(self, train_data, train_data_raw, adj_orig, size_factors, adj_norm, le=1, la=1, ke=1, ka=1):
+    def train(self, train_data, train_data_raw, graph, train_mask, valid_mask, le=1, la=1, ke=1, ka=1):
         """ Train function, gets loss and performs optimization step
         Parameters
         ----------
@@ -282,28 +294,29 @@ class GraphSCI:
         total_loss : float
             loss value of training loop
         """
+
         self.gnnmodel.train()
         self.aemodel.train()
         self.optimizer.zero_grad()
-        z_adj, z_adj_std, z_adj_mean = self.gnnmodel.forward(train_data, adj_norm)
-        z_exp, mean, disp, pi = self.aemodel.forward(train_data, z_adj, size_factors)
-        loss_adj, loss_exp, log_lik, kl, loss = self.get_loss(train_data_raw, adj_orig, z_adj, z_adj_std, z_adj_mean,
-                                                              z_exp, mean, disp, pi, size_factors, le, la, ke, ka)
+        z_adj, z_adj_log_std, z_adj_mean = self.gnnmodel.forward(graph)
+        z_exp, mean, disp, pi = self.aemodel.forward(train_data, z_adj, self.size_factors)
+        loss_adj, loss_exp, log_lik, kl, train_loss = self.get_loss(train_data_raw, self.adj, z_adj, z_adj_log_std,
+                                                                    z_adj_mean, z_exp, mean, disp, pi, train_mask, le,
+                                                                    la, ke, ka)
+        valid_loss, _, _ = self.evaluate(train_data, train_data_raw, graph, valid_mask, le, la, ke, ka)
         self.loss_adj = loss_adj.item()
         self.loss_exp = loss_exp.item()
         self.log_lik = log_lik.item()
         self.kl = kl.item()
-        self.loss = loss.item()
-        loss.backward()
-        nn.utils.clip_grad_norm_(self.model_params, 1e04)
+        self.train_loss = train_loss.item()
+        self.valid_loss = valid_loss.item()
+        train_loss.backward()
+        # nn.utils.clip_grad_norm_(self.model_params, 1e04)
         self.optimizer.step()
 
-        total_loss = self.loss
-        del loss_adj, loss_exp, log_lik, kl, loss
+        return train_loss.item()
 
-        return total_loss
-
-    def evaluate(self, features, features_raw, adj_norm, adj_orig, size_factors, le=1, la=1, ke=1, ka=1):
+    def evaluate(self, features, features_raw, graph, mask=None, le=1, la=1, ke=1, ka=1):
         """ Evaluate function, returns loss and reconstructions of expression and adjacency
         Parameters
         ----------
@@ -330,13 +343,18 @@ class GraphSCI:
         Returns
         -------
         """
+
+        if mask is None:
+            mask = np.ones_like(features_raw.cpu()).astype(bool)
+
         self.aemodel.eval()
         self.gnnmodel.eval()
         with torch.no_grad():
-            z_adj, z_adj_std, z_adj_mean = self.gnnmodel.forward(features, adj_norm)
-            z_exp, mean, disp, pi = self.aemodel.forward(features, z_adj, size_factors)
-            loss_adj, loss_exp, log_lik, kl, loss = self.get_loss(features_raw, adj_orig, z_adj, z_adj_std, z_adj_mean,
-                                                                  z_exp, mean, disp, pi, size_factors, le, la, ke, ka)
+            z_adj, z_adj_log_std, z_adj_mean = self.gnnmodel.forward(graph)
+            z_exp, mean, disp, pi = self.aemodel.forward(features, z_adj, self.size_factors)
+            _, _, _, _, loss = self.get_loss(features_raw, self.adj, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean,
+                                             disp, pi, mask, le, la, ke, ka)
+
         return loss, z_adj, z_exp
 
     def save_model(self):
@@ -347,9 +365,9 @@ class GraphSCI:
             'optimizer': self.optimizer.state_dict()
         }
 
-        torch.save(state, self.save_path / f"{self.train_dataset}.pt")
+        torch.save(state, self.save_path / f"{self.dataset}.pt")
 
-    def predict(self, data, data_raw, adj_norm, adj_orig, size_factors):
+    def predict(self, data, data_raw, graph, mask=None):
         """ Predict function
         Parameters
         ----------
@@ -369,10 +387,12 @@ class GraphSCI:
         z_exp :
             reconstructed expression data
         """
-        _, _, z_exp = self.evaluate(data, data_raw, adj_norm, adj_orig, size_factors)
+        if mask is not None:
+            data = self.maskdata(data, mask)
+        _, _, z_exp = self.evaluate(data, data_raw, graph)
         return z_exp
 
-    def get_loss(self, batch, adj_orig, z_adj, z_adj_std, z_adj_mean, z_exp, mean, disp, pi, sf, le=1, la=1, ke=1,
+    def get_loss(self, batch, adj_orig, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean, disp, pi, mask, le=1, la=1, ke=1,
                  ka=1):
         """ Loss function for GraphSCI
         Parameters
@@ -419,10 +439,13 @@ class GraphSCI:
         """
 
         pos_weight = (adj_orig.shape[0]**2 - adj_orig.sum(axis=1)) / (adj_orig.sum(axis=1))
-        norm_adj = (adj_orig.shape[0]**2) / (adj_orig.shape[0]**2 - adj_orig.sum() * 2)
-        loss_adj = la * torch.mean(F.cross_entropy(z_adj, adj_orig)) / adj_orig.shape[0]
+        norm_adj = adj_orig.shape[0] * adj_orig.shape[0] / float(
+            (adj_orig.shape[0] * adj_orig.shape[0] - adj_orig.sum()) * 2)
+        loss_adj = la * norm_adj * torch.mean(F.cross_entropy(z_adj, adj_orig, pos_weight))
 
-        eps = 1e-7
+        eps = 1e-10
+        mean = mean * torch.reshape(self.size_factors, (-1, 1))
+        disp = torch.clamp(disp, max=1e6)
         t1 = torch.lgamma(disp + eps) + torch.lgamma(batch + 1) - torch.lgamma(batch + disp + eps)
         t2 = (disp + batch) * torch.log(1.0 + (mean / (disp + eps))) + (batch *
                                                                         (torch.log(disp + eps) - torch.log(mean + eps)))
@@ -432,25 +455,24 @@ class GraphSCI:
         zero_nb = torch.pow(disp / (disp + mean + eps), disp)
         zero_case = -torch.log(pi + ((1 - pi) * zero_nb) + eps)
         loss_exp = torch.where(torch.lt(batch, 1e-8), zero_case, nb_loss)
-        loss_exp = le * torch.mean(loss_exp)
+        loss_exp = le * torch.mean(loss_exp[mask])
         log_lik = loss_exp + loss_adj
 
-        kl_adj = (self.weight_decay * 0.5 / batch.shape[1]**2) * torch.mean(
-            torch.sum(1 + 2 * torch.log(abs(z_adj_std)) - torch.square(z_adj_mean) - torch.square(z_adj_std), 1))
-        # kl_exp = (0.5 / batch.shape[0]) * torch.mean(F.mse_loss(z_exp, batch))
-        kl_exp = 0.5 * torch.mean(F.mse_loss(z_exp, batch))
+        kl_adj = (0.5 / batch.shape[0]) * torch.mean(
+            torch.sum(1 + 2 * z_adj_log_std - torch.square(z_adj_mean) - torch.square(torch.exp(z_adj_log_std)), 1))
+        kl_exp = 0.5 / batch.shape[1] * torch.mean(F.mse_loss(z_exp, batch, reduction="none")[mask])
         kl = ka * kl_adj - ke * kl_exp
         loss = log_lik - kl
         return loss_adj, loss_exp, log_lik, kl, loss
 
     def load_model(self):
         """Load function."""
-        model_path = self.prj_path / 'pretrained' / self.train_dataset / 'models' / f'{self.train_dataset}.pt'
+        model_path = self.save_path / f"{self.dataset}.pt"
         state = torch.load(model_path, map_location=self.device)
         self.aemodel.load_state_dict(state['aemodel'])
         self.gnnmodel.load_state_dict(state['gnnmodel'])
 
-    def score(self, true_expr, imputed_expr, test_idx, metric="MSE"):
+    def score(self, true_expr, imputed_expr, test_idx, mask=None, metric="MSE"):
         """ Scoring function of model
         Parameters
         ----------
@@ -459,26 +481,27 @@ class GraphSCI:
         imputed_expr :
             Imputed expression values
         test_idx :
-            index of testing genes
-        metric : str optional
-            Choice of scoring metric - 'MSE' or 'ARI'
+            index of testing cells
+        metric :
+            Choice of scoring metric - 'RMSE' or 'ARI'
 
         Returns
         -------
-        mse_error : float
-            mean square error
+        score :
+            evaluation score
         """
-        allowd_metrics = {"MSE", "PCC"}
-        true_target = true_expr[test_idx, ]
-        imputed_target = imputed_expr[test_idx, ]
+        allowd_metrics = {"RMSE", "PCC"}
         if metric not in allowd_metrics:
             raise ValueError("scoring metric %r." % allowd_metrics)
 
-        if (metric == 'MSE'):
-            mse_cells = pd.DataFrame(((true_target.cpu() - imputed_target.cpu())**2).mean(axis=0)).dropna()
-            mse_genes = pd.DataFrame(((true_target.cpu() - imputed_target.cpu())**2).mean(axis=1)).dropna()
-            return mse_cells, mse_genes
-        elif (metric == 'PCC'):
-            # cor_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
-            cor_cells = np.corrcoef(true_expr.cpu(), imputed_expr.cpu())
-            return cor_cells
+        true_target = true_expr[test_idx]
+        imputed_target = imputed_expr[test_idx]
+        if mask is not None:  # and metric == 'MSE':
+            # true_target = true_target[~mask[test_idx]]
+            # imputed_target = imputed_target[~mask[test_idx]]
+            imputed_target[mask[test_idx]] = true_target[mask[test_idx]]
+        if metric == 'RMSE':
+            return np.sqrt(F.mse_loss(true_target, imputed_target).item())
+        elif metric == 'PCC':
+            corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
+            return corr_cells

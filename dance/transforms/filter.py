@@ -1,11 +1,202 @@
+import anndata as ad
 import numpy as np
 import pandas as pd
-from anndata import AnnData
+import scanpy as sc
 
 from dance import logger as default_logger
 from dance.exceptions import DevError
 from dance.transforms.base import BaseTransform
 from dance.typing import Dict, List, Literal, Logger, Optional, Tuple, Union
+
+
+def get_count(count_or_ratio: Optional[Union[float, int]], total: int) -> Optional[int]:
+    """Get the count from a count or ratio.
+
+    Parameters
+    ----------
+    count_or_ratio
+        Either a count or a ratio. If None, then return None.
+    total
+        Total number.
+
+    """
+    if count_or_ratio is None:
+        return None
+    elif isinstance(count_or_ratio, float):
+        if count_or_ratio > 1.:
+            raise ValueError(f"{count_or_ratio=} is greater than 1. Ratio cannot be greater than 1.")
+        return int(count_or_ratio * total)
+    elif isinstance(count_or_ratio, int):
+        if count_or_ratio > total:
+            raise ValueError(f"{count_or_ratio=} is greater than {total=}")
+        return count_or_ratio
+    else:
+        raise TypeError(f"count_or_ratio must be either float or int, got {type(count_or_ratio)}")
+
+
+class FilterScanpy(BaseTransform):
+    """Scanpy filtering transformation with additional options."""
+
+    _FILTER_TARGET: Optional[Literal["cells", "genes"]] = None
+
+    def __init__(
+        self,
+        min_counts: Optional[int] = None,
+        min_genes_or_cells: Optional[Union[float, int]] = None,
+        max_counts: Optional[int] = None,
+        max_genes_or_cells: Optional[Union[float, int]] = None,
+        split_name: Optional[str] = None,
+        channel: Optional[str] = None,
+        channel_type: Optional[str] = "X",
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        self.min_counts = min_counts
+        self.min_genes_or_cells = min_genes_or_cells
+        self.max_counts = max_counts
+        self.max_genes_or_cells = max_genes_or_cells
+
+        self.split_name = split_name
+        self.channel = channel
+        self.channel_type = channel_type
+
+        if self._FILTER_TARGET is None:
+            raise NotImplementedError("Use FilterCellsScanpy or FilterGenesScanpy instead")
+        elif self._FILTER_TARGET == "cells":
+            self._subsetting_func_name = "_inplace_subset_obs"
+            self._filter_func = sc.pp.filter_cells
+            self.min_genes = min_genes_or_cells
+            self.max_genes = max_genes_or_cells
+        elif self._FILTER_TARGET == "genes":
+            self._subsetting_func_name = "_inplace_subset_var"
+            self._filter_func = sc.pp.filter_genes
+            self.min_cells = min_genes_or_cells
+            self.max_cells = max_genes_or_cells
+        else:
+            raise ValueError(f"Unknown filter target {self._FILTER_TARGET!r}")
+
+    def __call__(self, data):
+        x = data.get_feature(return_type="default", split_name=self.split_name, channel=self.channel,
+                             channel_type=self.channel_type)
+        total_cells, total_features = x.shape
+
+        min_counts = self.min_counts
+        max_counts = self.max_counts
+
+        # Determine whether we are dealing with cells or genes
+        basis = total_cells if self._FILTER_TARGET == "cells" else total_features
+        other_name = "cells" if self._FILTER_TARGET == "genes" else "genes"
+        opts = {
+            "min_counts": min_counts,
+            "max_counts": max_counts,
+            f"min_{other_name}": get_count(self.min_genes_or_cells, basis),
+            f"max_{other_name}": get_count(self.max_genes_or_cells, basis),
+        }
+        subset_ind, _ = self._filter_func(x, inplace=False, **opts)
+
+        if not subset_ind.all():
+            subset_func = getattr(data.data, self._subsetting_func_name)
+            self.logger.info(f"Subsetting {self._FILTER_TARGET} ({~subset_ind.sum():,} removed) due to {self}")
+            subset_func(subset_ind)
+
+
+class FilterCellsScanpy(FilterScanpy):
+    """Scanpy filtering cell transformation with additional options.
+
+    Allow passing gene counts as ratio
+
+    Parameters
+    ----------
+    min_counts
+        Minimum number of counts required for a cell to be kept.
+    min_genes
+        Minimum number (or ratio) of genes required for a cell to be kept.
+    max_counts
+        Maximum number of counts required for a cell to be kept.
+    max_genes
+        Maximum number (or ratio) of genes required for a cell to be kept.
+    split_name
+        Which split to be used for filtering.
+    channel
+        Channel to be used for filtering.
+    channel_type
+        Channel type to be used for filtering.
+
+    """
+
+    _DISPLAY_ATTRS = ("min_counts", "min_genes", "max_counts", "max_genes", "split_name")
+    _FILTER_TARGET = "cells"
+
+    def __init__(
+        self,
+        min_counts: Optional[int] = None,
+        min_genes: Optional[Union[float, int]] = None,
+        max_counts: Optional[int] = None,
+        max_genes: Optional[Union[float, int]] = None,
+        split_name: Optional[str] = None,
+        channel: Optional[str] = None,
+        channel_type: Optional[str] = "X",
+        **kwargs,
+    ):
+        super().__init__(
+            min_counts=min_counts,
+            min_genes_or_cells=min_genes,
+            max_counts=max_counts,
+            max_genes_or_cells=max_genes,
+            split_name=split_name,
+            channel=channel,
+            channel_type=channel_type,
+            **kwargs,
+        )
+
+
+class FilterGenesScanpy(FilterScanpy):
+    """Scanpy filtering gene transformation with additional options.
+
+    Parameters
+    ----------
+    min_counts
+        Minimum number of counts required for a gene to be kept.
+    min_cells
+        Minimum number (or ratio) of cells required for a gene to be kept.
+    max_counts
+        Maximum number of counts required for a gene to be kept.
+    max_cells
+        Maximum number (or ratio) of cells required for a gene to be kept.
+    split_name
+        Which split to be used for filtering.
+    channel
+        Channel to be used for filtering.
+    channel_type
+        Channel type to be used for filtering.
+
+    """
+
+    _DISPLAY_ATTRS = ("min_counts", "min_cells", "max_counts", "max_cells", "split_name")
+    _FILTER_TARGET = "genes"
+
+    def __init__(
+        self,
+        min_counts: Optional[int] = None,
+        min_cells: Optional[Union[float, int]] = None,
+        max_counts: Optional[int] = None,
+        max_cells: Optional[Union[float, int]] = None,
+        split_name: Optional[str] = None,
+        channel: Optional[str] = None,
+        channel_type: Optional[str] = "X",
+        **kwargs,
+    ):
+        super().__init__(
+            min_counts=min_counts,
+            min_genes_or_cells=min_cells,
+            max_counts=max_counts,
+            max_genes_or_cells=max_cells,
+            split_name=split_name,
+            channel=channel,
+            channel_type=channel_type,
+            **kwargs,
+        )
 
 
 class FilterGenesCommon(BaseTransform):
@@ -37,14 +228,14 @@ class FilterGenesCommon(BaseTransform):
         self.batch_key = batch_key
         self.split_keys = split_keys
 
-    def _select_by_splits(self, data) -> Dict[Union[str, int], AnnData]:
+    def _select_by_splits(self, data) -> Dict[Union[str, int], ad.AnnData]:
         sliced_data_dict = {}
         for split_key in self.split_keys:
             idx = data.get_split_idx(split_key, error_on_miss=True)
             sliced_data_dict[split_key] = data.data[idx]
         return sliced_data_dict
 
-    def _select_by_batch(self, data) -> Dict[Union[str, int], AnnData]:
+    def _select_by_batch(self, data) -> Dict[Union[str, int], ad.AnnData]:
         sliced_data_dict = {}
         for batch_id, group in data.data.obs.groupby(self.batch_key):
             sliced_data_dict[batch_id] = data.data[group.index]
