@@ -16,9 +16,9 @@ if __name__ == '__main__':
     parser.add_argument("--train_size", type=float, default=0.9, help="proportion of testing set")
     parser.add_argument("--le", type=float, default=1, help="parameter of expression loss")
     parser.add_argument("--la", type=float, default=1e-9, help="parameter of adjacency loss")
-    parser.add_argument("--ke", type=float, default=1, help="parameter of KL divergence of expression")
+    parser.add_argument("--ke", type=float, default=1e2, help="parameter of KL divergence of expression")
     parser.add_argument("--ka", type=float, default=1, help="parameter of KL divergence of adjacency")
-    parser.add_argument("--n_epochs", type=int, default=1000, help="number of training epochs")
+    parser.add_argument("--n_epochs", type=int, default=300, help="number of training epochs")
     parser.add_argument("--data_dir", type=str, default='data', help='test directory')
     parser.add_argument("--save_dir", type=str, default='result', help='save directory')
     parser.add_argument("--filetype", type=str, default='h5', choices=['csv', 'gz', 'h5'],
@@ -28,10 +28,8 @@ if __name__ == '__main__':
     parser.add_argument("--threshold", type=float, default=.3,
                         help="Lower bound for correlation between genes to determine edges in graph.")
     parser.add_argument("--mask_rate", type=float, default=.1, help="Masking rate.")
-    parser.add_argument("--min_cells", type=float, default=.2, 
+    parser.add_argument("--min_cells", type=float, default=.05, 
                         help="Minimum proportion of cells expressed required for a gene to pass filtering")
-    parser.add_argument("--min_genes", type=float, default=.05, 
-                        help="Minimum proportion of genes expressed required for a cell to pass filtering")
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--mask", type=bool, default=True, help="Mask data for validation.")
     params = parser.parse_args()
@@ -39,7 +37,7 @@ if __name__ == '__main__':
     set_seed(params.random_seed)
 
     dataloader = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset, train_size=params.train_size)
-    preprocessing_pipeline = GraphSCI.preprocessing_pipeline(min_cells=params.min_cells, min_genes=params.min_genes, threshold=params.threshold, mask=params.mask, 
+    preprocessing_pipeline = GraphSCI.preprocessing_pipeline(min_cells=params.min_cells, threshold=params.threshold, mask=params.mask, 
                                                              seed=params.random_seed, mask_rate=params.mask_rate)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=params.cache)
 
@@ -61,13 +59,17 @@ if __name__ == '__main__':
               params.n_epochs, params.lr, params.weight_decay)
     model.load_model()
     imputed_data = model.predict(X, X_raw, g, mask)
-    score = model.score(X_raw, imputed_data, test_idx, mask, metric='MSE')
-    print("MSE: %.4f" % score)
+    score = model.score(X_raw, imputed_data, test_idx, mask, metric='RMSE')
+    print("RMSE: %.4f" % score)
 """To reproduce GraphSCI benchmarks, please refer to command lines belows:
 
 Mouse Brain:
-$ python graphsci.py --dataset mouse_brain_data
+$ python graphsci.py --dataset mouse_brain_data 
 
 Mouse Embryo:
 $ python graphsci.py --dataset mouse_embryo_data
+
+PBMC
+$ python graphsci.py --dataset pbmc_data
+
 """

@@ -29,8 +29,6 @@ from dance.transforms import AnnDataTransform, Compose, SaveRaw, SetConfig, Cell
 from dance.typing import Any, List, LogLevel, Optional, Tuple
 
 
-import ipdb
-
 class NeuralNetworkModel(nn.Module):
     """ model class.
         Parameters
@@ -112,12 +110,12 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         self.models = self.build([len(genes) for genes in predictors], [len(genes) for genes in targets], self.device)
     
     @staticmethod
-    def preprocessing_pipeline(min_cells: float = 0.1, min_genes: float = 0.1, n_top: int = 5, sub_outputdim: int = 512, mask: bool = True, distr: str = "exp", 
+    def preprocessing_pipeline(min_cells: float = 0.1, n_top: int = 5, sub_outputdim: int = 512, mask: bool = True, distr: str = "exp", 
                                mask_rate: float = 0.1, seed: int = 1, log_level: LogLevel = "INFO"):
         
         transforms = [
-            AnnDataTransform(FilterGenesScanpy, min_cells=min_cells),
-            AnnDataTransform(FilterCellsScanpy, min_genes=min_genes),
+            FilterGenesScanpy(min_cells=min_cells),
+            FilterCellsScanpy(min_counts=1),
             SaveRaw(),
             AnnDataTransform(sc.pp.log1p),
             GeneHoldout(n_top=n_top, batch_size=sub_outputdim),
@@ -372,14 +370,14 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         test_idx :
             index of testing cells
         metric :
-            Choice of scoring metric - 'MSE' or 'ARI'
+            Choice of scoring metric - 'RMSE' or 'ARI'
 
         Returns
         -------
         score : 
             evaluation score
         """
-        allowd_metrics = {"MSE", "PCC"}
+        allowd_metrics = {"RMSE", "PCC"}
         if metric not in allowd_metrics:
             raise ValueError("scoring metric %r." % allowd_metrics)
         
@@ -389,8 +387,8 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
             # true_target = true_target[~mask[test_idx]]
             # imputed_target = imputed_target[~mask[test_idx]]
             imputed_target[mask[test_idx]] = true_target[mask[test_idx]]
-        if metric == 'MSE':
-            return F.mse_loss(true_target, imputed_target).item()
+        if metric == 'RMSE':
+            return np.sqrt(F.mse_loss(true_target, imputed_target).item())
         elif metric == 'PCC':
             corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
             return corr_cells

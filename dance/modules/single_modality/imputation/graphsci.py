@@ -153,12 +153,11 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.to(self.device)
     
     @staticmethod
-    def preprocessing_pipeline(min_cells: float = 0.1, min_genes: float = 0.1, threshold: float = 0.3, normalize_edges: bool = True, mask: bool = True, 
+    def preprocessing_pipeline(min_cells: float = 0.1, threshold: float = 0.3, normalize_edges: bool = True, mask: bool = True, 
                                distr: str = "exp", mask_rate: float = 0.1, seed: int = 1, log_level: LogLevel = "INFO"):
-        # TODO add n_counts
         transforms = [
-            AnnDataTransform(FilterGenesScanpy, min_cells=min_cells),
-            AnnDataTransform(FilterCellsScanpy, min_genes=min_genes),
+            FilterGenesScanpy(min_cells=min_cells),
+            FilterCellsScanpy(min_counts=1),
             SaveRaw(),
             AnnDataTransform(sc.pp.log1p),
             FeatureFeatureGraph(threshold=threshold, normalize_edges=normalize_edges),
@@ -478,14 +477,14 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         test_idx :
             index of testing cells
         metric :
-            Choice of scoring metric - 'MSE' or 'ARI'
+            Choice of scoring metric - 'RMSE' or 'ARI'
 
         Returns
         -------
         score : 
             evaluation score
         """
-        allowd_metrics = {"MSE", "PCC"}
+        allowd_metrics = {"RMSE", "PCC"}
         if metric not in allowd_metrics:
             raise ValueError("scoring metric %r." % allowd_metrics)
         
@@ -495,8 +494,8 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             # true_target = true_target[~mask[test_idx]]
             # imputed_target = imputed_target[~mask[test_idx]]
             imputed_target[mask[test_idx]] = true_target[mask[test_idx]]
-        if metric == 'MSE':
-            return F.mse_loss(true_target, imputed_target).item()
+        if metric == 'RMSE':
+            return np.sqrt(F.mse_loss(true_target, imputed_target).item())
         elif metric == 'PCC':
             corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
             return corr_cells
