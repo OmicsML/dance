@@ -202,10 +202,8 @@ pip install -e .
 | Model      | Evaluation Metric | Mouse Brain (current/reported) | Mouse Embryo (current/reported) | PBMC (current/reported) |
 | ---------- | ----------------- | ------------------------------ | ------------------------------- |
 | DeepImpute | RMSE               | 0.87 / N/A                     | 1.20 / N/A                      | 2.30 / N/A                      |
-<!-- | ScGNN      | MSE               | 0.47 / N/A                     | 1.10 / N/A                      | -->
 | GraphSCI   | MSE               | 1.55 / N/A                     | 1.81 / N/A                      | 3.68 / N/A                      |
 
-Note: the data split modality of DeepImpute is different from ScGNN and GraphSCI, so the results are not comparable.
 
 #### 2）Cell Type Annotation
 
