@@ -395,7 +395,7 @@ class ImputationDataset(BaseDataset):
             adata.var_names = counts.columns.tolist()
             adata.obs['time'] = time.to_numpy()
         else:
-            data_path = f'{self.data_dir}/train/{dataset}/{self.DATASET_TO_FILE[dataset]}'
+            data_path = osp.join(self.data_dir, "train", "dataset", self.DATASET_TO_FILE[dataset])
             if not os.path.exists(data_path):
                 raise NotImplementedError
 
