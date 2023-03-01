@@ -10,10 +10,8 @@ from sklearn.cluster import AffinityPropagation, KMeans
 from sklearn.preprocessing import minmax_scale
 from torch import nn, optim
 from torch.nn import functional as F
-from torch.nn.modules.module import Module
-from torch.nn.parameter import Parameter
 from torch.utils.data import DataLoader, Dataset
-from torch_geometric.nn import GAT
+from torch_geometric.nn import GAT, GCNConv
 
 from dance import logger
 from dance.typing import Any, Optional
@@ -323,14 +321,15 @@ class Feature_AE(nn.Module):
 
 class Graph_AE(nn.Module):
 
-    def __init__(self, dim, embedding_size, gat_dropout=0, multi_heads=2, gat_hid_embed=64):
+    def __init__(self, dim, embedding_size, gat_dropout=0, multi_heads=2, gat_hid_embed=64, use_GAT=True):
         super().__init__()
+        self.use_GAT = use_GAT
         self.gat = GAT(in_channels=dim, hidden_channels=gat_hid_embed, num_layers=2, out_channels=embedding_size,
                        dropout=gat_dropout)
 
-        self.gc1 = GraphConvolution(dim, 32, 0, act=nn.ReLU())
-        self.gc2 = GraphConvolution(32, embedding_size, 0, act=nn.Identity())
-        self.gc3 = GraphConvolution(32, embedding_size, 0, act=nn.Identity())
+        self.gc1 = GCNConv(dim, 32)
+        self.gc2 = GCNConv(32, embedding_size)
+        self.gc3 = GCNConv(32, embedding_size)
 
         self.decode = InnerProductDecoder(0, act=nn.Identity())
 
@@ -338,8 +337,8 @@ class Graph_AE(nn.Module):
         return self.gat(in_nodes_features, edge_index)
 
     def encode_gae(self, x, adj):
-        hidden1 = self.gc1(x, adj)
-        return self.gc2(hidden1, adj), self.gc3(hidden1, adj)
+        hidden1 = self.gc1.forward(x, adj).relu()
+        return self.gc2.forward(hidden1, adj), self.gc3.forward(hidden1, adj)
 
     def reparameterize(self, mu, logvar):
         if self.training:
@@ -349,11 +348,11 @@ class Graph_AE(nn.Module):
         else:
             return mu
 
-    def forward(self, in_nodes_features, edge_index, encode=False, use_GAT=True):
+    def forward(self, in_nodes_features, edge_index, encode=False):
         # [0] just extracts the node_features part of the data (index 1 contains the edge_index)
         gae_info = None
 
-        if use_GAT:
+        if self.use_GAT:
             out_nodes_features = self.encode_gat(in_nodes_features, edge_index)
         else:
             gae_info = self.encode_gae(in_nodes_features, edge_index)
@@ -381,83 +380,6 @@ class Cluster_AE(Feature_AE):
 
     def __init__(self, dim):
         super().__init__(dim)
-
-
-class GCNModelVAE(nn.Module):
-
-    def __init__(self, input_feat_dim, hidden_dim1, hidden_dim2, dropout):
-        super().__init__()
-        self.gc1 = GraphConvolution(input_feat_dim, hidden_dim1, dropout, act=F.relu)
-        self.gc2 = GraphConvolution(hidden_dim1, hidden_dim2, dropout, act=lambda x: x)
-        self.gc3 = GraphConvolution(hidden_dim1, hidden_dim2, dropout, act=lambda x: x)
-        self.dc = InnerProductDecoder(dropout, act=lambda x: x)
-
-    def encode(self, x, adj):
-        hidden1 = self.gc1(x, adj)
-        return self.gc2(hidden1, adj), self.gc3(hidden1, adj)
-
-    def reparameterize(self, mu, logvar):
-        if self.training:
-            std = torch.exp(logvar)
-            eps = torch.randn_like(std)
-            return eps.mul(std).add_(mu)
-        else:
-            return mu
-
-    def forward(self, x, adj):
-        mu, logvar = self.encode(x, adj)
-        z = self.reparameterize(mu, logvar)
-        return z, mu, logvar
-
-
-class GCNModelAE(nn.Module):
-
-    def __init__(self, input_feat_dim, hidden_dim1, hidden_dim2, dropout):
-        super().__init__()
-        self.gc1 = GraphConvolution(input_feat_dim, hidden_dim1, dropout, act=F.relu)
-        self.gc2 = GraphConvolution(hidden_dim1, hidden_dim2, dropout, act=lambda x: x)
-        self.dc = InnerProductDecoder(dropout, act=lambda x: x)
-
-    def encode(self, x, adj):
-        hidden1 = self.gc1(x, adj)
-        return self.gc2(hidden1, adj)
-
-    def forward(self, x, adj, encode=False):
-        z = self.encode(x, adj)
-        return z, z, None
-
-
-class GraphConvolution(Module):
-    """
-    Simple GCN layer, similar to https://arxiv.org/abs/1609.02907
-    """
-
-    def __init__(self, in_features, out_features, dropout=0., act=F.relu):
-        super().__init__()
-        self.in_features = in_features
-        self.out_features = out_features
-        # TODO
-        self.dropout = dropout
-        # self.dropout = Parameter(torch.FloatTensor(dropout))
-        self.act = act
-        # self.weight = Parameter(torch.DoubleTensor(in_features, out_features))
-        self.weight = Parameter(torch.FloatTensor(in_features, out_features))
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        torch.nn.init.xavier_uniform_(self.weight)
-
-    def forward(self, input, adj):
-        input = F.dropout(input, self.dropout, self.training)
-        support = torch.mm(input, self.weight)
-        output = torch.spmm(adj, support)
-        output = self.act(output)
-        return output
-
-    def __repr__(self):
-        return self.__class__.__name__ + ' (' \
-            + str(self.in_features) + ' -> ' \
-            + str(self.out_features) + ')'
 
 
 def edgeList2edgeIndex(edgeList):
@@ -506,33 +428,26 @@ def graph_AE_handler(X_embed, CCC_graph, args, param):
         zDiscret = X_embed
 
     adj, adj_train, edgeList = feature2adj(X_embed, neighborhood_factor, retain_weights)
-    adj_norm = preprocess_graph(adj_train)
     adj_label = (adj_train + sp.eye(adj_train.shape[0])).toarray()
 
-    # Prepare matrices
-    if use_GAT:
-        edgeIndex = edgeList2edgeIndex(edgeList)
-        edgeIndex = np.array(edgeIndex).T
-        CCC_graph_edge_index = torch.from_numpy(edgeIndex).type(torch.LongTensor).to(param["device"])
-    else:
-        CCC_graph_edge_index = adj_norm.to(param["device"])
-
-        pos_weight = float(adj_train.shape[0] * adj_train.shape[0] - adj_train.sum()) / adj_train.sum()
-        norm = adj_train.shape[0] * adj_train.shape[0] / \
-            float((adj_train.shape[0] * adj_train.shape[0] - adj_train.sum()) * 2)
+    norm = (adj_train.shape[0] * adj_train.shape[0] / float(
+        (adj_train.shape[0] * adj_train.shape[0] - adj_train.sum()) * 2))
+    pos_weight = float(adj_train.shape[0] * adj_train.shape[0] - adj_train.sum()) / adj_train.sum()
+    edgeIndex = np.array(edgeList2edgeIndex(edgeList)).T
+    CCC_graph_edge_index = torch.from_numpy(edgeIndex).type(torch.LongTensor).to(param["device"])
 
     X_embed_normalized = torch.from_numpy(zDiscret).type(torch.FloatTensor).to(param["device"])
     CCC_graph = torch.from_numpy(adj_label).type(torch.FloatTensor).to(param["device"])
 
-    graph_AE = Graph_AE(X_embed.shape[1], embedding_size, gat_dropout, args.gat_multi_heads,
-                        args.gat_hid_embed).to(param["device"])
+    graph_AE = Graph_AE(X_embed.shape[1], embedding_size, gat_dropout, args.gat_multi_heads, args.gat_hid_embed,
+                        use_GAT=use_GAT).to(param["device"])
     optimizer = optim.Adam(graph_AE.parameters(), lr=learning_rate)
 
     for epoch in range(total_epoch):
         graph_AE.train()
         optimizer.zero_grad()
 
-        embed, gae_info, recon_graph = graph_AE(X_embed_normalized, CCC_graph_edge_index, use_GAT=use_GAT)
+        embed, gae_info, recon_graph = graph_AE(X_embed_normalized, CCC_graph_edge_index)
 
         if use_GAT:
             loss = loss_function(preds=recon_graph, labels=CCC_graph)
