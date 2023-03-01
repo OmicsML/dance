@@ -8,8 +8,10 @@ import scanpy as sc
 import torch
 
 import dance.utils.metrics as metrics
+from scipy.sparse import csr_matrix
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.scmogcn import ScMoGCNWrapper
+from dance.data import Data
 from dance.transforms.graph_construct import basic_feature_graph_propagation, construct_basic_feature_graph
 from dance.utils import set_seed
 
@@ -41,6 +43,15 @@ if __name__ == '__main__':
         .load_metadata().load_sol().preprocess('aux', args.pretrained_folder).normalize()
     X_train, Y_train, X_test = dataset.preprocessed_data['X_train'], dataset.preprocessed_data['Y_train'], \
                                        dataset.preprocessed_data['X_test']
+    Y_test = dataset.test_sol.obs['cell_type'].to_numpy()
+    ### 下面这段是我写过最脑溢血的代码
+    adata = ad.AnnData(np.concatenate([X_train, X_test], 0))
+    adata.obs['cell_type'] = np.concatenate([Y_train[0].numpy(), Y_test], 0)
+    adata.obs['batch_label'] = np.concatenate([Y_train[1].numpy(), np.zeros_like(Y_test)], 0)
+    adata.obs['phase_labels'] = np.concatenate([Y_train[2].numpy(), np.zeros_like(Y_test)], 0)
+    adata.obs['phase_scores'] = np.concatenate([Y_train[3].numpy(), np.zeros_like(Y_test)], 0)
+    train_size = X_train.shape[0]
+    data = Data(adata, train_size=train_size)
 
     g = construct_basic_feature_graph(X_train, X_test, device=device)
     X = basic_feature_graph_propagation(g, layers=args.layers, device=device)
@@ -53,10 +64,9 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         test_id = np.arange(X[0].shape[0])
-        labels = dataset.test_sol.obs['cell_type'].to_numpy()
         embeds = model.predict(X, test_id).cpu().numpy()
         print(embeds)
-        print(model.score(X, test_id, labels, 'clustering'))
+        print(model.score(X, test_id, Y_test, 'clustering'))
 
     # mod1_obs = dataset.modalities[0].obs
     # mod1_uns = dataset.modalities[0].uns

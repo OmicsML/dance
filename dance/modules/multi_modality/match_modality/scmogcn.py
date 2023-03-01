@@ -42,8 +42,8 @@ class ScMoGCNWrapper:
     args : argparse.Namespace
         A Namespace object that contains arguments of ScMoGCN. For details of parameters in parser args, please refer
         to link (parser help document).
-    layers : list[int]
-        Specification of dimensions of hidden layers.
+    layers : List[List[int, float]]
+        Specification of hidden layers.
     temp : int optional
         Temperature for softmax, by default to be 1.
 
@@ -93,15 +93,15 @@ class ScMoGCNWrapper:
         else:
             self.model.load_state_dict(torch.load(path))
 
-    def fit(self, dataset, feats, labels):
+    def fit(self, feats, labels, train_size):
         """fit function for training.
 
         Parameters
         ----------
-        dataset : dance.datasets.multimodality.ModalityMatchingNIPSDataset
-            Dataset for mdality matching.
-        feats : torch.Tensor
+        feats : List[torch.Tensor]
             Modality features.
+        labels : List[torch.Tensor]
+            Matching labels.
 
         Returns
         -------
@@ -129,11 +129,11 @@ class ScMoGCNWrapper:
 
         BATCH_SIZE = 4096
 
-        idx = torch.randperm(dataset.sparse_features()[0].shape[0])
+        idx = torch.randperm(train_size)
         train_idx = idx[:-BATCH_SIZE]
         val_idx = idx[-BATCH_SIZE:]
-        test_idx = np.arange(dataset.sparse_features()[0].shape[0],
-                             dataset.sparse_features()[0].shape[0] + dataset.sparse_features()[2].shape[0])
+        test_idx = np.arange(train_size,
+                             feats[0].shape[0])
         train_dataset = SimpleIndexDataset(train_idx)
         train_loader = DataLoader(
             dataset=train_dataset,
@@ -204,19 +204,21 @@ class ScMoGCNWrapper:
         self.wt = weight_record
         return self
 
-    def predict(self, inputs, idx, enhance=False, dataset=None):
+    def predict(self, inputs, idx, enhance=False, batch1=None, batch2=None):
         """Predict function to get latent representation of data.
 
         Parameters
         ----------
-        inputs : list[torch.Tensor]
+        inputs : List[torch.Tensor]
             Multimodality features.
         idx : Iterable[int]
             Cell indices for prediction.
         enhance : bool optional
             Whether enable enhancement matching (e.g. bipartite matching), by default to be False.
-        dataset : dance.datasets.multimodality.ModalityMatchingNIPSDataset optional
-            Dataset for modality matching, needed when enhance parameter set to be True.
+        batch1 : torch.Tensor optional
+            Batch labels of modality 1, by default to be None.
+        batch2 : torch.Tensor optional
+            Batch labels of modality 2, by default to be None.
 
         Returns
         -------
@@ -237,24 +239,26 @@ class ScMoGCNWrapper:
 
             else:
                 emb1, emb2 = self.model.encode(m1, m2)
-                pred = batch_separated_bipartite_matching(dataset, emb1, emb2)
+                pred = batch_separated_bipartite_matching(batch1, batch2, emb1, emb2)
                 return pred
 
-    def score(self, inputs, idx, labels, enhance=False, dataset=None):
+    def score(self, inputs, idx, labels, enhance=False, batch1=None, batch2=None):
         """Score function to get score of prediction.
 
         Parameters
         ----------
-        inputs : list[torch.Tensor]
+        inputs : List[torch.Tensor]
             Multimodality features.
         idx : Iterable[int]
             Index of testing cells for scoring.
-        labels : torch.Tensor
+        labels : List[torch.Tensor]
             Ground truth label of cell matching matrix
         enhance : bool optional
             Whether enable enhancement matching (e.g. bipartite matching), by default to be False.
-        dataset : dance.datasets.multimodality.ModalityMatchingNIPSDataset optional
-            Dataset for modality matching, needed when enhance parameter set to be True.
+        batch1 : torch.Tensor optional
+            Batch labels of modality 1, by default to be None.
+        batch2 : torch.Tensor optional
+            Batch labels of modality 2, by default to be None.
 
         Returns
         -------
@@ -265,7 +269,7 @@ class ScMoGCNWrapper:
 
         if not enhance:
 
-            logits = self.predict(inputs, idx, enhance, dataset)
+            logits = self.predict(inputs, idx, enhance, batch1, batch2)
             forward_accuracy = (torch.argmax(logits, dim=1) == labels[1]).float().mean().item()
             backward_accuracy = (torch.argmax(logits, dim=0) == labels[0]).float().mean().item()
 
@@ -273,7 +277,7 @@ class ScMoGCNWrapper:
 
         else:
 
-            matrix = self.predict(inputs, idx, enhance, dataset)
+            matrix = self.predict(inputs, idx, enhance, batch1, batch2)
             score = (matrix * labels.numpy()).sum() / labels.shape[0]
 
             return score

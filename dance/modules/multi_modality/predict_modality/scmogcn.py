@@ -417,7 +417,7 @@ class ScMoGCN(nn.Module):
         super().__init__()
         self.args = args
         self.opw = args.only_pathway
-        self.npw = args.no_pathway
+        self.npw = not args.pathway
         self.nrc = args.no_readout_concatenate
 
         hid_feats = args.hidden_size

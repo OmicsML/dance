@@ -4,7 +4,8 @@ from sklearn.decomposition import PCA
 from dance.transforms.base import BaseTransform
 from dance.typing import Optional
 from dance.utils.matrix import normalize
-
+import torch
+import pandas as pd
 
 class WeightedFeaturePCA(BaseTransform):
     """Compute the weighted gene PCA as cell features.
@@ -75,4 +76,64 @@ class CellPCA(BaseTransform):
 
         data.data.obsm[self.out] = cell_feat
 
+        return data
+
+class BatchFeature(BaseTransform):
+    """Generate statistical features for each batch in the input data, and assign batch
+    features to each cell. This function returns batch features for each cell in all the
+    input sub-datasets.
+
+    Parameters
+    ----------
+    None.
+
+    """
+
+    def __init__(self, n_components: int = 400, *, channel: Optional[str] = None, mod: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+
+        self.n_components = n_components
+        self.channel = channel
+        self.mod = mod
+
+    def __call__(self, data):
+
+        cells = []
+        columns = [
+            'cell_mean', 'cell_std', 'nonzero_25%', 'nonzero_50%', 'nonzero_75%', 'nonzero_max', 'nonzero_count',
+            'nonzero_mean', 'nonzero_std', 'batch'
+        ]
+
+        ad_input = data.data['mod1']
+        bcl = list(ad_input.obs['batch'])
+        print(set(bcl))
+        for i, cell in enumerate(ad_input.X):
+            cell = cell.toarray()
+            nz = cell[np.nonzero(cell)]
+            if len(nz) == 0:
+                raise ValueError('Error: one cell contains all zero features.')
+            cells.append([
+                cell.mean(),
+                cell.std(),
+                np.percentile(nz, 25),
+                np.percentile(nz, 50),
+                np.percentile(nz, 75),
+                cell.max(),
+                len(nz) / 1000,
+                nz.mean(),
+                nz.std(), bcl[i]
+            ])
+
+        cell_features = pd.DataFrame(cells, columns=columns)
+        batch_source = cell_features.groupby('batch').mean().reset_index()
+        batch_list = batch_source.batch.tolist()
+        batch_source = batch_source.drop('batch', axis=1).to_numpy().tolist()
+        b2i = dict(zip(batch_list, range(len(batch_list))))
+        batch_features = []
+
+        for b in ad_input.obs['batch']:
+            batch_features.append(batch_source[b2i[b]])
+
+        batch_features = np.array(batch_features).astype(float)
+        data.data['mod1'].obsm['batch_features'] = batch_features
         return data

@@ -269,6 +269,10 @@ class ModalityMatchingDataset(MultiModalityDataset):
                     'mod1_test': m1_test,
                     'mod2_test': m2_test
                 }
+                self.modalities[0].obsm['X_pca'] = m1_train
+                self.modalities[1].obsm['X_pca'] = m2_train
+                self.modalities[2].obsm['X_pca'] = m1_test
+                self.modalities[3].obsm['X_pca'] = m2_test
                 pickle.dump(self.preprocessed_features, open(pkl_path, 'wb'))
 
             else:
@@ -493,5 +497,4 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
         self.std = np.concatenate([self.preprocessed_data['X_train'], self.preprocessed_data['X_test']], 0).std()
         self.preprocessed_data['X_train'] = (self.preprocessed_data['X_train'] - self.mean) / self.std
         self.preprocessed_data['X_test'] = (self.preprocessed_data['X_test'] - self.mean) / self.std
-
         return self

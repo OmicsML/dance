@@ -595,7 +595,9 @@ class MMVAE(nn.Module):
 
         """
         self.eval()
-
+        self.eval()
+        X = X.float().to(self.params.device)
+        Y = Y.float().to(self.params.device)
         if metric == 'loss':
             b_loss = 0
             idx = np.arange(X.shape[0])
@@ -623,7 +625,6 @@ class MMVAE(nn.Module):
         else:
             print('Warning: undefined evaluation metric.')
 
-    #TODO: predict function need to be modified to remove label input
     def predict(self, X):
         """Score function to get score of prediction.
 
@@ -639,6 +640,7 @@ class MMVAE(nn.Module):
 
         """
         self.eval()
+        X = X.float().to(self.params.device)
         idx = np.arange(X.shape[0])
         dataset = SimpleIndexDataset(idx)
         data_loader = DataLoader(

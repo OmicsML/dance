@@ -6,7 +6,7 @@ from anndata import AnnData
 from torch import Tensor
 
 CellIdxType = Union[int, str]
-FeatType = Literal["anndata", "default", "numpy", "torch"]
+FeatType = Literal["anndata", "default", "numpy", "torch", "sparse"]
 NormMode = Literal["normalize", "standardize", "minmax", "l2"]
 GeneSummaryMode = Literal["sum", "cv", "rv", "var"]
 LogLevel = Literal["NOTSET", "DEBUG", "INFO", "WARNING", "ERROR"]

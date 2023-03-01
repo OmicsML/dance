@@ -10,7 +10,6 @@ import torch
 import dance.utils.metrics as metrics
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.jae import JAEWrapper
-from dance.transforms.graph_construct import basic_feature_graph_propagation, construct_basic_feature_graph
 from dance.utils import set_seed
 
 if __name__ == '__main__':
@@ -39,6 +38,7 @@ if __name__ == '__main__':
         .load_metadata().load_sol().preprocess('aux', args.pretrained_folder).normalize()
     X_train, Y_train, X_test = dataset.preprocessed_data['X_train'], dataset.preprocessed_data['Y_train'], \
                                        dataset.preprocessed_data['X_test']
+
 
     model = JAEWrapper(args, dataset)
     model.fit(X_train, Y_train)

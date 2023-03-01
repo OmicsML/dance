@@ -397,7 +397,7 @@ class BaseData(ABC):
         split_name
             Name of the split to retrieve. If not set, return all.
         return_type
-            How should the features be returned. **numpy**: return as a numpy array; **torch**: return as a torch
+            How should the features be returned. **sparse**: return as a sparse matrix; **numpy**: return as a numpy array; **torch**: return as a torch
             tensor; **anndata**: return as an anndata object.
         channel
             Return a particular channel as features. If ``channel_type`` is ``X`` or ``raw_X``, then return ``.X`` or
@@ -422,8 +422,13 @@ class BaseData(ABC):
                 raise ValueError(f"split_name is not supported when return_type is 'default', got {split_name=!r}")
             return feature
 
+        if return_type == 'sparse':
+            if isinstance(feature, np.ndarray):
+                feature = sp.csr_matrix(feature)
+            elif not isinstance(feature, sp.spmatrix):
+                raise ValueError(f"Feature is not sparse, got {type(feature)}")
         # Transform features to numpy array
-        if hasattr(feature, "toarray"):  # convert sparse array to dense numpy array
+        elif hasattr(feature, "toarray"):  # convert sparse array to dense numpy array
             feature = feature.toarray()
         elif hasattr(feature, "to_numpy"):  # convert dataframe to numpy array
             feature = feature.to_numpy()
@@ -439,9 +444,8 @@ class BaseData(ABC):
         # Convert to other data types if needed
         if return_type == "torch":
             feature = torch.from_numpy(feature)
-        elif return_type != "numpy":
+        elif return_type not in ["numpy", "sparse"]:
             raise ValueError(f"Unknown return_type {return_type!r}")
-
         return feature
 
     def append(

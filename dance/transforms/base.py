@@ -2,7 +2,7 @@ import hashlib
 from abc import ABC, abstractmethod
 
 from dance import logger
-from dance.data.base import BaseData
+from dance.data.base import BaseData, Data
 from dance.typing import LogLevel, Optional, Tuple
 
 
@@ -43,5 +43,5 @@ class BaseTransform(ABC):
         return f"{self.name}({display_attrs_str})"
 
     @abstractmethod
-    def __call__(self, data: BaseData) -> BaseData:
+    def __call__(self, data: Data) -> Data:
         raise NotImplementedError
