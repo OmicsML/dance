@@ -626,53 +626,12 @@ def feature2adj(X_embed, graph_construction, neighborhood_factor, retain_weights
         adj_return = nx.adjacency_matrix(nx.from_dict_of_lists(graphdict))
 
     adj = adj_return.copy()
-    # adj_orig = adj
-
-    # Clear diagonal elements (no self loop)
-    # adj_orig = adj_orig - sp.dia_matrix((adj_orig.diagonal()[np.newaxis, :], [0]), shape=adj_orig.shape)
-    # adj_orig.eliminate_zeros()
-
-    # build test set with 10% positive links, edge lists only contain single direction of edge!
-    # adj_train, train_edges, val_edges, val_edges_false, test_edges, test_edges_false = gae_util.mask_test_edges(adj)
 
     # Clear diagonal elements (no self loop)
     adj_train = adj - sp.dia_matrix((adj.diagonal()[np.newaxis, :], [0]), shape=adj.shape)
     adj_train.eliminate_zeros()
 
     return adj_return, adj_train, edgeList
-
-
-def test_calculateKNNgraphDistanceMatrixStatsSingleThread(featureMatrix, distanceType="euclidean", k=10, verbose=True):
-    r"""
-    Thresholdgraph: KNN Graph with stats one-std based methods, SingleThread version
-    """
-
-    edgeList = []
-
-    for i in np.arange(featureMatrix.shape[0]):
-        print(f"\ni:{i}") if verbose else None
-        tmp = featureMatrix[i, :].reshape(1, -1)
-        print(f"tmp:{tmp}") if verbose else None
-        distMat = distance.cdist(tmp, featureMatrix, distanceType)
-        print(f"distMat:{distMat}") if verbose else None
-        res = distMat.argsort()[:k + 1]
-        print(f"res:{res}") if verbose else None
-        tmpdist = distMat[0, res[0][1:k + 1]]
-        print(f"tmpdist:{tmpdist}") if verbose else None
-        boundary = np.mean(tmpdist) + np.std(tmpdist)
-        print(f"boundary:{boundary}") if verbose else None
-        for j in np.arange(1, k + 1):
-            # TODO: check, only exclude large outliners
-            # if (distMat[0,res[0][j]]<=mean+std) and (distMat[0,res[0][j]]>=mean-std):
-            # if distMat[0,res[0][j]]<=boundary:
-            #     weight = 1.0-distMat[0,res[0][j]]/boundary#1.0
-            # else:
-            #     weight = 0.0
-            weight = -distMat[0, res[0][j]]
-            print(f"    {j} weight:{weight}") if verbose else None
-            edgeList.append((i, res[0][j], weight))
-
-    return edgeList
 
 
 def v0_calculateKNNgraphDistanceMatrixStatsSingleThread(featureMatrix, distanceType="euclidean", k=10):
@@ -859,16 +818,6 @@ def normalizer(X, base, axis=0):
 
     return normalized
 
-
-# import auto_encoders.model as model
-# import auto_encoders.train as train
-# import numpy as np
-# import torch
-# import util
-# from torch import optim
-# from torch.utils.data import DataLoader
-
-# from dance import logger
 
 # ---------------------------
 # args.cluster_AE_batch_size
