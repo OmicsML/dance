@@ -88,8 +88,6 @@ class ScGNN2:
 def clustering_handler(edgeList, args, param):
     logger.info("Start Clustering")
 
-    np.random.seed(args.seed)
-
     louvain_only = args.clustering_louvain_only
     # use_flexible_k = args.clustering_use_flexible_k
     # all_ct_count = metrics.metrics["cluster_count"]
@@ -474,7 +472,6 @@ def edgeList2edgeIndex(edgeList):
 # args.graph_AE_concat_prev_embed
 # args.graph_AE_normalize_embed
 # args.graph_AE_GAT_dropout
-# args.graph_AE_graph_construction
 # args.graph_AE_neighborhood_factor
 # args.graph_AE_retain_weights
 
@@ -492,7 +489,6 @@ def graph_AE_handler(X_embed, CCC_graph, args, param):
     concat_prev_embed = args.graph_AE_concat_prev_embed
     normalize_embed = args.graph_AE_normalize_embed
     gat_dropout = args.graph_AE_GAT_dropout
-    graph_construction = args.graph_AE_graph_construction
     neighborhood_factor = args.graph_AE_neighborhood_factor
     retain_weights = args.graph_AE_retain_weights
 
@@ -508,7 +504,7 @@ def graph_AE_handler(X_embed, CCC_graph, args, param):
     else:
         zDiscret = X_embed
 
-    adj, adj_train, edgeList = feature2adj(X_embed, graph_construction, neighborhood_factor, retain_weights)
+    adj, adj_train, edgeList = feature2adj(X_embed, neighborhood_factor, retain_weights)
     adj_norm = preprocess_graph(adj_train)
     adj_label = (adj_train + sp.eye(adj_train.shape[0])).toarray()
 
@@ -604,18 +600,13 @@ def convert_adj_to_edge_index(adjacency_matrix):
     return np.asarray(edge_index).transpose()  # change shape from (N,2) -> (2,N)
 
 
-def feature2adj(X_embed, graph_construction, neighborhood_factor, retain_weights):
+def feature2adj(X_embed, neighborhood_factor, retain_weights):
     neighborhood_size_temp = neighborhood_factor if neighborhood_factor > 1 else round(X_embed.shape[0] *
                                                                                        neighborhood_factor)
     neighborhood_size = neighborhood_size_temp - \
         1 if neighborhood_size_temp == X_embed.shape[0] else neighborhood_size_temp
 
-    if graph_construction == "v0":
-        edgeList = v0_calculateKNNgraphDistanceMatrixStatsSingleThread(X_embed)
-    elif graph_construction == "v1":
-        edgeList = v1_calculateKNNgraphDistanceMatrixStatsSingleThread(X_embed, k=neighborhood_size)
-    elif graph_construction == "v2":
-        edgeList = v2_calculateKNNgraphDistanceMatrixStatsSingleThread(X_embed, k=neighborhood_size)
+    edgeList = calculateKNNgraphDistanceMatrixStatsSingleThread(X_embed, k=neighborhood_size)
 
     if retain_weights:
         G = nx.DiGraph()
@@ -634,58 +625,7 @@ def feature2adj(X_embed, graph_construction, neighborhood_factor, retain_weights
     return adj_return, adj_train, edgeList
 
 
-def v0_calculateKNNgraphDistanceMatrixStatsSingleThread(featureMatrix, distanceType="euclidean", k=10):
-    r"""
-    Thresholdgraph: KNN Graph with stats one-std based methods, SingleThread version
-    """
-
-    edgeList = []
-
-    for i in np.arange(featureMatrix.shape[0]):
-        tmp = featureMatrix[i, :].reshape(1, -1)
-        distMat = distance.cdist(tmp, featureMatrix, distanceType)
-        res = distMat.argsort()[:k + 1]
-        tmpdist = distMat[0, res[0][1:k + 1]]
-        boundary = np.mean(tmpdist) + np.std(tmpdist)
-        for j in np.arange(1, k + 1):
-            # TODO: check, only exclude large outliners
-            # if (distMat[0,res[0][j]]<=mean+std) and (distMat[0,res[0][j]]>=mean-std):
-            if distMat[0, res[0][j]] <= boundary:
-                weight = 1.0
-            else:
-                weight = 0.0
-            edgeList.append((i, res[0][j], weight))
-
-    return edgeList
-
-
-def v1_calculateKNNgraphDistanceMatrixStatsSingleThread(featureMatrix, distanceType="euclidean", k=10):
-    r"""
-    Thresholdgraph: KNN Graph with stats one-std based methods, SingleThread version
-    """
-    edgeList = []
-    distance_dist = []
-
-    for i in np.arange(featureMatrix.shape[0]):
-        tmp = featureMatrix[i, :].reshape(1, -1)
-        distMat = distance.cdist(tmp, featureMatrix, distanceType)
-        res = distMat.argsort()[:k + 1]
-        tmpdist = distMat[0, res[0][1:k + 1]]
-        boundary = np.mean(tmpdist) + np.std(tmpdist)
-        for j in np.arange(1, k + 1):
-            # TODO: check, only exclude large outliners
-            # if (distMat[0,res[0][j]]<=mean+std) and (distMat[0,res[0][j]]>=mean-std):
-            if distMat[0, res[0][j]] <= boundary:
-                weight = 1.0 - distMat[0, res[0][j]] / boundary
-                distance_dist.append(weight)
-            else:
-                weight = 0.0
-            edgeList.append((i, res[0][j], weight))
-
-    return edgeList
-
-
-def v2_calculateKNNgraphDistanceMatrixStatsSingleThread(featureMatrix, distanceType="euclidean", k=10):
+def calculateKNNgraphDistanceMatrixStatsSingleThread(featureMatrix, distanceType="euclidean", k=10):
     r"""
     Thresholdgraph: KNN Graph with stats one-std based methods, SingleThread version
     """
