@@ -328,11 +328,11 @@ class Graph_AE(nn.Module):
         self.gat = GAT(in_channels=dim, hidden_channels=gat_hid_embed, num_layers=2, out_channels=embedding_size,
                        dropout=gat_dropout)
 
-        self.gc1 = GraphConvolution(dim, 32, 0, act=F.relu)
-        self.gc2 = GraphConvolution(32, embedding_size, 0, act=lambda x: x)
-        self.gc3 = GraphConvolution(32, embedding_size, 0, act=lambda x: x)
+        self.gc1 = GraphConvolution(dim, 32, 0, act=nn.ReLU())
+        self.gc2 = GraphConvolution(32, embedding_size, 0, act=nn.Identity())
+        self.gc3 = GraphConvolution(32, embedding_size, 0, act=nn.Identity())
 
-        self.decode = InnerProductDecoder(0, act=lambda x: x)
+        self.decode = InnerProductDecoder(0, act=nn.Identity())
 
     def encode_gat(self, in_nodes_features, edge_index):
         return self.gat(in_nodes_features, edge_index)
