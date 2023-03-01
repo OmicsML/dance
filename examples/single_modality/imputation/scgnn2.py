@@ -178,7 +178,6 @@ if __name__ == "__main__":
     )
     dataloader = ImputationDataset(data_dir="tmp_data", dataset="mouse_embryo_data")
     data = dataloader.load_data(transform=preprocessing_pipeline)
-    logger.info(f"Data loaded:\n{data}")
 
     x_train = data.data.X.A * data.data.layers["train_mask"]
     test_mask = data.data.layers["valid_mask"]
