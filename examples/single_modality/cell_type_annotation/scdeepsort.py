@@ -1,12 +1,13 @@
 import argparse
 import pprint
+from typing import get_args
 
 import torch
 
 from dance import logger
 from dance.datasets.singlemodality import ScDeepSortDataset
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
-from dance.typing import LOGLEVELS
+from dance.typing import LogLevel
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -16,7 +17,7 @@ if __name__ == "__main__":
     parser.add_argument("--device", type=str, default="cpu", help="Computation device")
     parser.add_argument("--dropout", type=float, default=0.1, help="dropout probability")
     parser.add_argument("--hidden_dim", type=int, default=200, help="number of hidden gcn units")
-    parser.add_argument("--log_level", type=str, default="INFO", choices=LOGLEVELS)
+    parser.add_argument("--log_level", type=str, default="INFO", choices=get_args(LogLevel))
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
     parser.add_argument("--n_epochs", type=int, default=300, help="number of training epochs")
     parser.add_argument("--n_layers", type=int, default=1, help="number of hidden gcn layers")

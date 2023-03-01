@@ -99,10 +99,12 @@ class BaseDataset(ABC):
         """
         cache_load = self._maybe_load_cache(transform, cache, redo_cache)
         if not isinstance(cache_load, str):
+            logger.info(f"Data loaded:\n{cache_load}")
             return cache_load
 
         raw_data = self.load_raw_data()
         data = self._raw_to_dance(raw_data)
+        logger.info(f"Raw data loaded:\n{data}")
 
         if transform is not None:
             if not isinstance(transform, BaseTransform):
@@ -110,6 +112,7 @@ class BaseDataset(ABC):
                                 f"{transform!r}.\nIf you want to use AnnData transfomrations functions such as "
                                 "scanpy.pp.log1p, please consider wrapping it with dance.transforms.AnnDataTransform")
             transform(data)
+            logger.info(f"Data transformed:\n{data}")
 
         if cache:
             with open(cache_load, "wb") as f:

@@ -1,12 +1,16 @@
+from abc import ABC
+from typing import get_args
+
 import anndata as ad
 import numpy as np
 import pandas as pd
 import scanpy as sc
+import scipy.sparse as sp
 
 from dance import logger as default_logger
 from dance.exceptions import DevError
 from dance.transforms.base import BaseTransform
-from dance.typing import Dict, List, Literal, Logger, Optional, Tuple, Union
+from dance.typing import Dict, GeneSummaryMode, List, Literal, Logger, Optional, Tuple, Union
 
 
 def get_count(count_or_ratio: Optional[Union[float, int]], total: int) -> Optional[int]:
@@ -316,7 +320,77 @@ class FilterGenesMatch(BaseTransform):
         return data
 
 
-class FilterGenesPercentile(BaseTransform):
+class FilterGenes(BaseTransform, ABC):
+    """Filter genes based on the summarized gene expressions."""
+
+    def __init__(
+        self,
+        *,
+        mode: GeneSummaryMode = "sum",
+        channel: Optional[str] = None,
+        channel_type: Optional[str] = None,
+        whitelist_indicators: Optional[Union[str, List[str]]] = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        if (channel is not None) and (channel_type != "layers"):
+            raise ValueError(f"Only X layers is available for filtering genes, specified {channel_type=!r}")
+
+        if mode not in (all_modes := sorted(get_args(GeneSummaryMode))):
+            raise ValueError(f"Unknown summarization mode {mode!r}, available options are {all_modes}")
+
+        self.mode = mode
+        self.channel = channel
+        self.channel_type = channel_type
+        self.whitelist_indicators = whitelist_indicators
+
+    def _get_preserve_mask(self, gene_summary: np.ndarray) -> np.ndarray:
+        """Select gene to be preserved and return as a mask."""
+        ...
+
+    def __call__(self, data):
+        x = data.get_feature(return_type="default", channel=self.channel, channel_type=self.channel_type)
+
+        # Compute gene summary stats for filtering
+        if self.mode == "sum":
+            gene_summary = np.array(x.sum(0)).ravel()
+        elif self.mode == "var":
+            x_squared = x.power(2) if isinstance(x, sp.spmatrix) else x**2
+            gene_summary = np.array(x_squared.mean(0) - np.square(x.mean(0))).ravel()
+        elif self.mode == "cv":
+            gene_summary = np.nan_to_num(np.array(x.std(0) / x.mean(0)), posinf=0, neginf=0).ravel()
+        elif self.mode == "rv":
+            gene_summary = np.nan_to_num(np.array(x.var(0) / x.mean(0)), posinf=0, neginf=0).ravel()
+        else:
+            raise DevError(f"{self.mode!r} not expected, please inform dev to fix this error.")
+
+        self.logger.info(f"Filtering genes based on {self.mode} expression percentiles in layer {self.channel!r}")
+        mask = self._get_preserve_mask(gene_summary)
+        selected_genes = sorted(data.data.var_names[mask])
+
+        # Get whitelist genes to be excluded from the filtering process
+        whitelist_gene_set = set()
+        if self.whitelist_indicators is not None:
+            columns = self.whitelist_indicators
+            columns = [columns] if isinstance(columns, str) else columns
+            indicators = data.data.var[columns]
+            # Genes that satisfy any one of the whitelist conditions will be selected as whitelist genes
+            whitelist_gene_set.update(indicators[indicators.max(1)].index.tolist())
+
+        # Exclude whitelisted genes
+        if len(whitelist_gene_set) > 0:
+            orig_num_selected = len(selected_genes)
+            selected_genes = sorted(set(selected_genes) | whitelist_gene_set)
+            num_added = len(selected_genes) - orig_num_selected
+            self.logger.info(f"{num_added:,} genes originally unselected are being added due to whitelist")
+
+        # Update data
+        self.logger.info(f"{data.shape[1] - len(selected_genes):,} genes removed")
+        data.data._inplace_subset_var(selected_genes)
+
+
+class FilterGenesPercentile(FilterGenes):
     """Filter genes based on percentiles of the summarized gene expressions.
 
     Parameters
@@ -326,8 +400,9 @@ class FilterGenesPercentile(BaseTransform):
     max_val
         Maximum percentile of the summarized expression value above which the genes will be discarded.
     mode
-        Summarization mode. Available options are ``[sum|cv|rv]``. ``sum`` calculates the sum of expression values,
-        ``cv`` uses the coefficient of variation (std / mean), and ``rv`` uses the relative variance (var / mean).
+        Summarization mode. Available options are ``[sum|var|cv|rv]``. ``sum`` calculates the sum of expression values,
+        ``var`` calculates the variance of the expression values, ``cv`` uses the coefficient of variation (std / mean
+        ), and ``rv`` uses the relative variance (var / mean).
     channel
         Which channel, more specificailly, ``layers``, to use. Use the default ``.X`` if not set. If ``channel`` is
         specified, then need to specify ``channel_type`` to be ``layers`` as well.
@@ -342,74 +417,92 @@ class FilterGenesPercentile(BaseTransform):
     """
 
     _DISPLAY_ATTRS = ("min_val", "max_val", "mode")
-    _MODES = ["sum", "cv", "rv"]
 
     def __init__(
         self,
         min_val: Optional[float] = 1,
         max_val: Optional[float] = 99,
-        mode: Literal["sum", "cv", "rv"] = "sum",
         *,
+        mode: GeneSummaryMode = "sum",
         channel: Optional[str] = None,
         channel_type: Optional[str] = None,
         whitelist_indicators: Optional[Union[str, List[str]]] = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-
-        if (channel is not None) and (channel_type != "layers"):
-            raise ValueError(f"Only X layers is available for filtering genes, specified {channel_type=!r}")
-
-        if mode not in self._MODES:
-            raise ValueError(f"Unknown summarization mode {mode!r}, available options are {self._MODES}")
-
+        super().__init__(
+            mode=mode,
+            channel=channel,
+            channel_type=channel_type,
+            whitelist_indicators=whitelist_indicators,
+            **kwargs,
+        )
         self.min_val = min_val
         self.max_val = max_val
-        self.mode = mode
-        self.channel = channel
-        self.channel_type = channel_type
-        self.whitelist_indicators = whitelist_indicators
 
-    def __call__(self, data):
-        x = data.get_feature(return_type="default", channel=self.channel, channel_type=self.channel_type)
-
-        # Compute gene summary stats for filtering
-        if self.mode == "sum":
-            gene_summary = np.array(x.sum(0)).ravel()
-        elif self.mode == "cv":
-            gene_summary = np.nan_to_num(np.array(x.std(0) / x.mean(0)), posinf=0, neginf=0).ravel()
-        elif self.mode == "rv":
-            gene_summary = np.nan_to_num(np.array(x.var(0) / x.mean(0)), posinf=0, neginf=0).ravel()
-        else:
-            raise DevError(f"{self.mode!r} not expected, please inform dev to fix this error.")
-
-        # Get whitelist genes to be excluded from the filtering process
-        whitelist_gene_set = set()
-        if self.whitelist_indicators is not None:
-            columns = self.whitelist_indicators
-            columns = [columns] if isinstance(columns, str) else columns
-            indicators = data.data.var[columns]
-            # Genes that satisfy any one of the whitelist conditions will be selected as whitelist genes
-            whitelist_gene_set.update(indicators[indicators.max(1)].index.tolist())
-
-        # Select genes to be filtered
-        self.logger.info(f"Filtering genes based on {self.mode} expression percentiles in layer {self.channel!r}")
+    def _get_preserve_mask(self, gene_summary):
         percentile_lo = np.percentile(gene_summary, self.min_val)
         percentile_hi = np.percentile(gene_summary, self.max_val)
-        mask = np.logical_and(gene_summary >= percentile_lo, gene_summary <= percentile_hi)
-        selected_genes = sorted(data.data.var_names[mask])
+        return np.logical_and(gene_summary >= percentile_lo, gene_summary <= percentile_hi)
 
-        # Exclude whitelisted genes
-        if len(whitelist_gene_set) > 0:
-            orig_num_selected = len(selected_genes)
-            selected_genes = sorted(set(selected_genes) | whitelist_gene_set)
-            num_added = len(selected_genes) - orig_num_selected
-            self.logger.info(f"{num_added:,} genes originally unselected are being added due to whitelist")
 
-        # Update data
-        num_removed = mask.size - len(selected_genes)
-        self.logger.info(f"{num_removed:,} genes removed ({percentile_lo=:.2e}, {percentile_hi=:.2e})")
-        data.data._inplace_subset_var(selected_genes)
+class FilterGenesTopK(FilterGenes):
+    """Select top/bottom genes based on the  summarized gene expressions.
+
+    Parameters
+    ----------
+    num_genes
+        Number of genes to be selected.
+    top
+        If set to :obj:`True`, then use the genes with highest values of the specified gene summary stats.
+    mode
+        Summarization mode. Available options are ``[sum|var|cv|rv]``. ``sum`` calculates the sum of expression values,
+        ``var`` calculates the variance of the expression values, ``cv`` uses the coefficient of variation (std / mean
+        ), and ``rv`` uses the relative variance (var / mean).
+    channel
+        Which channel, more specificailly, ``layers``, to use. Use the default ``.X`` if not set. If ``channel`` is
+        specified, then need to specify ``channel_type`` to be ``layers`` as well.
+    channel_type
+        Type of channels specified. Only allow ``None`` (the default setting) or ``layers`` (when ``channel`` is
+        specified).
+    whitelist_indicators
+        A list of (or a single) :obj:`.var` columns that indicates the genes to be excluded from the filtering process.
+        Note that these genes will still be used in the summary stats computation, and thus will still contribute to the
+        threshold percentile. If not set, then no genes will be excluded from the filtering process.
+
+    """
+
+    _DISPLAY_ATTRS = ("num_genes", "top", "mode")
+
+    def __init__(
+        self,
+        num_genes: int,
+        top: bool = True,
+        *,
+        mode: GeneSummaryMode = "cv",
+        channel: Optional[str] = None,
+        channel_type: Optional[str] = "X",
+        whitelist_indicators: Optional[Union[str, List[str]]] = None,
+        **kwargs,
+    ):
+        super().__init__(
+            mode=mode,
+            channel=channel,
+            channel_type=channel_type,
+            whitelist_indicators=whitelist_indicators,
+            **kwargs,
+        )
+        self.num_genes = num_genes
+        self.top = top
+
+    def _get_preserve_mask(self, gene_summary):
+        total_num_genes = gene_summary.size
+        if self.num_genes >= total_num_genes:
+            raise ValueError(f"{self.num_genes=!r} > total number of genes: {total_num_genes}")
+        sorted_idx = gene_summary.argsort()
+        selected_idx = sorted_idx[-self.num_genes:] if self.top else sorted_idx[:self.num_genes]
+        mask = np.zeros(total_num_genes, dtype=bool)
+        mask[selected_idx] = True
+        return mask
 
 
 class FilterGenesMarker(BaseTransform):
