@@ -36,8 +36,7 @@ def pipeline(inductive=False, verbose=2, logger=None, **kwargs):
     # mdata.var_names_make_unique()
     train_size = dataset.modalities[0].shape[0]
     data = Data(mdata, train_size=train_size)
-    data.set_config(feature_mod="mod1", label_mod="mod2", feature_channel_type='layers', feature_channel='counts',
-                    label_channel_type='layers', label_channel='counts')
+    data.set_config(feature_mod="mod1", label_mod="mod2")
 
     data = ScMoGNNGraph(inductive, kwargs["cell_init"], kwargs["pathway"], kwargs["subtask"],
                            kwargs['pathway_weight'], kwargs['pathway_threshold'],
@@ -50,8 +49,9 @@ def pipeline(inductive=False, verbose=2, logger=None, **kwargs):
     kwargs['FEATURE_SIZE'] = dataset.modalities[0].shape[1]
     kwargs['TRAIN_SIZE'] = dataset.modalities[0].shape[0]
     kwargs['OUTPUT_SIZE'] = dataset.modalities[1].shape[1]
+    kwargs['CELL_SIZE'] = dataset.modalities[0].shape[0] + dataset.modalities[2].shape[0]
 
-    if kwargs['inductive']:
+    if inductive:
         g, gtest = data.data.uns['g'], data.data.uns['gtest']
     else:
         gtest = g = data.data.uns['g']
@@ -60,9 +60,9 @@ def pipeline(inductive=False, verbose=2, logger=None, **kwargs):
     _, y_test = data.get_test_data(return_type="torch")
 
     if not kwargs['no_batch_features']:
-        batch_features = torch.from_numpy(data.data['mod1'].obsm['batch_features'])
+        batch_features = torch.from_numpy(data.data['mod1'].obsm['batch_features']).float()
         kwargs['BATCH_NUM'] = batch_features.shape[1]
-        if kwargs['inductive'] != 'trans':
+        if inductive:
             g.nodes['cell'].data['bf'] = batch_features[:kwargs['TRAIN_SIZE']]
             gtest.nodes['cell'].data['bf'] = batch_features
         else:
@@ -116,7 +116,7 @@ if __name__ == '__main__':
     parser.add_argument('-es', '--early_stopping', type=int, default=0)
     parser.add_argument('-c', '--cpu', type=int, default=1)
     parser.add_argument('-or', '--output_relu', default='none', choices=['relu', 'leaky_relu', 'none'])
-    parser.add_argument('-i', '--inductive', type=bool, action='store_true')
+    parser.add_argument('-i', '--inductive', action='store_true')
     parser.add_argument('-sa', '--subpath_activation', action='store_true')
     parser.add_argument('-ci', '--cell_init', default='none', choices=['none', 'svd'])
     parser.add_argument('-bas', '--batch_seperation', action='store_true')

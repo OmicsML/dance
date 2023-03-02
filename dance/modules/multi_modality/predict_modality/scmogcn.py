@@ -129,8 +129,8 @@ class ScMoGCNWrapper:
         TRAIN_SIZE = kwargs['TRAIN_SIZE']
 
         g = g.to(self.args.device)
-        y = y.to(self.args.device)
-        y_test = y_test.to(self.args.device) if y_test is not None else None
+        y = y.float().to(self.args.device)
+        y_test = y_test.float().to(self.args.device) if y_test is not None else None
 
         if verbose > 1 and logger is None:
             logger = open(f'{kwargs["log_folder"]}/{PREFIX}.log', 'w')
@@ -146,7 +146,6 @@ class ScMoGCNWrapper:
         te = []
         minval = 100
         minvep = -1
-        BATCH_SIZE = kwargs['batch_size']
 
         for epoch in range(kwargs['epoch']):
             if verbose > 1:
@@ -331,7 +330,7 @@ class ScMoGCNWrapper:
                     'feature': feature_sampled,
                 }).to(self.args.device)  # XXX: bottlenect
                 logits = self.model(subgraph)
-                output_labels = subgraph.nodes['cell'].data['label']
+                output_labels = subgraph.nodes['cell'].data['label'].float()
 
                 # blocks = [b.to(torch.device(self.args.device)) for b in blocks]
                 # logits = self.model(blocks, sampled = True)
@@ -416,7 +415,6 @@ class ScMoGCN(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.opw = args.only_pathway
         self.npw = not args.pathway
         self.nrc = args.no_readout_concatenate
 
@@ -461,9 +459,7 @@ class ScMoGCN(nn.Module):
             for i in range((args.embedding_layers - 1) * 2):
                 self.input_norm.append(nn.GroupNorm(4, hid_feats))
 
-        if self.opw:
-            self.edges = ['feature2cell', 'pathway']
-        elif self.npw:
+        if self.npw:
             self.edges = ['feature2cell', 'cell2feature']
         else:
             self.edges = ['feature2cell', 'cell2feature', 'pathway']

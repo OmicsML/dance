@@ -269,14 +269,18 @@ class ModalityMatchingDataset(MultiModalityDataset):
                     'mod1_test': m1_test,
                     'mod2_test': m2_test
                 }
-                self.modalities[0].obsm['X_pca'] = m1_train
-                self.modalities[1].obsm['X_pca'] = m2_train
-                self.modalities[2].obsm['X_pca'] = m1_test
-                self.modalities[3].obsm['X_pca'] = m2_test
+                self.modalities[0].obsm['X_pca'] = self.preprocessed_features['mod1_train']
+                self.modalities[1].obsm['X_pca'] = self.preprocessed_features['mod2_train']
+                self.modalities[2].obsm['X_pca'] = self.preprocessed_features['mod1_test']
+                self.modalities[3].obsm['X_pca'] = self.preprocessed_features['mod2_test']
                 pickle.dump(self.preprocessed_features, open(pkl_path, 'wb'))
 
             else:
                 self.preprocessed_features = pickle.load(open(pkl_path, 'rb'))
+                self.modalities[0].obsm['X_pca'] = self.preprocessed_features['mod1_train']
+                self.modalities[1].obsm['X_pca'] = self.preprocessed_features['mod2_train']
+                self.modalities[2].obsm['X_pca'] = self.preprocessed_features['mod1_test']
+                self.modalities[3].obsm['X_pca'] = self.preprocessed_features['mod2_test']
         elif kind == 'feature_selection':
             for i in range(2):
                 if self.modalities[i].shape[1] > selection_threshold:
@@ -339,6 +343,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
         return self
 
     def preprocess(self, kind='aux', pretrained_folder='.', selection_threshold=10000):
+        # aux -> cell cycle analysis
         if kind == 'aux':
             os.makedirs(pretrained_folder, exist_ok=True)
 
@@ -346,7 +351,21 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
 
                 with open(os.path.join(pretrained_folder, f'preprocessed_data_{self.subtask}.pkl'), 'rb') as f:
                     self.preprocessed_data = pickle.load(f)
+                    Y_train = self.preprocessed_data['Y_train']
+                    self.modalities[0].obsm['X_pca'] = self.preprocessed_data['X_pca_0']
+                    self.modalities[1].obsm['X_pca'] = self.preprocessed_data['X_pca_1']
+                    self.train_size = self.exploration[0].shape[0]
+                    self.modalities[0].obsm['cell_type'] = np.concatenate(
+                        [Y_train[0].numpy(), np.zeros(self.modalites[0].shape[0]-self.train_size)], 0)
+                    self.modalities[0].obsm['batch_label'] = np.concatenate(
+                        [Y_train[1].numpy(), np.zeros(self.modalites[0].shape[0]-self.train_size)], 0)
+                    self.modalities[0].obsm['phase_labels'] = np.concatenate(
+                        [Y_train[2].numpy(), np.zeros(self.modalites[0].shape[0]-self.train_size)], 0)
+                    self.modalities[0].obsm['phase_scores'] = np.concatenate(
+                        [Y_train[3].numpy(), np.zeros(self.modalites[0].shape[0]-self.train_size)], 0)
+
                 with open(os.path.join(pretrained_folder, f'{self.subtask}_config.pk'), 'rb') as f:
+                    # cell types, batch labels, cell cycle
                     self.nb_cell_types, self.nb_batches, self.nb_phases = pickle.load(f)
                 self.preprocessed = True
                 print('Preprocessing done.')
@@ -357,8 +376,6 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
             ##########################################
 
             # scale and log transform
-            scale = 1e4
-            n_components_mod1, n_components_mod2 = 256, 100
 
             mod1 = self.modalities[0].var["feature_types"][0]
             mod2 = self.modalities[1].var["feature_types"][0]
@@ -398,6 +415,8 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
             ##           DATA PREPROCESSING         ##
             ##########################################
 
+            # Only exploration dataset provides cell type information.
+            # The exploration dataset is a subset of the full dataset.
             ad_mod1 = self.exploration[0]
             ad_mod2 = self.exploration[1]
             mod1_obs = ad_mod1.obs
@@ -410,12 +429,13 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
                 mod1_pca_test = lsi_transformer_gex.transform(self.modalities[0][mod1_obs.shape[0]:]).values
                 mod2_pca = ad_mod2.X.toarray()
                 mod2_pca_test = self.numpy_features(1)[mod1_obs.shape[0]:]
-
-            if mod2 == "ATAC":
+            elif mod2 == "ATAC":
                 mod1_pca = lsi_transformer_gex.transform(ad_mod1).values
                 mod1_pca_test = lsi_transformer_gex.transform(self.modalities[0][mod1_obs.shape[0]:]).values
                 mod2_pca = lsi_transformer_atac.transform(ad_mod2).values
                 mod2_pca_test = lsi_transformer_atac.transform(self.modalities[1][mod1_obs.shape[0]:]).values
+            else:
+                raise ValueError(f"Unknown modality 2: {mod2}")
 
             cell_cycle_genes = [
                 'MCM5', 'PCNA', 'TYMS', 'FEN1', 'MCM2', \
@@ -439,19 +459,18 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
             print('Data loading and pca done', mod1_pca.shape, mod2_pca.shape)
             print('Start to calculate cell_cycle score. It may roughly take an hour.')
 
-            pca_combined = np.concatenate([mod1_pca, mod2_pca], axis=1)
-
-            del mod1_pca, mod2_pca
-
             cell_type_labels = mod1_obs['cell_type']
             batch_ids = mod1_obs['batch']
             phase_labels = mod1_obs['phase']
             nb_cell_types = len(np.unique(cell_type_labels))
             nb_batches = len(np.unique(batch_ids))
             nb_phases = len(np.unique(phase_labels)) - 1  # 2
-            c_labels = np.array([list(np.unique(cell_type_labels)).index(item) for item in cell_type_labels])
-            b_labels = np.array([list(np.unique(batch_ids)).index(item) for item in batch_ids])
-            p_labels = np.array([list(np.unique(phase_labels)).index(item) for item in phase_labels])
+            cell_type_labels_unique = list(np.unique(cell_type_labels))
+            batch_ids_unique = list(np.unique(batch_ids))
+            phase_labels_unique = list(np.unique(phase_labels))
+            c_labels = np.array([cell_type_labels_unique.index(item) for item in cell_type_labels])
+            b_labels = np.array([batch_ids_unique.index(item) for item in batch_ids])
+            p_labels = np.array([phase_labels_unique.index(item) for item in phase_labels])
             # 0:G1, 1:G2M, 2: S, only consider the last two
             s_genes = cell_cycle_genes[:43]
             g2m_genes = cell_cycle_genes[43:]
@@ -462,12 +481,22 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
             G2M_scores = ad_mod1.obs['G2M_score'].values
             phase_scores = np.stack([S_scores, G2M_scores]).T  # (nb_cells, 2)
 
-            X_train = pca_combined
-            # c_labels: cell type; b_labels: batch ids; p_labels: phase_labels; phase_scores
             Y_train = [c_labels, b_labels, p_labels, phase_scores]
-            X_test = np.concatenate([mod1_pca_test, mod2_pca_test], axis=1)
+            self.modalities[0].obsm['X_pca'] = np.concatenate([mod1_pca, mod1_pca_test], axis=0)
+            self.modalities[1].obsm['X_pca'] = np.concatenate([mod1_pca, mod2_pca_test], axis=0)
+            self.train_size = mod1_obs.shape[0]
+            self.modalities[0].obsm['cell_type'] = np.concatenate(
+                [Y_train[0].numpy(), np.zeros(self.modalities[0].shape[0] - self.train_size)], 0)
+            self.modalities[0].obsm['batch_label'] = np.concatenate(
+                [Y_train[1].numpy(), np.zeros(self.modalities[0].shape[0] - self.train_size)], 0)
+            self.modalities[0].obsm['phase_labels'] = np.concatenate(
+                [Y_train[2].numpy(), np.zeros(self.modalities[0].shape[0] - self.train_size)], 0)
+            self.modalities[0].obsm['phase_scores'] = np.concatenate(
+                [Y_train[3].numpy(), np.zeros(self.modalities[0].shape[0] - self.train_size)], 0)
 
-            self.preprocessed_data = {'X_train': X_train, 'Y_train': Y_train, 'X_test': X_test}
+            self.preprocessed_data = {'X_pca_0': self.modalities[0].obsm['X_pca'],
+                                      'X_pca_1': self.modalities[1].obsm['X_pca'],
+                                      'Y_train': Y_train}
             pickle.dump(self.preprocessed_data,
                         open(os.path.join(pretrained_folder, f'preprocessed_data_{self.subtask}.pkl'), 'wb'))
             pickle.dump([nb_cell_types, nb_batches, nb_phases],
@@ -493,8 +522,11 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
     def normalize(self):
         assert self.preprocessed, 'Normalization must be conducted after preprocessing.'
 
-        self.mean = np.concatenate([self.preprocessed_data['X_train'], self.preprocessed_data['X_test']], 0).mean()
-        self.std = np.concatenate([self.preprocessed_data['X_train'], self.preprocessed_data['X_test']], 0).std()
-        self.preprocessed_data['X_train'] = (self.preprocessed_data['X_train'] - self.mean) / self.std
-        self.preprocessed_data['X_test'] = (self.preprocessed_data['X_test'] - self.mean) / self.std
+        self.mean0 = self.modalities[0].obsm['X_pca'].mean()
+        self.mean1 = self.modalities[1].obsm['X_pca'].mean()
+        self.std0 = self.modalities[0].obsm['X_pca'].std()
+        self.std1 = self.modalities[1].obsm['X_pca'].std()
+        self.modalities[0].obsm['X_pca'] = (self.modalities[0].obsm['X_pca'] - self.mean0) / self.std0
+        self.modalities[1].obsm['X_pca'] = (self.modalities[1].obsm['X_pca'] - self.mean1) / self.std1
+
         return self

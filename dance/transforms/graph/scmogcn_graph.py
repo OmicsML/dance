@@ -208,8 +208,8 @@ def construct_enhanced_feature_graph(u, v, e, train_size, feature_size, cell_nod
         else:
             graph.nodes['cell'].data['id'] = cell_node_features
         graph.nodes['feature'].data['id'] = torch.arange(feature_size).long()
-        graph.edges['feature2cell'].data['weight'] = e
-        graph.edges['cell2feature'].data['weight'] = e[:graph.edges(etype='cell2feature')[0].shape[0]]
+        graph.edges['feature2cell'].data['weight'] = e.float()
+        graph.edges['cell2feature'].data['weight'] = e[:graph.edges(etype='cell2feature')[0].shape[0]].float()
         graph.edges['pathway'].data['weight'] = torch.tensor(ee).float()
 
     return graph
@@ -266,7 +266,7 @@ class ScMoGNNGraph(BaseTransform):
         x_train_sparse, _ = data.get_train_data(return_type="sparse")
         x_test_sparse, _ = data.get_test_data(return_type="sparse")
 
-        cell_size = x_train_sparse.shape[0] + x_test_sparse.shape[0] if self.inductive else x_train_sparse.shape[0]
+        cell_size = x_train_sparse.shape[0] + x_test_sparse.shape[0] if not self.inductive else x_train_sparse.shape[0]
         train_size = x_train_sparse.shape[0]
         feature_size = x_train_sparse.shape[1]
 

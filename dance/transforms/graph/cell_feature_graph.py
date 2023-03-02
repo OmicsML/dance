@@ -116,10 +116,10 @@ class CellFeatureBipartiteGraph(BaseTransform):
         self.mod = mod
 
     def __call__(self, data):
-        feat = data.get_feature(channel_type=self.cell_feature_channel, return_type="sparse", mod=self.mod)
+        feat = data.get_feature(channel=self.cell_feature_channel, return_type="sparse", mod=self.mod)
         g = dgl.bipartite_from_scipy(feat, utype='cell', etype='cell2feature', vtype='feature', eweight_name='weight')
         g.nodes['cell'].data['id'] = torch.arange(feat.shape[0]).long()
-        g.nodes['gene'].data['id'] = torch.arange(feat.shape[1]).long()
+        g.nodes['feature'].data['id'] = torch.arange(feat.shape[1]).long()
         g = AddReverse(copy_edata=True, sym_new_etype=True)(g)
         if self.mod is None:
             data.data.uns['g'] = g

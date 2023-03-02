@@ -10,6 +10,7 @@ from dance.datasets.multimodality import ModalityMatchingDataset
 from dance.modules.multi_modality.match_modality.scmogcn import ScMoGCNWrapper
 from dance.utils import set_seed
 from dance.data import Data
+import torch.nn.functional as F
 from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph, CellFeatureBipartitePropagation
 
 def normalize(X):
@@ -66,45 +67,46 @@ if __name__ == '__main__':
     #                 feature_channel=["prop", "prop"], label_channel='labels')
     # (x, y), z = data.get_feature(return_type="torch")
 
-    x = data['mod1'].uns['prop']
-    y = data['mod2'].uns['prop']
-    data.set_config(label_mod="mod1", label_channel='labels')
-    _, z = data.get_feature(return_type="torch")
-    # shit codes
+    data.set_config(feature_mod=["mod1", "mod2", "mod1", "mod2"], feature_channel_type=["uns", "uns", "obs", "obs"],
+                    feature_channel=["g", "g", "batch", "batch"],
+                    label_mod="mod1", label_channel='labels')
+    (g_mod1, g_mod2, batch_mod1, batch_mod2), z = data.get_data(return_type="default")
+
 
     if subtask == 'openproblems_bmmc_cite_phase2_rna':
         HIDDEN_SIZE = 64
         TEMPERATURE = 2.739896
         model = ScMoGCNWrapper(args, [[
-            (x.shape[1], 512, 0.25), (512, 512, 0.25), (512, HIDDEN_SIZE)
-        ], [(y.shape[1], 512, 0.2), (512, 512, 0.2),
-            (512, HIDDEN_SIZE)], [(HIDDEN_SIZE, 512, 0.2), (512, x.shape[1])],
+            (g_mod1.num_nodes('feature'), 512, 0.25), (512, 512, 0.25), (512, HIDDEN_SIZE)
+        ], [(g_mod2.num_nodes('feature'), 512, 0.2), (512, 512, 0.2),
+            (512, HIDDEN_SIZE)], [(HIDDEN_SIZE, 512, 0.2), (512, g_mod1.num_nodes('feature'))],
                                       [(HIDDEN_SIZE, 512, 0.2),
-                                       (512, y.shape[1])]], TEMPERATURE)
+                                       (512, g_mod2.num_nodes('feature'))]], TEMPERATURE)
     else:
         HIDDEN_SIZE = 256
         TEMPERATURE = 3.065016
         model = ScMoGCNWrapper(args, [[
-            (x.shape[1], 1024, 0.5), (1024, 1024, 0.5), (1024, HIDDEN_SIZE)
-        ], [(y.shape[1], 2048, 0.5),
+            (g_mod1.num_nodes('feature'), 1024, 0.5), (1024, 1024, 0.5), (1024, HIDDEN_SIZE)
+        ], [(g_mod2.num_nodes('feature'), 2048, 0.5),
             (2048, HIDDEN_SIZE)], [(HIDDEN_SIZE, 512, 0.2),
-                                   (512, x.shape[1])],
+                                   (512, g_mod1.num_nodes('feature'))],
                                       [(HIDDEN_SIZE, 512, 0.2),
-                                       (512, y.shape[1])]], TEMPERATURE)
+                                       (512, g_mod2.num_nodes('feature'))]], TEMPERATURE)
 
     train_size = dataset.sparse_features()[0].shape[0]
-    z_test = torch.from_numpy(z[train_size:])
-    labels1 = torch.argmax(z_test, dim=1).to(device)
-    labels0 = torch.argmax(z_test, dim=0).to(device)
+    z_test = F.one_hot(torch.from_numpy(z[train_size:]).long())
+    labels1 = torch.argmax(z_test, dim=0).to(device)
+    labels2 = torch.argmax(z_test, dim=1).to(device)
+    g_mod1 = g_mod1.to(device)
+    g_mod2 = g_mod2.to(device)
 
-    model.fit([x, y], [labels0, labels1], train_size=train_size)
+    model.fit(g_mod1, g_mod2, labels1, labels2, train_size=train_size)
     model.load(f'models/model_{rndseed}.pth')
 
-    test_inputs = [x, y]
     test_idx = np.arange(train_size,
-                         x.shape[0])
-    print(model.predict(test_inputs, test_idx, enhance=True, dataset=dataset))
-    print(model.score(test_inputs, test_idx, z_test, enhance=True, dataset=dataset))
+                         g_mod1.num_nodes('cell'))
+    print(model.predict(test_idx, enhance=True, batch1=batch_mod1, batch2=batch_mod2))
+    print(model.score(test_idx, labels_matrix=z_test, enhance=True, batch1=batch_mod1, batch2=batch_mod2))
 """ To reproduce scMoGCN on other samples, please refer to command lines belows:
 GEX-ADT:
 python scmogcn.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda
