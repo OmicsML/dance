@@ -1,7 +1,7 @@
 from dance.transforms import graph
 from dance.transforms.cell_feature import CellPCA, WeightedFeaturePCA
-from dance.transforms.filter import (FilterCellsScanpy, FilterGenesCommon, FilterGenesMatch, FilterGenesPercentile,
-                                     FilterGenesScanpy, FilterGenesTopK)
+from dance.transforms.filter import (FilterCellsScanpy, FilterGenesCommon, FilterGenesMarker, FilterGenesMatch,
+                                     FilterGenesPercentile, FilterGenesScanpy, FilterGenesTopK)
 from dance.transforms.gene_holdout import GeneHoldout
 from dance.transforms.interface import AnnDataTransform
 from dance.transforms.mask import CellwiseMaskData, MaskData
