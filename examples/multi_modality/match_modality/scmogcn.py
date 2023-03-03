@@ -11,8 +11,7 @@ from dance.modules.multi_modality.match_modality.scmogcn import ScMoGCNWrapper
 from dance.utils import set_seed
 from dance.data import Data
 import torch.nn.functional as F
-from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph, CellFeatureBipartitePropagation
-
+from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph
 def normalize(X):
     return (X - X.mean()) / X.std()
 
@@ -60,8 +59,6 @@ if __name__ == '__main__':
     data = Data(mdata)
     data = CellFeatureBipartiteGraph(cell_feature_channel='X_pca', mod='mod1')(data)
     data = CellFeatureBipartiteGraph(cell_feature_channel='X_pca', mod='mod2')(data)
-    data = CellFeatureBipartitePropagation(layers=layers, device=device, mod='mod2')(data)
-    data = CellFeatureBipartitePropagation(layers=layers, device=device, mod='mod2')(data)
 
     # data.set_config(feature_mod=["mod1", "mod2"], label_mod="mod1", feature_channel_type=["obsm", "obsm"],
     #                 feature_channel=["prop", "prop"], label_channel='labels')

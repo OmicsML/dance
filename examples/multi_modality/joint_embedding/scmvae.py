@@ -136,9 +136,9 @@ if __name__ == "__main__":
 
     # model.load_state_dict(torch.load('./saved_model/model_best.pth.tar') )
 
-    embeds = model.predict(x_test, y_test).cpu().numpy()
+    embeds = model.predict(torch.cat([x_train, x_test]), torch.cat([y_train, y_test])).cpu().numpy()
     print(embeds)
-    print(model.score(x_test, y_test, labels))
+    print(model.score(torch.cat([x_train, x_test]), torch.cat([y_train, y_test]), labels))
 
     # mod1_obs = dataset.modalities[0].obs
     # mod1_uns = dataset.modalities[0].uns

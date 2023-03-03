@@ -127,89 +127,89 @@ class CellFeatureBipartiteGraph(BaseTransform):
             data.data[self.mod].uns['g'] = g
         return data
 
-# TODO:Probably move to model part
-class CellFeatureBipartitePropagation(BaseTransform):
-    def __init__(self,
-                 alpha: float = 0.5,
-                 beta: float = 0.5,
-                 cell_init: str = None,
-                 feature_init: str = 'id',
-                 device: str = 'cuda',
-                 layers: int = 3,
-                 mod: Optional[str] = None,
-                 **kwargs):
-        super().__init__(**kwargs)
-        self.mod = mod
-        assert layers > 2, 'Less than two feature graph propagation layers is equivalent to original features.'
-        self.layers = layers
-        self.alpha = alpha
-        self.beta = beta
-        self.cell_init = cell_init
-        self.feature_init = feature_init
-        self.device = device
-
-    def __call__(self, data):
-        if self.mod is None:
-            g = data.data.uns['g']
-        else:
-            g = data.data[self.mod].uns['g'].to(self.device)
-        gconv = dglnn.HeteroGraphConv(
-            {
-                'cell2feature': dglnn.GraphConv(in_feats=0, out_feats=0, norm='none', weight=False, bias=False),
-                'rev_cell2feature': dglnn.GraphConv(in_feats=0, out_feats=0, norm='none', weight=False, bias=False),
-            }, aggregate='sum')
-
-        if self.feature_init is None:
-            feature_X = torch.zeros((g.nodes('feature').shape[0], g.srcdata[self.cell_init]['cell'].shape[1])).to(self.device)
-        elif self.feature_init == 'id':
-            feature_X = F.one_hot(g.srcdata['id']['feature']).float().to(self.device)
-        else:
-            raise NotImplementedError(f'Not implemented feature init feature {self.feature_init}.')
-
-        if self.cell_init is None:
-            cell_X = torch.zeros(g.nodes('cell').shape[0], feature_X.shape[1]).to(self.device)
-        else:
-            cell_X = g.srcdata[self.cell_init]['cell']
-
-        h = {'feature': feature_X, 'cell': cell_X}
-        hcell = []
-        for i in range(self.layers):
-            h1 = gconv(
-                g, h, mod_kwargs={
-                    'cell2feature': {
-                        'edge_weight': g.edges['cell2feature'].data['weight']
-                    },
-                    'rev_cell2feature': {
-                        'edge_weight': g.edges['rev_cell2feature'].data['weight']
-                    }
-                })
-            # if verbose: print(i, 'cell', h['cell'].abs().mean(), h1['cell'].abs().mean())
-            # if verbose: print(i, 'feature', h['feature'].abs().mean(), h1['feature'].abs().mean())
-
-            h1['feature'] = (h1['feature'] -
-                             h1['feature'].mean()) / (h1['feature'].std() if h1['feature'].mean() != 0 else 1)
-            h1['cell'] = (h1['cell'] - h1['cell'].mean()) / (h1['cell'].std() if h1['cell'].mean() != 0 else 1)
-
-            h = {
-                'feature': h['feature'] * self.alpha + h1['feature'] * (1 - self.alpha),
-                'cell': h['cell'] * self.beta + h1['cell'] * (1 - self.beta)
-            }
-
-            h['feature'] = (h['feature'] - h['feature'].mean()) / h['feature'].std()
-            h['cell'] = (h['cell'] - h['cell'].mean()) / h['cell'].std()
-
-            hcell.append(h['cell'])
-
-        # if verbose: print(hcell[-1].abs().mean())
-
-        # hcell = torch.cat(hcell[1:], dim=1)
-        # if self.mod is None:
-        #     data.data.obsm['prop'] = hcell[1:]
-        # else:
-        #     data.data[self.mod].obsm['prop'] = hcell[1:]
-
-        if self.mod is None:
-            data.data.uns['prop'] = hcell[1:]
-        else:
-            data.data[self.mod].uns['prop'] = hcell[1:]
-        return data
+# # TODO:Probably move to model part
+# class CellFeatureBipartitePropagation(BaseTransform):
+#     def __init__(self,
+#                  alpha: float = 0.5,
+#                  beta: float = 0.5,
+#                  cell_init: str = None,
+#                  feature_init: str = 'id',
+#                  device: str = 'cuda',
+#                  layers: int = 3,
+#                  mod: Optional[str] = None,
+#                  **kwargs):
+#         super().__init__(**kwargs)
+#         self.mod = mod
+#         assert layers > 2, 'Less than two feature graph propagation layers is equivalent to original features.'
+#         self.layers = layers
+#         self.alpha = alpha
+#         self.beta = beta
+#         self.cell_init = cell_init
+#         self.feature_init = feature_init
+#         self.device = device
+#
+#     def __call__(self, data):
+#         if self.mod is None:
+#             g = data.data.uns['g']
+#         else:
+#             g = data.data[self.mod].uns['g'].to(self.device)
+#         gconv = dglnn.HeteroGraphConv(
+#             {
+#                 'cell2feature': dglnn.GraphConv(in_feats=0, out_feats=0, norm='none', weight=False, bias=False),
+#                 'rev_cell2feature': dglnn.GraphConv(in_feats=0, out_feats=0, norm='none', weight=False, bias=False),
+#             }, aggregate='sum')
+#
+#         if self.feature_init is None:
+#             feature_X = torch.zeros((g.nodes('feature').shape[0], g.srcdata[self.cell_init]['cell'].shape[1])).to(self.device)
+#         elif self.feature_init == 'id':
+#             feature_X = F.one_hot(g.srcdata['id']['feature']).float().to(self.device)
+#         else:
+#             raise NotImplementedError(f'Not implemented feature init feature {self.feature_init}.')
+#
+#         if self.cell_init is None:
+#             cell_X = torch.zeros(g.nodes('cell').shape[0], feature_X.shape[1]).to(self.device)
+#         else:
+#             cell_X = g.srcdata[self.cell_init]['cell']
+#
+#         h = {'feature': feature_X, 'cell': cell_X}
+#         hcell = []
+#         for i in range(self.layers):
+#             h1 = gconv(
+#                 g, h, mod_kwargs={
+#                     'cell2feature': {
+#                         'edge_weight': g.edges['cell2feature'].data['weight']
+#                     },
+#                     'rev_cell2feature': {
+#                         'edge_weight': g.edges['rev_cell2feature'].data['weight']
+#                     }
+#                 })
+#             # if verbose: print(i, 'cell', h['cell'].abs().mean(), h1['cell'].abs().mean())
+#             # if verbose: print(i, 'feature', h['feature'].abs().mean(), h1['feature'].abs().mean())
+#
+#             h1['feature'] = (h1['feature'] -
+#                              h1['feature'].mean()) / (h1['feature'].std() if h1['feature'].mean() != 0 else 1)
+#             h1['cell'] = (h1['cell'] - h1['cell'].mean()) / (h1['cell'].std() if h1['cell'].mean() != 0 else 1)
+#
+#             h = {
+#                 'feature': h['feature'] * self.alpha + h1['feature'] * (1 - self.alpha),
+#                 'cell': h['cell'] * self.beta + h1['cell'] * (1 - self.beta)
+#             }
+#
+#             h['feature'] = (h['feature'] - h['feature'].mean()) / h['feature'].std()
+#             h['cell'] = (h['cell'] - h['cell'].mean()) / h['cell'].std()
+#
+#             hcell.append(h['cell'])
+#
+#         # if verbose: print(hcell[-1].abs().mean())
+#
+#         # hcell = torch.cat(hcell[1:], dim=1)
+#         # if self.mod is None:
+#         #     data.data.obsm['prop'] = hcell[1:]
+#         # else:
+#         #     data.data[self.mod].obsm['prop'] = hcell[1:]
+#
+#         if self.mod is None:
+#             data.data.uns['prop'] = hcell[1:]
+#         else:
+#             data.data[self.mod].uns['prop'] = hcell[1:]
+#         return data

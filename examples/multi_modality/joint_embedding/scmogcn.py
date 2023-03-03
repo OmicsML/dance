@@ -6,6 +6,7 @@ import dgl
 import numpy as np
 import scanpy as sc
 import torch
+import mudata
 
 import dance.utils.metrics as metrics
 from scipy.sparse import csr_matrix
@@ -13,6 +14,7 @@ from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.scmogcn import ScMoGCNWrapper
 from dance.data import Data
 from dance.transforms.graph_construct import basic_feature_graph_propagation, construct_basic_feature_graph
+from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph
 from dance.utils import set_seed
 
 if __name__ == '__main__':
@@ -41,22 +43,26 @@ if __name__ == '__main__':
 
     dataset = JointEmbeddingNIPSDataset(args.subtask, data_dir=args.data_folder).load_data()\
         .load_metadata().load_sol().preprocess('aux', args.pretrained_folder).normalize()
-    X_train, Y_train, X_test = dataset.preprocessed_data['X_train'], dataset.preprocessed_data['Y_train'], \
-                                       dataset.preprocessed_data['X_test']
-    Y_test = dataset.test_sol.obs['cell_type'].to_numpy()
-    ### 下面这段是我写过最脑溢血的代码
-    adata = ad.AnnData(np.concatenate([X_train, X_test], 0))
-    adata.obs['cell_type'] = np.concatenate([Y_train[0].numpy(), Y_test], 0)
-    adata.obs['batch_label'] = np.concatenate([Y_train[1].numpy(), np.zeros_like(Y_test)], 0)
-    adata.obs['phase_labels'] = np.concatenate([Y_train[2].numpy(), np.zeros_like(Y_test)], 0)
-    adata.obs['phase_scores'] = np.concatenate([Y_train[3].numpy(), np.zeros_like(Y_test)], 0)
-    train_size = X_train.shape[0]
-    data = Data(adata, train_size=train_size)
-
-    g = construct_basic_feature_graph(X_train, X_test, device=device)
-    X = basic_feature_graph_propagation(g, layers=args.layers, device=device)
-
-    l = args.layers - 1
+    mod1 = dataset.modalities[0]
+    mod2 = dataset.modalities[1]
+    mod1.var_names_make_unique()
+    mod2.var_names_make_unique()
+    mod1.obs_names_make_unique()
+    mod2.obs_names = mod1.obs_names
+    mdata = mudata.MuData({"mod1": mod1, "mod2": mod2})
+    mdata.var_names_make_unique()
+    # train_size = int(mod1.shape[0] * 0.85)
+    train_size = dataset.train_size
+    data = Data(mdata, train_size=train_size)
+    data = CellFeatureBipartiteGraph(cell_feature_channel='X_pca', mod='mod1')(data)
+    data = CellFeatureBipartiteGraph(cell_feature_channel='X_pca', mod='mod2')(data)
+    data.set_config(feature_mod=["mod1", "mod2", "mod1", "mod2"],
+                    label_mod=["mod1", "mod1", "mod1", "mod1", "mod1"],
+                    feature_channel=['X_pca', 'X_pca', "g", "g"],
+                    feature_channel_type=['obsm', 'obsm', 'uns', 'uns'],
+                    label_channel=['cell_type', 'batch_label', 'phase_labels', 'S_scores', 'G2M_scores'])
+    (X_mod1, X_mod2, g_mod1, g_mod2), (cell_type, batch_label, phase_label, S_score, G2M_score) = data.get_data(
+        return_type='default')
 
     model = ScMoGCNWrapper(args, dataset)
     model.fit(dataset, X, Y_train)
