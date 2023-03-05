@@ -247,6 +247,7 @@ class JAEWrapper:
                 # adata.obs['cell_type'] = adata_sol.obs['cell_type'][adata.obs_names]
                 true_labels = cell_type
                 pred_labels = kmeans.fit_predict(emb)
+                print(true_labels, pred_labels)
                 NMI_score = round(normalized_mutual_info_score(true_labels, pred_labels, average_method='max'), 3)
                 ARI_score = round(adjusted_rand_score(true_labels, pred_labels), 3)
 

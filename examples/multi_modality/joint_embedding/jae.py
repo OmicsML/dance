@@ -68,13 +68,13 @@ if __name__ == '__main__':
     model.load(f'models/model_joint_embedding_{rndseed}.pth')
 
     with torch.no_grad():
-        X_test = torch.cat([X_mod1_test, X_mod2_test], dim=1)
-        X_test = torch.cat([X_train, X_test], dim=0).float().to(device)
+        X_test = torch.cat([X_mod1_test, X_mod2_test], dim=1).float().to(device)
+        # X_test = torch.cat([X_train, X_test], dim=0).float().to(device)
         test_id = np.arange(X_test.shape[0])
         labels = cell_type_test.numpy()
         embeds = model.predict(X_test, test_id).cpu().numpy()
         print(embeds)
-        print(model.score(X_test, test_id, labels, 'clustering'))
+        print(model.score(X_test, test_id, labels, metric='clustering'))
 
     # mod1_obs = dataset.modalities[0].obs
     # mod1_uns = dataset.modalities[0].uns

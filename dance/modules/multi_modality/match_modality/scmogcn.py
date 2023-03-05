@@ -42,6 +42,7 @@ def cell_feature_propagation(g,
              feature_init: str = 'id',
              device: str = 'cuda',
              layers: int = 3):
+    g = g.to(device)
     gconv = dglnn.HeteroGraphConv(
         {
             'cell2feature': dglnn.GraphConv(in_feats=0, out_feats=0, norm='none', weight=False, bias=False),
@@ -131,6 +132,9 @@ class ScMoGCNWrapper:
         """
         self.args.device = device
         self.model = self.model.to(device)
+        self.feat_mod1 = self.feat_mod1.to(device)
+        self.feat_mod2 = self.feat_mod2.to(device)
+        return self
 
     def load(self, path, map_location=None):
         """Load model parameters from checkpoint file.
@@ -147,6 +151,7 @@ class ScMoGCNWrapper:
         None.
 
         """
+        self.fitted = True
         if map_location is not None:
             self.model.load_state_dict(torch.load(path, map_location=map_location))
         else:
@@ -176,9 +181,8 @@ class ScMoGCNWrapper:
 
         device = self.args.device
         wt = self.wt
-        hcell_mod1 = cell_feature_propagation(g_mod1, layers=self.args.layers)
-        hcell_mod2 = cell_feature_propagation(g_mod2, layers=self.args.layers)
-        self.fitted = True
+        hcell_mod1 = cell_feature_propagation(g_mod1, layers=self.args.layers, device=self.args.device)
+        hcell_mod2 = cell_feature_propagation(g_mod2, layers=self.args.layers, device=self.args.device)
         self.feat_mod1 = hcell_mod1
         self.feat_mod2 = hcell_mod2
 
@@ -267,6 +271,7 @@ class ScMoGCNWrapper:
                 break
 
         print('Valid: ', maxval)
+        self.fitted = True
 
         self.wt = weight_record
         return self

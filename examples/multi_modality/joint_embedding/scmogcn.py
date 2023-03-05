@@ -53,26 +53,37 @@ if __name__ == '__main__':
     mdata.var_names_make_unique()
     # train_size = int(mod1.shape[0] * 0.85)
     train_size = dataset.train_size
-    data = Data(mdata, train_size=train_size)
+    data = Data(mdata)
     data = CellFeatureBipartiteGraph(cell_feature_channel='X_pca', mod='mod1')(data)
     data = CellFeatureBipartiteGraph(cell_feature_channel='X_pca', mod='mod2')(data)
-    data.set_config(feature_mod=["mod1", "mod2", "mod1", "mod2"],
+    data.set_config(feature_mod=["mod1", "mod2"],
                     label_mod=["mod1", "mod1", "mod1", "mod1", "mod1"],
-                    feature_channel=['X_pca', 'X_pca', "g", "g"],
-                    feature_channel_type=['obsm', 'obsm', 'uns', 'uns'],
+                    feature_channel=['X_pca', 'X_pca'],
                     label_channel=['cell_type', 'batch_label', 'phase_labels', 'S_scores', 'G2M_scores'])
-    (X_mod1, X_mod2, g_mod1, g_mod2), (cell_type, batch_label, phase_label, S_score, G2M_score) = data.get_data(
-        return_type='default')
+    (x_mod1, x_mod2), (cell_type, batch_label, phase_label, S_score, G2M_score) = data.get_data(
+        return_type='torch')
+    phase_score = torch.cat([S_score[:, None], G2M_score[:, None]], 1)
 
-    model = ScMoGCNWrapper(args, dataset)
-    model.fit(dataset, X, Y_train)
+    model = ScMoGCNWrapper(args,
+                       num_celL_types=int(cell_type.max()+1),
+                       num_batches=int(batch_label.max()+1),
+                       num_phases=phase_score.shape[1],
+                       num_features=x_mod1.shape[1]+x_mod2.shape[1])
+    model.fit(g_mod1=data.data['mod1'].uns['g'],
+              g_mod2=data.data['mod2'].uns['g'],
+              train_size=train_size,
+              cell_type=cell_type,
+              batch_label=batch_label,
+              phase_score=phase_score, )
     model.load(f'models/model_joint_embedding_{rndseed}.pth')
 
     with torch.no_grad():
-        test_id = np.arange(X[0].shape[0])
-        embeds = model.predict(X, test_id).cpu().numpy()
+        test_id = np.arange(train_size, x_mod1.shape[0])
+        # test_id = np.arange(x_mod1.shape[0])
+        labels = cell_type.numpy()[test_id]
+        embeds = model.predict(test_id).cpu().numpy()
         print(embeds)
-        print(model.score(X, test_id, Y_test, 'clustering'))
+        print(model.score(test_id, labels, metric='clustering'))
 
     # mod1_obs = dataset.modalities[0].obs
     # mod1_uns = dataset.modalities[0].uns
