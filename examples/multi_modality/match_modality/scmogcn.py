@@ -1,19 +1,22 @@
 import argparse
 import random
 
-import numpy as np
-import torch
 import anndata
 import mudata
+import numpy as np
+import torch
+import torch.nn.functional as F
 
+from dance.data import Data
 from dance.datasets.multimodality import ModalityMatchingDataset
 from dance.modules.multi_modality.match_modality.scmogcn import ScMoGCNWrapper
-from dance.utils import set_seed
-from dance.data import Data
-import torch.nn.functional as F
 from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph
+from dance.utils import set_seed
+
+
 def normalize(X):
     return (X - X.mean()) / X.std()
+
 
 if __name__ == '__main__':
     rndseed = random.randint(0, 2147483647)
@@ -65,30 +68,27 @@ if __name__ == '__main__':
     # (x, y), z = data.get_feature(return_type="torch")
 
     data.set_config(feature_mod=["mod1", "mod2", "mod1", "mod2"], feature_channel_type=["uns", "uns", "obs", "obs"],
-                    feature_channel=["g", "g", "batch", "batch"],
-                    label_mod="mod1", label_channel='labels')
+                    feature_channel=["g", "g", "batch", "batch"], label_mod="mod1", label_channel='labels')
     (g_mod1, g_mod2, batch_mod1, batch_mod2), z = data.get_data(return_type="default")
-
 
     if subtask == 'openproblems_bmmc_cite_phase2_rna':
         HIDDEN_SIZE = 64
         TEMPERATURE = 2.739896
-        model = ScMoGCNWrapper(args, [[
-            (g_mod1.num_nodes('feature'), 512, 0.25), (512, 512, 0.25), (512, HIDDEN_SIZE)
-        ], [(g_mod2.num_nodes('feature'), 512, 0.2), (512, 512, 0.2),
-            (512, HIDDEN_SIZE)], [(HIDDEN_SIZE, 512, 0.2), (512, g_mod1.num_nodes('feature'))],
-                                      [(HIDDEN_SIZE, 512, 0.2),
-                                       (512, g_mod2.num_nodes('feature'))]], TEMPERATURE)
+        model = ScMoGCNWrapper(
+            args, [[(g_mod1.num_nodes('feature'), 512, 0.25), (512, 512, 0.25),
+                    (512, HIDDEN_SIZE)], [(g_mod2.num_nodes('feature'), 512, 0.2), (512, 512, 0.2), (512, HIDDEN_SIZE)],
+                   [(HIDDEN_SIZE, 512, 0.2),
+                    (512, g_mod1.num_nodes('feature'))], [(HIDDEN_SIZE, 512, 0.2),
+                                                          (512, g_mod2.num_nodes('feature'))]], TEMPERATURE)
     else:
         HIDDEN_SIZE = 256
         TEMPERATURE = 3.065016
-        model = ScMoGCNWrapper(args, [[
-            (g_mod1.num_nodes('feature'), 1024, 0.5), (1024, 1024, 0.5), (1024, HIDDEN_SIZE)
-        ], [(g_mod2.num_nodes('feature'), 2048, 0.5),
-            (2048, HIDDEN_SIZE)], [(HIDDEN_SIZE, 512, 0.2),
-                                   (512, g_mod1.num_nodes('feature'))],
-                                      [(HIDDEN_SIZE, 512, 0.2),
-                                       (512, g_mod2.num_nodes('feature'))]], TEMPERATURE)
+        model = ScMoGCNWrapper(
+            args, [[(g_mod1.num_nodes('feature'), 1024, 0.5), (1024, 1024, 0.5),
+                    (1024, HIDDEN_SIZE)], [(g_mod2.num_nodes('feature'), 2048, 0.5), (2048, HIDDEN_SIZE)],
+                   [(HIDDEN_SIZE, 512, 0.2),
+                    (512, g_mod1.num_nodes('feature'))], [(HIDDEN_SIZE, 512, 0.2),
+                                                          (512, g_mod2.num_nodes('feature'))]], TEMPERATURE)
 
     train_size = dataset.sparse_features()[0].shape[0]
     z_test = F.one_hot(torch.from_numpy(z[train_size:]).long())
@@ -100,8 +100,7 @@ if __name__ == '__main__':
     model.fit(g_mod1, g_mod2, labels1, labels2, train_size=train_size)
     model.load(f'models/model_{rndseed}.pth')
 
-    test_idx = np.arange(train_size,
-                         g_mod1.num_nodes('cell'))
+    test_idx = np.arange(train_size, g_mod1.num_nodes('cell'))
     print(model.predict(test_idx, enhance=True, batch1=batch_mod1, batch2=batch_mod2))
     print(model.score(test_idx, labels_matrix=z_test, enhance=True, batch1=batch_mod1, batch2=batch_mod2))
 """ To reproduce scMoGCN on other samples, please refer to command lines belows:

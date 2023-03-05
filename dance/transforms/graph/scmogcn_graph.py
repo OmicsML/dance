@@ -1,16 +1,19 @@
+import logging
+import os
+import pickle
+from collections import defaultdict
+
+import dgl
+import numpy as np
 import scipy.sparse
+import torch
+from sklearn.decomposition import TruncatedSVD
+
+from dance.data.base import Data
+from dance.typing import Optional, Tuple, Union
 
 from ..base import BaseTransform
-from collections import defaultdict
-import pickle
-import os
-import logging
-import numpy as np
-from dance.typing import Optional, Tuple, Union
-from sklearn.decomposition import TruncatedSVD
-from dance.data.base import Data
-import torch
-import dgl
+
 
 def read_gmt(entrez_string, symbol_string):
     gene_list = entrez_string.split()
@@ -37,12 +40,8 @@ def read_gmt(entrez_string, symbol_string):
     return gene_sets_symbols
 
 
-def create_pathway_graph(gex_features : scipy.sparse.spmatrix,
-                         gene_names: Union[str],
-                         pathway_weight: str,
-                         pathway_threshold: float,
-                         subtask: str,
-                         pathway_path: str):
+def create_pathway_graph(gex_features: scipy.sparse.spmatrix, gene_names: Union[str], pathway_weight: str,
+                         pathway_threshold: float, subtask: str, pathway_path: str):
     """Generate nodes, edges and edge weights for pathway dataset.
 
     Parameters
@@ -144,7 +143,9 @@ def create_pathway_graph(gex_features : scipy.sparse.spmatrix,
 
     return uu, vv, ee
 
-def construct_enhanced_feature_graph(u, v, e, train_size, feature_size, cell_node_features, inductive=False, enhance_graph=None, _test_graph=False):
+
+def construct_enhanced_feature_graph(u, v, e, train_size, feature_size, cell_node_features, inductive=False,
+                                     enhance_graph=None, _test_graph=False):
     """Generate a feature-cell graph, enhanced with domain-knowledge (e.g. pathway).
 
     Parameters
@@ -214,6 +215,7 @@ def construct_enhanced_feature_graph(u, v, e, train_size, feature_size, cell_nod
 
     return graph
 
+
 class ScMoGNNGraph(BaseTransform):
     """Construct the cell-feature graph object for scmognn.
 
@@ -242,15 +244,9 @@ class ScMoGNNGraph(BaseTransform):
 
     """
 
-    def __init__(self,
-                 inductive:bool =False,
-                 cell_init:str = 'none',
-                 pathway=True,
-                 subtask='openproblems_bmmc_cite_phase2_rna',
-                 pathway_weight=None,
-                 pathway_threshold:float =0.,
-                 pathway_path:str = 'data/h.all.v7.4',
-                 **kwargs):
+    def __init__(self, inductive: bool = False, cell_init: str = 'none', pathway=True,
+                 subtask='openproblems_bmmc_cite_phase2_rna', pathway_weight=None, pathway_threshold: float = 0.,
+                 pathway_path: str = 'data/h.all.v7.4', **kwargs):
         super().__init__(**kwargs)
         self.inductive = inductive
         self.cell_init = cell_init
@@ -279,12 +275,10 @@ class ScMoGNNGraph(BaseTransform):
             cell_node_features = torch.cat([torch.from_numpy(X_train_np), torch.from_numpy(X_test_np)], 0).float()
         if self.pathway:
             gene_names = data.data['mod1'].var_names.tolist()
-            enhance_graph = create_pathway_graph(gex_features = x_train,
-                         gene_names =  gene_names,
-                         pathway_weight =  self.pathway_weight,
-                         pathway_threshold = self.pathway_threshold,
-                         subtask = self.subtask,
-                         pathway_path = self.pathway_path)
+            enhance_graph = create_pathway_graph(gex_features=x_train, gene_names=gene_names,
+                                                 pathway_weight=self.pathway_weight,
+                                                 pathway_threshold=self.pathway_threshold, subtask=self.subtask,
+                                                 pathway_path=self.pathway_path)
         else:
             enhance_graph = None
 
@@ -293,8 +287,7 @@ class ScMoGNNGraph(BaseTransform):
                 np.concatenate([np.array(t.nonzero()[0] + i) for i, t in enumerate(x_train_sparse)], axis=0))
             v = torch.from_numpy(np.concatenate([np.array(t.nonzero()[1]) for t in x_train_sparse], axis=0))
             e = torch.from_numpy(x_train_sparse.tocsr().data).float()
-            g = construct_enhanced_feature_graph(u, v, e,
-                                                 train_size, feature_size, cell_node_features, self.inductive,
+            g = construct_enhanced_feature_graph(u, v, e, train_size, feature_size, cell_node_features, self.inductive,
                                                  enhance_graph, _test_graph=False)
 
             u = torch.from_numpy(np.concatenate([np.array(t.nonzero()[0] + i) for i, t in enumerate(x_train_sparse)] + \
@@ -304,9 +297,8 @@ class ScMoGNNGraph(BaseTransform):
                                                 [np.array(t.nonzero()[1]) for t in x_test_sparse], axis=0))
             e = torch.from_numpy(np.concatenate(
                 [x_train_sparse.tocsr().data, x_test_sparse.tocsr().data], axis=0)).float()
-            gtest = construct_enhanced_feature_graph(u, v, e,
-                                                 train_size, feature_size, cell_node_features, self.inductive,
-                                                 enhance_graph, _test_graph=True)
+            gtest = construct_enhanced_feature_graph(u, v, e, train_size, feature_size, cell_node_features,
+                                                     self.inductive, enhance_graph, _test_graph=True)
             data.data.uns['g'] = g
             data.data.uns['gtest'] = gtest
 
@@ -318,9 +310,8 @@ class ScMoGNNGraph(BaseTransform):
                                                 [np.array(t.nonzero()[1]) for t in x_test_sparse], axis=0))
             e = torch.from_numpy(np.concatenate(
                 [x_train_sparse.tocsr().data, x_test_sparse.tocsr().data], axis=0)).float()
-            g = construct_enhanced_feature_graph(u, v, e,
-                                                     train_size, feature_size, cell_node_features, self.inductive,
-                                                     enhance_graph)
+            g = construct_enhanced_feature_graph(u, v, e, train_size, feature_size, cell_node_features, self.inductive,
+                                                 enhance_graph)
             data.data.uns['g'] = g
 
         return data

@@ -3,18 +3,18 @@ import random
 
 import anndata as ad
 import dgl
+import mudata
 import numpy as np
 import scanpy as sc
 import torch
-import mudata
+from scipy.sparse import csr_matrix
 
 import dance.utils.metrics as metrics
-from scipy.sparse import csr_matrix
+from dance.data import Data
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.scmogcn import ScMoGCNWrapper
-from dance.data import Data
-from dance.transforms.graph_construct import basic_feature_graph_propagation, construct_basic_feature_graph
 from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph
+from dance.transforms.graph_construct import basic_feature_graph_propagation, construct_basic_feature_graph
 from dance.utils import set_seed
 
 if __name__ == '__main__':
@@ -56,25 +56,22 @@ if __name__ == '__main__':
     data = Data(mdata)
     data = CellFeatureBipartiteGraph(cell_feature_channel='X_pca', mod='mod1')(data)
     data = CellFeatureBipartiteGraph(cell_feature_channel='X_pca', mod='mod2')(data)
-    data.set_config(feature_mod=["mod1", "mod2"],
-                    label_mod=["mod1", "mod1", "mod1", "mod1", "mod1"],
-                    feature_channel=['X_pca', 'X_pca'],
+    data.set_config(feature_mod=["mod1", "mod2"], label_mod=["mod1", "mod1", "mod1", "mod1",
+                                                             "mod1"], feature_channel=['X_pca', 'X_pca'],
                     label_channel=['cell_type', 'batch_label', 'phase_labels', 'S_scores', 'G2M_scores'])
-    (x_mod1, x_mod2), (cell_type, batch_label, phase_label, S_score, G2M_score) = data.get_data(
-        return_type='torch')
+    (x_mod1, x_mod2), (cell_type, batch_label, phase_label, S_score, G2M_score) = data.get_data(return_type='torch')
     phase_score = torch.cat([S_score[:, None], G2M_score[:, None]], 1)
 
-    model = ScMoGCNWrapper(args,
-                       num_celL_types=int(cell_type.max()+1),
-                       num_batches=int(batch_label.max()+1),
-                       num_phases=phase_score.shape[1],
-                       num_features=x_mod1.shape[1]+x_mod2.shape[1])
-    model.fit(g_mod1=data.data['mod1'].uns['g'],
-              g_mod2=data.data['mod2'].uns['g'],
-              train_size=train_size,
-              cell_type=cell_type,
-              batch_label=batch_label,
-              phase_score=phase_score, )
+    model = ScMoGCNWrapper(args, num_celL_types=int(cell_type.max() + 1), num_batches=int(batch_label.max() + 1),
+                           num_phases=phase_score.shape[1], num_features=x_mod1.shape[1] + x_mod2.shape[1])
+    model.fit(
+        g_mod1=data.data['mod1'].uns['g'],
+        g_mod2=data.data['mod2'].uns['g'],
+        train_size=train_size,
+        cell_type=cell_type,
+        batch_label=batch_label,
+        phase_score=phase_score,
+    )
     model.load(f'models/model_joint_embedding_{rndseed}.pth')
 
     with torch.no_grad():

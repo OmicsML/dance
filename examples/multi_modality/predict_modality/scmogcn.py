@@ -2,16 +2,18 @@ import argparse
 import os
 from argparse import Namespace
 
-import numpy as np
-import torch
 import anndata
 import mudata
+import numpy as np
+import torch
+
 from dance.data import Data
 from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.scmogcn import ScMoGCNWrapper
-from dance.transforms.graph import ScMoGNNGraph
 from dance.transforms.cell_feature import BatchFeature
+from dance.transforms.graph import ScMoGNNGraph
 from dance.utils import set_seed
+
 
 def pipeline(inductive=False, verbose=2, logger=None, **kwargs):
     PREFIX = kwargs['prefix']
@@ -38,9 +40,8 @@ def pipeline(inductive=False, verbose=2, logger=None, **kwargs):
     data = Data(mdata, train_size=train_size)
     data.set_config(feature_mod="mod1", label_mod="mod2")
 
-    data = ScMoGNNGraph(inductive, kwargs["cell_init"], kwargs["pathway"], kwargs["subtask"],
-                           kwargs['pathway_weight'], kwargs['pathway_threshold'],
-                           kwargs['pathway_path'])(data)
+    data = ScMoGNNGraph(inductive, kwargs["cell_init"], kwargs["pathway"], kwargs["subtask"], kwargs['pathway_weight'],
+                        kwargs['pathway_threshold'], kwargs['pathway_path'])(data)
     if not kwargs['no_batch_features']:
         data = BatchFeature()(data)
 

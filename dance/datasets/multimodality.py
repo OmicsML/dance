@@ -1,3 +1,4 @@
+import logging
 import os
 import pickle
 
@@ -8,7 +9,7 @@ import torch
 
 from dance.transforms.preprocess import lsiTransformer
 from dance.utils.download import download_file, unzip_file
-import logging
+
 
 class MultiModalityDataset():
 
@@ -360,9 +361,9 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
                     self.train_size = self.exploration[0].shape[0]
                     self.modalities[0].obsm['cell_type'] = Y_train[0]
                     self.modalities[0].obsm['batch_label'] = np.concatenate(
-                        [Y_train[1], np.zeros(Y_train[0].shape[0]-self.train_size)], 0)
+                        [Y_train[1], np.zeros(Y_train[0].shape[0] - self.train_size)], 0)
                     self.modalities[0].obsm['phase_labels'] = np.concatenate(
-                        [Y_train[2], np.zeros(Y_train[0].shape[0]-self.train_size)], 0)
+                        [Y_train[2], np.zeros(Y_train[0].shape[0] - self.train_size)], 0)
                     self.modalities[0].obsm['S_scores'] = np.concatenate(
                         [Y_train[3], np.zeros(Y_train[0].shape[0] - self.train_size)], 0)
                     self.modalities[0].obsm['G2M_scores'] = np.concatenate(
@@ -468,7 +469,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
             logging.info('Data loading and pca done', mod1_pca.shape, mod2_pca.shape)
             logging.info('Start to calculate cell_cycle score. It may roughly take an hour.')
 
-            cell_type_labels = self.test_sol.obs['cell_type'].to_numpy()#mod1_obs['cell_type']
+            cell_type_labels = self.test_sol.obs['cell_type'].to_numpy()  #mod1_obs['cell_type']
             batch_ids = mod1_obs['batch']
             phase_labels = mod1_obs['phase']
             nb_cell_types = len(np.unique(cell_type_labels))
@@ -504,9 +505,11 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
             self.modalities[0].obsm['G2M_scores'] = np.concatenate(
                 [Y_train[4], np.zeros(self.modalities[0].shape[0] - self.train_size)], 0)
 
-            self.preprocessed_data = {'X_pca_0': self.modalities[0].obsm['X_pca'],
-                                      'X_pca_1': self.modalities[1].obsm['X_pca'],
-                                      'Y_train': Y_train}
+            self.preprocessed_data = {
+                'X_pca_0': self.modalities[0].obsm['X_pca'],
+                'X_pca_1': self.modalities[1].obsm['X_pca'],
+                'Y_train': Y_train
+            }
             pickle.dump(self.preprocessed_data,
                         open(os.path.join(pretrained_folder, f'preprocessed_data_{self.subtask}.pkl'), 'wb'))
             pickle.dump([nb_cell_types, nb_batches, nb_phases],

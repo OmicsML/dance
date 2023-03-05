@@ -3,17 +3,17 @@ import random
 
 import anndata as ad
 import dgl
+import mudata
 import numpy as np
 import scanpy as sc
 import torch
-import mudata
 
 import dance.utils.metrics as metrics
+from dance.data import Data
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.jae import JAEWrapper
-from dance.utils import set_seed
 from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph
-from dance.data import Data
+from dance.utils import set_seed
 
 if __name__ == '__main__':
     rndseed = random.randint(0, 2147483647)
@@ -50,20 +50,16 @@ if __name__ == '__main__':
     # train_size = int(mod1.shape[0] * 0.85)
     train_size = dataset.train_size
     data = Data(mdata, train_size=train_size)
-    data.set_config(feature_mod=["mod1", "mod2"],
-                    label_mod=["mod1", "mod1", "mod1", "mod1", "mod1"],
-                    feature_channel=['X_pca', 'X_pca'],
+    data.set_config(feature_mod=["mod1", "mod2"], label_mod=["mod1", "mod1", "mod1", "mod1",
+                                                             "mod1"], feature_channel=['X_pca', 'X_pca'],
                     label_channel=['cell_type', 'batch_label', 'phase_labels', 'S_scores', 'G2M_scores'])
-    (X_mod1_train, X_mod2_train), (cell_type, batch_label, phase_label, S_score, G2M_score) = data.get_train_data(
-        return_type='torch')
+    (X_mod1_train, X_mod2_train), (cell_type, batch_label, phase_label, S_score,
+                                   G2M_score) = data.get_train_data(return_type='torch')
     (X_mod1_test, X_mod2_test), (cell_type_test, _, _, _, _) = data.get_test_data(return_type='torch')
     X_train = torch.cat([X_mod1_train, X_mod2_train], dim=1)
     phase_score = torch.cat([S_score[:, None], G2M_score[:, None]], 1)
-    model = JAEWrapper(args,
-                       num_celL_types=int(cell_type.max()+1),
-                       num_batches=int(batch_label.max()+1),
-                       num_phases=phase_score.shape[1],
-                       num_features=X_train.shape[1])
+    model = JAEWrapper(args, num_celL_types=int(cell_type.max() + 1), num_batches=int(batch_label.max() + 1),
+                       num_phases=phase_score.shape[1], num_features=X_train.shape[1])
     model.fit(X_train, cell_type, batch_label, phase_score)
     model.load(f'models/model_joint_embedding_{rndseed}.pth')
 

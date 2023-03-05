@@ -9,6 +9,7 @@ Wen, Hongzhi, et al. "Graph Neural Networks for Multimodal Single-Cell Data Inte
 import math
 import os
 
+import dgl.nn.pytorch as dglnn
 import numpy as np
 import torch
 import torch.nn as nn
@@ -18,7 +19,6 @@ from torch.utils.data import DataLoader
 
 from dance.utils import SimpleIndexDataset
 from dance.utils.metrics import *
-import dgl.nn.pytorch as dglnn
 
 
 def propagation_layer_combination(X, idx, wt, from_logits=True):
@@ -31,13 +31,9 @@ def propagation_layer_combination(X, idx, wt, from_logits=True):
 
     return x
 
-def cell_feature_propagation(g,
-             alpha: float = 0.5,
-             beta: float = 0.5,
-             cell_init: str = None,
-             feature_init: str = 'id',
-             device: str = 'cuda',
-             layers: int = 3):
+
+def cell_feature_propagation(g, alpha: float = 0.5, beta: float = 0.5, cell_init: str = None, feature_init: str = 'id',
+                             device: str = 'cuda', layers: int = 3):
 
     g = g.to(device)
     gconv = dglnn.HeteroGraphConv(
@@ -90,6 +86,7 @@ def cell_feature_propagation(g,
     # if verbose: print(hcell[-1].abs().mean())
     return hcell[1:]
 
+
 class ScMoGCNWrapper:
     """ScMoGCN class.
 
@@ -133,7 +130,6 @@ class ScMoGCNWrapper:
 
         """
 
-
         wt = self.wt
         hcell_mod1 = cell_feature_propagation(g_mod1, layers=self.args.layers, device=self.args.device)
         hcell_mod2 = cell_feature_propagation(g_mod2, layers=self.args.layers, device=self.args.device)
@@ -143,11 +139,7 @@ class ScMoGCNWrapper:
         for l in range(len(self.feat_mod1)):
             X.append(torch.cat([self.feat_mod1[l], self.feat_mod2[l]], dim=1).float().to(self.args.device))
         self.X = X
-        Y = [
-            cell_type.to(self.args.device),
-            batch_label.to(self.args.device),
-            phase_score.float().to(self.args.device)
-        ]
+        Y = [cell_type.to(self.args.device), batch_label.to(self.args.device), phase_score.float().to(self.args.device)]
 
         idx = np.random.permutation(train_size)
         train_idx = idx[:int(idx.shape[0] * 0.9)]
@@ -286,7 +278,7 @@ class ScMoGCNWrapper:
 
         return self.model.encoder(X)
 
-    def score(self,idx, cell_type, phase_score=None, metric='loss'):
+    def score(self, idx, cell_type, phase_score=None, metric='loss'):
         """Score function to get score of prediction.
 
         Parameters

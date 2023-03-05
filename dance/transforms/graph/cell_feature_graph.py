@@ -1,12 +1,13 @@
 import dgl
+import dgl.nn.pytorch as dglnn
 import numpy as np
 import torch
 import torch.nn.functional as F
+from dgl import AddReverse
+
 from dance.transforms.base import BaseTransform
 from dance.transforms.cell_feature import WeightedFeaturePCA
 from dance.typing import LogLevel, Optional
-from dgl import AddReverse
-import dgl.nn.pytorch as dglnn
 
 
 #### TODO: Let's try this:
@@ -69,7 +70,6 @@ class CellFeatureGraph(BaseTransform):
                                         channel_type="obsm")
         g.ndata["features"] = torch.vstack((gene_feature, cell_feature))
 
-
         data.data.uns[self.out] = g
 
         return data
@@ -106,10 +106,10 @@ class PCACellFeatureGraph(BaseTransform):
                          log_level=self.log_level)(data)
         return data
 
+
 class CellFeatureBipartiteGraph(BaseTransform):
 
-    def __init__(self, cell_feature_channel: str,  *,
-                 mod: Optional[str] = None, **kwargs):
+    def __init__(self, cell_feature_channel: str, *, mod: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
 
         self.cell_feature_channel = cell_feature_channel
@@ -126,6 +126,7 @@ class CellFeatureBipartiteGraph(BaseTransform):
         else:
             data.data[self.mod].uns['g'] = g
         return data
+
 
 # # TODO:Probably move to model part
 # class CellFeatureBipartitePropagation(BaseTransform):

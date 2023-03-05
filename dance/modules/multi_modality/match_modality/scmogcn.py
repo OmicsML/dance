@@ -8,17 +8,19 @@ arXiv:2203.01884 (2022).
 """
 import math
 import os
+from typing import List, Optional
 
+import dgl.nn.pytorch as dglnn
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from typing import List, Optional
+
 from dance.utils import SimpleIndexDataset
 from dance.utils.metrics import batch_separated_bipartite_matching
-import dgl.nn.pytorch as dglnn
+
 
 def propagation_layer_combination(X, Y, idx, wt1, wt2, from_logits=True):
     if from_logits:
@@ -35,13 +37,8 @@ def propagation_layer_combination(X, Y, idx, wt1, wt2, from_logits=True):
     return x, y
 
 
-def cell_feature_propagation(g,
-             alpha: float = 0.5,
-             beta: float = 0.5,
-             cell_init: str = None,
-             feature_init: str = 'id',
-             device: str = 'cuda',
-             layers: int = 3):
+def cell_feature_propagation(g, alpha: float = 0.5, beta: float = 0.5, cell_init: str = None, feature_init: str = 'id',
+                             device: str = 'cuda', layers: int = 3):
     g = g.to(device)
     gconv = dglnn.HeteroGraphConv(
         {
@@ -92,6 +89,7 @@ def cell_feature_propagation(g,
 
     # if verbose: print(hcell[-1].abs().mean())
     return hcell[1:]
+
 
 class ScMoGCNWrapper:
     """ScMoGCN class.
@@ -203,8 +201,7 @@ class ScMoGCNWrapper:
         idx = torch.randperm(train_size)
         train_idx = idx[:-BATCH_SIZE]
         val_idx = idx[-BATCH_SIZE:]
-        test_idx = np.arange(train_size,
-                             hcell_mod1[0].shape[0])
+        test_idx = np.arange(train_size, hcell_mod1[0].shape[0])
         train_dataset = SimpleIndexDataset(train_idx)
         train_loader = DataLoader(
             dataset=train_dataset,

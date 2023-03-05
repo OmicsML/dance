@@ -1,11 +1,12 @@
 import numpy as np
+import pandas as pd
+import torch
 from sklearn.decomposition import PCA
 
 from dance.transforms.base import BaseTransform
 from dance.typing import Optional
 from dance.utils.matrix import normalize
-import torch
-import pandas as pd
+
 
 class WeightedFeaturePCA(BaseTransform):
     """Compute the weighted gene PCA as cell features.
@@ -77,6 +78,7 @@ class CellPCA(BaseTransform):
         data.data.obsm[self.out] = cell_feat
 
         return data
+
 
 class BatchFeature(BaseTransform):
     """Generate statistical features for each batch in the input data, and assign batch
