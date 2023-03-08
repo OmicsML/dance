@@ -8,7 +8,6 @@ arXiv:2203.01884 (2022).
 """
 import math
 import os
-from typing import List, Optional
 
 import dgl.nn.pytorch as dglnn
 import numpy as np
@@ -18,6 +17,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
+from dance import logger
 from dance.utils import SimpleIndexDataset
 from dance.utils.metrics import batch_separated_bipartite_matching
 
@@ -70,8 +70,8 @@ def cell_feature_propagation(g, alpha: float = 0.5, beta: float = 0.5, cell_init
                     'edge_weight': g.edges['rev_cell2feature'].data['weight'].float()
                 }
             })
-        # if verbose: print(i, 'cell', h['cell'].abs().mean(), h1['cell'].abs().mean())
-        # if verbose: print(i, 'feature', h['feature'].abs().mean(), h1['feature'].abs().mean())
+        logger.debug(f"{i} cell {h['cell'].abs().mean()} {h1['cell'].abs().mean()}")
+        logger.debug(f"{i} feature {h['feature'].abs().mean()} {h1['feature'].abs().mean()}")
 
         h1['feature'] = (h1['feature'] -
                          h1['feature'].mean()) / (h1['feature'].std() if h1['feature'].mean() != 0 else 1)
@@ -87,7 +87,7 @@ def cell_feature_propagation(g, alpha: float = 0.5, beta: float = 0.5, cell_init
 
         hcell.append(h['cell'])
 
-    # if verbose: print(hcell[-1].abs().mean())
+    logger.debug(f"{hcell[-1].abs().mean()=}")
     return hcell[1:]
 
 
@@ -215,7 +215,7 @@ class ScMoGCNWrapper:
         vals = []
         for epoch in range(self.args.epochs):
             self.model.train()
-            print('epoch', epoch)
+            logger.info(f'epoch {epoch}')
             total_loss = 0
             accum_acc = [0, 0]
 
@@ -247,14 +247,14 @@ class ScMoGCNWrapper:
                 loss.backward()
                 opt.step()
 
-            print('training loss: %.5f, foward: %.4f, backward: %.4f' %
-                  (total_loss / len(train_loader), accum_acc[0] / len(train_loader), accum_acc[1] / len(train_loader)))
+            logger.info('training loss: %.5f, forward: %.4f, backward: %.4f', total_loss / len(train_loader),
+                        accum_acc[0] / len(train_loader), accum_acc[1] / len(train_loader))
 
             temp = torch.arange(val_idx.shape[0]).to(device)
             vals.append(self.score(val_idx, labels1=temp, labels2=temp))
-            print('validation score: %.5f' % vals[-1])
+            logger.info('validation score: %.5f', vals[-1])
             if epoch % 10 == 9:
-                print('testing score: %.5f' % self.score(test_idx, labels1=labels1, labels2=labels2))
+                logger.info('testing score: %.5f', self.score(test_idx, labels1=labels1, labels2=labels2))
 
             if vals[-1] > maxval:
                 maxval = vals[-1]
@@ -264,10 +264,10 @@ class ScMoGCNWrapper:
                 weight_record = [wt[0].detach(), wt[1].detach()]
 
             if max(vals) != max(vals[-20:]):
-                print('Early stopped.')
+                logger.info('Early stopped.')
                 break
 
-        print('Valid: ', maxval)
+        logger.info(f'Valid: {maxval}')
         self.fitted = True
 
         self.wt = weight_record
