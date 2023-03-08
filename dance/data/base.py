@@ -397,8 +397,8 @@ class BaseData(ABC):
         split_name
             Name of the split to retrieve. If not set, return all.
         return_type
-            How should the features be returned. **sparse**: return as a sparse matrix; **numpy**: return as a numpy array; **torch**: return as a torch
-            tensor; **anndata**: return as an anndata object.
+            How should the features be returned. **sparse**: return as a sparse matrix; **numpy**: return as a numpy
+            array; **torch**: return as a torch tensor; **anndata**: return as an anndata object.
         channel
             Return a particular channel as features. If ``channel_type`` is ``X`` or ``raw_X``, then return ``.X`` or
             the ``.raw.X`` attribute from the :class:`~anndata.AnnData` directly. If ``channel_type`` is ``obs``, return
@@ -422,7 +422,7 @@ class BaseData(ABC):
                 raise ValueError(f"split_name is not supported when return_type is 'default', got {split_name=!r}")
             return feature
 
-        if return_type == 'sparse':
+        if return_type == "sparse":
             if isinstance(feature, np.ndarray):
                 feature = sp.csr_matrix(feature)
             elif not isinstance(feature, sp.spmatrix):
