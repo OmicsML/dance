@@ -1,4 +1,3 @@
-import logging
 import os
 import pickle
 from collections import defaultdict
@@ -9,8 +8,9 @@ import scipy.sparse
 import torch
 from sklearn.decomposition import TruncatedSVD
 
+from dance import logger
 from dance.data.base import Data
-from dance.typing import Optional, Tuple, Union
+from dance.typing import Union
 
 from ..base import BaseTransform
 
@@ -76,9 +76,8 @@ def create_pathway_graph(gex_features: scipy.sparse.spmatrix, gene_names: Union[
 
     pk_path = f'pw_{subtask}_{pathway_weight}.pkl'
     if os.path.exists(pk_path):
-        logging.warning(
-            'Pathway file exist. Load pickle file by default. Auguments "--pathway_weight" and "--pathway_path" will not take effect.'
-        )
+        logger.warning("Pathway file exist. Load pickle file by default. "
+                       "Auguments '--pathway_weight' and '--pathway_path' will not take effect.")
         uu, vv, ee = pickle.load(open(pk_path, 'rb'))
     else:
         # Load Original Pathway File

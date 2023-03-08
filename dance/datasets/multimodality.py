@@ -1,4 +1,3 @@
-import logging
 import os
 import pickle
 
@@ -7,6 +6,7 @@ import numpy as np
 import scanpy as sc
 import torch
 
+from dance import logger
 from dance.transforms.preprocess import lsiTransformer
 from dance.utils.download import download_file, unzip_file
 
@@ -183,7 +183,7 @@ class ModalityPredictionDataset(MultiModalityDataset):
 
     def preprocess(self, kind='feature_selection', selection_threshold=10000):
         if kind == 'pca':
-            logging.info('Preprocessing method not supported.')
+            logger.info('Preprocessing method not supported.')
             return self
         elif kind == 'feature_selection':
             if self.modalities[0].shape[1] > selection_threshold:
@@ -193,9 +193,9 @@ class ModalityPredictionDataset(MultiModalityDataset):
                 for i in [0, 2]:
                     self.modalities[i] = self.modalities[i][:, self.modalities[i].var['highly_variable']]
         else:
-            logging.info('Preprocessing method not supported.')
+            logger.info('Preprocessing method not supported.')
             return self
-        logging.info('Preprocessing done.')
+        logger.info('Preprocessing done.')
         return self
 
 
@@ -294,9 +294,9 @@ class ModalityMatchingDataset(MultiModalityDataset):
                     self.modalities[i] = self.modalities[i][:, self.modalities[i].var['highly_variable']]
                     self.modalities[i + 2] = self.modalities[i + 2][:, self.modalities[i + 2].var['highly_variable']]
         else:
-            logging.info('Preprocessing method not supported.')
+            logger.info('Preprocessing method not supported.')
             return self
-        logging.info('Preprocessing done.')
+        logger.info('Preprocessing done.')
         self.preprocessed = True
         return self
 
@@ -373,7 +373,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
                     # cell types, batch labels, cell cycle
                     self.nb_cell_types, self.nb_batches, self.nb_phases = pickle.load(f)
                 self.preprocessed = True
-                logging.info('Preprocessing done.')
+                logger.info('Preprocessing done.')
                 return self
 
             ##########################################
@@ -466,8 +466,8 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
                 'AURKA', 'PSRC1', 'ANLN', 'LBR', 'CKAP5', 'CENPE', 'CTCF', \
                 'NEK2', 'G2E3', 'GAS2L3', 'CBX5', 'CENPA']
 
-            logging.info('Data loading and pca done', mod1_pca.shape, mod2_pca.shape)
-            logging.info('Start to calculate cell_cycle score. It may roughly take an hour.')
+            logger.info('Data loading and pca done', mod1_pca.shape, mod2_pca.shape)
+            logger.info('Start to calculate cell_cycle score. It may roughly take an hour.')
 
             cell_type_labels = self.test_sol.obs['cell_type'].to_numpy()  #mod1_obs['cell_type']
             batch_ids = mod1_obs['batch']
@@ -523,10 +523,10 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
                                                 n_top_genes=selection_threshold)
                     self.modalities[i] = self.modalities[i][:, self.modalities[i].var['highly_variable']]
         else:
-            logging.info('Preprocessing method not supported.')
+            logger.info('Preprocessing method not supported.')
             return self
         self.preprocessed = True
-        logging.info('Preprocessing done.')
+        logger.info('Preprocessing done.')
         return self
 
     def get_preprocessed_data(self):
