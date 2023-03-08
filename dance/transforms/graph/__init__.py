@@ -8,11 +8,12 @@ from dance.transforms.graph.spatial_graph import SMEGraph, SpaGCNGraph, SpaGCNGr
 __all__ = [
     "CellFeatureGraph",
     "DSTGraph",
+    "FeatureFeatureGraph",
     "NeighborGraph",
     "PCACellFeatureGraph",
     "SMEGraph",
+    "ScMoGNNGraph",
     "SpaGCNGraph",
     "SpaGCNGraph2D",
     "StagateGraph",
-    "FeatureFeatureGraph",
 ]  # yapf: disable
