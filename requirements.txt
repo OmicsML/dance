@@ -17,4 +17,4 @@ scipy==1.10.1
 statsmodels==0.13.5
 tables==3.8.0
 torchnmf==0.3.4
-tqdm==4.64.1
+tqdm==4.65.0
