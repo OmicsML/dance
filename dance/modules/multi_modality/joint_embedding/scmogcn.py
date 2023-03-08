@@ -2,11 +2,9 @@
 
 Reference
 ---------
-Wen, Hongzhi, et al. "Graph Neural Networks for Multimodal Single-Cell Data Integration." arXiv preprint arXiv:2203.01884 (2022).
+Wen, Hongzhi, et al. "Graph Neural Networks for Multimodal Single-Cell Data Integration." arXiv:2203.01884 (2022).
 
 """
-
-import math
 import os
 
 import dgl.nn.pytorch as dglnn
@@ -14,11 +12,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
+from sklearn.cluster import KMeans
+from sklearn.metrics import adjusted_rand_score
+from sklearn.metrics.cluster import normalized_mutual_info_score
 from torch.utils.data import DataLoader
 
+from dance import logger
 from dance.utils import SimpleIndexDataset
-from dance.utils.metrics import *
 
 
 def propagation_layer_combination(X, idx, wt, from_logits=True):
@@ -34,7 +34,6 @@ def propagation_layer_combination(X, idx, wt, from_logits=True):
 
 def cell_feature_propagation(g, alpha: float = 0.5, beta: float = 0.5, cell_init: str = None, feature_init: str = 'id',
                              device: str = 'cuda', layers: int = 3):
-
     g = g.to(device)
     gconv = dglnn.HeteroGraphConv(
         {
@@ -66,8 +65,8 @@ def cell_feature_propagation(g, alpha: float = 0.5, beta: float = 0.5, cell_init
                     'edge_weight': g.edges['rev_cell2feature'].data['weight'].float()
                 }
             })
-        # if verbose: print(i, 'cell', h['cell'].abs().mean(), h1['cell'].abs().mean())
-        # if verbose: print(i, 'feature', h['feature'].abs().mean(), h1['feature'].abs().mean())
+        logger.debug(f"{i} cell {h['cell'].abs().mean()} {h1['cell'].abs().mean()}")
+        logger.debug(f"{i} feature {h['feature'].abs().mean()} {h1['feature'].abs().mean()}")
 
         h1['feature'] = (h1['feature'] -
                          h1['feature'].mean()) / (h1['feature'].std() if h1['feature'].mean() != 0 else 1)
@@ -83,7 +82,8 @@ def cell_feature_propagation(g, alpha: float = 0.5, beta: float = 0.5, cell_init
 
         hcell.append(h['cell'])
 
-    # if verbose: print(hcell[-1].abs().mean())
+    logger.debug(f"{hcell[-1].abs().mean()=}")
+
     return hcell[1:]
 
 
@@ -93,7 +93,8 @@ class ScMoGCNWrapper:
     Parameters
     ----------
     args : argparse.Namespace
-        A Namespace object that contains arguments of ScMoGCN. For details of parameters in parser args, please refer to link (parser help document).
+        A Namespace object that contains arguments of ScMoGCN. For details of parameters in parser args, please refer
+        to link (parser help document).
     dataset : dance.datasets.multimodality.JointEmbeddingNIPSDataset
         Joint embedding dataset.
 
@@ -136,8 +137,8 @@ class ScMoGCNWrapper:
         self.feat_mod1 = hcell_mod1
         self.feat_mod2 = hcell_mod2
         X = []
-        for l in range(len(self.feat_mod1)):
-            X.append(torch.cat([self.feat_mod1[l], self.feat_mod2[l]], dim=1).float().to(self.args.device))
+        for i in range(len(self.feat_mod1)):
+            X.append(torch.cat([self.feat_mod1[i], self.feat_mod2[i]], dim=1).float().to(self.args.device))
         self.X = X
         Y = [cell_type.to(self.args.device), batch_label.to(self.args.device), phase_score.float().to(self.args.device)]
 
@@ -387,5 +388,9 @@ class ScMoGCN(nn.Module):
         x0 = x
         x = self.decoder(x)
 
-        return x, x0[:, :self.nb_cell_types], x0[:, self.nb_cell_types:self.nb_cell_types + self.nb_batches], \
-               x0[:, self.nb_cell_types + self.nb_batches:self.nb_cell_types + self.nb_batches + self.nb_phases]
+        return (
+            x,
+            x0[:, :self.nb_cell_types],
+            x0[:, self.nb_cell_types:self.nb_cell_types + self.nb_batches],
+            x0[:, self.nb_cell_types + self.nb_batches:self.nb_cell_types + self.nb_batches + self.nb_phases],
+        )
