@@ -2,7 +2,7 @@ import hashlib
 from abc import ABC, abstractmethod
 
 from dance import logger
-from dance.data.base import BaseData, Data
+from dance.data.base import Data
 from dance.typing import LogLevel, Optional, Tuple
 
 
