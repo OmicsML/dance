@@ -3,14 +3,16 @@ import random
 
 import anndata as ad
 import dgl
+import mudata
 import numpy as np
 import scanpy as sc
 import torch
 
 import dance.utils.metrics as metrics
+from dance.data import Data
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.jae import JAEWrapper
-from dance.transforms.graph_construct import basic_feature_graph_propagation, construct_basic_feature_graph
+from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph
 from dance.utils import set_seed
 
 if __name__ == '__main__':
@@ -37,20 +39,38 @@ if __name__ == '__main__':
 
     dataset = JointEmbeddingNIPSDataset(args.subtask, data_dir=args.data_folder).load_data()\
         .load_metadata().load_sol().preprocess('aux', args.pretrained_folder).normalize()
-    X_train, Y_train, X_test = dataset.preprocessed_data['X_train'], dataset.preprocessed_data['Y_train'], \
-                                       dataset.preprocessed_data['X_test']
-
-    model = JAEWrapper(args, dataset)
-    model.fit(X_train, Y_train)
+    mod1 = dataset.modalities[0]
+    mod2 = dataset.modalities[1]
+    mod1.var_names_make_unique()
+    mod2.var_names_make_unique()
+    mod1.obs_names_make_unique()
+    mod2.obs_names = mod1.obs_names
+    mdata = mudata.MuData({"mod1": mod1, "mod2": mod2})
+    mdata.var_names_make_unique()
+    # train_size = int(mod1.shape[0] * 0.85)
+    train_size = dataset.train_size
+    data = Data(mdata, train_size=train_size)
+    data.set_config(feature_mod=["mod1", "mod2"], label_mod=["mod1", "mod1", "mod1", "mod1",
+                                                             "mod1"], feature_channel=['X_pca', 'X_pca'],
+                    label_channel=['cell_type', 'batch_label', 'phase_labels', 'S_scores', 'G2M_scores'])
+    (X_mod1_train, X_mod2_train), (cell_type, batch_label, phase_label, S_score,
+                                   G2M_score) = data.get_train_data(return_type='torch')
+    (X_mod1_test, X_mod2_test), (cell_type_test, _, _, _, _) = data.get_test_data(return_type='torch')
+    X_train = torch.cat([X_mod1_train, X_mod2_train], dim=1)
+    phase_score = torch.cat([S_score[:, None], G2M_score[:, None]], 1)
+    model = JAEWrapper(args, num_celL_types=int(cell_type.max() + 1), num_batches=int(batch_label.max() + 1),
+                       num_phases=phase_score.shape[1], num_features=X_train.shape[1])
+    model.fit(X_train, cell_type, batch_label, phase_score)
     model.load(f'models/model_joint_embedding_{rndseed}.pth')
 
     with torch.no_grad():
-        X_test = torch.from_numpy(np.concatenate([X_train, X_test])).float().to(device)
+        X_test = torch.cat([X_mod1_test, X_mod2_test], dim=1).float().to(device)
+        # X_test = torch.cat([X_train, X_test], dim=0).float().to(device)
         test_id = np.arange(X_test.shape[0])
-        labels = dataset.test_sol.obs['cell_type'].to_numpy()
+        labels = cell_type_test.numpy()
         embeds = model.predict(X_test, test_id).cpu().numpy()
         print(embeds)
-        print(model.score(X_test, test_id, labels, 'clustering'))
+        print(model.score(X_test, test_id, labels, metric='clustering'))
 
     # mod1_obs = dataset.modalities[0].obs
     # mod1_uns = dataset.modalities[0].uns

@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from sklearn.decomposition import PCA
 
 from dance.transforms.base import BaseTransform
@@ -75,4 +76,63 @@ class CellPCA(BaseTransform):
 
         data.data.obsm[self.out] = cell_feat
 
+        return data
+
+
+class BatchFeature(BaseTransform):
+    """Assign statistical batch features for each cell."""
+
+    def __init__(self, *, channel: Optional[str] = None, mod: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.channel = channel
+        self.mod = mod
+
+    def __call__(self, data):
+        # TODO: use get_feature; move mod1 to mod; replace for loop with np
+        cells = []
+        columns = [
+            "cell_mean",
+            "cell_std",
+            "nonzero_25%",
+            "nonzero_50%",
+            "nonzero_75%",
+            "nonzero_max",
+            "nonzero_count",
+            "nonzero_mean",
+            "nonzero_std",
+            "batch",
+        ]  # yapf: disable
+
+        ad_input = data.data["mod1"]
+        bcl = list(ad_input.obs["batch"])
+        print(set(bcl))
+        for i, cell in enumerate(ad_input.X):
+            cell = cell.toarray()
+            nz = cell[np.nonzero(cell)]
+            if len(nz) == 0:
+                raise ValueError("Error: one cell contains all zero features.")
+            cells.append([
+                cell.mean(),
+                cell.std(),
+                np.percentile(nz, 25),
+                np.percentile(nz, 50),
+                np.percentile(nz, 75),
+                cell.max(),
+                len(nz) / 1000,
+                nz.mean(),
+                nz.std(), bcl[i]
+            ])
+
+        cell_features = pd.DataFrame(cells, columns=columns)
+        batch_source = cell_features.groupby("batch").mean().reset_index()
+        batch_list = batch_source.batch.tolist()
+        batch_source = batch_source.drop("batch", axis=1).to_numpy().tolist()
+        b2i = dict(zip(batch_list, range(len(batch_list))))
+        batch_features = []
+
+        for b in ad_input.obs["batch"]:
+            batch_features.append(batch_source[b2i[b]])
+
+        batch_features = np.array(batch_features).astype(float)
+        data.data["mod1"].obsm["batch_features"] = batch_features
         return data

@@ -8,7 +8,6 @@ Wu, Kevin E., Kathryn E. Yost, Howard Y. Chang, and James Zou. "BABEL enables cr
 multiomic profiles at single-cell resolution." Proceedings of the National Academy of Sciences 118, no. 15 (2021).
 
 """
-import logging
 import math
 from typing import Callable, List, Tuple, Union
 
@@ -18,6 +17,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 import dance.utils.loss as loss_functions
+from dance import logger
 
 REDUCE_LR_ON_PLATEAU_PARAMS = {
     "mode": "min",
@@ -317,7 +317,7 @@ class ChromDecoder(nn.Module):
                 self.final_activations["act1"] = final_activations
             else:
                 raise ValueError(f"Unrecognized type for final_activation: {type(final_activations)}")
-        logging.info(f"ChromDecoder with {len(self.final_activations)} output activations")
+        logger.info(f"ChromDecoder with {len(self.final_activations)} output activations")
 
         self.final_decoders = nn.ModuleList()  # List[List[Module]]
         for n in self.num_outputs:

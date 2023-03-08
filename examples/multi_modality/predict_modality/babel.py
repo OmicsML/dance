@@ -7,14 +7,13 @@ import anndata
 import mudata
 import torch
 
+from dance import logger
 from dance.data import Data
 from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.babel import BabelWrapper
 from dance.utils import set_seed
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-
     OPTIMIZER_DICT = {
         "adam": torch.optim.Adam,
         "rmsprop": torch.optim.RMSprop,
@@ -52,13 +51,12 @@ if __name__ == "__main__":
         os.makedirs(os.path.dirname(args.outdir))
 
     # Specify output log file
-    logger = logging.getLogger()
     fh = logging.FileHandler(f"{args.outdir}/training_{args.subtask}_{args.rnd_seed}.log", "w")
     fh.setLevel(logging.INFO)
     logger.addHandler(fh)
 
     for arg in vars(args):
-        logging.info(f"Parameter {arg}: {getattr(args, arg)}")
+        logger.info(f"Parameter {arg}: {getattr(args, arg)}")
 
     # Construct data object
     mod1 = anndata.concat((dataset.modalities[0], dataset.modalities[2]))

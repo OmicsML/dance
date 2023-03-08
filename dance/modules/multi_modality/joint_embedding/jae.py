@@ -40,32 +40,32 @@ class JAEWrapper:
 
     """
 
-    def __init__(self, args, dataset):
-        self.model = JAE(dataset.nb_cell_types, dataset.nb_batches, dataset.nb_phases,
-                         dataset.preprocessed_data['X_train'].shape[1]).to(args.device)
+    def __init__(self, args, num_celL_types, num_batches, num_phases, num_features):
+        self.model = JAE(num_celL_types, num_batches, num_phases, num_features).to(args.device)
+        print(num_celL_types, num_batches, num_phases, num_features)
         self.args = args
 
-    def fit(self, inputs, labels):
+    def fit(self, inputs, cell_type, batch_label, phase_score):
         """fit function for training.
 
         Parameters
         ----------
         inputs : torch.Tensor
             Modality features.
-        labels : list[torch.Tensor]
-            Multiple auxiliary labels for supervision.
+        cell_type : torch.Tensor
+            Cell type labels.
+        batch_label : torch.Tensor
+            Batch labels.
+        phase_score : torch.Tensor
+            Phase scores.
 
         Returns
         -------
         None.
 
         """
-        X = torch.from_numpy(inputs).float().to(self.args.device)
-        Y = [
-            torch.from_numpy(labels[0]).long().to(self.args.device),
-            torch.from_numpy(labels[1]).long().to(self.args.device),
-            torch.from_numpy(labels[3]).float().to(self.args.device)
-        ]
+        X = inputs.float().to(self.args.device)
+        Y = [cell_type.to(self.args.device), batch_label.to(self.args.device), phase_score.float().to(self.args.device)]
 
         idx = np.random.permutation(X.shape[0])
         train_idx = idx[:int(idx.shape[0] * 0.9)]
@@ -119,7 +119,7 @@ class JAEWrapper:
                 print(f'loss{i + 1}', total_loss[i] / len(train_loader), end=', ')
             print()
 
-            loss1, loss2, loss3, loss4 = self.score(X, val_idx, Y)
+            loss1, loss2, loss3, loss4 = self.score(X, val_idx, Y[0], Y[1], Y[2])
             weighted_loss = loss1 * 0.7 + loss2 * 0.2 + loss3 * 0.05 + loss4 * 0.05
             print('val-loss1', loss1, 'val-loss2', loss2, 'val-loss3', loss3, 'val-loss4', loss4)
             print('val score', weighted_loss)
@@ -191,7 +191,7 @@ class JAEWrapper:
             prediction = self.model.encoder(inputs[idx])
         return prediction
 
-    def score(self, inputs, idx, labels, metric='loss'):
+    def score(self, inputs, idx, cell_type, batch_label=None, phase_score=None, metric='loss'):
         """Score function to get score of prediction.
 
         Parameters
@@ -200,8 +200,10 @@ class JAEWrapper:
             Multimodality features.
         idx : Iterable[int]
             Index of testing cells for scoring.
-        labels : list[torch.Tensor]
-            Multiple labels for evaluation.
+        cell_type : torch.Tensor
+            Cell type labels.
+        phase_score : torch.Tensor
+            Cell cycle phase labels.
         metric : str optional
             The type of evaluation metric, by default to be 'loss'.
 
@@ -227,9 +229,9 @@ class JAEWrapper:
                 X = inputs[idx]
                 output = self.model(X)
                 loss1 = mse(output[0], X).item()
-                loss2 = ce(output[1], labels[0][idx]).item()
-                loss3 = random_classification_loss(output[2], labels[1][idx]).item()
-                loss4 = mse(output[3], labels[2][idx]).item()
+                loss2 = ce(output[1], cell_type[idx]).item()
+                loss3 = random_classification_loss(output[2], batch_label[idx]).item()
+                loss4 = mse(output[3], phase_score[idx]).item()
 
                 return loss1, loss2, loss3, loss4
             else:
@@ -239,8 +241,9 @@ class JAEWrapper:
 
                 # adata.obs['batch'] = adata_sol.obs['batch'][adata.obs_names]
                 # adata.obs['cell_type'] = adata_sol.obs['cell_type'][adata.obs_names]
-                true_labels = labels
+                true_labels = cell_type
                 pred_labels = kmeans.fit_predict(emb)
+                print(true_labels, pred_labels)
                 NMI_score = round(normalized_mutual_info_score(true_labels, pred_labels, average_method='max'), 3)
                 ARI_score = round(adjusted_rand_score(true_labels, pred_labels), 3)
 

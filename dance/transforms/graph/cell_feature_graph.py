@@ -18,6 +18,17 @@ class CellFeatureGraph(BaseTransform):
         self.mod = mod
         self.normalize_edges = normalize_edges
 
+    def _alternative_construction(self, data):
+        # TODO: Try this alternative construction
+        x_sparse = data.get_feature(return_type="sparse", channel=self.cell_feature_channel, mod=self.mod)
+        g = dgl.bipartite_from_scipy(x_sparse, utype="cell", etype="expression", vtype="feature", eweight_name="weight")
+        g = dgl.ToSimple()(g)
+        g = dgl.AddSelfLoop(edge_feat_names="weight")(g)
+        g = dgl.AddReverse(copy_edata=True)(g)
+        g.ndata["weight"] = dgl.nn.EdgeWeightNorm(norm="both")(g, g.ndata["weight"])
+        data.data.uns[self.out] = g
+        return data
+
     def __call__(self, data):
         feat = data.get_feature(return_type="default", mod=self.mod)
         num_cells, num_feats = feat.shape
@@ -95,4 +106,25 @@ class PCACellFeatureGraph(BaseTransform):
                            feat_norm_axis=self.feat_norm_axis, log_level=self.log_level)(data)
         CellFeatureGraph(cell_feature_channel="WeightedFeaturePCA", mod=self.mod, normalize_edges=self.normalize_edges,
                          log_level=self.log_level)(data)
+        return data
+
+
+class CellFeatureBipartiteGraph(BaseTransform):
+
+    def __init__(self, cell_feature_channel: str, *, mod: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+
+        self.cell_feature_channel = cell_feature_channel
+        self.mod = mod
+
+    def __call__(self, data):
+        feat = data.get_feature(channel=self.cell_feature_channel, return_type="sparse", mod=self.mod)
+        g = dgl.bipartite_from_scipy(feat, utype='cell', etype='cell2feature', vtype='feature', eweight_name='weight')
+        g.nodes['cell'].data['id'] = torch.arange(feat.shape[0]).long()
+        g.nodes['feature'].data['id'] = torch.arange(feat.shape[1]).long()
+        g = AddReverse(copy_edata=True, sym_new_etype=True)(g)
+        if self.mod is None:
+            data.data.uns['g'] = g
+        else:
+            data.data[self.mod].uns['g'] = g
         return data

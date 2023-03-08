@@ -2,16 +2,20 @@ import argparse
 import os
 from argparse import Namespace
 
+import anndata
+import mudata
 import numpy as np
 import torch
 
+from dance.data import Data
 from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.scmogcn import ScMoGCNWrapper
-from dance.transforms.graph_construct import construct_modality_prediction_graph, gen_batch_features
+from dance.transforms.cell_feature import BatchFeature
+from dance.transforms.graph import ScMoGNNGraph
 from dance.utils import set_seed
 
 
-def pipeline(transductive=True, verbose=2, logger=None, **kwargs):
+def pipeline(inductive=False, verbose=2, logger=None, **kwargs):
     PREFIX = kwargs['prefix']
     os.makedirs(kwargs["log_folder"], exist_ok=True)
     os.makedirs(kwargs["model_folder"], exist_ok=True)
@@ -21,62 +25,59 @@ def pipeline(transductive=True, verbose=2, logger=None, **kwargs):
         logger.write(str(kwargs) + '\n')
 
     subtask = kwargs['subtask']
-
     dataset = ModalityPredictionDataset(subtask).load_data()
     dataset.download_pathway()
     if kwargs['preprocessing'] != 'none':
         dataset = dataset.preprocess(kwargs['preprocessing'])
 
+    mod1 = anndata.concat((dataset.modalities[0], dataset.modalities[2]))
+    mod2 = anndata.concat((dataset.modalities[1], dataset.modalities[3]))
+    mod1.var_names_make_unique()
+    mod2.var_names_make_unique()
+    mdata = mudata.MuData({"mod1": mod1, "mod2": mod2})
+    # mdata.var_names_make_unique()
+    train_size = dataset.modalities[0].shape[0]
+    data = Data(mdata, train_size=train_size)
+    data.set_config(feature_mod="mod1", label_mod="mod2")
+
+    data = ScMoGNNGraph(inductive, kwargs["cell_init"], kwargs["pathway"], kwargs["subtask"], kwargs['pathway_weight'],
+                        kwargs['pathway_threshold'], kwargs['pathway_path'])(data)
+    if not kwargs['no_batch_features']:
+        data = BatchFeature()(data)
+
     idx = np.random.permutation(dataset.modalities[0].shape[0])
     split = {'train': idx[:-int(len(idx) * 0.15)], 'valid': idx[-int(len(idx) * 0.15):]}
+    kwargs['FEATURE_SIZE'] = dataset.modalities[0].shape[1]
+    kwargs['TRAIN_SIZE'] = dataset.modalities[0].shape[0]
+    kwargs['OUTPUT_SIZE'] = dataset.modalities[1].shape[1]
+    kwargs['CELL_SIZE'] = dataset.modalities[0].shape[0] + dataset.modalities[2].shape[0]
 
-    input_train_mod1 = dataset.sparse_features()[0]
-    input_train_mod2 = dataset.sparse_features()[1]
-    if transductive:
-        input_test_mod1 = dataset.sparse_features()[2]
-        true_test_mod2 = dataset.sparse_features()[3]
-
-    FEATURE_SIZE = input_train_mod1.shape[1]
-    CELL_SIZE = input_train_mod1.shape[0] + input_test_mod1.shape[0] if transductive else input_train_mod1.shape[0]
-    OUTPUT_SIZE = input_train_mod2.shape[1]
-    TRAIN_SIZE = input_train_mod1.shape[0]
-
-    kwargs['FEATURE_SIZE'] = FEATURE_SIZE
-    kwargs['CELL_SIZE'] = CELL_SIZE
-    kwargs['OUTPUT_SIZE'] = OUTPUT_SIZE
-    kwargs['TRAIN_SIZE'] = TRAIN_SIZE
-
-    if kwargs['inductive'] != 'trans':
-        g, gtest = construct_modality_prediction_graph(dataset, **kwargs)
+    if inductive:
+        g, gtest = data.data.uns['g'], data.data.uns['gtest']
     else:
-        gtest = g = construct_modality_prediction_graph(dataset, **kwargs)
+        gtest = g = data.data.uns['g']
+
+    _, y_train = data.get_train_data(return_type="torch")
+    _, y_test = data.get_test_data(return_type="torch")
 
     if not kwargs['no_batch_features']:
-        if transductive:
-            batch_features = gen_batch_features([dataset.modalities[0], dataset.modalities[2]])
-        else:
-            batch_features = gen_batch_features(dataset.modalities[:1])
+        batch_features = torch.from_numpy(data.data['mod1'].obsm['batch_features']).float()
         kwargs['BATCH_NUM'] = batch_features.shape[1]
-        if kwargs['inductive'] != 'trans':
-            g.nodes['cell'].data['bf'] = batch_features[:TRAIN_SIZE]
+        if inductive:
+            g.nodes['cell'].data['bf'] = batch_features[:kwargs['TRAIN_SIZE']]
             gtest.nodes['cell'].data['bf'] = batch_features
         else:
             g.nodes['cell'].data['bf'] = batch_features
 
-    # data loader
-    y_train = torch.from_numpy(input_train_mod2.toarray())
-    if transductive:
-        y_test = torch.from_numpy(true_test_mod2.toarray())
-
     model = ScMoGCNWrapper(Namespace(**kwargs))
 
     if kwargs['sampling']:
-        model.fit_with_sampling(g, y_train, split, transductive, verbose, y_test, logger)
+        model.fit_with_sampling(g, y_train, split, not inductive, verbose, y_test, logger)
     else:
-        model.fit(g, y_train, split, transductive, verbose, y_test, logger)
+        model.fit(g, y_train, split, not inductive, verbose, y_test, logger)
 
-    print(model.predict(g, np.arange(TRAIN_SIZE, CELL_SIZE), device="cpu"))
-    print(model.score(g, np.arange(TRAIN_SIZE, CELL_SIZE), y_test, device="cpu"))
+    print(model.predict(g, np.arange(kwargs['TRAIN_SIZE'], kwargs['CELL_SIZE']), device="cpu"))
+    print(model.score(g, np.arange(kwargs['TRAIN_SIZE'], kwargs['CELL_SIZE']), y_test, device="cpu"))
 
 
 if __name__ == '__main__':
@@ -90,8 +91,7 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--result_folder', default='./results')
     parser.add_argument('-e', '--epoch', type=int, default=10000)
     parser.add_argument('-nbf', '--no_batch_features', action='store_true')
-    parser.add_argument('-npw', '--no_pathway', action='store_true')
-    parser.add_argument('-opw', '--only_pathway', action='store_true')
+    parser.add_argument('-npw', '--pathway', action='store_true')
     parser.add_argument('-res', '--residual', default='res_cat', choices=['none', 'res_add', 'res_cat'])
     parser.add_argument('-inres', '--initial_residual', action='store_true')
     parser.add_argument('-pwagg', '--pathway_aggregation', default='alpha',
@@ -117,16 +117,16 @@ if __name__ == '__main__':
     parser.add_argument('-es', '--early_stopping', type=int, default=0)
     parser.add_argument('-c', '--cpu', type=int, default=1)
     parser.add_argument('-or', '--output_relu', default='none', choices=['relu', 'leaky_relu', 'none'])
-    parser.add_argument('-i', '--inductive', default='trans', choices=['normal', 'opt', 'trans'])
+    parser.add_argument('-i', '--inductive', action='store_true')
     parser.add_argument('-sa', '--subpath_activation', action='store_true')
-    parser.add_argument('-ci', '--cell_init', default='none', choices=['none', 'pca'])
+    parser.add_argument('-ci', '--cell_init', default='none', choices=['none', 'svd'])
     parser.add_argument('-bas', '--batch_seperation', action='store_true')
     parser.add_argument('-pwpath', '--pathway_path', default='./data/h.all.v7.4')
     parser.add_argument('-seed', '--random_seed', type=int, default=777)
     parser.add_argument('-ws', '--weighted_sum', action='store_true')
     parser.add_argument('-samp', '--sampling', action='store_true')
     parser.add_argument('-ns', '--node_sampling_rate', type=float, default=0.5)
-    parser.add_argument('-prep', '--preprocessing', default='none', choices=['none', 'feature_selection', 'pca'])
+    parser.add_argument('-prep', '--preprocessing', default='none', choices=['none', 'feature_selection', 'svd'])
     parser.add_argument('-lm', '--low_memory', type=bool, default=True)
 
     args = parser.parse_args()
@@ -135,7 +135,7 @@ if __name__ == '__main__':
     if args.low_memory:
         print("WARNING: Running in low memory mode, some cli settings maybe overwritten!")
         args.preprocessing = 'feature_selection'
-        args.no_pathway = True
+        args.pathway = False
         args.sampling = True
         args.batch_size = 10000
         args.epoch = 10
@@ -147,9 +147,9 @@ if __name__ == '__main__':
 
     # Regular settings
     if args.subtask.find('rna') == -1:
-        args.no_pathway = True
+        args.pathway = False
     if args.sampling:
-        args.no_pathway = True
+        args.pathway = False
 
     set_seed(args.random_seed)
     torch.set_num_threads(args.cpu)

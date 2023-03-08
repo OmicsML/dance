@@ -102,11 +102,11 @@ def get_bipartite_matching_adjacency_matrix_mk3(raw_logits, threshold_quantile=0
     return bipartite_matching_adjacency
 
 
-def batch_separated_bipartite_matching(dataset, emb1, emb2):
-    matrix = np.zeros((dataset.modalities[2].shape[0], dataset.modalities[2].shape[0]))
-    for b in dataset.modalities[2].obs['batch'].unique():
-        i0 = (dataset.modalities[2].obs['batch'] == b).values.nonzero()[0].tolist()
-        j0 = (dataset.modalities[3].obs['batch'] == b).values.nonzero()[0].tolist()
+def batch_separated_bipartite_matching(batch1, batch2, emb1, emb2):
+    matrix = np.zeros((batch1.shape[0], batch2.shape[0]))
+    for b in batch1.unique():
+        i0 = (batch1 == b).values.nonzero()[0].tolist()
+        j0 = (batch2 == b).values.nonzero()[0].tolist()
         logits = torch.matmul(emb1[i0], emb2[j0].T)
         logits = torch.softmax(logits, -1) + torch.softmax(logits, 0)
         logits = logits.cpu().numpy()

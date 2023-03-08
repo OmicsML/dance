@@ -2,22 +2,23 @@
 
 Reference
 ---------
-Wen, Hongzhi, et al. "Graph Neural Networks for Multimodal Single-Cell Data Integration." arXiv preprint arXiv:2203.01884 (2022).
+Wen, Hongzhi, et al. "Graph Neural Networks for Multimodal Single-Cell Data Integration." arXiv:2203.01884 (2022).
 
 """
-
-import math
 import os
 
+import dgl.nn.pytorch as dglnn
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
+from sklearn.cluster import KMeans
+from sklearn.metrics import adjusted_rand_score
+from sklearn.metrics.cluster import normalized_mutual_info_score
 from torch.utils.data import DataLoader
 
+from dance import logger
 from dance.utils import SimpleIndexDataset
-from dance.utils.metrics import *
 
 
 def propagation_layer_combination(X, idx, wt, from_logits=True):
@@ -31,35 +32,98 @@ def propagation_layer_combination(X, idx, wt, from_logits=True):
     return x
 
 
+def cell_feature_propagation(g, alpha: float = 0.5, beta: float = 0.5, cell_init: str = None, feature_init: str = 'id',
+                             device: str = 'cuda', layers: int = 3):
+    g = g.to(device)
+    gconv = dglnn.HeteroGraphConv(
+        {
+            'cell2feature': dglnn.GraphConv(in_feats=0, out_feats=0, norm='none', weight=False, bias=False),
+            'rev_cell2feature': dglnn.GraphConv(in_feats=0, out_feats=0, norm='none', weight=False, bias=False),
+        }, aggregate='sum')
+
+    if feature_init is None:
+        feature_X = torch.zeros((g.nodes('feature').shape[0], g.srcdata[cell_init]['cell'].shape[1])).float().to(device)
+    elif feature_init == 'id':
+        feature_X = F.one_hot(g.srcdata['id']['feature']).float().to(device)
+    else:
+        raise NotImplementedError(f'Not implemented feature init feature {feature_init}.')
+
+    if cell_init is None:
+        cell_X = torch.zeros(g.nodes('cell').shape[0], feature_X.shape[1]).float().to(device)
+    else:
+        cell_X = g.srcdata[cell_init]['cell'].float().to(device)
+
+    h = {'feature': feature_X, 'cell': cell_X}
+    hcell = []
+    for i in range(layers):
+        h1 = gconv(
+            g, h, mod_kwargs={
+                'cell2feature': {
+                    'edge_weight': g.edges['cell2feature'].data['weight'].float()
+                },
+                'rev_cell2feature': {
+                    'edge_weight': g.edges['rev_cell2feature'].data['weight'].float()
+                }
+            })
+        logger.debug(f"{i} cell {h['cell'].abs().mean()} {h1['cell'].abs().mean()}")
+        logger.debug(f"{i} feature {h['feature'].abs().mean()} {h1['feature'].abs().mean()}")
+
+        h1['feature'] = (h1['feature'] -
+                         h1['feature'].mean()) / (h1['feature'].std() if h1['feature'].mean() != 0 else 1)
+        h1['cell'] = (h1['cell'] - h1['cell'].mean()) / (h1['cell'].std() if h1['cell'].mean() != 0 else 1)
+
+        h = {
+            'feature': h['feature'] * alpha + h1['feature'] * (1 - alpha),
+            'cell': h['cell'] * beta + h1['cell'] * (1 - beta)
+        }
+
+        h['feature'] = (h['feature'] - h['feature'].mean()) / h['feature'].std()
+        h['cell'] = (h['cell'] - h['cell'].mean()) / h['cell'].std()
+
+        hcell.append(h['cell'])
+
+    logger.debug(f"{hcell[-1].abs().mean()=}")
+
+    return hcell[1:]
+
+
 class ScMoGCNWrapper:
     """ScMoGCN class.
 
     Parameters
     ----------
     args : argparse.Namespace
-        A Namespace object that contains arguments of ScMoGCN. For details of parameters in parser args, please refer to link (parser help document).
+        A Namespace object that contains arguments of ScMoGCN. For details of parameters in parser args, please refer
+        to link (parser help document).
     dataset : dance.datasets.multimodality.JointEmbeddingNIPSDataset
         Joint embedding dataset.
 
     """
 
-    def __init__(self, args, dataset):
-        self.model = Transformation(dataset.nb_cell_types, dataset.nb_batches, dataset.nb_phases,
-                                    dataset.preprocessed_data['X_train'].shape[1]).to(args.device)
+    def __init__(self, args, num_celL_types, num_batches, num_phases, num_features):
+        self.model = ScMoGCN(num_celL_types, num_batches, num_phases, num_features).to(args.device)
         self.args = args
         self.wt = torch.tensor([0.] * (args.layers - 1)).to(args.device).requires_grad_(True)
 
-    def fit(self, dataset, inputs, labels):
+    def fit(self, g_mod1, g_mod2, train_size, cell_type, batch_label, phase_score):
         """fit function for training.
 
         Parameters
         ----------
-        dataset : dance.datasets.multimodality.JointEmbeddingNIPSDataset
-            Modality features.
-        inputs : torch.Tensor
-            Modality features.
-        labels : list[torch.Tensor]
-            Multiple auxiliary labels for supervision.
+        g_mod1 : dgl.DGLGraph
+            Bipartite expression feature graph for modality 1.
+        g_mod2 : dgl.DGLGraph
+            Bipartite expression feature graph for modality 2.
+        train_size : int
+            Number of training samples.
+        labels : torch.Tensor
+            Labels for training samples.
+        cell_type :torch.Tensor
+            Cell type labels for training samples.
+        batch_label : torch.Tensor
+            Batch labels for training samples.
+        phase_score : torch.Tensor
+            Phase labels for training samples.
 
         Returns
         -------
@@ -68,14 +132,17 @@ class ScMoGCNWrapper:
         """
 
         wt = self.wt
-        X = inputs
-        Y = [
-            torch.from_numpy(labels[0]).long().to(self.args.device),
-            torch.from_numpy(labels[1]).long().to(self.args.device),
-            torch.from_numpy(labels[3]).float().to(self.args.device)
-        ]
+        hcell_mod1 = cell_feature_propagation(g_mod1, layers=self.args.layers, device=self.args.device)
+        hcell_mod2 = cell_feature_propagation(g_mod2, layers=self.args.layers, device=self.args.device)
+        self.feat_mod1 = hcell_mod1
+        self.feat_mod2 = hcell_mod2
+        X = []
+        for i in range(len(self.feat_mod1)):
+            X.append(torch.cat([self.feat_mod1[i], self.feat_mod2[i]], dim=1).float().to(self.args.device))
+        self.X = X
+        Y = [cell_type.to(self.args.device), batch_label.to(self.args.device), phase_score.float().to(self.args.device)]
 
-        idx = np.random.permutation(dataset.preprocessed_data['X_train'].shape[0])
+        idx = np.random.permutation(train_size)
         train_idx = idx[:int(idx.shape[0] * 0.9)]
         val_idx = idx[int(idx.shape[0] * 0.9):]
 
@@ -127,7 +194,7 @@ class ScMoGCNWrapper:
                 print(f'loss{i + 1}', total_loss[i] / len(train_loader), end=', ')
             print()
 
-            loss1, loss2, loss3, loss4 = self.score(X, val_idx, Y)
+            loss1, loss2, loss3, loss4 = self.score(val_idx, Y[0], Y[2])
             weighted_loss = loss1 * 0.7 + loss2 * 0.2 + loss3 * 0.05 + loss4 * 0.05
             print('val-loss1', loss1, 'val-loss2', loss2, 'val-loss3', loss3, 'val-loss4', loss4)
             print('val score', weighted_loss)
@@ -142,6 +209,7 @@ class ScMoGCNWrapper:
                 break
 
         self.wt = weight_record
+        self.fitted = True
 
     def to(self, device):
         """Performs device conversion.
@@ -160,6 +228,9 @@ class ScMoGCNWrapper:
 
         self.args.device = device
         self.model = self.model.to(device)
+        self.feat_mod1 = self.feat_mod1.to(device)
+        self.feat_mod2 = self.feat_mod2.to(device)
+        self.X = self.X.to(device)
         return self
 
     def load(self, path, map_location=None):
@@ -177,18 +248,19 @@ class ScMoGCNWrapper:
         None.
 
         """
+        self.fitted = True
         if map_location is not None:
             self.model.load_state_dict(torch.load(path, map_location=map_location))
         else:
             self.model.load_state_dict(torch.load(path))
 
-    def predict(self, inputs, idx):
+    def predict(self, idx):
         """Predict function to get latent representation of data.
 
         Parameters
         ----------
-        inputs : torch.Tensor
-            Multimodality features.
+        idx : Iterable[int]
+            Index of testing samples for prediction.
 
         Returns
         -------
@@ -196,25 +268,28 @@ class ScMoGCNWrapper:
             Joint embedding of input data.
 
         """
+        if not self.fitted:
+            raise RuntimeError('Model is not fitted yet.')
         self.model.eval()
         wt = self.wt
+        inputs = self.X
 
         with torch.no_grad():
             X = propagation_layer_combination(inputs, idx, wt)
 
         return self.model.encoder(X)
 
-    def score(self, inputs, idx, labels, metric='loss'):
+    def score(self, idx, cell_type, phase_score=None, metric='loss'):
         """Score function to get score of prediction.
 
         Parameters
         ----------
-        inputs : torch.Tensor
-            Multimodality features.
         idx : Iterable[int]
             Index of testing samples for scoring.
-        labels: list[torch.Tensor]
-            Multiple cell labels for evaluation.
+        cell_type : torch.Tensor
+            Cell type labels of testing samples.
+        phase_score : torch.Tensor optional
+            Cell cycle score of testing samples.
         metric : str optional
             The type of evaluation metric, by default to be 'loss'.
 
@@ -234,24 +309,25 @@ class ScMoGCNWrapper:
         self.model.eval()
         ce = nn.CrossEntropyLoss()
         mse = nn.MSELoss()
+        inputs = self.X
 
         with torch.no_grad():
             if metric == 'loss':
                 X = propagation_layer_combination(inputs, idx, self.wt)
                 output = self.model(X)
                 loss1 = mse(output[0], X).item()
-                loss2 = ce(output[1], labels[0][idx]).item()
+                loss2 = ce(output[1], cell_type[idx]).item()
                 loss3 = (torch.norm(output[2], p=2, dim=-1).sum() * 1e-2).item()
-                loss4 = mse(output[3], labels[2][idx]).item()
+                loss4 = mse(output[3], phase_score[idx]).item()
 
                 return loss1, loss2, loss3, loss4
             else:
-                emb = self.predict(inputs, idx).cpu().numpy()
+                emb = self.predict(idx).cpu().numpy()
                 kmeans = KMeans(n_clusters=10, n_init=5, random_state=200)
 
                 # adata.obs['batch'] = adata_sol.obs['batch'][adata.obs_names]
                 # adata.obs['cell_type'] = adata_sol.obs['cell_type'][adata.obs_names]
-                true_labels = labels
+                true_labels = cell_type
                 pred_labels = kmeans.fit_predict(emb)
                 NMI_score = round(normalized_mutual_info_score(true_labels, pred_labels, average_method='max'), 3)
                 ARI_score = round(adjusted_rand_score(true_labels, pred_labels), 3)
@@ -260,7 +336,7 @@ class ScMoGCNWrapper:
                 return NMI_score, ARI_score
 
 
-class Transformation(nn.Module):
+class ScMoGCN(nn.Module):
 
     def __init__(self, nb_cell_types, nb_batches, nb_phases, input_dimension):
         super().__init__()
@@ -312,5 +388,9 @@ class Transformation(nn.Module):
         x0 = x
         x = self.decoder(x)
 
-        return x, x0[:, :self.nb_cell_types], x0[:, self.nb_cell_types:self.nb_cell_types + self.nb_batches], \
-               x0[:, self.nb_cell_types + self.nb_batches:self.nb_cell_types + self.nb_batches + self.nb_phases]
+        return (
+            x,
+            x0[:, :self.nb_cell_types],
+            x0[:, self.nb_cell_types:self.nb_cell_types + self.nb_batches],
+            x0[:, self.nb_cell_types + self.nb_batches:self.nb_cell_types + self.nb_batches + self.nb_phases],
+        )
