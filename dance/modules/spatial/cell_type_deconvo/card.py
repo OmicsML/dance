@@ -185,7 +185,7 @@ class Card(BaseRegressionMethod):
 
         # Scale the Xinput_norm and B to speed up the convergence.
         basis = self.basis.values.copy()
-        x_norm = x_norm * 0.1 / x_norm.sum()
+        x_norm = x_norm * 0.1 / x_norm.mean()
         b_mat = basis * 0.1 / basis.mean()
 
         # Initialize the proportion matrix
