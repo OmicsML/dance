@@ -11,7 +11,7 @@ pyro-ppl==1.8.4
 python-igraph==0.10.1
 requests==2.28.2
 scanpy==1.9.3
-scikit-learn==1.2.1
+scikit-learn==1.2.2
 scikit-misc==0.1.4
 scipy==1.10.1
 statsmodels==0.13.5
