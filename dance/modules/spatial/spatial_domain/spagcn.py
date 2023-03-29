@@ -48,14 +48,14 @@ def search_l(p, adj, start=0.01, end=1000, tol=0.01, max_run=100):
         return end
     while (p_low + tol) < p < (p_high - tol):
         run += 1
-        logger.info("Run {run}: l [{start}, {end}], p [{p_low}, {p_high}]")
+        logger.info(f"Run {run}: l [{start}, {end}], p [{p_low}, {p_high}]")
         if run > max_run:
-            logger.info("Exact l not found, closest values are:\nl={start}: p={p_low}\nl={end}: p={p_high}")
+            logger.info(f"Exact l not found, closest values are:\nl={start}: p={p_low}\nl={end}: p={p_high}")
             return None
         mid = (start + end) / 2
         p_mid = calculate_p(adj, mid)
         if np.abs(p_mid - p) <= tol:
-            logger.info("recommended l = ", str(mid))
+            logger.info(f"recommended l: {mid}")
             return mid
         if p_mid <= p:
             start = mid

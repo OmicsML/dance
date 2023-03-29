@@ -18,7 +18,6 @@ from torch import Tensor
 from torch.nn import Parameter
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.utils import add_self_loops, remove_self_loops, softmax
-from torch_sparse import SparseTensor, set_diag
 from tqdm import tqdm
 
 from dance import logger
@@ -92,17 +91,14 @@ class GATConv(MessagePassing):
             alpha = tied_attention
 
         if self.add_self_loops:
-            if isinstance(edge_index, Tensor):
-                # We only want to add self-loops for nodes that appear both as
-                # source and target nodes:
-                num_nodes = x_src.size(0)
-                if x_dst is not None:
-                    num_nodes = min(num_nodes, x_dst.size(0))
-                num_nodes = min(size) if size is not None else num_nodes
-                edge_index, _ = remove_self_loops(edge_index)
-                edge_index, _ = add_self_loops(edge_index, num_nodes=num_nodes)
-            elif isinstance(edge_index, SparseTensor):
-                edge_index = set_diag(edge_index)
+            # We only want to add self-loops for nodes that appear both as
+            # source and target nodes:
+            num_nodes = x_src.size(0)
+            if x_dst is not None:
+                num_nodes = min(num_nodes, x_dst.size(0))
+            num_nodes = min(size) if size is not None else num_nodes
+            edge_index, _ = remove_self_loops(edge_index)
+            edge_index, _ = add_self_loops(edge_index, num_nodes=num_nodes)
 
         out = self.propagate(edge_index, x=x, alpha=alpha, size=size)
 
@@ -116,10 +112,7 @@ class GATConv(MessagePassing):
             out = out.mean(dim=1)
 
         if isinstance(return_attention_weights, bool):
-            if isinstance(edge_index, Tensor):
-                return out, (edge_index, alpha)
-            elif isinstance(edge_index, SparseTensor):
-                return out, edge_index.set_value(alpha, layout="coo")
+            return out, (edge_index, alpha)
         else:
             return out
 
