@@ -1,10 +1,6 @@
-https://data.dgl.ai/wheels/dgl-0.8.0-cp38-cp38-manylinux1_x86_64.whl
-https://data.pyg.org/whl/torch-1.11.0%2Bcpu/torch_scatter-2.0.9-cp38-cp38-linux_x86_64.whl
-https://data.pyg.org/whl/torch-1.11.0%2Bcpu/torch_sparse-0.6.14-cp38-cp38-linux_x86_64.whl
-https://download.pytorch.org/whl/cpu/torch-1.11.0%2Bcpu-cp38-cp38-linux_x86_64.whl
-https://download.pytorch.org/whl/cpu/torch-1.11.0%2Bcpu-cp38-cp38-linux_x86_64.whl
-https://download.pytorch.org/whl/cpu/torchvision-0.12.0%2Bcpu-cp38-cp38-linux_x86_64.whl
-torch-geometric>=2.0.0
+https://data.dgl.ai/wheels/dgl-1.0.1-cp38-cp38-manylinux1_x86_64.whl
+https://download.pytorch.org/whl/cpu/torch-2.0.0%2Bcpu-cp38-cp38-linux_x86_64.whl
+torch-geometric==2.3.0
 torchnmf
 pyro-ppl
 sphinx
