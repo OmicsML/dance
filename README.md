@@ -109,13 +109,17 @@ as well as easily reproducible experiments by providing unified tools for
 The full installation process might be a bit tedious and could involve some debugging when using CUDA enabled packages.
 Thus, we provide an `install.sh` script that simplifies the installation process, assuming the user have [conda](https://conda.io/projects/conda/en/latest/index.html) set up on their machines.
 The installation script creates a conda environment `dance` and install the DANCE package along with all its dependencies with a apseicifc CUDA version.
-Currently, three options are accepted: `cpu`, `cu102`, and `cu113`.
-For example, to install the DANCE package using CUDA10.2 in a `dance-env` conda environment, simply run:
+Currently, two options are accepted: `cpu` and  `cu117`.
+For example, to install the DANCE package using CUDA11.7 in a `dance-env` conda environment, simply run:
 
 ```bash
+# Clone the repository via SSH
 git clone git@github.com:OmicsML/dance.git && cd dance
+# Alternatively, use HTTPS if you have not set up SSH
+# git clone https://github.com/OmicsML/dance.git  && cd dance
 
-source install.sh cu102 dance-env
+# Run the auto installation script to install DANCE and its dependencies in a conda environment
+source install.sh cu117 dance-env
 ```
 
 **Note**: the first argument for cuda version is mandatory, while the second argument for conda environment name is optional (default is `dance`).
@@ -132,27 +136,20 @@ First create a conda environment for dance (optional)
 conda create -n dance python=3.8 -y && conda activate dance-dev
 ```
 
-Then, install CUDA enabled packages (PyTorch, PyG, DGL) with CUDA 10.2:
+Then, install CUDA enabled packages (PyTorch, PyG, DGL):
 
 ```bash
-conda install pytorch=1.12.1 torchvision cudatoolkit=10.2 -c pytorch -y
-conda install dgl-cuda10.2 -c dglteam -y
-pip install torch-geometric==2.1.0 torch-scatter torch-sparse torch-cluster -f https://data.pyg.org/whl/torch-1.12.1+cu102.html
+conda install pytorch=2.0.0 torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvidia -y
+conda install pyg=2.3.0 -c pyg -y
+conda install dgl=1.0.1 -c dglteam/label/cu117 -y
 ```
 
 Alternatively, install these dependencies for CPU only:
 
 ```bash
-conda install pytorch=1.12.1 torchvision cpuonly -c pytorch -y
-conda install dgl -c dglteam
-pip install torch-geometric==2.1.0 torch-scatter torch-sparse torch-cluster -f https://data.pyg.org/whl/torch-1.12.1+cpu.html
-```
-
-**Note:** If you installed PyG using conda and encountered an issue with `GLIBC_2.27` when importing `torch_geometric.nn`,
-then you may need to uninstall `torch-spline-conv` (see https://github.com/pyg-team/pytorch_geometric/issues/3593)
-
-```bash
-pip uninstall torch-spline-conv
+conda install pytorch=2.0.0 torchvision torchaudio cpuonly -c pytorch -y
+conda install pyg=2.3.0 -c pyg -y
+conda install dgl -c dglteam -y
 ```
 
 For more information about installation or other CUDA version options, check out the installation pages for the corresponding packages
