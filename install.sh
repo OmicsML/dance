@@ -59,7 +59,7 @@ conda activate ${envname}
 conda install pytorch=${PYTORCH_VERSION} torchvision=${TORCHVISION_VERSION} \
     torchaudio=${TORCHAUDIO_VERSION} ${PYTORCH_CUDA_OPT} -y
 conda install pyg=${PYG_VERSION} -c pyg -y
-conda install -c ${DGL_CHANNEL} dgl -y
+conda install dgl=${DGL_VERSION} -c ${DGL_CHANNEL} -y
 
 # Install the rest of the dependencies
 pip install -r requirements.txt
