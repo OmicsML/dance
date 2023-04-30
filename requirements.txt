@@ -9,7 +9,7 @@ openpyxl==3.1.2
 pandas==2.0.0
 pyro-ppl==1.8.4
 python-igraph==0.10.1
-requests==2.28.2
+requests==2.29.0
 scanpy==1.9.3
 scikit-learn==1.2.2
 scikit-misc==0.2.0
