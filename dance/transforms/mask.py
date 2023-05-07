@@ -35,17 +35,16 @@ class CellwiseMaskData(BaseTransform):
         assert 0 <= valid_mask_rate < 1, "valid_mask_rate should be in [0, 1)"
         assert 0 < test_mask_rate < 1, "test_mask_rate should be in (0, 1)"
         assert 0 < valid_mask_rate + test_mask_rate < 1, "Total masking rate should be in (0, 1)"
-        self.mask_type = mask_type
         self.valid_mask_rate = valid_mask_rate
         self.test_mask_rate = test_mask_rate
         self.seed = seed
         self.min_gene_counts = min_gene_counts
         if mask_type == "mcar":
             self.distr = "uniform"
-        elif self.mask_type == "mar":
+        elif mask_type == "mar":
             self.distr = "exp"
         else:
-            raise NotImplementedError(f"Expect mask_type in ['mar', 'mcar'], but found {self.mask_type}")
+            raise NotImplementedError(f"Expect mask_type in ['mar', 'mcar'], but found {mask_type}")
 
     def _get_probs(self, vec):
         return {
@@ -120,16 +119,15 @@ class MaskData(BaseTransform):
         assert 0 <= valid_mask_rate < 1, "valid_mask_rate should be in [0, 1)"
         assert 0 < test_mask_rate < 1, "test_mask_rate should be in (0, 1)"
         assert 0 < valid_mask_rate + test_mask_rate < 1, "Total masking rate should be in (0, 1)"
-        self.mask_type = mask_type
         self.valid_mask_rate = valid_mask_rate
         self.test_mask_rate = test_mask_rate
         self.seed = seed
         if mask_type == "mcar":
             self.distr = "uniform"
-        elif self.mask_type == "mar":
+        elif mask_type == "mar":
             self.distr = "exp"
         else:
-            raise NotImplementedError(f"Expect mask_type in ['mar', 'mcar'], but found {self.mask_type}")
+            raise NotImplementedError(f"Expect mask_type in ['mar', 'mcar'], but found {mask_type}")
 
     def _get_probs(self, vec):
         return {

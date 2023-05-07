@@ -64,6 +64,6 @@ Mouse Embryo
 $ python deepimpute.py --dataset mouse_embryo_data
 
 PBMC
-$ python graphsci.py --dataset pbmc_data
+$ python deepimpute.py --dataset pbmc_data
 
 """
