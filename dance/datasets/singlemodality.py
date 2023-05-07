@@ -305,7 +305,7 @@ class ImputationDataset(BaseDataset):
         "human_stemcell_data": "GSE75748/GSE75748_sc_time_course_ec.csv.gz"
     }  # yapf: disable
 
-    def __init__(self, data_dir="data", dataset="human_stemcell", train_size=0.1):
+    def __init__(self, data_dir="data", dataset="human_stemcell", train_size=None):
         super().__init__(data_dir, full_download=False)
         self.data_dir = data_dir
         self.dataset = dataset
@@ -421,5 +421,8 @@ class ImputationDataset(BaseDataset):
 
     def _raw_to_dance(self, raw_data: ad.AnnData):
         adata = raw_data
-        data = Data(adata, train_size=int(adata.n_obs * self.train_size))
+        if self.train_size is not None:
+            data = Data(adata, train_size=int(adata.n_obs * self.train_size))
+        else:
+            data = Data(adata)
         return data

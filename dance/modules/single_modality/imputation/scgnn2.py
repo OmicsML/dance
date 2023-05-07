@@ -69,6 +69,44 @@ class ScGNN2:
 
     def predict(self, x: Optional[Any] = None) -> np.ndarray:
         return self.x_imputed
+    
+    def normalize_counts(self, counts):
+        counts = counts / counts.sum(1, keepdim=True) * 1e4
+        return torch.log1p(counts)
+
+    def score(self, true_expr, imputed_expr, mask=None, normalize=True, metric="MSE"):
+        """ Scoring function of model
+        Parameters
+        ----------
+        true_expr :
+            True underlying expression values
+        imputed_expr :
+            Imputed expression values
+        Mask :
+            Testing mask
+        metric :
+            Choice of scoring metric - 'RMSE' or 'MAE'
+
+        Returns
+        -------
+        score :
+            evaluation score
+        """
+        allowd_metrics = {"RMSE", "MAE"}
+        true_expr = true_expr if torch.is_tensor(true_expr) else torch.tensor(true_expr)
+        imputed_expr = imputed_expr if torch.is_tensor(imputed_expr) else torch.tensor(imputed_expr)
+        if metric not in allowd_metrics:
+            raise ValueError("scoring metric %r." % allowd_metrics)
+        if normalize:
+            true_expr = self.normalize_counts(true_expr)
+            imputed_expr = self.normalize_counts(imputed_expr)
+        if mask is not None:
+            true_expr = true_expr[mask]
+            imputed_expr = imputed_expr[mask]
+        if metric == 'RMSE':
+            return np.sqrt(F.mse_loss(imputed_expr, true_expr).item())
+        elif metric == 'MAE':
+            return F.l1_loss(imputed_expr, true_expr).item()
 
 
 # ---------------------------

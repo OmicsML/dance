@@ -22,8 +22,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dance.modules.base import BaseRegressionMethod
-from dance.transforms import (AnnDataTransform, CellwiseMaskData, Compose, FilterCellsScanpy, FilterGenesScanpy,
-                              SaveRaw, SetConfig)
+from dance.transforms import (AnnDataTransform, CellwiseMaskData, FilterCellsScanpy, FilterGenesScanpy,
+                              SaveRaw, SetConfig, Compose)
 from dance.transforms.graph import FeatureFeatureGraph
 from dance.typing import Any, List, LogLevel, Optional, Tuple
 
@@ -157,8 +157,8 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
 
     @staticmethod
     def preprocessing_pipeline(min_cells: float = 0.1, threshold: float = 0.3, normalize_edges: bool = True,
-                               mask: bool = True, distr: str = "exp", mask_rate: float = 0.1, seed: int = 1,
-                               log_level: LogLevel = "INFO"):
+                               mask: bool = True, mask_type: str = "mar", valid_mask_rate: float = 0.1, 
+                               test_mask_rate: float = 0.1, seed: int = 10, log_level: LogLevel = "INFO"):
         transforms = [
             FilterGenesScanpy(min_cells=min_cells),
             FilterCellsScanpy(min_counts=1),
@@ -168,10 +168,10 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         ]
         if mask:
             transforms.extend([
-                CellwiseMaskData(distr=distr, mask_rate=mask_rate, seed=seed),
+                CellwiseMaskData(mask_type=mask_type, valid_mask_rate=valid_mask_rate, test_mask_rate=test_mask_rate, seed=seed),
                 SetConfig({
-                    "feature_channel": [None, None, "FeatureFeatureGraph", "train_mask"],
-                    "feature_channel_type": ["X", "raw_X", "uns", "layers"],
+                    "feature_channel": [None, None, "FeatureFeatureGraph", "train_mask", "valid_mask", "test_mask"],
+                    "feature_channel_type": ["X", "raw_X", "uns", "layers", "layers", "layers"],
                     "label_channel": [None, None],
                     "label_channel_type": ["X", "raw_X"],
                 })
@@ -194,8 +194,8 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
 
         return X_masked
 
-    def fit(self, train_data, train_data_raw, graph, train_idx, mask=None, le=1, la=1, ke=1, ka=1, n_epochs=100,
-            lr=1e-3, weight_decay=1e-5):
+    def fit(self, train_data, train_data_raw, graph, train_idx, train_mask=None, valid_mask=None, le=1, la=1, ke=1, ka=1, 
+            n_epochs=100, lr=1e-3, weight_decay=1e-5):
         """ Data fitting function
         Parameters
         ----------
@@ -231,14 +231,16 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
 
         rng = np.random.default_rng(self.seed)
         # Specify train validation split
-        if mask is not None:
-            train_data_masked = self.maskdata(train_data, mask)
-            graph.ndata["feat"] = train_data_masked.float().T
-            train_mask = np.copy(mask)
-            test_idx = [i for i in range(len(train_data)) if i not in train_idx]
-            train_mask[test_idx] = False
-            valid_mask = ~mask
-            valid_mask[test_idx] = False
+        if train_mask is not None:
+            if valid_mask is None:
+                valid_mask = ~train_mask
+            else:
+                train_data_masked = self.maskdata(train_data, train_mask)
+                graph.ndata["feat"] = train_data_masked.float().T
+                train_mask = np.copy(train_mask)
+                test_idx = [i for i in range(len(train_data)) if i not in train_idx]
+                train_mask[test_idx] = False
+                valid_mask[test_idx] = False
         else:
             train_data_masked = train_data
             train_idx_permuted = rng.permutation(train_idx)
@@ -472,7 +474,11 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.aemodel.load_state_dict(state['aemodel'])
         self.gnnmodel.load_state_dict(state['gnnmodel'])
 
-    def score(self, true_expr, imputed_expr, test_idx, mask=None, metric="MSE"):
+    def normalize_counts(self, counts):
+        counts = counts / counts.sum(1, keepdim=True) * 1e4
+        return torch.log1p(counts)
+
+    def score(self, imputed_expr, true_expr, mask=None, normalize=True, metric="MSE"):
         """ Scoring function of model
         Parameters
         ----------
@@ -480,28 +486,26 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             True underlying expression values
         imputed_expr :
             Imputed expression values
-        test_idx :
-            index of testing cells
+        Mask :
+            Testing mask
         metric :
-            Choice of scoring metric - 'RMSE' or 'ARI'
+            Choice of scoring metric - 'RMSE' or 'MAE'
 
         Returns
         -------
         score :
             evaluation score
         """
-        allowd_metrics = {"RMSE", "PCC"}
+        allowd_metrics = {"RMSE", "MAE"}
         if metric not in allowd_metrics:
             raise ValueError("scoring metric %r." % allowd_metrics)
-
-        true_target = true_expr[test_idx]
-        imputed_target = imputed_expr[test_idx]
-        if mask is not None:  # and metric == 'MSE':
-            # true_target = true_target[~mask[test_idx]]
-            # imputed_target = imputed_target[~mask[test_idx]]
-            imputed_target[mask[test_idx]] = true_target[mask[test_idx]]
+        if normalize:
+            true_expr = self.normalize_counts(true_expr)
+            imputed_expr = self.normalize_counts(imputed_expr)
+        if mask is not None:
+            true_expr = true_expr[mask]
+            imputed_expr = imputed_expr[mask]
         if metric == 'RMSE':
-            return np.sqrt(F.mse_loss(true_target, imputed_target).item())
-        elif metric == 'PCC':
-            corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
-            return corr_cells
+            return np.sqrt(F.mse_loss(imputed_expr, true_expr).item())
+        elif metric == 'MAE':
+            return F.l1_loss(imputed_expr, true_expr).item()

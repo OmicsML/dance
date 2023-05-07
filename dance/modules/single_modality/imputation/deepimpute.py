@@ -112,7 +112,8 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
 
     @staticmethod
     def preprocessing_pipeline(min_cells: float = 0.1, n_top: int = 5, sub_outputdim: int = 512, mask: bool = True,
-                               distr: str = "exp", mask_rate: float = 0.1, seed: int = 1, log_level: LogLevel = "INFO"):
+                               mask_type: str = "mar", valid_mask_rate: float = 0.1, test_mask_rate: float = 0.1, 
+                               seed: int = 1, log_level: LogLevel = "INFO"):
 
         transforms = [
             FilterGenesScanpy(min_cells=min_cells),
@@ -123,10 +124,10 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         ]
         if mask:
             transforms.extend([
-                CellwiseMaskData(distr=distr, mask_rate=mask_rate, seed=seed),
+                CellwiseMaskData(mask_type=mask_type, valid_mask_rate=valid_mask_rate, test_mask_rate=test_mask_rate, seed=seed),
                 SetConfig({
-                    "feature_channel": [None, None, "targets", "predictors", "train_mask"],
-                    "feature_channel_type": ["X", "raw_X", "uns", "uns", "layers"],
+                    "feature_channel": [None, None, "targets", "predictors", "train_mask", "valid_mask", "test_mask"],
+                    "feature_channel_type": ["X", "raw_X", "uns", "uns", "layers", "layers", "layers"],
                     "label_channel": [None, None],
                     "label_channel_type": ["X", "raw_X"],
                 })
@@ -196,7 +197,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
 
         return X_masked, submask, counter_submask
 
-    def fit(self, X, Y, train_idx, mask=None, batch_size=64, lr=1e-3, n_epochs=100, patience=5):
+    def fit(self, X, Y, train_idx, train_mask=None, valid_mask=None, batch_size=64, lr=1e-3, n_epochs=100, patience=5):
         """Train model.
         Parameters
         ----------
@@ -219,13 +220,14 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         device = self.device
 
         # Specify train validation split
-        if mask is not None:
-            X_train, _, valid_mask = self.maskdata(X, mask, train_idx)
+        if train_mask is not None:
+            if valid_mask is None:
+                valid_mask = ~train_mask
+            X_train, _, _ = self.maskdata(X, train_mask, train_idx)
             X_valid = X_train
             Y_valid = Y_train = Y
         else:
             rng = np.random.default_rng(self.seed)
-            train_data_masked = train_data
             train_idx_permuted = rng.permutation(range(len(X)))
             train_idx = train_idx_permuted[:int(len(train_idx_permuted) * 0.9)]
             valid_idx = train_idx_permuted[int(len(train_idx_permuted) * 0.9):]
@@ -324,7 +326,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         model.load_state_dict(state[model_string])
         return model
 
-    def predict(self, X_test, test_idx, mask=None):
+    def predict(self, X_test, mask=None):
         """Get predictions from the trained model.
         Parameters
         ----------
@@ -339,7 +341,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         targets = self.targets
 
         if mask is not None:
-            X_test, _, _ = self.maskdata(X_test, mask, test_idx)
+            X_test, _, _ = self.maskdata(X_test, mask)
         X_test_list = []
         for j, inputgenes in enumerate(predictors):
             X_test_list.append(X_test[:, inputgenes])
@@ -360,8 +362,12 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         Y_pred = torch.expm1(Y_pred)
 
         return Y_pred
+    
+    def normalize_counts(self, counts):
+        counts = counts / counts.sum(1, keepdim=True) * 1e4
+        return torch.log1p(counts)
 
-    def score(self, true_expr, imputed_expr, test_idx, mask=None, metric="MSE"):
+    def score(self, imputed_expr, true_expr, mask=None, normalize=True, metric="MSE"):
         """ Scoring function of model
         Parameters
         ----------
@@ -369,28 +375,26 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
             True underlying expression values
         imputed_expr :
             Imputed expression values
-        test_idx :
-            index of testing cells
+        Mask :
+            Testing mask
         metric :
-            Choice of scoring metric - 'RMSE' or 'ARI'
+            Choice of scoring metric - 'RMSE' or 'MAE'
 
         Returns
         -------
         score :
             evaluation score
         """
-        allowd_metrics = {"RMSE", "PCC"}
+        allowd_metrics = {"RMSE", "MAE"}
         if metric not in allowd_metrics:
             raise ValueError("scoring metric %r." % allowd_metrics)
-
-        true_target = true_expr.to(self.device)
-        imputed_target = imputed_expr.to(self.device)
-        if mask is not None:  # and metric == 'MSE':
-            # true_target = true_target[~mask[test_idx]]
-            # imputed_target = imputed_target[~mask[test_idx]]
-            imputed_target[mask[test_idx]] = true_target[mask[test_idx]]
+        if normalize:
+            true_expr = self.normalize_counts(true_expr)
+            imputed_expr = self.normalize_counts(imputed_expr)
+        if mask is not None:
+            true_expr = true_expr[mask]
+            imputed_expr = imputed_expr[mask]
         if metric == 'RMSE':
-            return np.sqrt(F.mse_loss(true_target, imputed_target).item())
-        elif metric == 'PCC':
-            corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
-            return corr_cells
+            return np.sqrt(F.mse_loss(imputed_expr, true_expr).item())
+        elif metric == 'MAE':
+            return F.l1_loss(imputed_expr, true_expr).item()

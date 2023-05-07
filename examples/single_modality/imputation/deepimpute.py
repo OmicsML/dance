@@ -25,37 +25,36 @@ if __name__ == '__main__':
     parser.add_argument("--data_dir", type=str, default='data', help='test directory')
     parser.add_argument("--dataset", default='mouse_brain_data', type=str, help="dataset id")
     parser.add_argument("--n_top", type=int, default=5, help="Number of predictors.")
-    parser.add_argument("--train_size", type=float, default=0.9, help="proportion of testing set")
-    parser.add_argument("--mask_rate", type=float, default=.1, help="Masking rate.")
+    parser.add_argument("--valid_mask_rate", type=float, default=.1, help="Validation masking rate.")
+    parser.add_argument("--test_mask_rate", type=float, default=.1, help="Testing masking rate.")
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--mask", type=bool, default=True, help="Mask data for validation.")
     params = parser.parse_args()
     print(vars(params))
     set_seed(params.random_seed)
 
-    dataloader = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset, train_size=params.train_size)
+    dataloader = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset)
     preprocessing_pipeline = DeepImpute.preprocessing_pipeline(min_cells=params.min_cells, n_top=params.n_top,
                                                                sub_outputdim=params.sub_outputdim, mask=params.mask,
-                                                               seed=params.random_seed, mask_rate=params.mask_rate)
+                                                               seed=params.random_seed, valid_mask_rate=params.valid_mask_rate,
+                                                               test_mask_rate=params.test_mask_rate)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=params.cache)
 
-    if params.mask:
-        X, X_raw, targets, predictors, mask = data.get_x(return_type="default")
-    else:
-        mask = None
-        X, X_raw, targets, predictors = data.get_x(return_type="default")
-    X = torch.tensor(X.toarray())
-    X_raw = torch.tensor(X_raw.toarray())
-    train_idx = data.train_idx
-    test_idx = data.test_idx
+    device = "cpu" if params.gpu == -1 else f"cuda:{params.gpu}"
+    if True:
+        X, X_raw, targets, predictors, train_mask, valid_mask, test_mask = data.get_x(return_type="default")
+    X = torch.tensor(X.toarray()).to(device)
+    X_raw = torch.tensor(X_raw.toarray()).to(device)
+    train_idx = range(len(X))
 
     model = DeepImpute(predictors, targets, params.dataset, params.sub_outputdim, params.hidden_dim, params.dropout,
                        params.random_seed, params.gpu)
-    model.fit(X[train_idx], X[train_idx], train_idx, mask, params.batch_size, params.lr, params.n_epochs,
+    model.fit(X[train_idx], X[train_idx], train_idx, train_mask, valid_mask, params.batch_size, params.lr, params.n_epochs,
               params.patience)
-    imputed_data = model.predict(X[test_idx], test_idx, mask)
-    score = model.score(X_raw[test_idx], imputed_data, test_idx, mask, metric='RMSE')
-    print("RMSE: %.4f" % score)
+    imputed_data = model.predict(X, train_mask)
+    rmse = model.score(X_raw, imputed_data, test_mask, metric='RMSE')
+    mae = model.score(X_raw, imputed_data, test_mask, metric='MAE')
+    print(f"RMSE: {rmse:.4f}, MAE: {mae:.4f}")
 """To reproduce deepimpute benchmarks, please refer to command lines belows:
 
 Mouse Brain

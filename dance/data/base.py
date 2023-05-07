@@ -60,7 +60,7 @@ class BaseData(ABC):
     data
         Cell data.
     train_size
-        Number of cells to be used for training. If not specified, not splits will be generated.
+        Number of cells to be used for training. If not specified, no splits will be generated.
     val_size
         Number of cells to be used for validation. If set to -1, use what's left from training and testing.
     test_size

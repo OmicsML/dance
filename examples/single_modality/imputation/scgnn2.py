@@ -172,7 +172,7 @@ if __name__ == "__main__":
         FilterGenesScanpy(min_cells=0.01),
         FilterCellsScanpy(min_genes=0.01),
         FilterGenesTopK(num_genes=2000, mode="var"),
-        CellwiseMaskData(),
+        CellwiseMaskData(valid_mask_rate=0., test_mask_rate=0.1, seed=args.seed),
         AnnDataTransform(sc.pp.log1p),
         log_level="INFO",
     )
@@ -180,13 +180,14 @@ if __name__ == "__main__":
     data = dataloader.load_data(transform=preprocessing_pipeline)
 
     x_train = data.data.X.A * data.data.layers["train_mask"]
-    test_mask = data.data.layers["valid_mask"]
+    test_mask = data.data.layers["test_mask"]
 
     model = ScGNN2(args)
-
     model.fit(x_train)
-    test_mse = ((data.data.X.A[test_mask] - model.predict()[test_mask])**2).mean()
-    print(f"MSE: {test_mse:.4f}")
+    imputed_data = model.predict(x_train)
+    rmse = model.score(imputed_data, data.data.X.A, test_mask, normalize=False, metric='RMSE')
+    mae = model.score(imputed_data, data.data.X.A, test_mask, normalize=False, metric='MAE')
+    print(f"RMSE: {rmse:.4f}, MAE: {mae:.4f}")
 """
 
 Mouse Brain
