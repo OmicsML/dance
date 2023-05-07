@@ -169,9 +169,9 @@ if __name__ == "__main__":
     logger.info(pformat(vars(args)))
 
     preprocessing_pipeline = Compose(
-        FilterGenesScanpy(min_cells=0.01),
-        FilterCellsScanpy(min_genes=0.01),
-        FilterGenesTopK(num_genes=2000, mode="var"),
+        FilterGenesScanpy(min_cells=0.05),
+        FilterCellsScanpy(min_cunts=1),
+        # FilterGenesTopK(num_genes=2000, mode="var"),
         CellwiseMaskData(valid_mask_rate=0., test_mask_rate=0.1, seed=args.seed),
         AnnDataTransform(sc.pp.log1p),
         log_level="INFO",

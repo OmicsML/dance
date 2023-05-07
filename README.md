@@ -198,9 +198,9 @@ pip install -e .
 
 | Model      | Evaluation Metric | Mouse Brain (current/reported) | Mouse Embryo (current/reported) | PBMC (current/reported) |
 | ---------- | ----------------- | ------------------------------ | ------------------------------- | ----------------------- |
-| DeepImpute | RMSE              | 0.87 / N/A                     | 1.20 / N/A                      | 2.30 / N/A              |
-| GraphSCI   | RMSE              | 1.55 / N/A                     | 1.81 / N/A                      | 3.68 / N/A              |
-| scGNN2.0   | MSE               | 1.04 / N/A                     | 1.12 / N/A                      | 1.22 / N/A              |
+| DeepImpute | RMSE              | 0.87 / N/A                     | 1.20 / N/A                      | 0.93 / N/A              |
+| GraphSCI   | RMSE              | 1.55 / N/A                     | 1.81 / N/A                      | 0.77 / N/A              |
+| scGNN2.0   | RMSE              | 1.04 / N/A                     | 1.12 / N/A                      | 0.71 / N/A              |
 
 **Note**: scGNN2.0 is evaluated on 2,000 genes with highest variance following the original paper.
 

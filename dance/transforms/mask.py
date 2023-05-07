@@ -39,6 +39,8 @@ class CellwiseMaskData(BaseTransform):
         self.test_mask_rate = test_mask_rate
         self.seed = seed
         self.min_gene_counts = min_gene_counts
+        
+        self.mask_type = mask_type
         if mask_type == "mcar":
             self.distr = "uniform"
         elif mask_type == "mar":
