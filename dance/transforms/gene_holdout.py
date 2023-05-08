@@ -34,7 +34,7 @@ class GeneHoldout(BaseTransform):
         feat = data.get_feature(return_type="numpy")
         num_feat = feat.shape[1]
         num_batches = np.ceil(num_feat / self.batch_size)
-        targets = np.split(rng.permutation(feat.shape[1]), num_batches)
+        targets = np.array_split(rng.permutation(feat.shape[1]), num_batches)
 
         # Use covariance to select predictors
         covariance_matrix = np.cov(feat, rowvar=False)
