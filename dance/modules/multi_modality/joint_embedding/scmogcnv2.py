@@ -338,7 +338,7 @@ class ScMoGCNWrapper:
         self.model = ScMoGCN(args).to(args.device)
 
     def fit(self, g, y, train_labels=None, epochs=500):
-        """fit function for training.
+        """Fit function for training.
 
         Parameters
         ----------
@@ -946,7 +946,7 @@ class ScMoGCNWrapper:
         self.model = ScMoGCN(args).to(args.device)
 
     def fit(self, g, y, train_labels=None, epochs=500):
-        """fit function for training.
+        """Fit function for training.
 
         Parameters
         ----------

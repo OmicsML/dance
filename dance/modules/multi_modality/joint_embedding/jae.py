@@ -46,7 +46,7 @@ class JAEWrapper:
         self.args = args
 
     def fit(self, inputs, cell_type, batch_label, phase_score):
-        """fit function for training.
+        """Fit function for training.
 
         Parameters
         ----------

@@ -99,7 +99,7 @@ class GraphConvolution(nn.Module):
 
 
 class GCN(nn.Module):
-    """dropout + GC + activation."""
+    """Dropout + GC + activation."""
 
     def __init__(self, nfeat, nhid1, nout, bias=False, dropout=0., act=F.relu):
         super().__init__()
@@ -110,7 +110,7 @@ class GCN(nn.Module):
         self.act = act
 
     def forward(self, x, adj):
-        """forward function.
+        """Forward function.
 
         Parameters
         ----------

@@ -729,7 +729,7 @@ class DCCA(nn.Module):
         self.attention_loss = attention_loss
 
     def fit(self, train_loader, test_loader, total_loader, first="RNA"):
-        """fit function for training.
+        """Fit function for training.
 
         Parameters
         ----------
@@ -824,7 +824,7 @@ class DCCA(nn.Module):
             used_cycle = used_cycle + 1
 
     def score(self, dataloader):
-        """score function to get score of prediction.
+        """Score function to get score of prediction.
 
         Parameters
         ----------

@@ -60,7 +60,8 @@ def acc(true: Union[torch.Tensor, np.ndarray], pred: Union[torch.Tensor, np.ndar
 def ari(true: Union[torch.Tensor, np.ndarray], pred: Union[torch.Tensor, np.ndarray]) -> float:
     """Adjusted rand index score.
 
-    See :func:`sklearn.metrics.adjusted_rand_score`.
+    See
+    :func: `sklearn.metrics.adjusted_rand_score`.
 
     """
     return adjusted_rand_score(true, pred)
@@ -71,7 +72,8 @@ def ari(true: Union[torch.Tensor, np.ndarray], pred: Union[torch.Tensor, np.ndar
 def mse(true: Union[torch.Tensor, np.ndarray], pred: Union[torch.Tensor, np.ndarray]) -> float:
     """Mean squared error score.
 
-    See :func:`sklearn.metrics.mean_squared_error`
+    See
+    :func: `sklearn.metrics.mean_squared_error`
 
     """
     return mean_squared_error(true, pred)

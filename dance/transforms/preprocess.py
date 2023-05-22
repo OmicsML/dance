@@ -172,13 +172,9 @@ class tfidfTransformer():
 class SAINTSampler:
 
     def __init__(self, dn, g, train_nid, node_budget, num_repeat=50):
-        """
-        :param dn: name of dataset
-        :param g: full graph
-        :param train_nid: ids of training nodes
-        :param node_budget: expected number of sampled nodes
-        :param num_repeat: number of times of repeating sampling one node
-        """
+        """:param dn: name of dataset :param g: full graph :param train_nid: ids of
+        training nodes :param node_budget: expected number of sampled nodes :param
+        num_repeat: number of times of repeating sampling one node."""
         self.g = g
         self.train_g: dgl.graph = g.subgraph(train_nid)
         self.dn, self.num_repeat = dn, num_repeat

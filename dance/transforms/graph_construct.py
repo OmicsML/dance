@@ -315,6 +315,7 @@ def construct_basic_feature_graph(feature_mod1, feature_mod1_test=None, bf_input
     --------
     g: DGLGraph
         The generated graph.
+
     """
 
     if feature_mod1_test is not None:
@@ -645,11 +646,7 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
     """Generating edgeList."""
 
     def calculateKNNgraphDistanceMatrixPairwise(featureMatrix, para):
-        r"""
-        KNNgraphPairwise:  measuareName:k
-        Pairwise:5
-        Minkowski-Pairwise:5:1
-        """
+        r"""KNNgraphPairwise:  measuareName:k Pairwise:5 Minkowski-Pairwise:5:1."""
         measureName = ''
         k = 5
         if para != None:
@@ -722,9 +719,7 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
     adj = None
 
     def calculateThresholdgraphDistanceMatrix(featureMatrix, distanceType='euclidean', threshold=0.5):
-        r"""
-        Thresholdgraph: Graph with certain threshold
-        """
+        r"""Thresholdgraph: Graph with certain threshold."""
 
         distMat = distance.cdist(featureMatrix, featureMatrix, distanceType)
 
@@ -738,9 +733,7 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
         return edgeList
 
     def calculateKNNThresholdgraphDistanceMatrix(featureMatrix, distanceType='cosine', k=10, threshold=0.5):
-        r"""
-        Thresholdgraph: KNN Graph with certain threshold
-        """
+        r"""Thresholdgraph: KNN Graph with certain threshold."""
 
         distMat = distance.cdist(featureMatrix, featureMatrix, distanceType)
 
@@ -756,11 +749,9 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
         return edgeList
 
     def calculateKNNgraphDistanceMatrixML(featureMatrix, distanceType='euclidean', k=10, param=None):
-        r"""
-        Thresholdgraph: KNN Graph with Machine Learning based methods
-        IsolationForest
-        https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.IsolationForest.html#sklearn.ensemble.IsolationForest
-        """
+        r"""Thresholdgraph: KNN Graph with Machine Learning based methods
+        IsolationForest https://scikit-learn.org/stable/modules/generated/sklearn.ensemb
+        le.IsolationForest.html#sklearn.ensemble.IsolationForest."""
 
         distMat = distance.cdist(featureMatrix, featureMatrix, distanceType)
         edgeList = []
@@ -783,9 +774,8 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
         return edgeList
 
     def calculateKNNgraphDistanceMatrixStatsSingleThread(featureMatrix, distanceType='euclidean', k=10, param=None):
-        r"""
-        Thresholdgraph: KNN Graph with stats one-std based methods, SingleThread version
-        """
+        r"""Thresholdgraph: KNN Graph with stats one-std based methods, SingleThread
+        version."""
 
         edgeList = []
         # Version 1: cost memory, precalculate all dist
@@ -828,9 +818,8 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
 
     def calculateKNNgraphDistanceMatrixStats(featureMatrix, distanceType='euclidean', k=10, param=None,
                                              parallelLimit=0):
-        r"""
-        Thresholdgraph: KNN Graph with stats one-std based methods using parallel cores
-        """
+        r"""Thresholdgraph: KNN Graph with stats one-std based methods using parallel
+        cores."""
         edgeList = []
         # Get number of availble cores
         USE_CORES = 0

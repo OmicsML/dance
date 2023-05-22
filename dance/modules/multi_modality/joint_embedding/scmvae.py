@@ -620,7 +620,7 @@ class scMVAE(nn.Module):
         return latent_z, recon_x1, norm_x1, recon_x_2, norm_x2
 
     def fit(self, args, train, valid, final_rate, scale_factor, device):
-        """fit function for training.
+        """Fit function for training.
 
         Parameters
         ----------
@@ -796,7 +796,7 @@ class scMVAE(nn.Module):
                 return None
 
     def score(self, X1, X2, labels):
-        """score function to get score of prediction.
+        """Score function to get score of prediction.
 
         Parameters
         ----------
@@ -835,8 +835,7 @@ class ProductOfExperts(nn.Module):
     """Return parameters for product of independent experts. See
     https://arxiv.org/pdf/1410.7827.pdf for equations.
 
-    @param mu: M x D for M experts
-    @param logvar: M x D for M experts
+    @param mu: M x D for M experts @param logvar: M x D for M experts
 
     """
 
@@ -851,10 +850,12 @@ class ProductOfExperts(nn.Module):
 
 
 def prior_expert(size):
-    """Universal prior expert. Here we use a spherical
+    """Universal prior expert. Here we use a spherical.
+
     Gaussian: N(0, 1).
     @param size: integer
                  dimensionality of Gaussian
+
     """
     mu = Variable(torch.zeros(size))
     logvar = Variable(torch.log(torch.ones(size)))

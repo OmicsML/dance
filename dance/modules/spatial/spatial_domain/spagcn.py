@@ -358,7 +358,7 @@ class SimpleGCDEC(nn.Module):
         adj = adj.cpu()
 
     def predict(self, X, adj):
-        """transform to float tensor."""
+        """Transform to float tensor."""
         z, q = self(torch.FloatTensor(X), torch.FloatTensor(adj))
         return z, q
 

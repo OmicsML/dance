@@ -33,13 +33,13 @@ score = spaDecon.fit_score(x, y, lr=args.lr, max_iter=args.max_iter, print_perio
 print(f"MSE: {score:7.4f}")
 """To reproduce SpatialDecon benchmarks, please refer to command lines belows:
 
-CARD synthetic
-$ python spatialdecon.py --dataset CARD_synthetic --lr .01 --max_iter 2250 --bias 1
+CARD synthetic $ python spatialdecon.py --dataset CARD_synthetic --lr .01 --max_iter
+2250 --bias 1
 
-GSE174746
-$ python spatialdecon.py --dataset GSE174746 --lr .0001 --max_iter 20000 --bias 1
+GSE174746 $ python spatialdecon.py --dataset GSE174746 --lr .0001 --max_iter 20000
+--bias 1
 
-SPOTLight synthetic
-$ python spatialdecon.py --dataset SPOTLight_synthetic --lr .01 --max_iter 500 --bias 1
+SPOTLight synthetic $ python spatialdecon.py --dataset SPOTLight_synthetic --lr .01
+--max_iter 500 --bias 1
 
 """

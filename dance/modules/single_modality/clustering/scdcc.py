@@ -58,7 +58,7 @@ def buildNetwork(layers: List[int], network_type: str, activation: str = "relu")
 
 
 class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
-    """scDCC class.
+    """ScDCC class.
 
     Parameters
     ----------

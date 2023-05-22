@@ -5,7 +5,7 @@ from dance.typing import Optional
 
 
 class GeneHoldout(BaseTransform):
-    """Progressively hold out genes for DeepImpute
+    """Progressively hold out genes for DeepImpute.
 
     Split genes into target batches. For every target gene in one batch, refer to the genes that are not in
     this batch and select predictor genes with high covariance with target gene.

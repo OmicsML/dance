@@ -95,7 +95,7 @@ class ScMoGCNWrapper:
     # TODO: need to modify the logic of validation and test to adapt Inductive learning;
     #  w. test = Transductive learning, w/o = Inductive learning
     def fit(self, g, y, split=None, eval=True, verbose=2, y_test=None, logger=None, sampling=False, eval_interval=1):
-        """fit function for training.
+        """Fit function for training.
 
         Parameters
         ----------
@@ -219,7 +219,7 @@ class ScMoGCNWrapper:
         return self.model
 
     def fit_with_sampling(self, g, y, split=None, eval=True, verbose=2, y_test=None, logger=None, eval_interval=1):
-        """fit function for training with graph sampling.
+        """Fit function for training with graph sampling.
 
         Parameters
         ----------

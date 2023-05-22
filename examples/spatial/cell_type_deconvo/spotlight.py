@@ -35,13 +35,13 @@ score = model.fit_score(x, y, lr=args.lr, max_iter=args.max_iter)
 print(f"MSE: {score:7.4f}")
 """To reproduce SpatialDecon benchmarks, please refer to command lines belows:
 
-CARD_synthetic
-$ python spotlight.py --dataset CARD_synthetic --lr .1 --max_iter 100 --rank 8 --bias 0
+CARD_synthetic $ python spotlight.py --dataset CARD_synthetic --lr .1 --max_iter 100
+--rank 8 --bias 0
 
-GSE174746
-$ python spotlight.py --dataset GSE174746 --lr .1 --max_iter 15000 --rank 4 --bias 0
+GSE174746 $ python spotlight.py --dataset GSE174746 --lr .1 --max_iter 15000 --rank 4
+--bias 0
 
-SPOTLight synthetic
-$ python spotlight.py --dataset SPOTLight_synthetic --lr .1 --max_iter 150 --rank 10 --bias 0
+SPOTLight synthetic $ python spotlight.py --dataset SPOTLight_synthetic --lr .1
+--max_iter 150 --rank 10 --bias 0
 
 """

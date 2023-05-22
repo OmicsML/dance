@@ -196,7 +196,8 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
 
     def fit(self, train_data, train_data_raw, graph, train_idx, mask=None, le=1, la=1, ke=1, ka=1, n_epochs=100,
             lr=1e-3, weight_decay=1e-5):
-        """ Data fitting function
+        """Data fitting function.
+
         Parameters
         ----------
         train_data :
@@ -221,6 +222,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         Returns
         -------
         None
+
         """
         # Get weighted adjacency matrix
         u, v = graph.edges()
@@ -266,7 +268,8 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
                   % (epoch, self.train_loss, self.loss_adj, self.loss_exp, abs(self.kl), self.valid_loss))
 
     def train(self, train_data, train_data_raw, graph, train_mask, valid_mask, le=1, la=1, ke=1, ka=1):
-        """ Train function, gets loss and performs optimization step
+        """Train function, gets loss and performs optimization step.
+
         Parameters
         ----------
         train_data :
@@ -293,6 +296,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         -------
         total_loss : float
             loss value of training loop
+
         """
 
         self.gnnmodel.train()
@@ -317,7 +321,9 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         return train_loss.item()
 
     def evaluate(self, features, features_raw, graph, mask=None, le=1, la=1, ke=1, ka=1):
-        """ Evaluate function, returns loss and reconstructions of expression and adjacency
+        """Evaluate function, returns loss and reconstructions of expression and
+        adjacency.
+
         Parameters
         ----------
         features :
@@ -342,6 +348,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
 
         Returns
         -------
+
         """
 
         if mask is None:
@@ -368,7 +375,8 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         torch.save(state, self.save_path / f"{self.dataset}.pt")
 
     def predict(self, data, data_raw, graph, mask=None):
-        """ Predict function
+        """Predict function.
+
         Parameters
         ----------
         data :
@@ -386,6 +394,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         -------
         z_exp :
             reconstructed expression data
+
         """
         if mask is not None:
             data = self.maskdata(data, mask)
@@ -394,7 +403,8 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
 
     def get_loss(self, batch, adj_orig, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean, disp, pi, mask, le=1, la=1, ke=1,
                  ka=1):
-        """ Loss function for GraphSCI
+        """Loss function for GraphSCI.
+
         Parameters
         ----------
         batch :
@@ -436,6 +446,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             kullback leibler loss
         loss : float
             log_lik - kl
+
         """
 
         pos_weight = (adj_orig.shape[0]**2 - adj_orig.sum(axis=1)) / (adj_orig.sum(axis=1))
@@ -473,7 +484,8 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.gnnmodel.load_state_dict(state['gnnmodel'])
 
     def score(self, true_expr, imputed_expr, test_idx, mask=None, metric="MSE"):
-        """ Scoring function of model
+        """Scoring function of model.
+
         Parameters
         ----------
         true_expr :
@@ -489,6 +501,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         -------
         score :
             evaluation score
+
         """
         allowd_metrics = {"RMSE", "PCC"}
         if metric not in allowd_metrics:
