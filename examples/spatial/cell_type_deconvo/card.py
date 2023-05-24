@@ -29,13 +29,10 @@ score = model.fit_score(inputs, y, max_iter=args.max_iter, epsilon=args.epsilon,
 print(f"MSE: {score:7.4f}")
 """To reproduce CARD benchmarks, please refer to command lines belows:
 
-CARD synthetic
-$ python card.py --dataset CARD_synthetic
+CARD synthetic $ python card.py --dataset CARD_synthetic
 
-GSE174746
-$ python card.py --dataset GSE174746 --location_free
+GSE174746 $ python card.py --dataset GSE174746 --location_free
 
-SPOTLight synthetic
-$ python card.py --dataset SPOTLight_synthetic --location_free
+SPOTLight synthetic $ python card.py --dataset SPOTLight_synthetic --location_free
 
 """

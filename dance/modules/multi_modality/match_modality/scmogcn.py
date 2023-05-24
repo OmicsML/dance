@@ -156,7 +156,7 @@ class ScMoGCNWrapper:
             self.model.load_state_dict(torch.load(path))
 
     def fit(self, g_mod1, g_mod2, labels1, labels2, train_size):
-        """fit function for training.
+        """Fit function for training.
 
         Parameters
         ----------

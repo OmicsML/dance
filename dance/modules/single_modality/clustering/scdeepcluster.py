@@ -61,7 +61,7 @@ def euclidean_dist(x, y):
 
 
 class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
-    """scDeepCluster class.
+    """ScDeepCluster class.
 
     Parameters
     ----------

@@ -146,18 +146,16 @@ class DeepCountAutoencoder(nn.Module):
         replacing the original count values with the mean of the negative binomial
         component as predicted in the output layer.
 
-        This matrix represents the denoised and library size normalized expression matrix, the final output of the
-        method.
+        This matrix represents the denoised and library size normalized expression
+        matrix, the final output of the method.
 
         """
         return self.decode(self.encode(x), size_factors)
 
     def forward_no_decode(self, x, _size_factors):
-        """
-        Return the hidden representation instead of decoding it as well
-        Useful for probing the latent dimension using pytorch_eval
-        Use by setting model.forward = model.forward_no_decode
-        """
+        """Return the hidden representation instead of decoding it as well Useful for
+        probing the latent dimension using pytorch_eval Use by setting model.forward =
+        model.forward_no_decode."""
         return self.encode(x)
 
 
@@ -224,7 +222,7 @@ class Decoder(nn.Module):
                 raise ValueError(f"Unrecognized type for final_activation: {type(final_activation)}")
 
     def forward(self, x, size_factors=None):
-        """include size factor here because we may want to scale the output by that."""
+        """Include size factor here because we may want to scale the output by that."""
         x = self.act1(self.bn1(self.decode1(x)))
 
         retval1 = self.decode21(x)  # This is invariably the counts
@@ -430,7 +428,7 @@ class PairedAutoEncoder(nn.Module):
         self.model2 = model2
 
     def forward(self, x):
-        """x is expected to be a tuple of two inputs."""
+        """X is expected to be a tuple of two inputs."""
         x1, x2 = x
         y1 = self.model1(x1)
         y2 = self.model2(x2)
@@ -794,7 +792,7 @@ class BabelWrapper:
             return pred
 
     def fit(self, x_train, y_train, max_epochs=500, val_ratio=0.15):
-        """fit function for training.
+        """Fit function for training.
 
         Parameters
         ----------

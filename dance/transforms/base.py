@@ -17,7 +17,6 @@ class BaseTransform(ABC):
         Name of the obsm channel or layer where the transformed features will be saved. Use the current
         transformation name if it is not set.
 
-
     """
 
     _DISPLAY_ATTRS: Tuple[str] = ()

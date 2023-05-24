@@ -612,7 +612,7 @@ def GMM_loss(gamma, c_params, z_params):
 
 
 class Eucli_dis(nn.Module):
-    """like what you like: knowledge distill via neuron selectivity transfer."""
+    """Like what you like: knowledge distill via neuron selectivity transfer."""
 
     def __init__(self):
         super().__init__()
@@ -627,7 +627,7 @@ class Eucli_dis(nn.Module):
 
 
 class L1_dis(nn.Module):
-    """like what you like: knowledge distill via neuron selectivity transfer."""
+    """Like what you like: knowledge distill via neuron selectivity transfer."""
 
     def __init__(self):
         super().__init__()
@@ -643,7 +643,7 @@ class L1_dis(nn.Module):
 
 
 class NSTLoss(nn.Module):
-    """like what you like: knowledge distill via neuron selectivity transfer."""
+    """Like what you like: knowledge distill via neuron selectivity transfer."""
 
     def __init__(self):
         super().__init__()
@@ -733,8 +733,8 @@ class Similarity(nn.Module):
 class Correlation(nn.Module):
     """Correlation Congruence for Knowledge Distillation, ICCV 2019.
 
-    The authors nicely shared the code with me. I restructured their code to be compatible with my running framework.
-    Credits go to the original author
+    The authors nicely shared the code with me. I restructured their code to be
+    compatible with my running framework. Credits go to the original author
 
     """
 

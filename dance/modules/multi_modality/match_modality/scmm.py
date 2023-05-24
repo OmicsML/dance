@@ -497,7 +497,7 @@ class MMVAE(nn.Module):
         return lats
 
     def fit(self, x_train, y_train, val_ratio=0.15):
-        """fit function for training.
+        """Fit function for training.
 
         Parameters
         ----------

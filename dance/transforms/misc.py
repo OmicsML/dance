@@ -22,7 +22,6 @@ class Compose(BaseTransform):
     The order in which the ``transform`` object are passed will be exactly the order in which they will be applied to
     the data object.
 
-
     """
 
     def __init__(self, *transforms: Tuple[BaseTransform, ...], use_master_log_level: bool = True, **kwargs):

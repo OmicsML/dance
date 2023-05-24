@@ -118,8 +118,12 @@ def query_knn(data, k, query=None):
 
 
 def knn(cell_embedding, spots1, spots2, k):
-    embedding_spots1 = cell_embedding.loc[spots1, ]
-    embedding_spots2 = cell_embedding.loc[spots2, ]
+    embedding_spots1 = cell_embedding.loc[
+        spots1,
+    ]
+    embedding_spots2 = cell_embedding.loc[
+        spots2,
+    ]
     nnaa = query_knn(embedding_spots1, k=k + 1)
     nnbb = query_knn(embedding_spots2, k=k + 1)
     nnab = query_knn(data=embedding_spots2, k=k, query=embedding_spots1)

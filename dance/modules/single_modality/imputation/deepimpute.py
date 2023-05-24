@@ -31,13 +31,15 @@ from dance.typing import Any, List, LogLevel, Optional, Tuple
 
 
 class NeuralNetworkModel(nn.Module):
-    """ model class.
-        Parameters
-        ----------
-        None
-        Returns
-        -------
-        None
+    """Model class.
+
+    Parameters
+    ----------
+    None
+    Returns
+    -------
+    None
+
     """
 
     def __init__(self, inputdim, sub_outputdim, hidden_dim=None, dropout=0.2):
@@ -57,6 +59,7 @@ class NeuralNetworkModel(nn.Module):
 
 class DeepImpute(nn.Module, BaseRegressionMethod):
     """DeepImpute class.
+
     Parameters
     ----------
     learning_rate : float optional
@@ -92,6 +95,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
 
     policy: string optional
         imputation policy
+
     """
 
     def __init__(self, predictors, targets, dataset, sub_outputdim=512, hidden_dim=256, dropout=0.2, seed=1, gpu=-1):
@@ -144,7 +148,8 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         return Compose(*transforms, log_level=log_level)
 
     def wMSE(self, y_true, y_pred, binary=False):
-        """weighted MSE.
+        """Weighted MSE.
+
         Parameters
         ----------
         y_true: array
@@ -157,6 +162,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         -------
         val: float
             weighted MSE
+
         """
 
         if binary:
@@ -168,7 +174,8 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         return val
 
     def build(self, inputdims, outputdims, device="cpu"):
-        """build model.
+        """Build model.
+
         Parameters
         ----------
         inputdims: int
@@ -177,6 +184,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         -------
         models : array
             array of subnetworks
+
         """
         models = []
         for i in range(len(inputdims)):
@@ -198,6 +206,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
 
     def fit(self, X, Y, train_idx, mask=None, batch_size=64, lr=1e-3, n_epochs=100, patience=5):
         """Train model.
+
         Parameters
         ----------
         X_train: optional
@@ -213,6 +222,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         Returns
         -------
         None
+
         """
         predictors = self.predictors
         targets = self.targets
@@ -282,7 +292,8 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
                         break
 
     def save_model(self, model, optimizer, i):
-        """save model.
+        """Save model.
+
         Parameters
         ----------
         model:
@@ -296,6 +307,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         Returns
         -------
         None
+
         """
 
         model_string = 'model_' + str(i)
@@ -304,7 +316,8 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         torch.save(state, self.save_path / f"{self.dataset}_{i}.pt")
 
     def load_model(self, model, i):
-        """load model.
+        """Load model.
+
         Parameters
         ----------
         model:
@@ -316,6 +329,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         -------
         model :
             loaded model
+
         """
 
         model_path = self.save_path / f"{self.dataset}_{i}.pt"
@@ -326,6 +340,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
 
     def predict(self, X_test, test_idx, mask=None):
         """Get predictions from the trained model.
+
         Parameters
         ----------
         targetgenes: array optional
@@ -334,6 +349,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         -------
         imputed : DataFrame
             imputed gene expression
+
         """
         predictors = self.predictors
         targets = self.targets
@@ -362,7 +378,8 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         return Y_pred
 
     def score(self, true_expr, imputed_expr, test_idx, mask=None, metric="MSE"):
-        """ Scoring function of model
+        """Scoring function of model.
+
         Parameters
         ----------
         true_expr :
@@ -378,6 +395,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         -------
         score :
             evaluation score
+
         """
         allowd_metrics = {"RMSE", "PCC"}
         if metric not in allowd_metrics:

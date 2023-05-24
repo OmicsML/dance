@@ -103,7 +103,7 @@ class SpatialDecon(BaseRegressionMethod):
         max_iter: int = 500,
         print_period: int = 100,
     ):
-        """fit function for model training.
+        """Fit function for model training.
 
         Parameters
         ----------

@@ -106,7 +106,7 @@ class ScMoGCNWrapper:
         self.wt = torch.tensor([0.] * (args.layers - 1)).to(args.device).requires_grad_(True)
 
     def fit(self, g_mod1, g_mod2, train_size, cell_type, batch_label, phase_score):
-        """fit function for training.
+        """Fit function for training.
 
         Parameters
         ----------

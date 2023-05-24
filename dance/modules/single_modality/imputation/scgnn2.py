@@ -142,9 +142,7 @@ def clustering_handler(edgeList, args, param):
 
 
 def generateLouvainCluster(edgeList):
-    """
-    Louvain Clustering using igraph
-    """
+    """Louvain Clustering using igraph."""
     Gtmp = nx.Graph()
     Gtmp.add_weighted_edges_from(edgeList)
     W = nx.adjacency_matrix(Gtmp)
@@ -179,8 +177,10 @@ def cluster_output_handler(listResult):
 
 
 def trimClustering(listResult, minMemberinCluster=5, maxClusterNumber=30):
-    """
-    If the clustering numbers larger than certain number, use this function to trim. May have better solution
+    """If the clustering numbers larger than certain number, use this function to trim.
+
+    May have better solution
+
     """
     numDict = {}
     for item in listResult:
@@ -427,9 +427,7 @@ class GCNModelAE(nn.Module):
 
 
 class GraphConvolution(Module):
-    """
-    Simple GCN layer, similar to https://arxiv.org/abs/1609.02907
-    """
+    """Simple GCN layer, similar to https://arxiv.org/abs/1609.02907."""
 
     def __init__(self, in_features, out_features, dropout=0., act=F.relu):
         super().__init__()
@@ -581,8 +579,7 @@ def normalize_features_dense(node_features_dense):
 
 
 def convert_adj_to_edge_index(adjacency_matrix):
-    """
-    """
+    """"""
     assert isinstance(adjacency_matrix, np.ndarray), f"Expected NumPy array got {type(adjacency_matrix)}."
     height, width = adjacency_matrix.shape
     assert height == width, f"Expected square shape got = {adjacency_matrix.shape}."
@@ -626,9 +623,8 @@ def feature2adj(X_embed, neighborhood_factor, retain_weights):
 
 
 def calculateKNNgraphDistanceMatrixStatsSingleThread(featureMatrix, distanceType="euclidean", k=10):
-    r"""
-    Thresholdgraph: KNN Graph with stats one-std based methods, SingleThread version
-    """
+    r"""Thresholdgraph: KNN Graph with stats one-std based methods, SingleThread
+    version."""
 
     edgeList = []
 
@@ -835,9 +831,8 @@ def cluster_AE_handler(X_recon, TRS, clusterIndexList, args, param, model_state)
 
 
 class GAT(torch.nn.Module):
-    """
-    The most interesting and hardest implementation is implementation #3.
-    Imp1 and imp2 differ in subtle details but are basically the same thing.
+    """The most interesting and hardest implementation is implementation #3. Imp1 and
+    imp2 differ in subtle details but are basically the same thing.
 
     So I'll focus on imp #3 in this notebook.
 
@@ -873,8 +868,8 @@ class GAT(torch.nn.Module):
 
 
 class GATLayer(torch.nn.Module):
-    """
-    Implementation #3 was inspired by PyTorch Geometric: https://github.com/rusty1s/pytorch_geometric
+    """Implementation #3 was inspired by PyTorch Geometric:
+    https://github.com/rusty1s/pytorch_geometric.
 
     But, it's hopefully much more readable! (and of similar performance)
 
@@ -1010,13 +1005,14 @@ class GATLayer(torch.nn.Module):
     #
 
     def neighborhood_aware_softmax(self, scores_per_edge, trg_index, num_of_nodes):
-        """
-        As the fn name suggest it does softmax over the neighborhoods. Example: say we have 5 nodes in a graph.
-        Two of them 1, 2 are connected to node 3. If we want to calculate the representation for node 3 we should take
-        into account feature vectors of 1, 2 and 3 itself. Since we have scores for edges 1-3, 2-3 and 3-3
-        in scores_per_edge variable, this function will calculate attention scores like this: 1-3/(1-3+2-3+3-3)
-        (where 1-3 is overloaded notation it represents the edge 1-3 and its (exp) score) and similarly for 2-3 and 3-3
-         i.e. for this neighborhood we don't care about other edge scores that include nodes 4 and 5.
+        """As the fn name suggest it does softmax over the neighborhoods. Example: say
+        we have 5 nodes in a graph. Two of them 1, 2 are connected to node 3. If we want
+        to calculate the representation for node 3 we should take into account feature
+        vectors of 1, 2 and 3 itself. Since we have scores for edges 1-3, 2-3 and 3-3 in
+        scores_per_edge variable, this function will calculate attention scores like
+        this: 1-3/(1-3+2-3+3-3) (where 1-3 is overloaded notation it represents the edge
+        1-3 and its (exp) score) and similarly for 2-3 and 3-3 i.e. for this
+        neighborhood we don't care about other edge scores that include nodes 4 and 5.
 
         Note:
         Subtracting the max value from logits doesn't change the end result but it improves the numerical stability
@@ -1074,8 +1070,8 @@ class GATLayer(torch.nn.Module):
         return out_nodes_features
 
     def lift(self, scores_source, scores_target, nodes_features_matrix_proj, edge_index):
-        """
-        Lifts i.e. duplicates certain vectors depending on the edge index.
+        """Lifts i.e. duplicates certain vectors depending on the edge index.
+
         One of the tensor dims goes from N -> E (that's where the "lift" comes from).
 
         """
@@ -1098,9 +1094,10 @@ class GATLayer(torch.nn.Module):
         return this.expand_as(other)
 
     def init_params(self):
-        """
-        The reason we're using Glorot (aka Xavier uniform) initialization is because it's a default TF initialization:
-            https://stackoverflow.com/questions/37350131/what-is-the-default-variable-initializer-in-tensorflow
+        """The reason we're using Glorot (aka Xavier uniform) initialization is because
+        it's a default TF initialization:
+        https://stackoverflow.com/questions/37350131/what-is-the-default-variable-
+        initializer-in-tensorflow.
 
         The original repo was developed in TensorFlow (TF) and they used the default initialization.
         Feel free to experiment - there may be better initializations depending on your problem.
@@ -1179,11 +1176,12 @@ def train_handler(
     regu_type,
     impute_regu,
 ):
-    """
-    EMFlag indicates whether in EM processes.
-        If in EM, use regulized-type parsed from program entrance,
-        Otherwise, noregu
-        taskType: celltype or imputation
+    """EMFlag indicates whether in EM processes.
+
+    If in EM, use regulized-type parsed from program entrance,
+    Otherwise, noregu
+    taskType: celltype or imputation
+
     """
 
     if len(regu_type) == 2:
@@ -1249,10 +1247,8 @@ def train_handler(
 
 def loss_function_graph(recon_x, x, regulationMatrix=None, regularizer_type="noregu", regu_strength=0.9,
                         reduction="sum", param=None):
-    """
-    Regularized by the graph information
-    Reconstruction + KL divergence losses summed over all elements and batch
-    """
+    """Regularized by the graph information Reconstruction + KL divergence losses summed
+    over all elements and batch."""
     if regularizer_type in ["LTMG", "Celltype"]:
         x.requires_grad = True
 

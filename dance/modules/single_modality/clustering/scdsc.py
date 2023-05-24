@@ -31,7 +31,7 @@ from dance.utils.loss import ZINBLoss
 
 
 class ScDSC(TorchNNPretrain, BaseClusteringMethod):
-    """scDSC wrapper class.
+    """ScDSC wrapper class.
 
     Parameters
     ----------
@@ -323,7 +323,7 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
 
 
 class ScDSCModel(nn.Module):
-    """scDSC class.
+    """ScDSC class.
 
     Parameters
     ----------

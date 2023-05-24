@@ -194,7 +194,8 @@ class BaseData(ABC):
     def set_config(self, *, overwrite: bool = False, **kwargs):
         """Set dance data object configuration.
 
-        See :meth:`~BaseData.set_config_from_dict`.
+        See
+        :meth: `~BaseData.set_config_from_dict`.
 
         """
         self.set_config_from_dict(kwargs, overwrite=overwrite)
