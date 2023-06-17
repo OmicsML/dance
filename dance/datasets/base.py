@@ -157,10 +157,11 @@ class BaseDataset(ABC):
             logger.debug("Missing files ({self.is_complete()=!r}). Start downloading...")
             self.download()
 
-    def get_avalilable_data(self) -> Union[List[str], Dict[str, List[Any]]]:
+    @classmethod
+    def get_avalilable_data(cls) -> Union[List[str], Dict[str, List[Any]]]:
         """List available data of the dataset."""
-        if hasattr(self, "AVAILABLE_DATA"):
-            return self.AVAILABLE_DATA
+        if hasattr(cls, "AVAILABLE_DATA"):
+            return cls.AVAILABLE_DATA
         else:
-            raise NotImplementedError(f"Dataset {self.__class__.__name__} does not have AVAILABLE_DATA specified yet, "
+            raise NotImplementedError(f"Dataset {cls.__class__.__name__} does not have AVAILABLE_DATA specified yet, "
                                       "please specify in the class definition to enable listing data availablity.")
