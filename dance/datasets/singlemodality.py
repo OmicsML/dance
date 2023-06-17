@@ -51,6 +51,18 @@ class ScDeepSortDataset(BaseDataset):
         "test_mouse_Kidney203_celltype.csv":    "https://www.dropbox.com/s/t4eyaig889qdiz2?dl=1",
         "test_mouse_Kidney203_data.csv":        "https://www.dropbox.com/s/kmos1ceubumgmpj?dl=1",
     }  # yapf: disable
+    AVAILABLE_TRIN_DATA = [
+        ("mouse", "Brain", "3285"),
+        ("mouse", "Brain", "753"),
+        ("mouse", "Kidney", "4682"),
+        ("mouse", "Spleen", "1970"),
+    ]
+    AVAILABLE_TEST_DATA = [
+        ("mouse", "Brain", "2695"),
+        ("mouse", "Kidney", "203"),
+        ("mouse", "Spleen", "1759"),
+    ]
+    AVAILABLE_DATA = {"train": AVAILABLE_TRIN_DATA, "test": AVAILABLE_TEST_DATA}
 
     def __init__(self, full_download=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
                  train_dir="train", test_dir="test", map_path="map", data_dir="./"):
@@ -250,6 +262,7 @@ class ClusteringDataset(BaseDataset):
         "mouse_ES_cell": "https://www.dropbox.com/s/zbuku7oznvji8jk/mouse_ES_cell.h5?dl=1",
         "worm_neuron_cell": "https://www.dropbox.com/s/58fkgemi2gcnp2k/worm_neuron_cell.h5?dl=1",
     }
+    AVAILABLE_DATA = sorted(URL_DICT)
 
     def __init__(self, data_dir: str = "./data", dataset: str = "mouse_bladder_cell"):
         super().__init__(data_dir, full_download=False)
@@ -289,7 +302,6 @@ class ImputationDataset(BaseDataset):
         "mouse_brain_data": "https://www.dropbox.com/s/zzpotaayy2i29hk/neuron_10k.zip?dl=0",
         "human_stemcell_data": "https://www.dropbox.com/s/g2qua2j3rqcngn6/GSE75748.zip?dl=0"
     }
-
     DATASET_TO_FILE = {
         "pbmc_data": "5k_pbmc_protein_v3_filtered_feature_bc_matrix.h5",
         "mouse_embryo_data": [
@@ -304,6 +316,7 @@ class ImputationDataset(BaseDataset):
         "mouse_brain_data": "neuron_10k_v3_filtered_feature_bc_matrix.h5",
         "human_stemcell_data": "GSE75748/GSE75748_sc_time_course_ec.csv.gz"
     }  # yapf: disable
+    AVAILABLE_DATA = sorted(URL)
 
     def __init__(self, data_dir="data", dataset="human_stemcell", train_size=0.1):
         super().__init__(data_dir, full_download=False)

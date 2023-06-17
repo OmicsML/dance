@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from dance import logger
 from dance.data import Data
 from dance.transforms.base import BaseTransform
-from dance.typing import Any, Optional, Tuple, Union
+from dance.typing import Any, Dict, List, Optional, Tuple, Union
 from dance.utils import hexdigest
 from dance.utils.wrappers import TimeIt
 
@@ -153,3 +153,11 @@ class BaseDataset(ABC):
         elif not self.is_complete():
             logger.debug("Missing files ({self.is_complete()=!r}). Start downloading...")
             self.download()
+
+    def get_avalilable_data(self) -> Union[List[str], Dict[str, List[Any]]]:
+        """List available data of the dataset."""
+        if hasattr(self, "AVAILABLE_DATA"):
+            return self.AVAILABLE_DATA
+        else:
+            raise NotImplementedError(f"Dataset {self.__class__.__name__} does not have AVAILABLE_DATA specified yet, "
+                                      "please specify in the class definition to enable listing data availablity.")
