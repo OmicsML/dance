@@ -134,7 +134,10 @@ class BaseDataset(ABC):
         if osp.isfile(cache_file_path) and cache:
             with open(cache_file_path, "rb") as f:
                 data = pickle.load(f)
-            terminal_width = os.get_terminal_size().columns
+            try:
+                terminal_width = os.get_terminal_size().columns
+            except OSError:
+                terminal_width = 80
             logger.info(f"Loading cached data at {cache_file_path}\n"
                         f"{'Cache data info':=^{terminal_width}}\n"
                         f"{'Dataset object info':-^{terminal_width}}\n{self!r}\n"
