@@ -16,5 +16,6 @@ scikit-misc==0.2.0
 scipy==1.10.1
 statsmodels==0.14.0
 tables==3.8.0
+threadpoolctl==3.1.0
 torchnmf==0.3.4
 tqdm==4.65.0
