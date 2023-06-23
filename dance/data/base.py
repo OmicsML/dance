@@ -55,6 +55,11 @@ class BaseData(ABC):
         >>> adata = anndata.AnnData(...)
         >>> ddata = dance.data.Data(adata.copy())
 
+    Note
+    ----
+    You can directly access some main properties of :class:`~anndata.AnnData` (or :class:`~mudata.MuData` depending on
+    which type of data you passed in), such as ``X``, ``obs``, ``var``, and etc.
+
     Parameters
     ----------
     data
@@ -77,7 +82,11 @@ class BaseData(ABC):
                  full_split_name: Optional[str] = None):
         super().__init__()
 
+        # Store data and pass through some main properties over
         self._data = data
+        for prop in self._DATA_CHANNELS + ["X"]:
+            assert not hasattr(self, prop)
+            setattr(self, prop, getattr(data, prop))
 
         # TODO: move _split_idx_dict into data.uns
         self._split_idx_dict: Dict[str, Sequence[int]] = {}

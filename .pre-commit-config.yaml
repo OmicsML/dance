@@ -37,7 +37,7 @@ repos:
     hooks:
       - id: docformatter
         name: Format docstring
-        args: [--config, ./pyproject.toml]
+        args: [--wrap-summaries, "88", --wrap-descriptions, "88", --in-place, --blank]
 
   - repo: https://github.com/executablebooks/mdformat
     rev: 0.7.16
