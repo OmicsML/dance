@@ -15,61 +15,36 @@ from dance.utils.download import download_file, unzip_file
 
 class MultiModalityDataset:
 
-    AVAILABLE_DATA = [
-        "adt2gex",
-        "atac2gex",
-        "gex2adt",
-        "gex2atac",
-        "openproblems_bmmc_cite_phase2",
-        "openproblems_bmmc_cite_phase2_mod2",
-        "openproblems_bmmc_cite_phase2_rna",
-        "openproblems_bmmc_multiome_phase2",
-        "openproblems_bmmc_multiome_phase2_mod2",
-        "openproblems_bmmc_multiome_phase2_rna",
-    ]
+    TASK = "N/A"
+    URL_DICT = {}
+    SUBTASK_NAME_MAP = {}
+    AVAILABLE_DATA = []
 
-    def __init__(self, task, data_url, subtask, data_dir="./data"):
+    def __init__(self, subtask, data_dir="./data"):
         assert subtask in self.AVAILABLE_DATA, f"Undefined subtask {subtask!r}."
-        assert task in ["predict_modality", "match_modality", "joint_embedding"], f"Undefined task {task!r}."
+        assert self.TASK in ["predict_modality", "match_modality", "joint_embedding"]
 
-        # Standardize subtask name
-        if task == "joint_embedding":
-            if subtask == "adt":
-                subtask = "openproblems_bmmc_cite_phase2"
-            elif subtask == "atac":
-                subtask = "openproblems_bmmc_multiome_phase2"
-        else:
-            if subtask == "adt2gex":
-                subtask = "openproblems_bmmc_cite_phase2_mod2"
-            elif subtask == "gex2adt":
-                subtask = "openproblems_bmmc_cite_phase2_rna"
-            elif subtask == "atac2gex":
-                subtask = "openproblems_bmmc_multiome_phase2_mod2"
-            elif subtask == "gex2atac":
-                subtask = "openproblems_bmmc_multiome_phase2_rna"
+        self.subtask = self.SUBTASK_NAME_MAP.get(subtask, subtask)
+        self.data_url = self.URL_DICT[subtask]
 
-        self.task = task
-        self.subtask = subtask
         self.data_dir = data_dir
         self.loaded = False
-        self.data_url = data_url
 
     def download_data(self):
-        # download data
-        download_file(self.data_url, self.data_dir + "/{}.zip".format(self.subtask))
-        unzip_file(self.data_dir + "/{}.zip".format(self.subtask), self.data_dir)
+        download_file(self.data_url, osp.join(self.data_dir, f"{self.subtask}.zip"))
+        unzip_file(osp.join(self.data_dir, f"{self.subtask}.zip"), self.data_dir)
         return self
 
     def download_pathway(self):
         download_file("https://www.dropbox.com/s/uqoakpalr3albiq/h.all.v7.4.entrez.gmt?dl=1",
-                      self.data_dir + "/h.all.v7.4.entrez.gmt")
+                      osp.join(self.data_dir, "h.all.v7.4.entrez.gmt"))
         download_file("https://www.dropbox.com/s/yjrcsd2rpmahmfo/h.all.v7.4.symbols.gmt?dl=1",
-                      self.data_dir + "/h.all.v7.4.symbols.gmt")
+                      osp.join(self.data_dir, "h.all.v7.4.symbols.gmt"))
         return self
 
     @property
     def mod_data_paths(self) -> List[str]:
-        if self.task == "joint_embedding":
+        if self.TASK == "joint_embedding":
             paths = [
                 osp.join(self.data_dir, self.subtask, f"{self.subtask}.censor_dataset.output_mod1.h5ad"),
                 osp.join(self.data_dir, self.subtask, f"{self.subtask}.censor_dataset.output_mod2.h5ad"),
@@ -88,9 +63,7 @@ class MultiModalityDataset:
 
     def load_data(self):
         # Load data from existing h5ad files, or download files and load data.
-        if self.is_complete():
-            pass
-        else:
+        if not self.is_complete():
             self.download_data()
             assert self.is_complete()
 
@@ -146,6 +119,7 @@ class MultiModalityDataset:
 
 class ModalityPredictionDataset(MultiModalityDataset):
 
+    TASK = "predict_modality"
     URL_DICT = {
         "openproblems_bmmc_cite_phase2_mod2":
         "https://www.dropbox.com/s/snh8knscnlcq4um/openproblems_bmmc_cite_phase2_mod2.zip?dl=1",
@@ -165,10 +139,7 @@ class ModalityPredictionDataset(MultiModalityDataset):
     AVAILABLE_DATA = sorted(list(URL_DICT) + list(SUBTASK_NAME_MAP))
 
     def __init__(self, subtask, data_dir="./data"):
-        assert subtask in self.AVAILABLE_DATA, f"Undefined subtask {subtask!r}."
-        subtask = self.SUBTASK_NAME_MAP.get(subtask, subtask)
-        data_url = self.URL_DICT[subtask]
-        super().__init__("predict_modality", data_url, subtask, data_dir)
+        super().__init__(subtask, data_dir)
 
     def preprocess(self, kind="feature_selection", selection_threshold=10000):
         if kind == "pca":
@@ -190,6 +161,7 @@ class ModalityPredictionDataset(MultiModalityDataset):
 
 class ModalityMatchingDataset(MultiModalityDataset):
 
+    TASK = "match_modality"
     URL_DICT = {
         "openproblems_bmmc_cite_phase2_mod2":
         "https://www.dropbox.com/s/fa6zut89xx73itz/openproblems_bmmc_cite_phase2_mod2.zip?dl=1",
@@ -209,10 +181,7 @@ class ModalityMatchingDataset(MultiModalityDataset):
     AVAILABLE_DATA = sorted(list(URL_DICT) + list(SUBTASK_NAME_MAP))
 
     def __init__(self, subtask, data_dir="./data"):
-        assert subtask in self.AVAILABLE_DATA, f"Undefined subtask {subtask!r}."
-        subtask = self.SUBTASK_NAME_MAP.get(subtask, subtask)
-        data_url = self.URL_DICT[subtask]
-        super().__init__("match_modality", data_url, subtask, data_dir)
+        super().__init__(subtask, data_dir)
         self.preprocessed = False
 
     def load_sol(self):
@@ -291,6 +260,7 @@ class ModalityMatchingDataset(MultiModalityDataset):
 
 class JointEmbeddingNIPSDataset(MultiModalityDataset):
 
+    TASK = "joint_embedding"
     URL_DICT = {
         "openproblems_bmmc_cite_phase2":
         "https://www.dropbox.com/s/hjr4dxuw55vin5z/openproblems_bmmc_cite_phase2.zip?dl=1",
@@ -304,10 +274,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
     AVAILABLE_DATA = sorted(list(URL_DICT) + list(SUBTASK_NAME_MAP))
 
     def __init__(self, subtask, data_dir="./data"):
-        assert subtask in self.AVAILABLE_DATA, f"Undefined subtask {subtask!r}."
-        subtask = self.SUBTASK_NAME_MAP.get(subtask, subtask)
-        data_url = self.URL_DICT[subtask]
-        super().__init__("joint_embedding", data_url, subtask, data_dir)
+        super().__init__(subtask, data_dir)
         self.preprocessed = False
 
     def load_metadata(self):
