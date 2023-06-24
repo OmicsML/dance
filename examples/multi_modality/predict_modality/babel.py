@@ -62,7 +62,7 @@ if __name__ == "__main__":
     model.fit(x_train, y_train, val_ratio=0.15)
     print(model.predict(x_test))
     print(model.score(x_test, y_test))
-""" To reproduce BABEL on other samples, please refer to command lines belows:
+"""To reproduce BABEL on other samples, please refer to command lines belows:
 GEX to ADT:
 python babel.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda
 

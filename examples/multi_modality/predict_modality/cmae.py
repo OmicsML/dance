@@ -76,17 +76,6 @@ if __name__ == "__main__":
     x_test = x_test.float().to(device)
     y_test = y_test.float().to(device)
 
-    # mod1 = anndata.concat((dataset.modalities[0], dataset.modalities[2]))
-    # mod2 = anndata.concat((dataset.modalities[1], dataset.modalities[3]))
-    # batch = le.fit_transform(mod1.obs["batch"])
-    # mod1.var_names_make_unique()
-    # mod2.var_names_make_unique()
-    # mod1.obsm["batch"] = batch
-    # mdata = mudata.MuData({"mod1": mod1, "mod2": mod2})
-    # mdata.var_names_make_unique()
-    # train_size = dataset.modalities[0].shape[0]
-    # data = Data(mdata, train_size=train_size)
-
     config = vars(opts)
     # Some Fixed Settings
     config["input_dim_a"] = x_train.shape[1]
