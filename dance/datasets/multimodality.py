@@ -1,77 +1,80 @@
 import os
 import os.path as osp
 import pickle
+from abc import ABC
 
 import anndata as ad
+import mudata as md
 import numpy as np
 import scanpy as sc
 import torch
 
 from dance import logger
+from dance.data import Data
+from dance.datasets.base import BaseDataset
 from dance.transforms.preprocess import lsiTransformer
 from dance.typing import List
 from dance.utils.download import download_file, unzip_file
 
 
-class MultiModalityDataset:
+class MultiModalityDataset(BaseDataset, ABC):
 
     TASK = "N/A"
     URL_DICT = {}
     SUBTASK_NAME_MAP = {}
     AVAILABLE_DATA = []
 
-    def __init__(self, subtask, data_dir="./data"):
+    def __init__(self, subtask, root="./data"):
         assert subtask in self.AVAILABLE_DATA, f"Undefined subtask {subtask!r}."
         assert self.TASK in ["predict_modality", "match_modality", "joint_embedding"]
 
         self.subtask = self.SUBTASK_NAME_MAP.get(subtask, subtask)
         self.data_url = self.URL_DICT[subtask]
-
-        self.data_dir = data_dir
         self.loaded = False
 
+        super().__init__(root=root, full_download=False)
+
+    def download(self):
+        self.download_data()
+
     def download_data(self):
-        download_file(self.data_url, osp.join(self.data_dir, f"{self.subtask}.zip"))
-        unzip_file(osp.join(self.data_dir, f"{self.subtask}.zip"), self.data_dir)
+        download_file(self.data_url, osp.join(self.root, f"{self.subtask}.zip"))
+        unzip_file(osp.join(self.root, f"{self.subtask}.zip"), self.root)
         return self
 
     def download_pathway(self):
         download_file("https://www.dropbox.com/s/uqoakpalr3albiq/h.all.v7.4.entrez.gmt?dl=1",
-                      osp.join(self.data_dir, "h.all.v7.4.entrez.gmt"))
+                      osp.join(self.root, "h.all.v7.4.entrez.gmt"))
         download_file("https://www.dropbox.com/s/yjrcsd2rpmahmfo/h.all.v7.4.symbols.gmt?dl=1",
-                      osp.join(self.data_dir, "h.all.v7.4.symbols.gmt"))
+                      osp.join(self.root, "h.all.v7.4.symbols.gmt"))
         return self
 
     @property
     def mod_data_paths(self) -> List[str]:
         if self.TASK == "joint_embedding":
             paths = [
-                osp.join(self.data_dir, self.subtask, f"{self.subtask}.censor_dataset.output_mod1.h5ad"),
-                osp.join(self.data_dir, self.subtask, f"{self.subtask}.censor_dataset.output_mod2.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_mod1.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_mod2.h5ad"),
             ]
         else:
             paths = [
-                osp.join(self.data_dir, self.subtask, f"{self.subtask}.censor_dataset.output_train_mod1.h5ad"),
-                osp.join(self.data_dir, self.subtask, f"{self.subtask}.censor_dataset.output_train_mod2.h5ad"),
-                osp.join(self.data_dir, self.subtask, f"{self.subtask}.censor_dataset.output_test_mod1.h5ad"),
-                osp.join(self.data_dir, self.subtask, f"{self.subtask}.censor_dataset.output_test_mod2.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_train_mod1.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_train_mod2.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_mod1.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_mod2.h5ad"),
             ]
         return paths
 
     def is_complete(self) -> bool:
         return all(map(osp.exists, self.mod_data_paths))
 
-    def load_data(self):
-        # Load data from existing h5ad files, or download files and load data.
-        if not self.is_complete():
-            self.download_data()
-            assert self.is_complete()
-
-        self.modalities = []
+    def _load_raw_data(self) -> List[ad.AnnData]:
+        modalities = []
         for mod_path in self.mod_data_paths:
-            self.modalities.append(ad.read_h5ad(mod_path))
+            logger.info(f"Loading {mod_path}")
+            modalities.append(ad.read_h5ad(mod_path))
         self.loaded = True
-        return self
+        return modalities
 
     def sparse_features(self, index=None, count=False):
         assert self.loaded, "Data have not been loaded."
@@ -138,25 +141,39 @@ class ModalityPredictionDataset(MultiModalityDataset):
     }
     AVAILABLE_DATA = sorted(list(URL_DICT) + list(SUBTASK_NAME_MAP))
 
-    def __init__(self, subtask, data_dir="./data"):
-        super().__init__(subtask, data_dir)
+    def __init__(self, subtask, root="./data", preprocess=None):
+        # TODO: factor our preprocess
+        self.preprocess = preprocess
+        super().__init__(subtask, root)
 
-    def preprocess(self, kind="feature_selection", selection_threshold=10000):
-        if kind == "pca":
-            logger.info("Preprocessing method not supported.")
-            return self
-        elif kind == "feature_selection":
-            if self.modalities[0].shape[1] > selection_threshold:
-                sc.pp.highly_variable_genes(self.modalities[0], layer="counts", flavor="seurat_v3",
+    def _raw_to_dance(self, raw_data):
+        train_mod1, train_mod2, test_mod1, test_mod2 = self._maybe_preprocess(raw_data)
+
+        mod1 = ad.concat((train_mod1, test_mod1))
+        mod2 = ad.concat((train_mod2, test_mod2))
+        mod1.var_names_make_unique()
+        mod2.var_names_make_unique()
+
+        mdata = md.MuData({"mod1": mod1, "mod2": mod2})
+        mdata.var_names_make_unique()
+
+        data = Data(mdata, train_size=train_mod1.shape[0])
+        data.set_config(feature_mod="mod1", label_mod="mod2")
+
+        return data
+
+    def _maybe_preprocess(self, raw_data, selection_threshold=10000):
+        if self.preprocess == "feature_selection":
+            if raw_data[0].shape[1] > selection_threshold:
+                sc.pp.highly_variable_genes(raw_data[0], layer="counts", flavor="seurat_v3",
                                             n_top_genes=selection_threshold)
-                self.modalities[2].var["highly_variable"] = self.modalities[0].var["highly_variable"]
+                raw_data[2].var["highly_variable"] = raw_data[0].var["highly_variable"]
                 for i in [0, 2]:
-                    self.modalities[i] = self.modalities[i][:, self.modalities[i].var["highly_variable"]]
-        else:
-            logger.info("Preprocessing method not supported.")
-            return self
+                    raw_data[i] = raw_data[i][:, raw_data[i].var["highly_variable"]]
+        elif self.preprocess is not None:
+            logger.info(f"Preprocessing method {self.preprocess!r} not supported.")
         logger.info("Preprocessing done.")
-        return self
+        return raw_data
 
 
 class ModalityMatchingDataset(MultiModalityDataset):
@@ -180,16 +197,16 @@ class ModalityMatchingDataset(MultiModalityDataset):
     }
     AVAILABLE_DATA = sorted(list(URL_DICT) + list(SUBTASK_NAME_MAP))
 
-    def __init__(self, subtask, data_dir="./data"):
-        super().__init__(subtask, data_dir)
+    def __init__(self, subtask, root="./data"):
+        super().__init__(subtask, root)
         self.preprocessed = False
 
     def load_sol(self):
         assert (self.loaded)
         self.train_sol = ad.read_h5ad(
-            osp.join(self.data_dir, self.subtask, f"{self.subtask}.censor_dataset.output_train_sol.h5ad"))
+            osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_train_sol.h5ad"))
         self.test_sol = ad.read_h5ad(
-            osp.join(self.data_dir, self.subtask, f"{self.subtask}.censor_dataset.output_test_sol.h5ad"))
+            osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_sol.h5ad"))
         self.modalities[1] = self.modalities[1][self.train_sol.to_df().values.argmax(1)]
         return self
 
@@ -273,8 +290,8 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
     }
     AVAILABLE_DATA = sorted(list(URL_DICT) + list(SUBTASK_NAME_MAP))
 
-    def __init__(self, subtask, data_dir="./data"):
-        super().__init__(subtask, data_dir)
+    def __init__(self, subtask, root="./data"):
+        super().__init__(subtask, root)
         self.preprocessed = False
 
     def load_metadata(self):
@@ -287,15 +304,15 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
             mod = "atac"
             meta = "multiome"
         self.exploration = [
-            ad.read_h5ad(osp.join(self.data_dir, self.subtask, f"{meta}_gex_processed_training.h5ad")),
-            ad.read_h5ad(osp.join(self.data_dir, self.subtask, f"{meta}_{mod}_processed_training.h5ad")),
+            ad.read_h5ad(osp.join(self.root, self.subtask, f"{meta}_gex_processed_training.h5ad")),
+            ad.read_h5ad(osp.join(self.root, self.subtask, f"{meta}_{mod}_processed_training.h5ad")),
         ]
         return self
 
     def load_sol(self):
         assert (self.loaded)
         self.test_sol = ad.read_h5ad(
-            osp.join(self.data_dir, self.subtask, f"{self.subtask}.censor_dataset.output_solution.h5ad"))
+            osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_solution.h5ad"))
         return self
 
     def preprocess(self, kind="aux", pretrained_folder=".", selection_threshold=10000):
