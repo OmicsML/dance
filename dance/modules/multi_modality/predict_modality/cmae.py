@@ -583,7 +583,6 @@ class CMAE(nn.Module):
         while True:
             print('Iteration: ', iterations)
             for it, batch_idx in enumerate(train_loader):
-                self._update_learning_rate()
                 mod1, mod2 = train_mod1[batch_idx], train_mod2[batch_idx]
 
                 for _ in range(num_disc):
@@ -594,6 +593,7 @@ class CMAE(nn.Module):
                                          aux_labels[batch_idx], variational=False)
                     else:
                         self._gen_update(mod1, mod2, mod1, mod2, hyperparameters, variational=False)
+                self._update_learning_rate()
 
             print('RMSE Loss:', self.score(train_mod1[val_idx], train_mod2[val_idx]))
 
