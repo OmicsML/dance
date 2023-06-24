@@ -51,18 +51,15 @@ class ScDeepSortDataset(BaseDataset):
         "test_mouse_Kidney203_celltype.csv":    "https://www.dropbox.com/s/t4eyaig889qdiz2?dl=1",
         "test_mouse_Kidney203_data.csv":        "https://www.dropbox.com/s/kmos1ceubumgmpj?dl=1",
     }  # yapf: disable
-    AVAILABLE_TRIN_DATA = [
-        ("mouse", "Brain", "3285"),
-        ("mouse", "Brain", "753"),
-        ("mouse", "Kidney", "4682"),
-        ("mouse", "Spleen", "1970"),
-    ]
-    AVAILABLE_TEST_DATA = [
-        ("mouse", "Brain", "2695"),
-        ("mouse", "Kidney", "203"),
-        ("mouse", "Spleen", "1759"),
-    ]
-    AVAILABLE_DATA = {"train": AVAILABLE_TRIN_DATA, "test": AVAILABLE_TEST_DATA}
+    AVAILABLE_DATA = [
+        {"split": "train", "species": "mouse", "tissue": "Brain", "dataset": "3285"},
+        {"split": "train", "species": "mouse", "tissue": "Brain", "dataset": "753"},
+        {"split": "train", "species": "mouse", "tissue": "Kidney", "dataset": "4682"},
+        {"split": "train", "species": "mouse", "tissue": "Spleen", "dataset": "1970"},
+        {"split": "test", "species": "mouse", "tissue": "Brain", "dataset": "2695"},
+        {"split": "test", "species": "mouse", "tissue": "Kidney", "dataset": "203"},
+        {"split": "test", "species": "mouse", "tissue": "Spleen", "dataset": "1759"},
+    ]  # yapf: disable
 
     def __init__(self, full_download=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
                  train_dir="train", test_dir="test", map_path="map", data_dir="./"):
