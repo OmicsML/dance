@@ -3,12 +3,9 @@ import logging
 import os
 import random
 
-import anndata
-import mudata
 import torch
 
 from dance import logger
-from dance.data import Data
 from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.babel import BabelWrapper
 from dance.utils import set_seed
@@ -40,15 +37,13 @@ if __name__ == "__main__":
     torch.set_num_threads(args.cpus)
     rndseed = args.rnd_seed
     set_seed(rndseed)
-    dataset = ModalityPredictionDataset(args.subtask).load_data().preprocess("feature_selection")
+    dataset = ModalityPredictionDataset(args.subtask, preprocess="feature_selection")
+    data = dataset.load_data()
+
     device = args.device
+    args.outdir = os.path.abspath(args.outdir)
     os.makedirs(args.model_folder, exist_ok=True)
     os.makedirs(args.outdir, exist_ok=True)
-
-    args.outdir = os.path.abspath(args.outdir)
-
-    if not os.path.isdir(os.path.dirname(args.outdir)):
-        os.makedirs(os.path.dirname(args.outdir))
 
     # Specify output log file
     fh = logging.FileHandler(f"{args.outdir}/training_{args.subtask}_{args.rnd_seed}.log", "w")
@@ -57,17 +52,6 @@ if __name__ == "__main__":
 
     for arg in vars(args):
         logger.info(f"Parameter {arg}: {getattr(args, arg)}")
-
-    # Construct data object
-    mod1 = anndata.concat((dataset.modalities[0], dataset.modalities[2]))
-    mod2 = anndata.concat((dataset.modalities[1], dataset.modalities[3]))
-    mod1.var_names_make_unique()
-    mod2.var_names_make_unique()
-    mdata = mudata.MuData({"mod1": mod1, "mod2": mod2})
-    mdata.var_names_make_unique()
-    train_size = dataset.modalities[0].shape[0]
-    data = Data(mdata, train_size=train_size)
-    data.set_config(feature_mod="mod1", label_mod="mod2")
 
     # Obtain training and testing data
     x_train, y_train = data.get_train_data(return_type="torch")
@@ -78,7 +62,7 @@ if __name__ == "__main__":
     model.fit(x_train, y_train, val_ratio=0.15)
     print(model.predict(x_test))
     print(model.score(x_test, y_test))
-""" To reproduce BABEL on other samples, please refer to command lines belows:
+"""To reproduce BABEL on other samples, please refer to command lines belows:
 GEX to ADT:
 python babel.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda
 
