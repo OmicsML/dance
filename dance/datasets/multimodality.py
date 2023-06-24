@@ -170,7 +170,7 @@ class ModalityPredictionDataset(MultiModalityDataset):
                 raw_data[2].var["highly_variable"] = raw_data[0].var["highly_variable"]
                 for i in [0, 2]:
                     raw_data[i] = raw_data[i][:, raw_data[i].var["highly_variable"]]
-        elif self.preprocess is not None:
+        elif self.preprocess not in (None, "none"):
             logger.info(f"Preprocessing method {self.preprocess!r} not supported.")
         logger.info("Preprocessing done.")
         return raw_data
