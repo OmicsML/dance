@@ -158,7 +158,7 @@ class BaseDataset(ABC):
             self.download()
 
     @classmethod
-    def get_avalilable_data(cls) -> Union[List[str], Dict[str, List[Any]]]:
+    def get_avalilable_data(cls) -> List[Union[str, Dict[str, str]]]:
         """List available data of the dataset."""
         if hasattr(cls, "AVAILABLE_DATA"):
             return cls.AVAILABLE_DATA
