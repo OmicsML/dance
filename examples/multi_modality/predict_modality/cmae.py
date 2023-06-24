@@ -14,7 +14,6 @@ from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.cmae import CMAE
 from dance.utils import set_seed
 
-
 if __name__ == "__main__":
     rndseed = random.randint(0, 2147483647)
     parser = argparse.ArgumentParser()
