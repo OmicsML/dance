@@ -4,7 +4,7 @@ https://download.pytorch.org/whl/cpu/torchvision-0.15.0%2Bcpu-cp38-cp38-linux_x8
 torch-geometric==2.3.0
 torchnmf
 pyro-ppl
-sphinx==6.2.1
+sphinx==7.0.1
 sphinx_rtd_theme==1.2.2
 sphinxcontrib-napoleon==0.7
 sphinx-autodoc-typehints==1.23.0
