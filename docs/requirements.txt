@@ -1,5 +1,6 @@
 https://data.dgl.ai/wheels/dgl-1.0.1-cp38-cp38-manylinux1_x86_64.whl
 https://download.pytorch.org/whl/cpu/torch-2.0.0%2Bcpu-cp38-cp38-linux_x86_64.whl
+https://download.pytorch.org/whl/cpu/torchvision-0.13.1%2Bcpu-cp38-cp38-linux_x86_64.whl
 torch-geometric==2.3.0
 torchnmf
 pyro-ppl
