@@ -40,7 +40,7 @@ environment with all necessary dependencies as well as DANCE.
 .. code-block:: bash
 
    git clone git@github.com:OmicsML/dance.git && cd dance
-   source install.sh cu102  # other options are [cpu,cu113]
+   source install.sh cu117  # other options are [cpu,cu118]
 
 Finally, you can checkout some
 `example scripts <https://github.com/OmicsML/dance/tree/main/examples>`_
