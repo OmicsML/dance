@@ -6,7 +6,7 @@ from dance.modules.spatial.cell_type_deconvo.card import Card
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--cache", action="store_true", help="Cache processed data.")
-parser.add_argument("--dataset", default="CARD_synthetic", choices=CellTypeDeconvoDataset.DATASETS)
+parser.add_argument("--dataset", default="CARD_synthetic", choices=CellTypeDeconvoDataset.AVAILABLE_DATA)
 parser.add_argument("--datadir", default="data/spatial", help="Directory to save the data.")
 parser.add_argument("--max_iter", type=int, default=10, help="Maximum optimization iteration.")
 parser.add_argument("--epsilon", type=float, default=1e-10, help="Optimization threshold.")

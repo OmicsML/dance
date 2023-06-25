@@ -10,7 +10,7 @@ from dance.utils import set_seed
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--cache", action="store_true", help="Cache processed data.")
-parser.add_argument("--dataset", default="CARD_synthetic", choices=CellTypeDeconvoDataset.DATASETS)
+parser.add_argument("--dataset", default="CARD_synthetic", choices=CellTypeDeconvoDataset.AVAILABLE_DATA)
 parser.add_argument("--datadir", default="data/spatial", help="Directory to save the data.")
 parser.add_argument("--sc_ref", type=bool, default=True, help="Reference scRNA (True) or cell-mixtures (False).")
 parser.add_argument("--num_pseudo", type=int, default=500, help="Number of pseudo mixtures to generate.")
