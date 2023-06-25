@@ -3,7 +3,7 @@ https://download.pytorch.org/whl/cpu/torch-2.0.0%2Bcpu-cp38-cp38-linux_x86_64.wh
 torch-geometric==2.3.0
 torchnmf
 pyro-ppl
-sphinx
-sphinx_rtd_theme
-sphinxcontrib-napoleon
-sphinx-autodoc-typehints
+sphinx==6.2.1
+sphinx_rtd_theme==1.2.2
+sphinxcontrib-napoleon==0.7
+sphinx-autodoc-typehints==1.23.0
