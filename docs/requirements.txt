@@ -7,4 +7,4 @@ pyro-ppl
 sphinx==6.2.1
 sphinx_rtd_theme==1.2.2
 sphinxcontrib-napoleon==0.7
-sphinx-autodoc-typehints==1.23.0
+sphinx-autodoc-typehints==1.23.2
