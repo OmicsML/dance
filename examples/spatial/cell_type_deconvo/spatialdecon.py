@@ -7,7 +7,7 @@ from dance.utils import set_seed
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--cache", action="store_true", help="Cache processed data.")
-parser.add_argument("--dataset", default="CARD_synthetic", choices=CellTypeDeconvoDataset.DATASETS)
+parser.add_argument("--dataset", default="CARD_synthetic", choices=CellTypeDeconvoDataset.AVAILABLE_DATA)
 parser.add_argument("--datadir", default="data/spatial", help="Directory to save the data.")
 parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate.")
 parser.add_argument("--bias", type=bool, default=False, help="Include/Exclude bias term.")
