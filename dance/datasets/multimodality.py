@@ -56,12 +56,21 @@ class MultiModalityDataset(BaseDataset, ABC):
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_mod1.h5ad"),
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_mod2.h5ad"),
             ]
-        else:
+        elif self.TASK == "predict_modality":
             paths = [
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_train_mod1.h5ad"),
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_train_mod2.h5ad"),
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_mod1.h5ad"),
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_mod2.h5ad"),
+            ]
+        elif self.TASK == "match_modality":
+            paths = [
+                osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_train_mod1.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_train_mod2.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_train_sol.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_mod1.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_mod2.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_sol.h5ad"),
             ]
         return paths
 
@@ -197,42 +206,66 @@ class ModalityMatchingDataset(MultiModalityDataset):
     }
     AVAILABLE_DATA = sorted(list(URL_DICT) + list(SUBTASK_NAME_MAP))
 
-    def __init__(self, subtask, root="./data"):
+    def __init__(self, subtask, root="./data", preprocess=None):
+        # TODO: factor our preprocess
+        self.preprocess = preprocess
         super().__init__(subtask, root)
-        self.preprocessed = False
 
-    def load_sol(self):
-        assert (self.loaded)
-        self.train_sol = ad.read_h5ad(
-            osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_train_sol.h5ad"))
-        self.test_sol = ad.read_h5ad(
-            osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_sol.h5ad"))
-        self.modalities[1] = self.modalities[1][self.train_sol.to_df().values.argmax(1)]
-        return self
+    def _load_raw_data(self):
+        # TODO: merge to MultiModalityDataset?
+        modalities = []
+        for mod_path in self.mod_data_paths:
+            logger.info(f"Loading {mod_path}")
+            modalities.append(ad.read_h5ad(mod_path))
+        return modalities
 
-    def preprocess(self, kind="pca", pkl_path=None, selection_threshold=10000):
+    def _raw_to_dance(self, raw_data):
+        train_mod1, train_mod2, train_label, test_mod1, test_mod2, test_label = self._maybe_preprocess(raw_data)
+
+        mod1 = ad.concat((train_mod1, test_mod1))
+        mod2 = ad.concat((train_mod2, test_mod2))
+        mod1.var_names_make_unique()
+        mod2.var_names_make_unique()
+        mod2.obs_names = mod1.obs_names
+        train_size = train_mod1.shape[0]
+
+        # Align matched cells
+        train_mod2 = train_mod2[train_label.to_df().values.argmax(1)]
+        mod1.obsm["labels"] = np.concatenate([np.zeros(train_size), np.argmax(test_label.X.toarray(), 1)])
+
+        # Combine modalities into mudata
+        mdata = md.MuData({"mod1": mod1, "mod2": mod2})
+        mdata.var_names_make_unique()
+
+        data = Data(mdata, train_size=train_size)
+
+        return data
+
+    def _maybe_preprocess(self, raw_data, pkl_path=None, selection_threshold=10000):
+        train_mod1, train_mod2, train_label, test_mod1, test_mod2, test_label = raw_data
+        modalities = [train_mod1, train_mod2, test_mod1, test_mod2]
 
         # TODO: support other two subtasks
         assert self.subtask in ("openproblems_bmmc_cite_phase2_rna",
                                 "openproblems_bmmc_multiome_phase2_rna"), "Currently not available."
 
-        if kind == "pca":
+        if self.preprocess == "pca":
             if pkl_path and (not osp.exists(pkl_path)):
 
                 if self.subtask == "openproblems_bmmc_cite_phase2_rna":
                     lsi_transformer_gex = lsiTransformer(n_components=256, drop_first=True)
-                    m1_train = lsi_transformer_gex.fit_transform(self.modalities[0]).values
-                    m1_test = lsi_transformer_gex.transform(self.modalities[2]).values
-                    m2_train = self.modalities[1].X.toarray()
-                    m2_test = self.modalities[3].X.toarray()
+                    m1_train = lsi_transformer_gex.fit_transform(modalities[0]).values
+                    m1_test = lsi_transformer_gex.transform(modalities[2]).values
+                    m2_train = modalities[1].X.toarray()
+                    m2_test = modalities[3].X.toarray()
 
                 elif self.subtask == "openproblems_bmmc_multiome_phase2_rna":
                     lsi_transformer_gex = lsiTransformer(n_components=256, drop_first=True)
-                    m1_train = lsi_transformer_gex.fit_transform(self.modalities[0]).values
-                    m1_test = lsi_transformer_gex.transform(self.modalities[2]).values
+                    m1_train = lsi_transformer_gex.fit_transform(modalities[0]).values
+                    m1_test = lsi_transformer_gex.transform(modalities[2]).values
                     lsi_transformer_atac = lsiTransformer(n_components=512, drop_first=True)
-                    m2_train = lsi_transformer_atac.fit_transform(self.modalities[1]).values
-                    m2_test = lsi_transformer_atac.transform(self.modalities[3]).values
+                    m2_train = lsi_transformer_atac.fit_transform(modalities[1]).values
+                    m2_test = lsi_transformer_atac.transform(modalities[3]).values
 
                 else:
                     raise ValueError(f"Unrecognized subtask name: {self.subtask}")
@@ -243,36 +276,35 @@ class ModalityMatchingDataset(MultiModalityDataset):
                     "mod1_test": m1_test,
                     "mod2_test": m2_test
                 }
-                self.modalities[0].obsm["X_pca"] = self.preprocessed_features["mod1_train"]
-                self.modalities[1].obsm["X_pca"] = self.preprocessed_features["mod2_train"]
-                self.modalities[2].obsm["X_pca"] = self.preprocessed_features["mod1_test"]
-                self.modalities[3].obsm["X_pca"] = self.preprocessed_features["mod2_test"]
+                modalities[0].obsm["X_pca"] = self.preprocessed_features["mod1_train"]
+                modalities[1].obsm["X_pca"] = self.preprocessed_features["mod2_train"]
+                modalities[2].obsm["X_pca"] = self.preprocessed_features["mod1_test"]
+                modalities[3].obsm["X_pca"] = self.preprocessed_features["mod2_test"]
                 pickle.dump(self.preprocessed_features, open(pkl_path, "wb"))
 
             else:
                 self.preprocessed_features = pickle.load(open(pkl_path, "rb"))
-                self.modalities[0].obsm["X_pca"] = self.preprocessed_features["mod1_train"]
-                self.modalities[1].obsm["X_pca"] = self.preprocessed_features["mod2_train"]
-                self.modalities[2].obsm["X_pca"] = self.preprocessed_features["mod1_test"]
-                self.modalities[3].obsm["X_pca"] = self.preprocessed_features["mod2_test"]
-        elif kind == "feature_selection":
+                modalities[0].obsm["X_pca"] = self.preprocessed_features["mod1_train"]
+                modalities[1].obsm["X_pca"] = self.preprocessed_features["mod2_train"]
+                modalities[2].obsm["X_pca"] = self.preprocessed_features["mod1_test"]
+                modalities[3].obsm["X_pca"] = self.preprocessed_features["mod2_test"]
+
+        elif self.preprocess == "feature_selection":
             for i in range(2):
-                if self.modalities[i].shape[1] > selection_threshold:
-                    sc.pp.highly_variable_genes(self.modalities[i], layer="counts", flavor="seurat_v3",
+                if modalities[i].shape[1] > selection_threshold:
+                    sc.pp.highly_variable_genes(modalities[i], layer="counts", flavor="seurat_v3",
                                                 n_top_genes=selection_threshold)
-                    self.modalities[i + 2].var["highly_variable"] = self.modalities[i].var["highly_variable"]
-                    self.modalities[i] = self.modalities[i][:, self.modalities[i].var["highly_variable"]]
-                    self.modalities[i + 2] = self.modalities[i + 2][:, self.modalities[i + 2].var["highly_variable"]]
+                    modalities[i + 2].var["highly_variable"] = modalities[i].var["highly_variable"]
+                    modalities[i] = modalities[i][:, modalities[i].var["highly_variable"]]
+                    modalities[i + 2] = modalities[i + 2][:, modalities[i + 2].var["highly_variable"]]
+
         else:
             logger.info("Preprocessing method not supported.")
-            return self
-        logger.info("Preprocessing done.")
-        self.preprocessed = True
-        return self
 
-    def get_preprocessed_features(self):
-        assert self.preprocessed, "Transformed features do not exist."
-        return self.preprocessed_features
+        logger.info("Preprocessing done.")
+
+        train_mod1, train_mod2, test_mod1, test_mod2 = modalities
+        return train_mod1, train_mod2, train_label, test_mod1, test_mod2, test_label
 
 
 class JointEmbeddingNIPSDataset(MultiModalityDataset):
