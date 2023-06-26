@@ -206,9 +206,10 @@ class ModalityMatchingDataset(MultiModalityDataset):
     }
     AVAILABLE_DATA = sorted(list(URL_DICT) + list(SUBTASK_NAME_MAP))
 
-    def __init__(self, subtask, root="./data", preprocess=None):
+    def __init__(self, subtask, root="./data", preprocess=None, pkl_path=None):
         # TODO: factor our preprocess
         self.preprocess = preprocess
+        self.pkl_path = pkl_path
         super().__init__(subtask, root)
 
     def _load_raw_data(self):
@@ -241,7 +242,7 @@ class ModalityMatchingDataset(MultiModalityDataset):
 
         return data
 
-    def _maybe_preprocess(self, raw_data, pkl_path=None, selection_threshold=10000):
+    def _maybe_preprocess(self, raw_data, selection_threshold=10000):
         train_mod1, train_mod2, train_label, test_mod1, test_mod2, test_label = raw_data
         modalities = [train_mod1, train_mod2, test_mod1, test_mod2]
 
@@ -250,8 +251,11 @@ class ModalityMatchingDataset(MultiModalityDataset):
                                 "openproblems_bmmc_multiome_phase2_rna"), "Currently not available."
 
         if self.preprocess == "pca":
-            if pkl_path and (not osp.exists(pkl_path)):
+            if self.pkl_path and osp.exists(self.pkl_path):
+                with open(self.pkl_path, "rb") as f:
+                    preprocessed_features = pickle.load(f)
 
+            else:
                 if self.subtask == "openproblems_bmmc_cite_phase2_rna":
                     lsi_transformer_gex = lsiTransformer(n_components=256, drop_first=True)
                     m1_train = lsi_transformer_gex.fit_transform(modalities[0]).values
@@ -270,24 +274,21 @@ class ModalityMatchingDataset(MultiModalityDataset):
                 else:
                     raise ValueError(f"Unrecognized subtask name: {self.subtask}")
 
-                self.preprocessed_features = {
+                preprocessed_features = {
                     "mod1_train": m1_train,
                     "mod2_train": m2_train,
                     "mod1_test": m1_test,
                     "mod2_test": m2_test
                 }
-                modalities[0].obsm["X_pca"] = self.preprocessed_features["mod1_train"]
-                modalities[1].obsm["X_pca"] = self.preprocessed_features["mod2_train"]
-                modalities[2].obsm["X_pca"] = self.preprocessed_features["mod1_test"]
-                modalities[3].obsm["X_pca"] = self.preprocessed_features["mod2_test"]
-                pickle.dump(self.preprocessed_features, open(pkl_path, "wb"))
 
-            else:
-                self.preprocessed_features = pickle.load(open(pkl_path, "rb"))
-                modalities[0].obsm["X_pca"] = self.preprocessed_features["mod1_train"]
-                modalities[1].obsm["X_pca"] = self.preprocessed_features["mod2_train"]
-                modalities[2].obsm["X_pca"] = self.preprocessed_features["mod1_test"]
-                modalities[3].obsm["X_pca"] = self.preprocessed_features["mod2_test"]
+                if self.pkl_path:
+                    with open(self.pkl_path, "wb") as f:
+                        pickle.dump(f)
+
+            modalities[0].obsm["X_pca"] = preprocessed_features["mod1_train"]
+            modalities[1].obsm["X_pca"] = preprocessed_features["mod2_train"]
+            modalities[2].obsm["X_pca"] = preprocessed_features["mod1_test"]
+            modalities[3].obsm["X_pca"] = preprocessed_features["mod2_test"]
 
         elif self.preprocess == "feature_selection":
             for i in range(2):
