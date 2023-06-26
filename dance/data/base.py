@@ -84,7 +84,7 @@ class BaseData(ABC):
 
         # Store data and pass through some main properties over
         self._data = data
-        for prop in self._DATA_CHANNELS + ["X"]:
+        for prop in self._DATA_CHANNELS + ["X", "mod"]:
             assert not hasattr(self, prop)
             setattr(self, prop, getattr(data, prop))
 
