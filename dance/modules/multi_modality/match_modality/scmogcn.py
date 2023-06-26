@@ -109,7 +109,6 @@ class ScMoGCNWrapper:
     def __init__(self, args, layers, temp=1):
         self.model = ScMoGCN(args, layers, temp).to(args.device)
         self.args = args
-        self.fitted = False
         wt1 = torch.tensor([0.] * (args.layers - 1)).to(args.device).requires_grad_(True)
         wt2 = torch.tensor([0.] * (args.layers - 1)).to(args.device).requires_grad_(True)
         self.wt = [wt1, wt2]
@@ -149,7 +148,6 @@ class ScMoGCNWrapper:
         None.
 
         """
-        self.fitted = True
         if map_location is not None:
             self.model.load_state_dict(torch.load(path, map_location=map_location))
         else:
@@ -268,7 +266,6 @@ class ScMoGCNWrapper:
                 break
 
         logger.info(f'Valid: {maxval}')
-        self.fitted = True
 
         self.wt = weight_record
         return self
@@ -294,8 +291,6 @@ class ScMoGCNWrapper:
 
         """
         # inputs: [train_mod1, train_mod2], idx: valid_idx, labels: [sol, sol.T], wt: [wt0, wt1]
-        if not self.fitted:
-            raise RuntimeError('Model not fitted yet.')
         self.model.eval()
 
         with torch.no_grad():
