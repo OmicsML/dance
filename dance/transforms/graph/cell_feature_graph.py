@@ -122,7 +122,7 @@ class CellFeatureBipartiteGraph(BaseTransform):
         g = dgl.bipartite_from_scipy(feat, utype='cell', etype='cell2feature', vtype='feature', eweight_name='weight')
         g.nodes['cell'].data['id'] = torch.arange(feat.shape[0]).long()
         g.nodes['feature'].data['id'] = torch.arange(feat.shape[1]).long()
-        g = AddReverse(copy_edata=True, sym_new_etype=True)(g)
+        g = dgl.AddReverse(copy_edata=True, sym_new_etype=True)(g)
         if self.mod is None:
             data.data.uns['g'] = g
         else:
