@@ -78,7 +78,7 @@ if __name__ == "__main__":
             TEMPERATURE,
         )  # yapf: disable
 
-    train_size = dataset.sparse_features()[0].shape[0]
+    train_size = len(data.get_split_idx("train"))
     z_test = F.one_hot(torch.from_numpy(z[train_size:]).long())
     labels1 = torch.argmax(z_test, dim=0).to(device)
     labels2 = torch.argmax(z_test, dim=1).to(device)
