@@ -283,7 +283,7 @@ class ModalityMatchingDataset(MultiModalityDataset):
 
                 if self.pkl_path:
                     with open(self.pkl_path, "wb") as f:
-                        pickle.dump(f)
+                        pickle.dump(preprocessed_features, f)
 
             modalities[0].obsm["X_pca"] = preprocessed_features["mod1_train"]
             modalities[1].obsm["X_pca"] = preprocessed_features["mod2_train"]
