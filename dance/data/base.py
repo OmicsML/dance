@@ -82,9 +82,17 @@ class BaseData(ABC):
                  full_split_name: Optional[str] = None):
         super().__init__()
 
+        # Check data type
+        if isinstance(data, anndata.AnnData):
+            additional_channels = ["X"]
+        elif isinstance(data, mudata.MuData):
+            additional_channels = ["X", "mod"]
+        else:
+            raise TypeError(f"Unknown data type {type(data)}, must be either AnnData or MuData.")
+
         # Store data and pass through some main properties over
         self._data = data
-        for prop in self._DATA_CHANNELS + ["X", "mod"]:
+        for prop in self._DATA_CHANNELS + additional_channels:
             assert not hasattr(self, prop)
             setattr(self, prop, getattr(data, prop))
 
