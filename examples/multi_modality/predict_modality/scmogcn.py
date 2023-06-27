@@ -154,6 +154,9 @@ if __name__ == "__main__":
 
     pipeline(**vars(args))
 """To reproduce scMoGCN on other samples, please refer to command lines belows:
+GEX to ADT (subset):
+python scmogcn.py --subtask oopenproblems_bmmc_cite_phase2_rna_subset --device cuda
+
 GEX to ADT:
 python scmogcn.py --subtask oopenproblems_bmmc_cite_phase2_rna --device cuda
 

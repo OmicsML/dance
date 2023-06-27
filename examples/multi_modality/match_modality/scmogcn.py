@@ -93,6 +93,9 @@ if __name__ == "__main__":
     print(model.score(test_idx, labels_matrix=z_test, enhance=True, batch1=batch_mod1, batch2=batch_mod2))
 """To reproduce scMoGCN on other samples, please refer to command lines belows:
 
+GEX-ADT (subset):
+python scmogcn.py --subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda
+
 GEX-ADT:
 python scmogcn.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda
 

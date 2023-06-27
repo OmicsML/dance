@@ -98,12 +98,15 @@ class ModalityPredictionDataset(MultiModalityDataset):
         "https://www.dropbox.com/s/p9ve2ljyy4yqna4/openproblems_bmmc_multiome_phase2_mod2.zip?dl=1",
         "openproblems_bmmc_multiome_phase2_rna":
         "https://www.dropbox.com/s/cz60vp7bwapz0kw/openproblems_bmmc_multiome_phase2_rna.zip?dl=1",
+        "openproblems_bmmc_cite_phase2_rna_subset":
+        "https://www.dropbox.com/s/veytldxkgzyoa8j/openproblems_bmmc_cite_phase2_rna_subset.zip?dl=1",
     }
     SUBTASK_NAME_MAP = {
         "adt2gex": "openproblems_bmmc_cite_phase2_mod2",
         "atac2gex": "openproblems_bmmc_multiome_phase2_mod2",
         "gex2adt": "openproblems_bmmc_cite_phase2_rna",
         "gex2atac": "openproblems_bmmc_multiome_phase2_rna",
+        "gex2adt_subset": "openproblems_bmmc_cite_phase2_rna_subset",
     }
     AVAILABLE_DATA = sorted(list(URL_DICT) + list(SUBTASK_NAME_MAP))
 
@@ -153,13 +156,16 @@ class ModalityMatchingDataset(MultiModalityDataset):
         "openproblems_bmmc_multiome_phase2_mod2":
         "https://www.dropbox.com/s/31qi5sckx768acw/openproblems_bmmc_multiome_phase2_mod2.zip?dl=1",
         "openproblems_bmmc_multiome_phase2_rna":
-        "https://www.dropbox.com/s/h1s067wkefs1jh2/openproblems_bmmc_multiome_phase2_rna.zip?dl=1"
+        "https://www.dropbox.com/s/h1s067wkefs1jh2/openproblems_bmmc_multiome_phase2_rna.zip?dl=1",
+        "openproblems_bmmc_cite_phase2_rna_subset":
+        "https://www.dropbox.com/s/3q4xwpzjbe81x58/openproblems_bmmc_cite_phase2_rna_subset.zip?dl=1",
     }
     SUBTASK_NAME_MAP = {
         "adt2gex": "openproblems_bmmc_cite_phase2_mod2",
         "atac2gex": "openproblems_bmmc_multiome_phase2_mod2",
         "gex2adt": "openproblems_bmmc_cite_phase2_rna",
         "gex2atac": "openproblems_bmmc_multiome_phase2_rna",
+        "gex2adt_subset": "openproblems_bmmc_cite_phase2_rna_subset",
     }
     AVAILABLE_DATA = sorted(list(URL_DICT) + list(SUBTASK_NAME_MAP))
 
@@ -199,7 +205,7 @@ class ModalityMatchingDataset(MultiModalityDataset):
         modalities = [train_mod1, train_mod2, test_mod1, test_mod2]
 
         # TODO: support other two subtasks
-        assert self.subtask in ("openproblems_bmmc_cite_phase2_rna",
+        assert self.subtask in ("openproblems_bmmc_cite_phase2_rna", "openproblems_bmmc_cite_phase2_rna_subset",
                                 "openproblems_bmmc_multiome_phase2_rna"), "Currently not available."
 
         if self.preprocess == "pca":
@@ -208,7 +214,7 @@ class ModalityMatchingDataset(MultiModalityDataset):
                     preprocessed_features = pickle.load(f)
 
             else:
-                if self.subtask == "openproblems_bmmc_cite_phase2_rna":
+                if self.subtask in ("openproblems_bmmc_cite_phase2_rna", "openproblems_bmmc_cite_phase2_rna_subset"):
                     lsi_transformer_gex = lsiTransformer(n_components=256, drop_first=True)
                     m1_train = lsi_transformer_gex.fit_transform(modalities[0]).values
                     m1_test = lsi_transformer_gex.transform(modalities[2]).values

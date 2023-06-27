@@ -69,6 +69,9 @@ if __name__ == "__main__":
     print(model.score(x_test, y_test, labels))
 """To reproduce scMM on other samples, please refer to command lines belows:
 
+GEX-ADT (subset):
+python scmm.py --subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda
+
 GEX-ADT:
 python scmm.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda
 
