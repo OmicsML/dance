@@ -420,7 +420,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
             mod1.obsm["X_pca"] = mod1_pca
             mod2.obsm["X_pca"] = mod2_pca
             train_size = mod1_obs.shape[0]
-            mod1.obsm["cell_type"] = cell_type_labels
+            mod1.obsm["cell_type"] = c_labels
             mod1.obsm["batch_label"] = np.concatenate([y_train[1], np.zeros(mod1.shape[0] - train_size)], 0)
             mod1.obsm["phase_labels"] = np.concatenate([y_train[2], np.zeros(mod1.shape[0] - train_size)], 0)
             mod1.obsm["S_scores"] = np.concatenate([y_train[3], np.zeros(mod1.shape[0] - train_size)], 0)
