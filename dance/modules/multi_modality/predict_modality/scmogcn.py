@@ -247,7 +247,8 @@ class ScMoGCNWrapper:
         PREFIX = kwargs['prefix']
         CELL_SIZE = kwargs['CELL_SIZE']
         TRAIN_SIZE = kwargs['TRAIN_SIZE']
-        BATCH_SIZE = kwargs['batch_size']
+        # Make sure the batch size is small enough to cover all splits
+        BATCH_SIZE = min(kwargs['batch_size'], min(map(len, split.values())))
 
         if verbose > 1 and logger is None:
             logger = open(f'{kwargs["log_folder"]}/{PREFIX}.log', 'w')

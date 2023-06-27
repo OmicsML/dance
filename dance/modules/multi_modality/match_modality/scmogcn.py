@@ -194,7 +194,8 @@ class ScMoGCNWrapper:
             'params': wt[1]
         }], lr=self.args.learning_rate)
 
-        BATCH_SIZE = 4096
+        # Make sure the batch size is small enough to cover all splits
+        BATCH_SIZE = min(4096, math.floor(train_size / 2))
 
         idx = torch.randperm(train_size)
         train_idx = idx[:-BATCH_SIZE]
