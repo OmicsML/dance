@@ -19,7 +19,7 @@ def delete_file(path):
     if not os.path.exists(path):
         logger.info("File does not exist")
     else:
-        logger.info(f"Deleting {path!r}")
+        logger.info(f"Deleting {path}")
         os.remove(path)
 
 
@@ -74,7 +74,7 @@ def unzip_file(path, directory_to_extract_to):
     if not os.path.exists(path):
         logger.info("File does not exist")
     else:
-        logger.info(f"Unzipping {path!r}")
+        logger.info(f"Unzipping {path}")
         with zipfile.ZipFile(path, "r") as zip_ref:
             zip_ref.extractall(directory_to_extract_to)
         delete_file(path)
