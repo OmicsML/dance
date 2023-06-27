@@ -271,7 +271,7 @@ class ScMoGCNWrapper:
         self.wt = weight_record
         return self
 
-    def predict(self, idx, enhance=False, batch1=None, batch2=None):
+    def predict(self, idx, enhance=False, batch1=None, batch2=None, threshold_quantile=0.95):
         """Predict function to get latent representation of data.
 
         Parameters
@@ -284,6 +284,8 @@ class ScMoGCNWrapper:
             Batch labels of modality 1, by default to be None.
         batch2 : torch.Tensor optional
             Batch labels of modality 2, by default to be None.
+        threshold_quantile: float
+            Parameter for batch_separated_bipartite_matching when enhance is set to true, which controls the sparsity.
 
         Returns
         -------
@@ -304,10 +306,11 @@ class ScMoGCNWrapper:
 
             else:
                 emb1, emb2 = self.model.encode(m1, m2)
-                pred = batch_separated_bipartite_matching(batch1[idx], batch2[idx], emb1, emb2)
+                pred = batch_separated_bipartite_matching(batch1[idx], batch2[idx], emb1, emb2, threshold_quantile)
                 return pred
 
-    def score(self, idx, labels1=None, labels2=None, labels_matrix=None, enhance=False, batch1=None, batch2=None):
+    def score(self, idx, labels1=None, labels2=None, labels_matrix=None, enhance=False, batch1=None, batch2=None,
+              threshold_quantile=0.95):
         """Score function to get score of prediction.
 
         Parameters
@@ -326,6 +329,8 @@ class ScMoGCNWrapper:
             Batch labels of modality 1, by default to be None.
         batch2 : torch.Tensor optional
             Batch labels of modality 2, by default to be None.
+        threshold_quantile: float
+            Parameter for batch_separated_bipartite_matching when enhance is set to true, which controls the sparsity.
 
         Returns
         -------
@@ -343,7 +348,7 @@ class ScMoGCNWrapper:
 
         else:
 
-            matrix = self.predict(idx, enhance, batch1, batch2)
+            matrix = self.predict(idx, enhance, batch1, batch2, threshold_quantile)
             score = (matrix * labels_matrix.numpy()).sum() / labels_matrix.shape[0]
 
             return score
