@@ -817,17 +817,14 @@ class scMVAE(nn.Module):
         """
 
         emb = self.predict(X1, X2).cpu().numpy()
-
         kmeans = KMeans(n_clusters=10, n_init=5, random_state=200)
 
-        # adata.obs['batch'] = adata_sol.obs['batch'][adata.obs_names]
-        # adata.obs['cell_type'] = adata_sol.obs['cell_type'][adata.obs_names]
         true_labels = labels.numpy()
         pred_labels = kmeans.fit_predict(emb)
+
         NMI_score = round(normalized_mutual_info_score(true_labels, pred_labels, average_method='max'), 3)
         ARI_score = round(adjusted_rand_score(true_labels, pred_labels), 3)
 
-        # print('ARI: ' + str(ARI_score) + ' NMI: ' + str(NMI_score))
         return NMI_score, ARI_score
 
 

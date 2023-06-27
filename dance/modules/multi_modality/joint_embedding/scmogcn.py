@@ -146,10 +146,13 @@ class ScMoGCNWrapper:
         train_idx = idx[:int(idx.shape[0] * 0.9)]
         val_idx = idx[int(idx.shape[0] * 0.9):]
 
+        # Make sure the batch size is small enough to cover all splits
+        batch_size = min(self.args.batch_size, len(val_idx))
+
         train_dataset = SimpleIndexDataset(train_idx)
         train_loader = DataLoader(
             dataset=train_dataset,
-            batch_size=self.args.batch_size,
+            batch_size=batch_size,
             shuffle=True,
             num_workers=1,
         )

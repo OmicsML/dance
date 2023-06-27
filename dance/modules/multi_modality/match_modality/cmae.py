@@ -327,7 +327,7 @@ class CMAE(nn.Module):
             nn = NearestNeighbors(metric=metric)
             nn.fit(emb1.cpu())
             transp_nearest_neighbor = torch.tensor(nn.kneighbors(emb2.cpu(), 1, return_distance=False))
-            pred = torch.zeros(emb1.shape[0], emb1.shape[0])
+            pred = torch.zeros(emb1.shape[0], emb1.shape[0], device=mod1.device)
             pred[torch.arange(emb1.shape[0]), transp_nearest_neighbor.squeeze(-1)] = 1
         return pred
 

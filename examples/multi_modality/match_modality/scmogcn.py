@@ -13,8 +13,7 @@ from dance.utils import set_seed
 if __name__ == "__main__":
     rndseed = random.randint(0, 2147483647)
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna",
-                        choices=["openproblems_bmmc_cite_phase2_rna", "openproblems_bmmc_multiome_phase2_rna"])
+    parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
     parser.add_argument("-d", "--data_folder", default="./data/modality_matching")
     parser.add_argument("-csv", "--csv_path", default="decoupled_lsi.csv")
     parser.add_argument("-l", "--layers", default=4, type=int, choices=[3, 4, 5, 6, 7])
@@ -26,6 +25,7 @@ if __name__ == "__main__":
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-e", "--epochs", default=2000, type=int)
+    parser.add_argument("-tq", "--threshold_quantile", default=0.95, type=float)
 
     args = parser.parse_args()
 
@@ -89,9 +89,17 @@ if __name__ == "__main__":
     model.load(f"models/model_{rndseed}.pth")
 
     test_idx = np.arange(train_size, g_mod1.num_nodes("cell"))
-    print(model.predict(test_idx, enhance=True, batch1=batch_mod1, batch2=batch_mod2))
-    print(model.score(test_idx, labels_matrix=z_test, enhance=True, batch1=batch_mod1, batch2=batch_mod2))
+    pred = model.predict(test_idx, enhance=True, batch1=batch_mod1, batch2=batch_mod2,
+                         threshold_quantile=args.threshold_quantile)
+    score = model.score(test_idx, labels_matrix=z_test, enhance=True, batch1=batch_mod1, batch2=batch_mod2,
+                        threshold_quantile=args.threshold_quantile)
+
+    print(pred)
+    print(score)
 """To reproduce scMoGCN on other samples, please refer to command lines belows:
+
+GEX-ADT (subset):
+python scmogcn.py --subtask openproblems_bmmc_cite_phase2_rna_subset --threshold_quantile 0.85 --device cuda
 
 GEX-ADT:
 python scmogcn.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda

@@ -17,7 +17,6 @@ SKIP_LIST: List[str] = [
     "joint_embedding-dcca",  # OOM with 64GB mem and V100 GPU (succeed with 80GB mem)
     "joint_embedding-jae",  # long run (~1 hr using V100 GPU)
     "joint_embedding-scmogcn",  # long run (~1 hr using V100 GPU)
-    "match_modality-scmogcn",  # long run (~30 min using V100 GPU)
 ]
 
 light_options_dict: Dict[str, Tuple[str, str]] = {
@@ -40,14 +39,14 @@ light_options_dict: Dict[str, Tuple[str, str]] = {
     "joint_embedding-dcca-gex_adt": "--subtask openproblems_bmmc_cite_phase2 --device cuda --max_epoch 2 --max_iteration 10 --anneal_epoch 2 --epoch_per_test 2",
     "joint_embedding-jae-gex_adt": "--subtask openproblems_bmmc_cite_phase2 --device cuda",
     "joint_embedding-scmogcn-gex_adt": "--subtask openproblems_bmmc_cite_phase2 --device cuda",
-    "joint_embedding-scmvae-gex_adt": "--subtask openproblems_bmmc_multiome_phase2 --device cuda --max_epoch 2 --anneal_epoch 2 --epoch_per_test 2 --max_iteration 10",
-    "match_modality-cmae-gex_adt": "--subtask openproblems_bmmc_multiome_phase2_rna --device cuda --max_epochs 2",
-    "match_modality-scmm-gex_adt": "--subtask openproblems_bmmc_multiome_phase2_rna --device cuda --epochs 2",
-    "match_modality-scmogcn-gex_adt": "--subtask openproblems_bmmc_multiome_phase2_rna --device cuda --epochs 2",
-    "predict_modality-babel-adt2gex": "--subtask openproblems_bmmc_multiome_phase2_rna --device cuda --max_epochs 2 --earlystop 2",
-    "predict_modality-cmae-adt2gex": "--subtask openproblems_bmmc_multiome_phase2_rna --device cuda --max_epochs 2",
-    "predict_modality-scmm-adt2gex": "--subtask openproblems_bmmc_multiome_phase2_rna --device cuda --epochs 2",
-    "predict_modality-scmogcn-adt2gex": "--subtask openproblems_bmmc_multiome_phase2_rna --device cuda --epoch 2",
+    "joint_embedding-scmvae-gex_adt": "--subtask openproblems_bmmc_cite_phase2 --device cuda --max_epoch 2 --anneal_epoch 2 --epoch_per_test 2 --max_iteration 10",
+    "match_modality-cmae-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --max_epochs 2",
+    "match_modality-scmm-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --epochs 2",
+    "match_modality-scmogcn-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --threshold_quantile 0.85 --device cuda --epochs 2",
+    "predict_modality-babel-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --max_epochs 2 --earlystop 2",
+    "predict_modality-cmae-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --max_epochs 2",
+    "predict_modality-scmm-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --epochs 2",
+    "predict_modality-scmogcn-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --epoch 2",
     # Spatial
     "cell_type_deconvo-card-card_synth": "--dataset CARD_synthetic --max_iter 2",
     "cell_type_deconvo-dstg-spotlight_synth": "--dataset SPOTLight_synthetic --nhid 32 --lr .1 --epochs 25 --device cuda",

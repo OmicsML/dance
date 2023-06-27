@@ -105,7 +105,7 @@ def get_bipartite_matching_adjacency_matrix_mk3(raw_logits, threshold_quantile=0
     return bipartite_matching_adjacency
 
 
-def batch_separated_bipartite_matching(batch1, batch2, emb1, emb2):
+def batch_separated_bipartite_matching(batch1, batch2, emb1, emb2, threshold_quantile):
     matrix = np.zeros((batch1.shape[0], batch2.shape[0]))
     for b in batch1.unique():
         i0 = (batch1 == b).values.nonzero()[0].tolist()
@@ -114,7 +114,7 @@ def batch_separated_bipartite_matching(batch1, batch2, emb1, emb2):
         logits = torch.softmax(logits, -1) + torch.softmax(logits, 0)
         logits = logits.cpu().numpy()
 
-        out1_2 = get_bipartite_matching_adjacency_matrix_mk3(logits, threshold_quantile=0.950)
+        out1_2 = get_bipartite_matching_adjacency_matrix_mk3(logits, threshold_quantile=threshold_quantile)
         matrix[np.ix_(i0, j0)] = out1_2
     return matrix
 

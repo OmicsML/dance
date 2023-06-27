@@ -101,6 +101,9 @@ if __name__ == "__main__":
     print(model.predict(x_test))
     print(model.score(x_test, y_test))
 """To reproduce CMAE on other samples, please refer to command lines belows:
+GEX to ADT (subset):
+python cmae.py --subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda
+
 GEX to ADT:
 python cmae.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda
 
