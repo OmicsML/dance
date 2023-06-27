@@ -110,7 +110,9 @@ if __name__ == "__main__":
 
     embeds = model.predict(torch.cat([x_train, x_test]), torch.cat([y_train, y_test])).cpu().numpy()
     print(embeds)
-    print(model.score(torch.cat([x_train, x_test]), torch.cat([y_train, y_test]), labels))
+
+    nmi_score, ari_score = model.score(x_test, y_test, labels)
+    print(f"NMI: {nmi_score:.3f}, ARI: {ari_score:.3f}")
 """To reproduce scMVAE on other samples, please refer to command lines belows:
 
 GEX-ADT:
