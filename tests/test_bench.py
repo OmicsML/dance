@@ -43,11 +43,11 @@ light_options_dict: Dict[str, Tuple[str, str]] = {
     "joint_embedding-scmvae-gex_adt": "--subtask openproblems_bmmc_cite_phase2 --device cuda --max_epoch 2 --anneal_epoch 2 --epoch_per_test 2 --max_iteration 10",
     "match_modality-cmae-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --max_epochs 2",
     "match_modality-scmm-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --epochs 2",
-    # "match_modality-scmogcn-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --epochs 2",  # BUG: gex2adt subset for scmogcn
-    "predict_modality-babel-adt2gex_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --max_epochs 2 --earlystop 2",
-    "predict_modality-cmae-adt2gex_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --max_epochs 2",
-    "predict_modality-scmm-adt2gex_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --epochs 2",
-    "predict_modality-scmogcn-adt2gex_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --epoch 2",
+    # "match_modality-scmogcn-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --epochs 2",  # BUG: subsetted label incorrect
+    "predict_modality-babel-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --max_epochs 2 --earlystop 2",
+    "predict_modality-cmae-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --max_epochs 2",
+    "predict_modality-scmm-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --epochs 2",
+    "predict_modality-scmogcn-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --epoch 2",
     # Spatial
     "cell_type_deconvo-card-card_synth": "--dataset CARD_synthetic --max_iter 2",
     "cell_type_deconvo-dstg-spotlight_synth": "--dataset SPOTLight_synthetic --nhid 32 --lr .1 --epochs 25 --device cuda",

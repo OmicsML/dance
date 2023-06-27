@@ -13,8 +13,7 @@ from dance.utils import set_seed
 if __name__ == "__main__":
     rndseed = random.randint(0, 2147483647)
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna",
-                        choices=["openproblems_bmmc_cite_phase2_rna", "openproblems_bmmc_multiome_phase2_rna"])
+    parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
     parser.add_argument("-d", "--data_folder", default="./data/modality_matching")
     parser.add_argument("-csv", "--csv_path", default="decoupled_lsi.csv")
     parser.add_argument("-l", "--layers", default=4, type=int, choices=[3, 4, 5, 6, 7])
