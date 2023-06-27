@@ -33,9 +33,12 @@ if __name__ == "__main__":
     dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess="aux", normalize=True)
     data = dataset.load_data()
 
-    data.set_config(feature_mod=["mod1", "mod2"], label_mod=["mod1", "mod1", "mod1", "mod1",
-                                                             "mod1"], feature_channel=["X_pca", "X_pca"],
-                    label_channel=["cell_type", "batch_label", "phase_labels", "S_scores", "G2M_scores"])
+    data.set_config(
+        feature_mod=["mod1", "mod2"],
+        label_mod=["mod1", "mod1", "mod1", "mod1", "mod1"],
+        feature_channel=["X_pca", "X_pca"],
+        label_channel=["cell_type", "batch_label", "phase_labels", "S_scores", "G2M_scores"],
+    )
     (X_mod1_train, X_mod2_train), (cell_type, batch_label, phase_label, S_score,
                                    G2M_score) = data.get_train_data(return_type="torch")
     (X_mod1_test, X_mod2_test), (cell_type_test, _, _, _, _) = data.get_test_data(return_type="torch")
