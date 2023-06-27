@@ -117,8 +117,8 @@ if __name__ == "__main__":
     print(embeds)
     print(model.score(total_loader))
 
-    mod1_obs = dataset.modalities[0].obs
-    mod1_uns = dataset.modalities[0].uns
+    mod1_obs = data.mod["mod1"].obs
+    mod1_uns = data.mod["mod1"].uns
     adata = ad.AnnData(
         X=embeds,
         obs=mod1_obs,
@@ -128,7 +128,7 @@ if __name__ == "__main__":
         },
     )
 
-    metrics.labeled_clustering_evaluate(adata, dataset)
+    metrics.labeled_clustering_evaluate(adata, data.mod["test_sol"])
 """To reproduce DCCA on other samples, please refer to command lines belows:
 
 GEX-ADT:

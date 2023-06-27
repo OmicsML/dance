@@ -1,3 +1,4 @@
+import anndata as ad
 import numpy as np
 import torch
 from networkx.algorithms import bipartite
@@ -118,14 +119,10 @@ def batch_separated_bipartite_matching(batch1, batch2, emb1, emb2):
     return matrix
 
 
-def labeled_clustering_evaluate(adata, dataset, cluster=10):
+def labeled_clustering_evaluate(adata: ad.AnnData, test_sol: ad.AnnData, cluster: int = 10):
     kmeans = KMeans(n_clusters=cluster, n_init=5, random_state=200)
 
-    adata_sol = dataset.test_sol
-    # adata.obs['batch'] = adata_sol.obs['batch'][adata.obs_names]
-    # adata.obs['cell_type'] = adata_sol.obs['cell_type'][adata.obs_names]
-    true_labels = adata_sol.obs['cell_type'].to_numpy()
-
+    true_labels = test_sol.obs['cell_type'].to_numpy()
     pred_labels = kmeans.fit_predict(adata.X)
     NMI_score = round(normalized_mutual_info_score(true_labels, pred_labels, average_method='max'), 3)
     ARI_score = round(adjusted_rand_score(true_labels, pred_labels), 3)
