@@ -303,5 +303,9 @@ class JAE(nn.Module):
         x0 = x
         x = self.decoder(x)
 
-        return x, x0[:, :self.nb_cell_types], x0[:, self.nb_cell_types:self.nb_cell_types + self.nb_batches], \
-               x0[:, self.nb_cell_types + self.nb_batches:self.nb_cell_types + self.nb_batches + self.nb_phases]
+        return (
+            x,
+            x0[:, :self.nb_cell_types],
+            x0[:, self.nb_cell_types:self.nb_cell_types + self.nb_batches],
+            x0[:, self.nb_cell_types + self.nb_batches:self.nb_cell_types + self.nb_batches + self.nb_phases],
+        )

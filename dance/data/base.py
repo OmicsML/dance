@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from functools import partial
 from operator import is_not
+from pprint import pformat
 
 import anndata
 import mudata
@@ -589,8 +590,19 @@ class Data(BaseData):
 
         out = []
         for mod, channel, channel_type in zip(mods, channels, channel_types):
-            x = self.get_feature(split_name=split_name, return_type=return_type, mod=mod, channel=channel,
-                                 channel_type=channel_type, **kwargs)
+            try:
+                x = self.get_feature(split_name=split_name, return_type=return_type, mod=mod, channel=channel,
+                                     channel_type=channel_type, **kwargs)
+            except Exception as e:
+                settings = {
+                    "split_name": split_name,
+                    "return_type": return_type,
+                    "mod": mod,
+                    "channel": channel,
+                    "channel_type": channel_type,
+                    "kwargs": kwargs,
+                }
+                raise RuntimeError(f"Failed to get features for the following settings:\n{pformat(settings)}") from e
             out.append(x)
         out = out[0] if len(out) == 1 else out
 
