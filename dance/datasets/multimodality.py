@@ -28,7 +28,7 @@ class MultiModalityDataset(BaseDataset, ABC):
         assert self.TASK in ["predict_modality", "match_modality", "joint_embedding"]
 
         self.subtask = self.SUBTASK_NAME_MAP.get(subtask, subtask)
-        self.data_url = self.URL_DICT[subtask]
+        self.data_url = self.URL_DICT[self.subtask]
 
         super().__init__(root=root, full_download=False)
 
