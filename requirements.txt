@@ -6,7 +6,7 @@ numba==0.57.1
 numpy==1.22.4
 opencv-python==4.7.0.72
 openpyxl==3.1.2
-pandas==2.0.2
+pandas==2.0.3
 pyro-ppl==1.8.5
 python-igraph==0.10.1
 requests==2.31.0
