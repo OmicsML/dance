@@ -13,7 +13,7 @@ repos:
         args: [-c=.yamllint.yml]
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.8.0
+    rev: v3.9.0
     hooks:
       - id: pyupgrade
         args: [--py3-plus]
@@ -33,7 +33,7 @@ repos:
         args: [--line-width, "120"]
 
   - repo: https://github.com/PyCQA/docformatter
-    rev: v1.7.3
+    rev: v1.7.5
     hooks:
       - id: docformatter
         name: Format docstring
