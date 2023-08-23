@@ -39,7 +39,7 @@ def download_file(url, path):
         u = urllib.request.urlopen(url)
         f = open(path, "wb")
         meta = u.info()
-        file_size = int(meta.get("Content-Length"))
+        file_size = int(meta.get("Content-Length", 0))
         logger.info(f"Downloading: {path} Bytes: {file_size:,}")
 
         file_size_dl = 0
