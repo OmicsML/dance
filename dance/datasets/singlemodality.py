@@ -51,12 +51,10 @@ class ScDeepSortDataset(BaseDataset):
         "train_mouse_Kidney4682_data.csv":      "https://www.dropbox.com/s/olf5nirtieu1ikq?dl=1",
         "test_mouse_Kidney203_celltype.csv":    "https://www.dropbox.com/s/t4eyaig889qdiz2?dl=1",
         "test_mouse_Kidney203_data.csv":        "https://www.dropbox.com/s/kmos1ceubumgmpj?dl=1",
-
         "train_human_Brain328_celltype.csv":"https://dl.dropboxusercontent.com/scl/fi/6s5c2tw1pm4cqadyiysnh/human_Brain328_celltype.csv?rlkey=8b8a1jvmyf8zr52rogiii1zxj&dl=0",
         "train_human_Brain328_data.csv":"https://dl.dropboxusercontent.com/scl/fi/qy09gjzapmsrqnk6v8g8e/human_Brain328_data.csv?rlkey=ykt4dvbyz12ei0gcld4rtrcfb&dl=0",
         "test_human_Brain138_celltype.csv":"https://dl.dropboxusercontent.com/scl/fi/umh8n798z3xkjiatmbb5n/human_Brain138_celltype.csv?rlkey=30mafnfp2o9e1xyv2rhy8vxj6&dl=0",
         "test_human_Brain138_data.csv":"https://dl.dropboxusercontent.com/scl/fi/ayhbmxrqiqjbw39u6n54o/human_Brain138_data.csv?rlkey=o2vse9qbmjl3bc4van8ru26ga&dl=0",
-
         "train_human_Spleen3043_celltype.csv": "https://dl.dropboxusercontent.com/scl/fi/18w6ikivkiqvot88kost6/human_Spleen3043_celltype.csv?rlkey=14k438vfhfsoijla8ngdmmvck&dl=0",
         "train_human_Spleen3043_data.csv": "https://dl.dropboxusercontent.com/scl/fi/6630o9i9ln9i9nq013gz1/human_Spleen3043_data.csv?rlkey=qme5ho206nl9aaruiwsbpkxcj&dl=0",
         "train_human_Spleen4657_celltype.csv":"https://dl.dropboxusercontent.com/scl/fi/udfwibe7itemp5e0lhcxc/human_Spleen4657_celltype.csv?rlkey=n65vmrov4gbhltzc1itc6n72d&dl=0",
@@ -79,7 +77,6 @@ class ScDeepSortDataset(BaseDataset):
         "test_human_Spleen2724_data.csv": "https://dl.dropboxusercontent.com/scl/fi/ns8n3amo4oipw2lhd90md/human_Spleen2743_data.csv?rlkey=5tax6jxge37x14elhwv8b1bi5&dl=0",
         "test_human_Spleen2743_celltype.csv": "https://dl.dropboxusercontent.com/scl/fi/eo86chn0acfuzvj947i8j/human_Spleen2743_celltype.csv?rlkey=y3mmkp9v05ei1hvpw1tvemffc&dl=0",
         "test_human_Spleen2743_data.csv": "https://dl.dropboxusercontent.com/scl/fi/ns8n3amo4oipw2lhd90md/human_Spleen2743_data.csv?rlkey=5tax6jxge37x14elhwv8b1bi5&dl=0",
-
         "train_human_Immune11407_celltype.csv":"https://dl.dropboxusercontent.com/scl/fi/mcw025mbv82fz19ihqabp/human_Immune11407_celltype.csv?rlkey=kx03krmbz1i91gbsl6pz4m9tk&dl=0",
         "train_human_Immune11407_data.csv": "https://dl.dropboxusercontent.com/scl/fi/t5qy70vjvp9ag3jfnbeh3/human_Immune11407_data.csv?rlkey=zq0l1e83jh2wcumzrw40d0w0i&dl=0",
         "train_human_Immune9258_celltype.csv":"https://dl.dropboxusercontent.com/scl/fi/fse8yheqap91ksru4v26q/human_Immune9258_celltype.csv?rlkey=3ky50q0770kpifc8z1i85lgus&dl=0",
@@ -102,7 +99,6 @@ class ScDeepSortDataset(BaseDataset):
         "test_human_Immune1925_data.csv": "https://dl.dropboxusercontent.com/scl/fi/nn1tazw4gj3aabdu1nm4o/human_Immune1925_data.csv?rlkey=9kh2yrbdzj2l1tdj20tbxbyfb&dl=0",
         "test_human_Immune205_celltype.csv": "https://dl.dropboxusercontent.com/scl/fi/n6aa3rn4is2cjqy5bx51y/human_Immune205_celltype.csv?rlkey=inojmgblnjkn8ya2cfynhyfiz&dl=0",
         "test_human_Immune205_data.csv": "https://dl.dropboxusercontent.com/scl/fi/veawggfxoqk2xp98av1r0/human_Immune205_data.csv?rlkey=85hc4bm4h3ynt3khce3ncj8t9&dl=0",
-
         "train_human_CD41247_celltype.csv":"https://dl.dropboxusercontent.com/scl/fi/6pccnff27e8bpzkpbs30d/human_CD41247_celltype.csv?rlkey=ll6uipqapx38gfrmcyd4dzy7j&dl=0",
         "train_human_CD41247_data.csv":"https://dl.dropboxusercontent.com/scl/fi/a2cw89rksiyymm85s578o/human_CD41247_data.csv?rlkey=rwx79a4nra4t1d672dkijuf2k&dl=0",
         "train_human_CD41013_celltype.csv":"https://dl.dropboxusercontent.com/scl/fi/w8rtm5lskqz6t0zdeuhdd/human_CD41013_celltype.csv?rlkey=t2a7uz7j9d3uvt5qm43ju7m3g&dl=0",
@@ -143,8 +139,6 @@ class ScDeepSortDataset(BaseDataset):
         "test_human_CD4340_data.csv": "https://dl.dropboxusercontent.com/scl/fi/jnfen8pedmhqj6c9spgju/human_CD4340_data.csv?rlkey=fqeg1wjmetfa48zazaux3v5z1&dl=0",
         "test_human_CD4315_celltype.csv": "https://dl.dropboxusercontent.com/scl/fi/uznry9km4q32vzm0fs9zh/human_CD4315_celltype.csv?rlkey=yd3q8j0fnp4zdtjifcg35qgoi&dl=0",
         "test_human_CD4315_data.csv": "https://dl.dropboxusercontent.com/scl/fi/r8fj7t5xsng68wlodfjiw/human_CD4315_data.csv?rlkey=nv55kwsirmsjh0hvmiy1kpo9n&dl=0",
-
-
         "train_human_CD81641_celltype.csv":"https://dl.dropboxusercontent.com/scl/fi/9wt6lvubklrca4mpur9rl/human_CD81641_celltype.csv?rlkey=30fn1vmfp9lbcxl4ughkqvjl5&dl=0",
         "train_human_CD81641_data.csv":"https://dl.dropboxusercontent.com/scl/fi/6ya70xs0s4aqzkjnkrs9s/human_CD81641_data.csv?rlkey=qku4kqu67b55xqpx1cchx4apx&dl=0",
         "train_human_CD81357_celltype.csv":"https://dl.dropboxusercontent.com/scl/fi/cufeihloz1slnqj2cj36k/human_CD81357_celltype.csv?rlkey=s9whz8wlm1q2aunrsx72ee1dl&dl=0",
