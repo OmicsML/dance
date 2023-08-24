@@ -1,5 +1,6 @@
 import logging
 import logging.config
+from pathlib import Path
 from typing import Union
 
 _logger_config = {
@@ -40,6 +41,8 @@ def change_log_level(name: str = "dance", /, *, level: Union[str, int]):
     """
     logging.getLogger(name).setLevel(level)
 
+
+METADIR = Path(__file__).resolve().parent / "metadata"
 
 __all__ = [
     "change_log_level",
