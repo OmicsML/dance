@@ -14,12 +14,27 @@ import scanpy as sc
 from scipy.sparse import csr_matrix
 
 from dance import logger
+from dance.config import METADIR
 from dance.data import Data
 from dance.datasets.base import BaseDataset
 from dance.registers import register_dataset
 from dance.typing import Dict, List, Optional, Set, Tuple
 from dance.utils.download import download_file, download_unzip
 from dance.utils.preprocess import cell_label_to_df
+
+
+def _load_scdeepsort_metadata():
+    path = METADIR / "scdeepsort.csv"
+    logger.debug(f"Loading scdeepsort metadata from {path}")
+    scdeepsort_meta_df = pd.read_csv(path).astype(str)
+
+    bench_url_dict, available_data = {}, []
+    for _, i in scdeepsort_meta_df.iterrows():
+        bench_url_dict[i["celltype_fname"]] = i["celltype_url"]
+        bench_url_dict[i["data_fname"]] = i["data_url"]
+        available_data.append({key: i[key] for key in ("split", "species", "tissue", "dataset")})
+
+    return bench_url_dict, available_data
 
 
 @register_dataset("scdeepsort")
@@ -32,34 +47,7 @@ class ScDeepSortDataset(BaseDataset):
         "train_mouse_cell_atlas":   "https://www.dropbox.com/s/ng8d3eujfah9ppl?dl=1",
         "test_mouse_test_data":     "https://www.dropbox.com/s/pkr28czk5g3al2p?dl=1",
     }  # yapf: disable
-    BENCH_URL_DICT: Dict[str, str] = {
-        # Mouse spleen benchmark
-        "train_mouse_Spleen1970_celltype.csv":  "https://www.dropbox.com/s/3ea64vk546fjxvr?dl=1",
-        "train_mouse_Spleen1970_data.csv":      "https://www.dropbox.com/s/c4te0fr1qicqki8?dl=1",
-        "test_mouse_Spleen1759_celltype.csv":   "https://www.dropbox.com/s/gczehvgai873mhb?dl=1",
-        "test_mouse_Spleen1759_data.csv":       "https://www.dropbox.com/s/fl8t7rbo5dmznvq?dl=1",
-        # Mouse brain benchmark
-        "train_mouse_Brain753_celltype.csv":    "https://www.dropbox.com/s/x2katwk93z06sgw?dl=1",
-        "train_mouse_Brain753_data.csv":        "https://www.dropbox.com/s/3f3wbplgo3xa4ww?dl=1",
-        "train_mouse_Brain3285_celltype.csv":   "https://www.dropbox.com/s/ozsobozk3ihkrqg?dl=1",
-        "train_mouse_Brain3285_data.csv":       "https://www.dropbox.com/s/zjrloejx8iqdqsa?dl=1",
-        "test_mouse_Brain2695_celltype.csv":    "https://www.dropbox.com/s/gh72dk7i0p7fggu?dl=1",
-        "test_mouse_Brain2695_data.csv":        "https://www.dropbox.com/s/ufianih66xjqxdu?dl=1",
-        # Mouse kidney benchmark
-        "train_mouse_Kidney4682_celltype.csv":  "https://www.dropbox.com/s/3plrve7g9v428ec?dl=1",
-        "train_mouse_Kidney4682_data.csv":      "https://www.dropbox.com/s/olf5nirtieu1ikq?dl=1",
-        "test_mouse_Kidney203_celltype.csv":    "https://www.dropbox.com/s/t4eyaig889qdiz2?dl=1",
-        "test_mouse_Kidney203_data.csv":        "https://www.dropbox.com/s/kmos1ceubumgmpj?dl=1",
-    }  # yapf: disable
-    AVAILABLE_DATA = [
-        {"split": "train", "species": "mouse", "tissue": "Brain", "dataset": "3285"},
-        {"split": "train", "species": "mouse", "tissue": "Brain", "dataset": "753"},
-        {"split": "train", "species": "mouse", "tissue": "Kidney", "dataset": "4682"},
-        {"split": "train", "species": "mouse", "tissue": "Spleen", "dataset": "1970"},
-        {"split": "test", "species": "mouse", "tissue": "Brain", "dataset": "2695"},
-        {"split": "test", "species": "mouse", "tissue": "Kidney", "dataset": "203"},
-        {"split": "test", "species": "mouse", "tissue": "Spleen", "dataset": "1759"},
-    ]  # yapf: disable
+    BENCH_URL_DICT, AVAILABLE_DATA = _load_scdeepsort_metadata()
 
     def __init__(self, full_download=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
                  train_dir="train", test_dir="test", map_path="map", data_dir="./"):
