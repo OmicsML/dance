@@ -41,7 +41,7 @@ repos:
         args: [--config, pyproject.toml]
 
   - repo: https://github.com/executablebooks/mdformat
-    rev: 0.7.16
+    rev: 0.7.17
     hooks:
       - id: mdformat
         name: Format markdown
