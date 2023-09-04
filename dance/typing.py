@@ -1,9 +1,12 @@
+import os
 from logging import Logger
 from typing import Any, Callable, Dict, Iterator, List, Literal, Mapping, Optional, Sequence, Set, Tuple, Union
 
 import numpy as np
 from anndata import AnnData
 from torch import Tensor
+
+PathLike = Union[str, bytes, os.PathLike]
 
 CellIdxType = Union[int, str]
 FeatType = Literal["anndata", "default", "numpy", "torch", "sparse"]
