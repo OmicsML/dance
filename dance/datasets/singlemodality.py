@@ -20,6 +20,7 @@ from dance.datasets.base import BaseDataset
 from dance.registers import register_dataset
 from dance.typing import Dict, List, Optional, Set, Tuple
 from dance.utils.download import download_file, download_unzip
+from dance.utils.io import load_data_url_dict_from_csv
 from dance.utils.preprocess import cell_label_to_df
 
 
@@ -241,12 +242,7 @@ class ClusteringDataset(BaseDataset):
 
     """
 
-    URL_DICT: Dict[str, str] = {
-        "10X_PBMC": "https://www.dropbox.com/s/pfunm27qzgfpj3u/10X_PBMC.h5?dl=1",
-        "mouse_bladder_cell": "https://www.dropbox.com/s/xxtnomx5zrifdwi/mouse_bladder_cell.h5?dl=1",
-        "mouse_ES_cell": "https://www.dropbox.com/s/zbuku7oznvji8jk/mouse_ES_cell.h5?dl=1",
-        "worm_neuron_cell": "https://www.dropbox.com/s/58fkgemi2gcnp2k/worm_neuron_cell.h5?dl=1",
-    }
+    URL_DICT = load_data_url_dict_from_csv(METADIR / "clustering.csv")
     AVAILABLE_DATA = sorted(URL_DICT)
 
     def __init__(self, data_dir: str = "./data", dataset: str = "mouse_bladder_cell"):
