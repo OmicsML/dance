@@ -17,12 +17,13 @@ from dance import logger
 from dance.config import METADIR
 from dance.data import Data
 from dance.datasets.base import BaseDataset
+from dance.metadata.imputation import IMPUTATION_DATASET_TO_FILE
 from dance.registers import register_dataset
 from dance.typing import Dict, List, Optional, Set, Tuple
 from dance.utils.download import download_file, download_unzip
 from dance.utils.io import load_data_url_dict_from_csv
 from dance.utils.preprocess import cell_label_to_df
-from dance.metadata.imputation import IMPUTATION_DATASET_TO_FILE
+
 
 def _load_scdeepsort_metadata():
     path = METADIR / "scdeepsort.csv"
@@ -81,8 +82,7 @@ class ScDeepSortDataset(BaseDataset):
                 pass
             os.rename(download_path, move_path)
 
-    def get_all_filenames(self, filetype: str = "csv",
-                          feat_suffix: str = "data", label_suffix: str = "celltype"):
+    def get_all_filenames(self, filetype: str = "csv", feat_suffix: str = "data", label_suffix: str = "celltype"):
         filenames = []
         for id in self.train_dataset:
             filenames.append(f"{self.species}_{self.tissue}{id}_{feat_suffix}.{filetype}")
@@ -93,7 +93,7 @@ class ScDeepSortDataset(BaseDataset):
         if self.is_complete():
             return
 
-        filenames=self.get_all_filenames()
+        filenames = self.get_all_filenames()
         # Download training and testing data
         for name, url in self.BENCH_URL_DICT.items():
             parts = name.split("_")  # [train|test]_{species}_{tissue}{id}_[celltype|data].csv
@@ -296,8 +296,10 @@ class ImputationDataset(BaseDataset):
 
     def download(self):
 
-        gene_class = ["pbmc_data", "mouse_brain_data", "mouse_embryo_data", "human_stemcell_data",
-                      "human_breast_TGFb_data", "human_breast_Dox_data", "human_melanoma_data", "mouse_visual_data"]
+        gene_class = [
+            "pbmc_data", "mouse_brain_data", "mouse_embryo_data", "human_stemcell_data", "human_breast_TGFb_data",
+            "human_breast_Dox_data", "human_melanoma_data", "mouse_visual_data"
+        ]
 
         file_name = {
             "pbmc_data": "5k.zip?dl=0",
@@ -328,8 +330,9 @@ class ImputationDataset(BaseDataset):
                 os.system("mkdir " + self.data_dir + "/train")
 
             for class_name in gene_class:
-                if self.dataset==gene_class:
-                    if not any(map(osp.exists, glob(osp.join(self.data_dir, "train", class_name, dl_files[class_name])))):
+                if self.dataset == gene_class:
+                    if not any(map(osp.exists, glob(osp.join(self.data_dir, "train", class_name,
+                                                             dl_files[class_name])))):
                         os.system("mkdir " + self.data_dir + "/train/" + class_name)
                         os.system("wget " + self.URL[class_name])  # assumes linux... mac needs to install
                         os.system("unzip " + file_name[class_name])
@@ -342,8 +345,9 @@ class ImputationDataset(BaseDataset):
             if not osp.exists(self.data_dir + "/train"):
                 os.mkdir(self.data_dir + "/train")
             for class_name in gene_class:
-                if self.dataset==gene_class:
-                    if not any(map(osp.exists, glob(osp.join(self.data_dir, "train", class_name, dl_files[class_name])))):
+                if self.dataset == gene_class:
+                    if not any(map(osp.exists, glob(osp.join(self.data_dir, "train", class_name,
+                                                             dl_files[class_name])))):
                         os.mkdir(self.data_dir + "/train/" + class_name)
                         os.system("curl " + self.URL[class_name])
                         os.system("tar -xf " + file_name[class_name])
