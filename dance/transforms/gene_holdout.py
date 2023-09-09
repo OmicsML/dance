@@ -39,9 +39,9 @@ class GeneHoldout(BaseTransform):
         # Use covariance to select predictors
         covariance_matrix = np.cov(feat, rowvar=False)
         predictors = []
-        for targs in enumerate(targets):
-            genes_not_in_target = np.setdiff1d(range(feat.shape[1]), targs[1])
-            subMatrix = covariance_matrix[targs[1]][:, genes_not_in_target]
+        for targs in targets:
+            genes_not_in_target = np.setdiff1d(range(feat.shape[1]), targs)
+            subMatrix = covariance_matrix[targs][:, genes_not_in_target]
             sorted_idx = np.argsort(-subMatrix, axis=0)
             preds = genes_not_in_target[sorted_idx[:self.n_top].flatten()]
             predictors.append(np.unique(preds))
