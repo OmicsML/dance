@@ -1,5 +1,8 @@
 import hashlib
+import warnings
 from abc import ABC, abstractmethod
+
+from anndata import AnnData
 
 from dance import logger
 from dance.data.base import Data
@@ -44,3 +47,29 @@ class BaseTransform(ABC):
     @abstractmethod
     def __call__(self, data: Data) -> Data:
         raise NotImplementedError
+
+
+class AnnDataAdaptor:
+    """Adaptor for transforming AnnData instead of dance data object.
+
+    Example
+    -------
+    Modify an :class:`AnnData` object inplace
+
+        >>> AnnDataAdaptor(FilterGenes(mode="sum"))(adata)
+
+    """
+
+    def __init__(self, transform):
+        warnings.warn(
+            "This is a temporary patch to enable transforming AnnData, and "
+            "might have potential incompatibility issues. Use cautiously.",
+            UserWarning,
+            stacklevel=2,
+        )
+        self.transform = transform
+
+    def __call__(self, adata: AnnData) -> AnnData:
+        data = Data(adata)
+        self.transform(data)
+        return data.data
