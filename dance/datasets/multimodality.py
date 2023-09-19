@@ -62,8 +62,55 @@ class MultiModalityDataset(BaseDataset, ABC):
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_train_mod1.h5ad"),
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_train_mod2.h5ad"),
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_mod1.h5ad"),
-                osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_mod2.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_mod2.h5ad")
             ]
+            if self.subtask=="10k_pbmc":
+                paths=[
+                osp.join(self.root, self.subtask, f"{self.subtask}.10kanti_dataset_subset.output_train_mod1.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.10kanti_dataset_subset.output_train_mod2.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.10kanti_dataset_subset.output_test_mod1.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.10kanti_dataset_subset.output_test_mod2.h5ad")]
+            if self.subtask=="pbmc_cite":
+                paths=[
+                osp.join(self.root, self.subtask, f"{self.subtask}.citeanti_dataset.output_train_mod1.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.citeanti_dataset.output_train_mod2.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.citeanti_dataset.output_test_mod1.h5ad"),
+                osp.join(self.root, self.subtask, f"{self.subtask}.citeanti_dataset.output_test_mod2.h5ad")]
+            if self.subtask.startswith("5k_pbmc"):
+                paths=[
+                    osp.join(self.root, self.subtask, f"{self.subtask}.5kanti_dataset.output_train_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.5kanti_dataset.output_train_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.5kanti_dataset.output_test_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.5kanti_dataset.output_test_mod2.h5ad")
+                ]
+            if self.subtask.startswith("openproblems_2022"):
+                paths=[
+                    osp.join(self.root, self.subtask, f"{self.subtask}.open_dataset.output_train_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.open_dataset.output_train_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.open_dataset.output_test_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.open_dataset.output_test_mod2.h5ad")
+                ]
+            if self.subtask.startswith("GSE127064"):
+                paths=[
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE126074_dataset.output_train_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE126074_dataset.output_train_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE126074_dataset.output_test_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE126074_dataset.output_test_mod2.h5ad")
+                ]
+            if self.subtask.startswith("GSE117089"):
+                paths=[
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE117089_dataset.output_train_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE117089_dataset.output_train_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE117089_dataset.output_test_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE117089_dataset.output_test_mod2.h5ad")
+                ]
+            if self.subtask.startswith("GSE140203"):
+                paths=[
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE140203_dataset.output_train_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE140203_dataset.output_train_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE140203_dataset.output_test_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE140203_dataset.output_test_mod2.h5ad")
+                ]
         elif self.TASK == "match_modality":
             paths = [
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_train_mod1.h5ad"),
@@ -100,6 +147,24 @@ class ModalityPredictionDataset(MultiModalityDataset):
         "https://www.dropbox.com/s/cz60vp7bwapz0kw/openproblems_bmmc_multiome_phase2_rna.zip?dl=1",
         "openproblems_bmmc_cite_phase2_rna_subset":
         "https://www.dropbox.com/s/veytldxkgzyoa8j/openproblems_bmmc_cite_phase2_rna_subset.zip?dl=1",
+        "5k_pbmc":"https://www.dropbox.com/scl/fi/uoyis946glh0oo7g833qj/5k_pbmc.zip?rlkey=mw9cvqq7e12iowfbr9rp7av5u&dl=1",
+        "5k_pbmc_subset":"https://www.dropbox.com/scl/fi/pykqc9zyt1fjypnjf4m1l/5k_pbmc_subset.zip?rlkey=brkmnqhfz5yl9axiuu0f8gmxy&dl=1",
+        "10k_pbmc":"https://www.dropbox.com/scl/fi/npz3n36d3w089creppph2/10k_pbmc.zip?rlkey=6yyv61omv2rw7sqqmfp6u7m1s&dl=1",
+        "pbmc_cite":"https://www.dropbox.com/scl/fi/8yvel9lu2f4pbemjeihzq/pbmc_cite.zip?rlkey=5f5jpjy1fcg14hwzot0hot7xd&dl=1",
+        "openproblems_2022_multi_atac2gex":"https://www.dropbox.com/scl/fi/4ynxepu306g3k6vqpi3aw/openproblems_2022_multi_atac2gex.zip?rlkey=2mq5vjnsh26gg5zgq9d85ikcp&dl=1",
+        "openproblems_2022_cite_gex2adt":"https://www.dropbox.com/scl/fi/dalt3qxwe440107ihjbpy/openproblems_2022_cite_gex2adt.zip?rlkey=ps1fvcr622vhibc1wc1umfdaw&dl=1",
+        "GSE127064_AdBrain_gex2atac":"https://www.dropbox.com/scl/fi/4ybsx6pgiuy6j9m0y92ly/GSE127064_AdBrain_gex2atac.zip?rlkey=6a5u7p7xr2dqsoduflzxjluja&dl=1",
+        "GSE127064_p0Brain_gex2atac":"https://www.dropbox.com/scl/fi/k4p3nkkqq56ev6ljyo5se/GSE127064_p0Brain_gex2atac.zip?rlkey=y7kayqmk2l72jjogzlvfxtl74&dl=1",
+        "GSE117089_mouse_gex2atac":"https://www.dropbox.com/scl/fi/egktuwiognr06xebeuouk/GSE117089_mouse_gex2atac.zip?rlkey=jadp3hlopc3112lmxe6nz5cd1&dl=1",
+        "GSE117089_A549_gex2atac":"https://www.dropbox.com/scl/fi/b7evc2n5ih5o3xxwcd7uq/GSE117089_A549_gex2atac.zip?rlkey=b5o0ykptfodim59qwnu2m89fh&dl=1",
+        "GSE117089_sciCAR_gex2atac":"https://www.dropbox.com/scl/fi/juibpvmtv2otvfsq1xyr7/GSE117089_sciCAR_gex2atac.zip?rlkey=qcdbfqsuhab56bc553cwm78gc&dl=1",
+        "GSE140203_3T3_HG19_atac2gex":"https://www.dropbox.com/scl/fi/v1vbypz87t1rz012vojkh/GSE140203_3T3_HG19_atac2gex.zip?rlkey=xmxrwso5e5ty3w53ctbm5bo9z&dl=1",
+        "GSE140203_3T3_MM10_atac2gex":"https://www.dropbox.com/scl/fi/po9k064twny51subze6df/GSE140203_3T3_MM10_atac2gex.zip?rlkey=q0b4y58bsvacnjrmvsclk4jqu&dl=1",
+        "GSE140203_12878.rep2_atac2gex":"https://www.dropbox.com/scl/fi/jqijimb7h6cv4w4hkax1q/GSE140203_12878.rep2_atac2gex.zip?rlkey=c837xkoacap4wjszffpfrmuak&dl=1",
+        "GSE140203_12878.rep3_atac2gex":"https://www.dropbox.com/scl/fi/wlv9dhvylz78kq8ezncmd/GSE140203_12878.rep3_atac2gex.zip?rlkey=5r607plnqzlxdgxtc4le8d6o1&dl=1",
+        "GSE140203_K562_HG19_atac2gex":"https://www.dropbox.com/scl/fi/n2he1br3u604p3mgniowz/GSE140203_K562_HG19_atac2gex.zip?rlkey=2lhe7s5run8ly5uk4b0vfemyj&dl=1",
+        "GSE140203_K562_MM10_atac2gex":"https://www.dropbox.com/scl/fi/dhdorqy87915uah3xl07a/GSE140203_K562_MM10_atac2gex.zip?rlkey=ecwsy5sp7f2i2gtjo1qyaf4zt&dl=1",
+        "GSE140203_LUNG_atac2gex":"https://www.dropbox.com/scl/fi/gabugiw244ky85j3ckq4d/GSE140203_LUNG_atac2gex.zip?rlkey=uj0we276s6ay2acpioj4tmfj3&dl=1"
     }
     SUBTASK_NAME_MAP = {
         "adt2gex": "openproblems_bmmc_cite_phase2_mod2",
@@ -110,9 +175,10 @@ class ModalityPredictionDataset(MultiModalityDataset):
     }
     AVAILABLE_DATA = sorted(list(URL_DICT) + list(SUBTASK_NAME_MAP))
 
-    def __init__(self, subtask, root="./data", preprocess=None):
+    def __init__(self, subtask, root="./data", preprocess=None,span=0.3):
         # TODO: factor our preprocess
         self.preprocess = preprocess
+        self.span=span
         super().__init__(subtask, root)
 
     def _raw_to_dance(self, raw_data):
@@ -135,7 +201,7 @@ class ModalityPredictionDataset(MultiModalityDataset):
         if self.preprocess == "feature_selection":
             if raw_data[0].shape[1] > selection_threshold:
                 sc.pp.highly_variable_genes(raw_data[0], layer="counts", flavor="seurat_v3",
-                                            n_top_genes=selection_threshold)
+                                            n_top_genes=selection_threshold,span=self.span)
                 raw_data[2].var["highly_variable"] = raw_data[0].var["highly_variable"]
                 for i in [0, 2]:
                     raw_data[i] = raw_data[i][:, raw_data[i].var["highly_variable"]]
@@ -169,10 +235,11 @@ class ModalityMatchingDataset(MultiModalityDataset):
     }
     AVAILABLE_DATA = sorted(list(URL_DICT) + list(SUBTASK_NAME_MAP))
 
-    def __init__(self, subtask, root="./data", preprocess=None, pkl_path=None):
+    def __init__(self, subtask, root="./data", preprocess=None, pkl_path=None,span=0.3):
         # TODO: factor our preprocess
         self.preprocess = preprocess
         self.pkl_path = pkl_path
+        self.span=span
         super().__init__(subtask, root)
 
     def _raw_to_dance(self, raw_data):
@@ -252,7 +319,7 @@ class ModalityMatchingDataset(MultiModalityDataset):
             for i in range(2):
                 if modalities[i].shape[1] > selection_threshold:
                     sc.pp.highly_variable_genes(modalities[i], layer="counts", flavor="seurat_v3",
-                                                n_top_genes=selection_threshold)
+                                                n_top_genes=selection_threshold,span=self.span)
                     modalities[i + 2].var["highly_variable"] = modalities[i].var["highly_variable"]
                     modalities[i] = modalities[i][:, modalities[i].var["highly_variable"]]
                     modalities[i + 2] = modalities[i + 2][:, modalities[i + 2].var["highly_variable"]]
