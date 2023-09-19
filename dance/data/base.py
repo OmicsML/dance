@@ -456,7 +456,7 @@ class BaseData(ABC):
         if split_name is not None:
             if channel_type in ["X", "raw_X", "obs", "obsm", "obsp", "layers"]:
                 idx = self.get_split_idx(split_name, error_on_miss=True)
-                idx=list(filter(lambda a:a<feature.shape[0],idx))
+                idx = list(filter(lambda a: a < feature.shape[0], idx))
                 feature = feature[idx][:, idx] if channel_type == "obsp" else feature[idx]
             else:
                 logger.warning(f"Indexing option for {channel_type!r} not implemented yet.")
