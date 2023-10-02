@@ -60,7 +60,7 @@ class AnnDataAdaptor:
 
     """
 
-    def __init__(self, transform):
+    def __init__(self, transform, **data_init_kwargs):
         warnings.warn(
             "This is a temporary patch to enable transforming AnnData, and "
             "might have potential incompatibility issues. Use cautiously.",
@@ -68,8 +68,9 @@ class AnnDataAdaptor:
             stacklevel=2,
         )
         self.transform = transform
+        self.data_init_kwargs = data_init_kwargs
 
     def __call__(self, adata: AnnData) -> AnnData:
-        data = Data(adata)
+        data = Data(adata, **self.data_init_kwargs)
         self.transform(data)
         return data.data
