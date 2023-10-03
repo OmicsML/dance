@@ -33,7 +33,6 @@ jobs:
           pip install tox tox-gh-actions -U
 
       - name: Lint and test installation with tox
-        # run: tox -e python${{ matrix.python-version }}-cpu-notest
         run: tox
         env:
           RUN_SETTINGS: cpu-notest
