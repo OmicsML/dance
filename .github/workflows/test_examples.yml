@@ -6,17 +6,18 @@ on:
     - cron: '59 23 * * 0,2,4'
 
 env:
-  # CUDA paths for MSU ICER HPC with "module load GCC/8.3.0 CUDA/10.2.89"
-  CUDA_PATH: '/opt/software/CUDA/10.2.89-GCC-8.3.0'
-  LD_LIBRARY_PATH: '/opt/software/CUDA/10.2.89-GCC-8.3.0/lib64'
+  ### CUDA paths for MSU ICER HPC with "module load CUDA/11.8"
+  CUDA_PATH: '/opt/software/CUDA/11.8.0'
+  LD_LIBRARY_PATH: '/opt/software/CUDA/11.8.0/lib64'
+  ### CUDA paths for MSU ICER HPC with "module load GCC/8.3.0 CUDA/10.2.89"
+  # CUDA_PATH: '/opt/software/CUDA/10.2.89-GCC-8.3.0'
+  # LD_LIBRARY_PATH: '/opt/software/CUDA/10.2.89-GCC-8.3.0/lib64'
 
 jobs:
   run_examples:
     runs-on: self-hosted
     strategy:
       fail-fast: false
-      matrix:
-        python-version: ['3.9']
 
     steps:
       - uses: actions/checkout@v3
@@ -27,7 +28,7 @@ jobs:
       - name: Install dependencies
         run:
           python -m pip install -U pip
-          pip install tox tox-gh-actions -U
+          pip install tox -U
 
       - name: Test with tox
-        run: tox -e python${{ matrix.python-version }}-gpu-test
+        run: tox -e py38-gpu-test
