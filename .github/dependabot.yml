@@ -15,4 +15,3 @@ updates:
     ignore:
       - dependency-name: "torch" # see PyG
       - dependency-name: "torchvision"
-      - dependency-name: "numpy" # see numba
