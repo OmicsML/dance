@@ -189,6 +189,7 @@ def construct_enhanced_feature_graph(u, v, e, train_size, feature_size, cell_nod
             graph.nodes['cell'].data['id'] = cell_node_features[:train_size] if not _test_graph else cell_node_features
         else:
             graph.nodes['cell'].data['id'] = cell_node_features
+        feature_size = min(graph.num_nodes('feature'), feature_size)
         graph.nodes['feature'].data['id'] = torch.arange(feature_size).long()
         graph.edges['feature2cell'].data['weight'] = e
         graph.edges['cell2feature'].data['weight'] = e[:graph.edges(etype='cell2feature')[0].shape[0]]

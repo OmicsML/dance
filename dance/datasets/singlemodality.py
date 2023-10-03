@@ -17,6 +17,7 @@ from dance import logger
 from dance.config import METADIR
 from dance.data import Data
 from dance.datasets.base import BaseDataset
+from dance.metadata.imputation import IMPUTATION_DATASET_TO_FILE
 from dance.registers import register_dataset
 from dance.typing import Dict, List, Optional, Set, Tuple
 from dance.utils.download import download_file, download_unzip
@@ -40,13 +41,12 @@ def _load_scdeepsort_metadata():
 
 @register_dataset("scdeepsort")
 class ScDeepSortDataset(BaseDataset):
-
     _DISPLAY_ATTRS = ("species", "tissue", "train_dataset", "test_dataset")
     ALL_URL_DICT: Dict[str, str] = {
-        "train_human_cell_atlas":   "https://www.dropbox.com/s/1itq1pokplbqxhx?dl=1",
-        "test_human_test_data":     "https://www.dropbox.com/s/gpxjnnvwyblv3xb?dl=1",
-        "train_mouse_cell_atlas":   "https://www.dropbox.com/s/ng8d3eujfah9ppl?dl=1",
-        "test_mouse_test_data":     "https://www.dropbox.com/s/pkr28czk5g3al2p?dl=1",
+        "train_human_cell_atlas": "https://www.dropbox.com/s/1itq1pokplbqxhx?dl=1",
+        "test_human_test_data": "https://www.dropbox.com/s/gpxjnnvwyblv3xb?dl=1",
+        "train_mouse_cell_atlas": "https://www.dropbox.com/s/ng8d3eujfah9ppl?dl=1",
+        "test_mouse_test_data": "https://www.dropbox.com/s/pkr28czk5g3al2p?dl=1",
     }  # yapf: disable
     BENCH_URL_DICT, AVAILABLE_DATA = _load_scdeepsort_metadata()
 
@@ -82,17 +82,25 @@ class ScDeepSortDataset(BaseDataset):
                 pass
             os.rename(download_path, move_path)
 
+    def get_all_filenames(self, filetype: str = "csv", feat_suffix: str = "data", label_suffix: str = "celltype"):
+        filenames = []
+        for id in self.train_dataset:
+            filenames.append(f"{self.species}_{self.tissue}{id}_{feat_suffix}.{filetype}")
+            filenames.append(f"{self.species}_{self.tissue}{id}_{label_suffix}.{filetype}")
+        return filenames
+
     def download(self, download_map=True):
         if self.is_complete():
             return
 
-        # TODO: only download missing files
+        filenames = self.get_all_filenames()
         # Download training and testing data
         for name, url in self.BENCH_URL_DICT.items():
             parts = name.split("_")  # [train|test]_{species}_{tissue}{id}_[celltype|data].csv
             filename = "_".join(parts[1:])
-            filepath = osp.join(self.data_dir, *parts[:2], filename)
-            download_file(url, filepath)
+            if filename in filenames:
+                filepath = osp.join(self.data_dir, *parts[:2], filename)
+                download_file(url, filepath)
 
         if download_map:
             # Download mapping data
@@ -115,7 +123,7 @@ class ScDeepSortDataset(BaseDataset):
     def is_complete(self):
         """Check if benchmarking data is complete."""
         for name in self.BENCH_URL_DICT:
-            filename = name[name.find('mouse'):]
+            filename = name[name.find(self.species):]
             file_i = osp.join(self.data_dir, *name.split("_")[:2], filename)
             if not osp.exists(file_i):
                 logger.info(file_i)
@@ -276,27 +284,8 @@ class ClusteringDataset(BaseDataset):
 
 @register_dataset("imputation")
 class ImputationDataset(BaseDataset):
-
-    URL = {
-        "pbmc_data": "https://www.dropbox.com/s/brj3orsjbhnhawa/5k.zip?dl=0",
-        "mouse_embryo_data": "https://www.dropbox.com/s/8ftx1bydoy7kn6p/GSE65525.zip?dl=0",
-        "mouse_brain_data": "https://www.dropbox.com/s/zzpotaayy2i29hk/neuron_10k.zip?dl=0",
-        "human_stemcell_data": "https://www.dropbox.com/s/g2qua2j3rqcngn6/GSE75748.zip?dl=0"
-    }
-    DATASET_TO_FILE = {
-        "pbmc_data": "5k_pbmc_protein_v3_filtered_feature_bc_matrix.h5",
-        "mouse_embryo_data": [
-            osp.join("GSE65525", i)
-            for i in [
-                "GSM1599494_ES_d0_main.csv",
-                "GSM1599497_ES_d2_LIFminus.csv",
-                "GSM1599498_ES_d4_LIFminus.csv",
-                "GSM1599499_ES_d7_LIFminus.csv",
-            ]
-        ],
-        "mouse_brain_data": "neuron_10k_v3_filtered_feature_bc_matrix.h5",
-        "human_stemcell_data": "GSE75748/GSE75748_sc_time_course_ec.csv.gz"
-    }  # yapf: disable
+    URL = load_data_url_dict_from_csv(METADIR / "imputation.csv")
+    DATASET_TO_FILE =IMPUTATION_DATASET_TO_FILE   # yapf: disable
     AVAILABLE_DATA = sorted(URL)
 
     def __init__(self, data_dir="data", dataset="human_stemcell", train_size=0.1):
@@ -307,20 +296,31 @@ class ImputationDataset(BaseDataset):
 
     def download(self):
 
-        gene_class = ["pbmc_data", "mouse_brain_data", "mouse_embryo_data", "human_stemcell_data"]
+        gene_class = [
+            "pbmc_data", "mouse_brain_data", "mouse_embryo_data", "human_stemcell_data", "human_breast_TGFb_data",
+            "human_breast_Dox_data", "human_melanoma_data", "mouse_visual_data"
+        ]
 
         file_name = {
             "pbmc_data": "5k.zip?dl=0",
             "mouse_embryo_data": "GSE65525.zip?dl=0",
             "mouse_brain_data": "neuron_10k.zip?dl=0",
-            "human_stemcell_data": "GSE75748.zip?dl=0"
+            "human_stemcell_data": "GSE75748.zip?dl=0",
+            "human_breast_TGFb_data": "GSE114397.zip?dl=0",
+            "human_breast_Dox_data": "GSM3141014.zip?dl=0",
+            "human_melanoma_data": "human_melanoma_data.zip?dl=0",
+            "mouse_visual_data": "mouse_visual_data.zip?dl=0"
         }
 
         dl_files = {
             "pbmc_data": "5k_*",
             "mouse_embryo_data": "GSE65525",
             "mouse_brain_data": "neuron*",
-            "human_stemcell_data": "GSE75748"
+            "human_stemcell_data": "GSE75748",
+            "human_breast_TGFb_data": "GSE11*",
+            "human_breast_Dox_data": "GSM31*",
+            "human_melanoma_data": "human*",
+            "mouse_visual_data": "GSM27*"
         }
 
         if sys.platform != 'win32':
@@ -330,12 +330,14 @@ class ImputationDataset(BaseDataset):
                 os.system("mkdir " + self.data_dir + "/train")
 
             for class_name in gene_class:
-                if not any(map(osp.exists, glob(osp.join(self.data_dir, "train", class_name, dl_files[class_name])))):
-                    os.system("mkdir " + self.data_dir + "/train/" + class_name)
-                    os.system("wget " + self.URL[class_name])  # assumes linux... mac needs to install
-                    os.system("unzip " + file_name[class_name])
-                    os.system("rm " + file_name[class_name])
-                    os.system("mv " + dl_files[class_name] + " " + self.data_dir + "/train/" + class_name + "/")
+                if self.dataset == gene_class:
+                    if not any(map(osp.exists, glob(osp.join(self.data_dir, "train", class_name,
+                                                             dl_files[class_name])))):
+                        os.system("mkdir " + self.data_dir + "/train/" + class_name)
+                        os.system("wget " + self.URL[class_name])  # assumes linux... mac needs to install
+                        os.system("unzip " + file_name[class_name])
+                        os.system("rm " + file_name[class_name])
+                        os.system("mv " + dl_files[class_name] + " " + self.data_dir + "/train/" + class_name + "/")
             os.system("cp -r " + self.data_dir + "/train/ " + self.data_dir + "/test")
         if sys.platform == 'win32':
             if not osp.exists(self.data_dir):
@@ -343,12 +345,14 @@ class ImputationDataset(BaseDataset):
             if not osp.exists(self.data_dir + "/train"):
                 os.mkdir(self.data_dir + "/train")
             for class_name in gene_class:
-                if not any(map(osp.exists, glob(osp.join(self.data_dir, "train", class_name, dl_files[class_name])))):
-                    os.mkdir(self.data_dir + "/train/" + class_name)
-                    os.system("curl " + self.URL[class_name])
-                    os.system("tar -xf " + file_name[class_name])
-                    os.system("del -R " + file_name[class_name])
-                    os.system("move " + dl_files[class_name] + " " + self.data_dir + "/train/" + class_name + "/")
+                if self.dataset == gene_class:
+                    if not any(map(osp.exists, glob(osp.join(self.data_dir, "train", class_name,
+                                                             dl_files[class_name])))):
+                        os.mkdir(self.data_dir + "/train/" + class_name)
+                        os.system("curl " + self.URL[class_name])
+                        os.system("tar -xf " + file_name[class_name])
+                        os.system("del -R " + file_name[class_name])
+                        os.system("move " + dl_files[class_name] + " " + self.data_dir + "/train/" + class_name + "/")
             os.system("copy /r " + self.data_dir + "/train/ " + self.data_dir + "/test")
 
     def is_complete(self):
@@ -370,7 +374,7 @@ class ImputationDataset(BaseDataset):
         else:
             dataset = self.dataset
 
-        if self.dataset == 'mouse_embryo' or self.dataset == 'mouse_embryo_data':
+        if self.dataset == 'mouse_embryo' or self.dataset == 'mouse_embryo_data' or self.dataset == "mouse_visual_data":
             for i in range(len(self.DATASET_TO_FILE[dataset])):
                 fname = self.DATASET_TO_FILE[dataset][i]
                 data_path = f'{self.data_dir}/train/{dataset}/{fname}'
@@ -394,12 +398,15 @@ class ImputationDataset(BaseDataset):
                 raise FileNotFoundError(f"{data_path} does not exist")
 
             if self.DATASET_TO_FILE[dataset][-3:] == 'csv':
-                counts = pd.read_csv(data_path, index_col=0, header=None)
+                counts = pd.read_csv(data_path, header=None, index_col=0)
+                nums = pd.Series(np.arange(counts.shape[1]))
+                nums = pd.DataFrame(nums)
+                nums.columns = ['nums']
                 counts = counts.T
+                counts.index = [i for i in range(counts.shape[0])]
                 adata = ad.AnnData(csr_matrix(counts.values))
-                # adata.obs_names = ["%d"%i for i in range(adata.shape[0])]
-                adata.obs_names = counts.index.tolist()
                 adata.var_names = counts.columns.tolist()
+                adata.obs['nums'] = nums.to_numpy()
             if self.DATASET_TO_FILE[dataset][-2:] == 'gz':
                 counts = pd.read_csv(data_path, index_col=0, compression='gzip', header=0)
                 counts = counts.T
