@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.8']
+        python-version: ['3.9']
 
     steps:
       - uses: actions/checkout@v3
@@ -30,4 +30,4 @@ jobs:
           pip install tox tox-gh-actions -U
 
       - name: Test with tox
-        run: tox -e python${{ matrix.python-version }}-gpu
+        run: tox -e python${{ matrix.python-version }}-gpu-test
