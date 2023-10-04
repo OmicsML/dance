@@ -1,0 +1,15 @@
+#!/bin/bash --login
+
+#SBATCH -N 1
+#SBATCH -c 12
+#SBATCH -t 3:55:00
+#SBATCH --mem=128GB  # need at least 80GB due to joint_embedding-dcca
+#SBATCH --gres=gpu:v100:1
+#SBATCH -A cmse
+#SBATCH -o slurm_history/slurm-%A.out
+
+# module load GCC/8.3.0 CUDA/10.2.89
+module load CUDA/11.8
+
+cd $SLURM_SUBMIT_DIR
+./run.sh
