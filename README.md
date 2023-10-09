@@ -134,7 +134,7 @@ source install.sh cu118 dance-env
 First create a conda environment for dance (optional)
 
 ```bash
-conda create -n dance python=3.8 -y && conda activate dance-dev
+conda create -n dance python=3.8 -y && conda activate dance
 ```
 
 Then, install CUDA enabled packages (PyTorch, PyG, DGL):
