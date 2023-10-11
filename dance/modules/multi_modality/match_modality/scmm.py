@@ -65,13 +65,17 @@ def m_elbo_naive(model, x):
 
 def m_elbo_naive_warmup(model, x, beta):
     """Computes E_{p(x)}[ELBO] for multi-modal vae --- NOT EXPOSED."""
+    # x=tuple(map(torch.nan_to_num,x))
+    # print(torch.isnan(x[0]).any())
+    # print(torch.isnan(x[1]).any())
     qz_xs, px_zs, zss = model(x)
     lpx_zs, klds = [], []
     for r, qz_x in enumerate(qz_xs):
         kld = kl_divergence(qz_x, model.pz(*model._get_pz_params))
         klds.append(kld.sum(-1))
         for d, px_z in enumerate(px_zs[r]):
-            lpx_z = px_z.log_prob(x[d]) * model.vaes[d].llik_scaling
+            
+            lpx_z = px_z.log_prob(x[d].to(torch.int)) * model.vaes[d].llik_scaling
             lpx_zs.append(lpx_z.sum(-1))
     obj = (1 / len(model.vaes)) * (torch.stack(lpx_zs).sum(0) - beta * torch.stack(klds).sum(0))
     return obj.sum()
@@ -194,8 +198,11 @@ class Enc(nn.Module):
         return (read)
 
     def forward(self, x):
+        x=torch.nan_to_num(x)
         read = self.read_count(x)
         x = x / read * self.scale_factor
+        # if self.enc['0.0.weight']
+        x=torch.nan_to_num(x)
         e = self.enc(x)
         lv = self.fc22(e).clamp(-12, 12)  # restrict to avoid torch.exp() over/underflow
         return self.fc21(e), F.softmax(lv, dim=-1) * lv.size(-1) + Constants.eta
@@ -265,8 +272,10 @@ class ATAC(VAE):
         return dataloader
 
     def forward(self, x):
+        # print(torch.isfinite(x).all())
         read_count = self.enc.read_count(x)
-        self._qz_x_params = self.enc(x)
+        t1,t2= self.enc(x)
+        self._qz_x_params=tuple([t1,t2])
         qz_x = self.qz_x(*self._qz_x_params)
         zs = qz_x.rsample()
         r, p, g = self.dec(zs)
@@ -306,7 +315,9 @@ class Protein(VAE):
 
     def forward(self, x):
         read_count = self.enc.read_count(x)
-        self._qz_x_params = self.enc(x)
+        # self._qz_x_params = self.enc(x)
+        t1,t2= self.enc(x)
+        self._qz_x_params=tuple([t1,t2])
         qz_x = self.qz_x(*self._qz_x_params)
         zs = qz_x.rsample()
         r, _ = self.dec(zs)
@@ -349,7 +360,9 @@ class RNA(VAE):
 
     def forward(self, x):
         read_count = self.enc.read_count(x)
-        self._qz_x_params = self.enc(x)
+        # self._qz_x_params = self.enc(x)
+        t1,t2= self.enc(x)
+        self._qz_x_params=tuple([t1,t2])
         qz_x = self.qz_x(*self._qz_x_params)
         zs = qz_x.rsample()
         r, _ = self.dec(zs)
@@ -536,6 +549,9 @@ class MMVAE(nn.Module):
             self.train()
             b_loss = 0
             for i, batch_idx in enumerate(train_loader):
+                # print(i)
+                # if i==4:
+                #     print(i)
                 dataT = (train_mod1[batch_idx], train_mod2[batch_idx])
                 beta = (epoch - 1) / start_early_stop if epoch <= start_early_stop else 1
                 if dataT[0].size()[0] == 1:
@@ -544,9 +560,13 @@ class MMVAE(nn.Module):
                 data = dataT
                 optimizer.zero_grad()
                 loss = -objective(self, data, beta)
+                # print(torch.isfinite(loss).all())
+                # print(loss)
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.parameters(), 0.01)
                 optimizer.step()
                 b_loss += loss.item()
+                
                 if self.params.print_freq > 0 and i % self.params.print_freq == 0:
                     print("iteration {:04d}: loss: {:6.3f}".format(i, loss.item() / self.params.batch_size))
             tr.append(b_loss / len(train_loader.dataset))
