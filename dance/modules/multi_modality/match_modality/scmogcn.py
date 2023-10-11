@@ -342,6 +342,7 @@ class ScMoGCNWrapper:
         if not enhance:
 
             logits = self.predict(idx, enhance, batch1, batch2)
+            t=(torch.argmax(logits, dim=0) == labels1)
             backward_accuracy = (torch.argmax(logits, dim=0) == labels1).float().mean().item()
             forward_accuracy = (torch.argmax(logits, dim=1) == labels2).float().mean().item()
             return (forward_accuracy + backward_accuracy) / 2
