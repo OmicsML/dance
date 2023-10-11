@@ -198,7 +198,6 @@ class Enc(nn.Module):
         x=torch.nan_to_num(x)
         read = self.read_count(x)
         x = x / read * self.scale_factor
-        # if self.enc['0.0.weight']
         x=torch.nan_to_num(x)
         e = self.enc(x)
         lv = self.fc22(e).clamp(-12, 12)  # restrict to avoid torch.exp() over/underflow
@@ -269,7 +268,6 @@ class ATAC(VAE):
         return dataloader
 
     def forward(self, x):
-        # print(torch.isfinite(x).all())
         read_count = self.enc.read_count(x)
         t1,t2= self.enc(x)
         self._qz_x_params=tuple([t1,t2])
