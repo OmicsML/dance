@@ -171,7 +171,11 @@ class VAEGen(nn.Module):
 
     def encode(self, images):
         hiddens = self.enc(images)
-        noise = Variable(torch.randn(hiddens.size()).cuda(hiddens.data.get_device()))
+        device_index=hiddens.data.get_device()
+        if device_index<0:
+            noise = Variable(torch.randn(hiddens.size()))
+        else:
+            noise = Variable(torch.randn(hiddens.size()).cuda(device_index))
         return hiddens, noise
 
     def decode(self, hiddens):
@@ -587,3 +591,4 @@ class CMAE(nn.Module):
             if iterations >= hyperparameters['max_epochs']:
                 print('Finish training')
                 return self
+s
