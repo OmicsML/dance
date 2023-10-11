@@ -34,7 +34,7 @@ class CellFeatureGraph(BaseTransform):
         num_cells, num_feats = feat.shape
 
         row, col = np.nonzero(feat)
-        edata = np.array(feat[row, col]).ravel()[:, None]
+        edata = np.array(feat[row, col])[:, None]
         self.logger.info(f"Number of nonzero entries: {edata.size:,}")
         self.logger.info(f"Nonzero rate = {edata.size / num_cells / num_feats:.1%}")
 
