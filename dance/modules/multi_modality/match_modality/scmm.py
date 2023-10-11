@@ -65,9 +65,6 @@ def m_elbo_naive(model, x):
 
 def m_elbo_naive_warmup(model, x, beta):
     """Computes E_{p(x)}[ELBO] for multi-modal vae --- NOT EXPOSED."""
-    # x=tuple(map(torch.nan_to_num,x))
-    # print(torch.isnan(x[0]).any())
-    # print(torch.isnan(x[1]).any())
     qz_xs, px_zs, zss = model(x)
     lpx_zs, klds = [], []
     for r, qz_x in enumerate(qz_xs):
@@ -549,9 +546,6 @@ class MMVAE(nn.Module):
             self.train()
             b_loss = 0
             for i, batch_idx in enumerate(train_loader):
-                # print(i)
-                # if i==4:
-                #     print(i)
                 dataT = (train_mod1[batch_idx], train_mod2[batch_idx])
                 beta = (epoch - 1) / start_early_stop if epoch <= start_early_stop else 1
                 if dataT[0].size()[0] == 1:
@@ -560,8 +554,6 @@ class MMVAE(nn.Module):
                 data = dataT
                 optimizer.zero_grad()
                 loss = -objective(self, data, beta)
-                # print(torch.isfinite(loss).all())
-                # print(loss)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.parameters(), 0.01)
                 optimizer.step()
