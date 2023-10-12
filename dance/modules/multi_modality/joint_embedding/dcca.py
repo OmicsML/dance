@@ -14,11 +14,12 @@ import os
 import time
 import warnings
 from collections import OrderedDict
-import torch.nn.init as init
 
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.init as init
+import torch.nn.utils as utils
 import torch.utils.data as data_utils
 from sklearn import metrics
 from sklearn.cluster import KMeans
@@ -30,7 +31,7 @@ from torch.autograd import Variable
 from torch.distributions import Normal
 from torch.distributions import kl_divergence as kl
 from torch.nn import functional as F
-import torch.nn.utils as utils
+
 # from DCCA.loss_function import log_zinb_positive, log_nb_positive, binary_cross_entropy, mse_loss, KL_diver
 from dance.utils.loss import Attention, Correlation, Eucli_dis, FactorTransfer, KL_diver, L1_dis, NSTLoss, Similarity
 
@@ -97,9 +98,9 @@ def log_nb_positive(x, mu, theta, eps=1e-8):
 def build_multi_layers(layers, use_batch_norm=True, dropout_rate=0.1):
     """Build multilayer linear perceptron."""
     if dropout_rate > 0:
-        ts=[]
+        ts = []
         for i, (n_in, n_out) in enumerate(zip(layers[:-1], layers[1:])):
-            t=nn.Linear(n_in, n_out)
+            t = nn.Linear(n_in, n_out)
             init.xavier_uniform(t.weight)
             ts.append((
                 "Layer {}".format(i),
@@ -111,8 +112,7 @@ def build_multi_layers(layers, use_batch_norm=True, dropout_rate=0.1):
                 ),
             ))
 
-        fc_layers = nn.Sequential(
-            collections.OrderedDict(ts))
+        fc_layers = nn.Sequential(collections.OrderedDict(ts))
 
     else:
         fc_layers = nn.Sequential(
@@ -413,7 +413,7 @@ class VAE(nn.Module):
                 epoch_lr = adjust_learning_rate(args.lr1, optimizer, epoch, args.flr1, 10)
             else:
                 epoch_lr = adjust_learning_rate(args.lr2, optimizer, epoch, args.flr2, 10)
-            for batch_idx, (X1, X1_raw, size_factor1, X2, X2_raw, size_factor2) in enumerate(train_loader):  
+            for batch_idx, (X1, X1_raw, size_factor1, X2, X2_raw, size_factor2) in enumerate(train_loader):
 
                 X1, X1_raw, size_factor1 = X1.to(args.device), X1_raw.to(args.device), size_factor1.to(args.device)
                 X2, X2_raw, size_factor2 = X2.to(args.device), X2_raw.to(args.device), size_factor2.to(args.device)
@@ -511,9 +511,7 @@ class VAE(nn.Module):
                                                                                    logvar_1, hidden_1, size_factor1,
                                                                                    criterion, attention_loss)
                             loss = torch.mean(loss1 + (kl_weight * kl_divergence_z) + (args.sf2 * (atten_loss1)))
-                
-                
-               
+
                 loss.backward()
                 optimizer.step()
 

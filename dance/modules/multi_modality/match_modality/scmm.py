@@ -71,7 +71,7 @@ def m_elbo_naive_warmup(model, x, beta):
         kld = kl_divergence(qz_x, model.pz(*model._get_pz_params))
         klds.append(kld.sum(-1))
         for d, px_z in enumerate(px_zs[r]):
-            
+
             lpx_z = px_z.log_prob(x[d].to(torch.int)) * model.vaes[d].llik_scaling
             lpx_zs.append(lpx_z.sum(-1))
     obj = (1 / len(model.vaes)) * (torch.stack(lpx_zs).sum(0) - beta * torch.stack(klds).sum(0))
@@ -195,10 +195,10 @@ class Enc(nn.Module):
         return (read)
 
     def forward(self, x):
-        x=torch.nan_to_num(x)
+        x = torch.nan_to_num(x)
         read = self.read_count(x)
         x = x / read * self.scale_factor
-        x=torch.nan_to_num(x)
+        x = torch.nan_to_num(x)
         e = self.enc(x)
         lv = self.fc22(e).clamp(-12, 12)  # restrict to avoid torch.exp() over/underflow
         return self.fc21(e), F.softmax(lv, dim=-1) * lv.size(-1) + Constants.eta
@@ -269,8 +269,8 @@ class ATAC(VAE):
 
     def forward(self, x):
         read_count = self.enc.read_count(x)
-        t1,t2= self.enc(x)
-        self._qz_x_params=tuple([t1,t2])
+        t1, t2 = self.enc(x)
+        self._qz_x_params = tuple([t1, t2])
         qz_x = self.qz_x(*self._qz_x_params)
         zs = qz_x.rsample()
         r, p, g = self.dec(zs)
@@ -311,8 +311,8 @@ class Protein(VAE):
     def forward(self, x):
         read_count = self.enc.read_count(x)
         # self._qz_x_params = self.enc(x)
-        t1,t2= self.enc(x)
-        self._qz_x_params=tuple([t1,t2])
+        t1, t2 = self.enc(x)
+        self._qz_x_params = tuple([t1, t2])
         qz_x = self.qz_x(*self._qz_x_params)
         zs = qz_x.rsample()
         r, _ = self.dec(zs)
@@ -356,8 +356,8 @@ class RNA(VAE):
     def forward(self, x):
         read_count = self.enc.read_count(x)
         # self._qz_x_params = self.enc(x)
-        t1,t2= self.enc(x)
-        self._qz_x_params=tuple([t1,t2])
+        t1, t2 = self.enc(x)
+        self._qz_x_params = tuple([t1, t2])
         qz_x = self.qz_x(*self._qz_x_params)
         zs = qz_x.rsample()
         r, _ = self.dec(zs)
@@ -555,7 +555,7 @@ class MMVAE(nn.Module):
                 loss.backward()
                 optimizer.step()
                 b_loss += loss.item()
-                
+
                 if self.params.print_freq > 0 and i % self.params.print_freq == 0:
                     print("iteration {:04d}: loss: {:6.3f}".format(i, loss.item() / self.params.batch_size))
             tr.append(b_loss / len(train_loader.dataset))
