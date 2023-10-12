@@ -413,7 +413,6 @@ class VAE(nn.Module):
                 epoch_lr = adjust_learning_rate(args.lr1, optimizer, epoch, args.flr1, 10)
             else:
                 epoch_lr = adjust_learning_rate(args.lr2, optimizer, epoch, args.flr2, 10)
-                    # 64 10000  64 10000   64 1   64 140 64 140   64 1
             for batch_idx, (X1, X1_raw, size_factor1, X2, X2_raw, size_factor2) in enumerate(train_loader):  
 
                 X1, X1_raw, size_factor1 = X1.to(args.device), X1_raw.to(args.device), size_factor1.to(args.device)
@@ -516,9 +515,6 @@ class VAE(nn.Module):
                 
                
                 loss.backward()
-                # Calculate the norm of the gradients
-                # max_norm = 0.1
-                # utils.clip_grad_norm_(params, max_norm)
                 optimizer.step()
 
             if epoch % args.epoch_per_test == 0 and epoch > 0:
