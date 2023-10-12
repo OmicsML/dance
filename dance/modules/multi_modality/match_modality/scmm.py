@@ -553,7 +553,6 @@ class MMVAE(nn.Module):
                 optimizer.zero_grad()
                 loss = -objective(self, data, beta)
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.parameters(), 0.01)
                 optimizer.step()
                 b_loss += loss.item()
                 
