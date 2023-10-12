@@ -65,7 +65,10 @@ class JAEWrapper:
 
         """
         X = inputs.float().to(self.args.device)
-        Y = [cell_type.to(self.args.device), batch_label.to(self.args.device), phase_score.float().to(self.args.device)]
+        if phase_score is not None:
+            Y = [cell_type.to(self.args.device), batch_label.to(self.args.device), phase_score.float().to(self.args.device)]
+        else:
+            Y = [cell_type.to(self.args.device), batch_label.to(self.args.device)]
 
         idx = np.random.permutation(X.shape[0])
         train_idx = idx[:int(idx.shape[0] * 0.9)]
