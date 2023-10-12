@@ -134,7 +134,7 @@ class MultiModalityDataset(BaseDataset, ABC):
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_train_sol.h5ad"),
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_mod1.h5ad"),
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_mod2.h5ad"),
-                osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_sol.h5ad"),#必须按照这个顺序添加
+                osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_sol.h5ad"),
             ]
             if self.subtask=="pbmc_cite":
                 paths=[
@@ -419,30 +419,13 @@ class ModalityMatchingDataset(MultiModalityDataset):
             modalities[3].obsm["X_pca"] = preprocessed_features["mod2_test"]
 
         elif self.preprocess == "feature_selection":
-             for i in range(2):
+            for i in range(2):
                 if modalities[i].shape[1] > selection_threshold:
                     sc.pp.highly_variable_genes(modalities[i], layer="counts", flavor="seurat_v3",
                                                 n_top_genes=selection_threshold, span=self.span)
                     modalities[i + 2].var["highly_variable"] = modalities[i].var["highly_variable"]
                     modalities[i] = modalities[i][:, modalities[i].var["highly_variable"]]
                     modalities[i + 2] = modalities[i + 2][:, modalities[i + 2].var["highly_variable"]]
-            # if modalities[0].shape[1] > selection_threshold:
-            #     sc.pp.highly_variable_genes(modalities[0], layer="counts", flavor="seurat_v3",
-            #                                 n_top_genes=selection_threshold,span=self.span)
-            #     modalities[2].var["highly_variable"] = modalities[0].var["highly_variable"]
-            #     # print(modalities[0].var)
-            #     # print(modalities[2].var)
-            #     for i in [0, 2]:
-            #         modalities[i] = modalities[i][:, modalities[i].var["highly_variable"]]
-            #     # for i in range(2):
-            #         # sc.pp.filter_genes(modalities[i],min_cells=1)
-            #         # if modalities[i].shape[1] > selection_threshold:
-            #         #     sc.pp.highly_variable_genes(modalities[i], layer="counts", flavor="seurat_v3",
-            #         #                                 n_top_genes=selection_threshold,span=self.span)
-            #         #     modalities[i + 2].var["highly_variable"] = modalities[i].var["highly_variable"]
-            #         #     # print(modalities[i+2].var["highly_variable"])
-            #         #     modalities[i] = modalities[i][:, modalities[i].var["highly_variable"]]
-            #         #     modalities[i + 2] = modalities[i + 2][:, modalities[i + 2].var["highly_variable"]]
 
         else:
             logger.info("Preprocessing method not supported.")
