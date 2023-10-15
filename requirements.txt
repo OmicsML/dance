@@ -1,4 +1,4 @@
-h5py==3.9.0
+h5py==3.10.0
 igraph==0.10.8
 leidenalg==0.10.1
 mudata==0.2.3
