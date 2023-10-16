@@ -23,7 +23,7 @@ parser.add_argument("--bias", type=bool, default=False, help="Include/Exclude bi
 parser.add_argument("--nhid", type=int, default=16, help="Number of neurons in latent layer.")
 parser.add_argument("--dropout", type=float, default=0., help="Dropout rate.")
 parser.add_argument("--epochs", type=int, default=25, help="Number of epochs to train the model.")
-parser.add_argument("--seed", type=int, default=17, help="Random seed.")
+parser.add_argument("--seed", type=int, default=42)
 parser.add_argument("--device", default="auto", help="Computation device.")
 args = parser.parse_args()
 set_seed(args.seed)

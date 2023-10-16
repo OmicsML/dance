@@ -1,5 +1,4 @@
 import argparse
-import random
 
 import numpy as np
 import torch
@@ -10,7 +9,6 @@ from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph
 from dance.utils import set_seed
 
 if __name__ == "__main__":
-    rndseed = random.randint(0, 2147483647)
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2",
                         choices=["openproblems_bmmc_cite_phase2", "openproblems_bmmc_multiome_phase2"])
@@ -19,19 +17,17 @@ if __name__ == "__main__":
     parser.add_argument("-csv", "--csv_path", default="decoupled_lsi.csv")
     parser.add_argument("-l", "--layers", default=3, type=int, choices=[3, 4, 5, 6, 7])
     parser.add_argument("-dis", "--disable_propagation", default=0, type=int, choices=[0, 1, 2])
-    parser.add_argument("-seed", "--rnd_seed", default=rndseed, type=int)
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-bs", "--batch_size", default=512, type=int)
     parser.add_argument("-nm", "--normalize", default=1, type=int, choices=[0, 1])
+    parser.add_argument("--seed", type=int, default=42)
 
     args = parser.parse_args()
 
-    device = args.device
-    pre_normalize = bool(args.normalize)
+    device = args.device  # XXX: not used
     torch.set_num_threads(args.cpus)
-    rndseed = args.rnd_seed
-    set_seed(rndseed)
+    set_seed(args.seed)
 
     dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess="aux", normalize=True)
     data = dataset.load_data()
@@ -58,7 +54,7 @@ if __name__ == "__main__":
         batch_label=batch_label,
         phase_score=phase_score,
     )
-    model.load(f"models/model_joint_embedding_{rndseed}.pth")
+    model.load(f"models/model_joint_embedding_{args.seed}.pth")
 
     with torch.no_grad():
         test_id = np.arange(train_size, x_mod1.shape[0])

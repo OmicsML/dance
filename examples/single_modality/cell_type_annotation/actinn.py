@@ -26,11 +26,11 @@ if __name__ == "__main__":
     parser.add_argument("--num_epochs", type=int, default=50, help="Number of epochs")
     parser.add_argument("--print_cost", action="store_true", help="Print cost when training")
     parser.add_argument("--runs", type=int, default=10, help="Number of repetitions")
-    parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
     parser.add_argument("--species", default="mouse")
     parser.add_argument("--test_dataset", nargs="+", default=[1759], help="List of testing dataset ids.")
     parser.add_argument("--tissue", default="Spleen")
     parser.add_argument("--train_dataset", nargs="+", default=[1970], help="List of training dataset ids.")
+    parser.add_argument("--seed", type=int, default=42)
 
     args = parser.parse_args()
     logger.setLevel(args.log_level)

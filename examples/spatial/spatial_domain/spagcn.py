@@ -22,9 +22,9 @@ if __name__ == "__main__":
     parser.add_argument("--n_clusters", type=int, default=7, help="the number of clusters")
     parser.add_argument("--step", type=float, default=0.1, help="")
     parser.add_argument("--lr", type=float, default=0.05, help="learning rate")
-    parser.add_argument("--random_state", type=int, default=100)
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
-    set_seed(args.random_state)
+    set_seed(args.seed)
 
     # Initialize model and get model specific preprocessing pipeline
     model = SpaGCN()

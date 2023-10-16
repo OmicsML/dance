@@ -5,7 +5,6 @@ This code is based on https://github.com/NVlabs/MUNIT.
 """
 import argparse
 import os
-import random
 
 import torch
 from sklearn import preprocessing
@@ -15,7 +14,6 @@ from dance.modules.multi_modality.match_modality.cmae import CMAE
 from dance.utils import set_seed
 
 if __name__ == "__main__":
-    rndseed = random.randint(0, 2147483647)
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_path", type=str, default="./match_modality/output", help="outputs path")
     parser.add_argument("-d", "--data_folder", default="./data/modality_matching")
@@ -23,7 +21,6 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
-    parser.add_argument("-seed", "--rnd_seed", default=rndseed, type=int)
     parser.add_argument("-pk", "--pickle_suffix", default="_lsi_input_pca_count.pkl")
 
     parser.add_argument("--max_epochs", default=50, type=int, help="maximum number of training epochs")
@@ -46,13 +43,11 @@ if __name__ == "__main__":
     parser.add_argument("--recon_kl_w", default=0, type=int, help="weight of KL loss for reconstruction")
     parser.add_argument("--supervise", default=1, type=float, help="fraction to supervise")
     parser.add_argument("--super_w", default=0.1, type=float, help="weight of supervision loss")
+    parser.add_argument("--seed", default=42, type=int)
 
     opts = parser.parse_args()
-
     torch.set_num_threads(opts.cpus)
-    rndseed = opts.rnd_seed
-    device = opts.device
-    set_seed(rndseed)
+    set_seed(opts.seed)
 
     # Setup logger and output folders
     output_directory = os.path.join(opts.output_path, "outputs")
@@ -71,6 +66,7 @@ if __name__ == "__main__":
                     label_channel="labels")
 
     # Obtain training and testing data
+    device = opts.device
     (x_train, y_train, batch), _ = data.get_train_data(return_type="torch")
     (x_test, y_test, _), labels = data.get_test_data(return_type="torch")
     batch = batch.long().to(device)

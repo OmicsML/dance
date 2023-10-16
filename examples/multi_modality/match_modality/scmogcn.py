@@ -19,11 +19,11 @@ if __name__ == "__main__":
     parser.add_argument("-dis", "--disable_propagation", default=0, type=int, choices=[0, 1, 2])
     parser.add_argument("-aux", "--auxiliary_loss", default=True, type=bool)
     parser.add_argument("-pk", "--pickle_suffix", default="_lsi_input_pca_count.pkl")
-    parser.add_argument("-seed", "--rnd_seed", default=42, type=int)
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-e", "--epochs", default=2000, type=int)
     parser.add_argument("-tq", "--threshold_quantile", default=0.95, type=float)
+    parser.add_argument("--seed", type=int, default=42)
 
     args = parser.parse_args()
     torch.set_num_threads(args.cpus)

@@ -22,7 +22,6 @@ def parse_args():
     parser.add_argument("--eps", type=float, default=0.01, help="eps")
 
     parser.add_argument("--batch_size", "-b", type=int, default=64, help="Batch size")
-    parser.add_argument("--seed", type=int, default=200, help="Random seed for repeat results")
     parser.add_argument("--latent", "-l", type=int, default=10, help="latent layer dim")
     parser.add_argument("--max_epoch", "-me", type=int, default=25, help="Max epoches")
     parser.add_argument("--max_iteration", "-mi", type=int, default=3000, help="Max iteration")
@@ -34,6 +33,7 @@ def parse_args():
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("--final_rate", type=float, default=1e-4)
     parser.add_argument("--scale_factor", type=float, default=4)
+    parser.add_argument("--seed", type=int, default=42)
 
     return parser.parse_args()
 

@@ -120,12 +120,12 @@ if __name__ == "__main__":
     parser.add_argument("-ci", "--cell_init", default="none", choices=["none", "svd"])
     parser.add_argument("-bas", "--batch_seperation", action="store_true")
     parser.add_argument("-pwpath", "--pathway_path", default="./data/h.all.v7.4")
-    parser.add_argument("-seed", "--random_seed", type=int, default=777)
     parser.add_argument("-ws", "--weighted_sum", action="store_true")
     parser.add_argument("-samp", "--sampling", action="store_true")
     parser.add_argument("-ns", "--node_sampling_rate", type=float, default=0.5)
     parser.add_argument("-prep", "--preprocessing", default="none", choices=["none", "feature_selection", "svd"])
     parser.add_argument("-lm", "--low_memory", type=bool, default=True)
+    parser.add_argument("--seed", type=int, default=42)
 
     args = parser.parse_args()
 
@@ -149,7 +149,7 @@ if __name__ == "__main__":
     if args.sampling:
         args.pathway = False
 
-    set_seed(args.random_seed)
+    set_seed(args.seed)
     torch.set_num_threads(args.cpu)
 
     pipeline(**vars(args))

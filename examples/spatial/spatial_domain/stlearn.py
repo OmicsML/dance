@@ -13,9 +13,9 @@ if __name__ == "__main__":
                         help="12 human dorsolateral prefrontal cortex datasets for the spatial domain task.")
     parser.add_argument("--mode", type=str, default="louvain", choices=MODES)
     parser.add_argument("--n_clusters", type=int, default=17, help="the number of clusters")
-    parser.add_argument("--seed", type=int, default=2)
     parser.add_argument("--n_components", type=int, default=50, help="the number of components in PCA")
     parser.add_argument("--device", type=str, default="cuda", help="device for resnet extract feature")
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
     set_seed(args.seed)
 

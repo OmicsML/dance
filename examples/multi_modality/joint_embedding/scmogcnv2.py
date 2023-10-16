@@ -48,7 +48,7 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--data_folder', default='./data/joint_embedding')
     parser.add_argument('-pre', '--pretrained_folder', default='./data/joint_embedding/pretrained')
     parser.add_argument('-csv', '--csv_path', default='decoupled_lsi.csv')
-    parser.add_argument('-seed', '--rnd_seed', default=rndseed, type=int)
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument('-cpu', '--cpus', default=1, type=int)
     parser.add_argument('-bs', '--batch_size', default=512, type=int)
     parser.add_argument('-prefix', '--prefix', default='dance_openproblems_bmmc_atac2rna_test')
@@ -93,12 +93,10 @@ if __name__ == '__main__':
     parser.add_argument('-ws', '--weighted_sum', action='store_true')
 
     args = parser.parse_args()
-    args.rnd_seed = 1507659161
 
     device = args.device
     torch.set_num_threads(args.cpus)
-    rndseed = args.rnd_seed
-    set_seed(rndseed)
+    set_seed(args.seed)
 
     args.no_pathway = True
     args.no_batch_features = True  #False
@@ -126,9 +124,9 @@ if __name__ == '__main__':
 
     model = ScMoGCNWrapper(args)
 
-    model.load(f'models/model_joint_embedding_{rndseed}.pth')
+    model.load(f'models/model_joint_embedding_{args.seed}.pth')
     # model.fit(g, X, Y_train, args.epoch)
-    # model.load(f'models/model_joint_embedding_{rndseed}.pth')
+    # model.load(f'models/model_joint_embedding_{args.seed}.pth')
 
     with torch.no_grad():
         embeds = model.predict(g).cpu().numpy()
@@ -144,7 +142,7 @@ if __name__ == '__main__':
             'method_id': 'scmogcn',
         },
     )
-    adata.write_h5ad(f'./joint_embedding_{rndseed}.h5ad', compression="gzip")
+    adata.write_h5ad(f'./joint_embedding_{args.seed}.h5ad', compression="gzip")
 
     # scmvae test
     metrics.labeled_clustering_evaluate(adata, dataset)  #, 45)

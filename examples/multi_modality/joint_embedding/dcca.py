@@ -36,7 +36,7 @@ def parse_args():
 
     parser.add_argument("--batch_size", "-b", type=int, default=64, help="Batch size")
 
-    parser.add_argument("--seed", type=int, default=1, help="Random seed for repeat results")
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--latent", "-l", type=int, default=10, help="latent layer dim")
     parser.add_argument("--max_epoch", "-me", type=int, default=10, help="Max epoches")
     parser.add_argument("--max_iteration", "-mi", type=int, default=3000, help="Max iteration")

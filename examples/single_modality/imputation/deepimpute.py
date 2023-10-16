@@ -8,7 +8,6 @@ from dance.utils import set_seed
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--random_seed", type=int, default=10)
     parser.add_argument("--dropout", type=float, default=0.1, help="dropout probability")
     parser.add_argument("--gpu", type=int, default=0, help="GPU id, -1 for cpu")
     parser.add_argument("--lr", type=float, default=1e-5, help="learning rate")
@@ -28,14 +27,15 @@ if __name__ == '__main__':
     parser.add_argument("--mask_rate", type=float, default=.1, help="Masking rate.")
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--mask", type=bool, default=True, help="Mask data for validation.")
+    parser.add_argument("--seed", type=int, default=42)
     params = parser.parse_args()
     print(vars(params))
-    set_seed(params.random_seed)
+    set_seed(params.seed)
 
     dataloader = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset, train_size=params.train_size)
     preprocessing_pipeline = DeepImpute.preprocessing_pipeline(min_cells=params.min_cells, n_top=params.n_top,
                                                                sub_outputdim=params.sub_outputdim, mask=params.mask,
-                                                               seed=params.random_seed, mask_rate=params.mask_rate)
+                                                               seed=params.seed, mask_rate=params.mask_rate)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=params.cache)
 
     if params.mask:
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     test_idx = data.test_idx
 
     model = DeepImpute(predictors, targets, params.dataset, params.sub_outputdim, params.hidden_dim, params.dropout,
-                       params.random_seed, params.gpu)
+                       params.seed, params.gpu)
     model.fit(X[train_idx], X[train_idx], train_idx, mask, params.batch_size, params.lr, params.n_epochs,
               params.patience)
     imputed_data = model.predict(X[test_idx], test_idx, mask)

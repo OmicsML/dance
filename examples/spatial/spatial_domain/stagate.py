@@ -13,9 +13,9 @@ if __name__ == "__main__":
                         help="12 human dorsolateral prefrontal cortex datasets for the spatial domain task.")
     parser.add_argument("--hidden_dims", type=list, default=[512, 32], help="hidden dimensions")
     parser.add_argument("--rad_cutoff", type=int, default=150, help="")
-    parser.add_argument("--seed", type=int, default=3, help="")
     parser.add_argument("--epochs", type=int, default=1000, help="epochs")
     parser.add_argument("--high_variable_genes", type=int, default=3000, help="")
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
     set_seed(args.seed)
 

@@ -18,7 +18,6 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
-    parser.add_argument("-seed", "--rnd_seed", default=42, type=int)
     parser.add_argument("-m", "--model_folder", default="./models")
     parser.add_argument("--outdir", "-o", default="./logs", help="Directory to output to")
     parser.add_argument("--lossweight", type=float, default=1., help="Relative loss weight")
@@ -29,6 +28,7 @@ if __name__ == "__main__":
     parser.add_argument("--naive", "-n", action="store_true", help="Use a naive model instead of lego model")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--max_epochs", type=int, default=500)
+    parser.add_argument("--seed", default=42, type=int)
     args = parser.parse_args()
     args.resume = True
 

@@ -1,5 +1,4 @@
 import argparse
-import random
 
 import torch
 
@@ -8,7 +7,6 @@ from dance.modules.multi_modality.match_modality.scmm import MMVAE
 from dance.utils import set_seed
 
 if __name__ == "__main__":
-    rndseed = random.randint(0, 2147483647)
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_path", type=str, default="./modality_matching/output", help="outputs path")
     parser.add_argument("-d", "--data_folder", default="./data/modality_matching")
@@ -16,7 +14,6 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
-    parser.add_argument("-seed", "--rnd_seed", default=rndseed, type=int)
 
     parser.add_argument("--experiment", type=str, default="test", metavar="E", help="experiment name")
     parser.add_argument("--obj", type=str, default="m_elbo_naive_warmup", metavar="O",
@@ -39,16 +36,14 @@ if __name__ == "__main__":
     parser.add_argument("--print_freq", type=int, default=0, metavar="f",
                         help="frequency with which to print stats (default: 0)")
     parser.add_argument("--deterministic_warmup", type=int, default=50, metavar="W", help="deterministic warmup")
+    parser.add_argument("--seed", default=42, type=int)
     args = parser.parse_args()
 
     torch.set_num_threads(args.cpus)
-    rndseed = args.rnd_seed
-    set_seed(rndseed)
-    subtask = args.subtask
-    device = args.device
+    set_seed(args.seed)
 
     # Preprocess and load data
-    dataset = ModalityMatchingDataset(subtask, root=args.data_folder, preprocess="feature_selection")
+    dataset = ModalityMatchingDataset(args.subtask, root=args.data_folder, preprocess="feature_selection")
     data = dataset.load_data()
 
     # Set data config
@@ -61,8 +56,8 @@ if __name__ == "__main__":
     args.r_dim = x_train.shape[1]
     args.p_dim = y_train.shape[1]
 
-    model_class = "rna-protein" if subtask == "openproblems_bmmc_cite_phase2_rna" else "rna-dna"
-    model = MMVAE(model_class, args).to(device)
+    model_class = "rna-protein" if args.subtask == "openproblems_bmmc_cite_phase2_rna" else "rna-dna"
+    model = MMVAE(model_class, args).to(args.device)
 
     model.fit(x_train, y_train)
     print(model.predict(x_test, y_test))

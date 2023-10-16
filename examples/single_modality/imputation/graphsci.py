@@ -8,7 +8,6 @@ from dance.utils import set_seed
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--random_seed", type=int, default=10)
     parser.add_argument("--dropout", type=float, default=0.1, help="dropout probability")
     parser.add_argument("--gpu", type=int, default=0, help="GPU id, -1 for cpu")
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
@@ -31,13 +30,14 @@ if __name__ == '__main__':
                         help="Minimum proportion of cells expressed required for a gene to pass filtering")
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--mask", type=bool, default=True, help="Mask data for validation.")
+    parser.add_argument("--seed", type=int, default=42)
     params = parser.parse_args()
-    set_seed(params.random_seed)
+    set_seed(params.seed)
     print(vars(params))
 
     dataloader = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset, train_size=params.train_size)
     preprocessing_pipeline = GraphSCI.preprocessing_pipeline(min_cells=params.min_cells, threshold=params.threshold,
-                                                             mask=params.mask, seed=params.random_seed,
+                                                             mask=params.mask, seed=params.seed,
                                                              mask_rate=params.mask_rate)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=params.cache)
 
@@ -54,7 +54,7 @@ if __name__ == '__main__':
     test_idx = data.test_idx
 
     model = GraphSCI(num_cells=X.shape[0], num_genes=X.shape[1], dataset=params.dataset, dropout=params.dropout,
-                     gpu=params.gpu, seed=params.random_seed)
+                     gpu=params.gpu, seed=params.seed)
     model.fit(X, X_raw, g, train_idx, mask, params.le, params.la, params.ke, params.ka, params.n_epochs, params.lr,
               params.weight_decay)
     model.load_model()

@@ -22,11 +22,11 @@ if __name__ == "__main__":
     parser.add_argument("--train_dataset", nargs="+", default=[1970], help="List of training dataset ids.")
     parser.add_argument("--not_use_SGD", action="store_true",
                         help="Training algorithm -- weather it will be stochastic gradient descent.")
-    parser.add_argument("--random_state", type=int, default=42)
+    parser.add_argument("--seed", type=int, default=42)
 
     args = parser.parse_args()
     logger.setLevel(args.log_level)
-    set_seed(args.random_state)
+    set_seed(args.seed)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
 
     # Initialize model and get model specific preprocessing pipeline

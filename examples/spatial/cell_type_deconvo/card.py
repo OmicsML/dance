@@ -12,9 +12,9 @@ parser.add_argument("--datadir", default="data/spatial", help="Directory to save
 parser.add_argument("--max_iter", type=int, default=10, help="Maximum optimization iteration.")
 parser.add_argument("--epsilon", type=float, default=1e-10, help="Optimization threshold.")
 parser.add_argument("--location_free", action="store_true", help="Do not supply spatial location if set.")
-parser.add_argument("--random_state", type=int, default=100)
+parser.add_argument("--seed", type=int, default=42)
 args = parser.parse_args()
-set_seed(args.random_state)
+set_seed(args.seed)
 pprint(vars(args))
 
 # Load dataset

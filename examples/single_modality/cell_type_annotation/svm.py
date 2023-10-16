@@ -14,15 +14,15 @@ if __name__ == "__main__":
     parser.add_argument("--dense_dim", type=int, default=400, help="dim of PCA")
     parser.add_argument("--gpu", type=int, default=-1, help="GPU id, set to -1 for CPU")
     parser.add_argument("--log_level", type=str, default="INFO", choices=get_args(LogLevel))
-    parser.add_argument("--random_seed", type=int, default=10)
     parser.add_argument("--species", default="mouse")
     parser.add_argument("--test_dataset", nargs="+", default=[1759], type=int, help="list of dataset id")
     parser.add_argument("--tissue", default="Spleen")  # TODO: Add option for different tissue name for train/test
     parser.add_argument("--train_dataset", nargs="+", default=[1970], type=int, help="list of dataset id")
+    parser.add_argument("--seed", type=int, default=42)
 
     args = parser.parse_args()
     logger.setLevel(args.log_level)
-    set_seed(args.random_seed)
+    set_seed(args.seed)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
 
     # Initialize model and get model specific preprocessing pipeline
