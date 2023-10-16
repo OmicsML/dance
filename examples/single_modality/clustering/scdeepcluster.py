@@ -6,7 +6,8 @@ from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdeepcluster import ScDeepCluster
 from dance.utils import set_seed
 
-if __name__ == "__main__":
+
+def parse_args():
     parser = argparse.ArgumentParser(description="train", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--knn", default=20, type=int,
                         help="number of nearest neighbors, used by the Louvain algorithm")
@@ -31,7 +32,11 @@ if __name__ == "__main__":
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
     set_seed(args.seed)
 
     # Load data and perform necessary preprocessing

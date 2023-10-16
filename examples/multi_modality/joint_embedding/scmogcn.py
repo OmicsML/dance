@@ -8,7 +8,8 @@ from dance.modules.multi_modality.joint_embedding.scmogcn import ScMoGCNWrapper
 from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph
 from dance.utils import set_seed
 
-if __name__ == "__main__":
+
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2",
                         choices=["openproblems_bmmc_cite_phase2", "openproblems_bmmc_multiome_phase2"])
@@ -22,9 +23,11 @@ if __name__ == "__main__":
     parser.add_argument("-bs", "--batch_size", default=512, type=int)
     parser.add_argument("-nm", "--normalize", default=1, type=int, choices=[0, 1])
     parser.add_argument("--seed", type=int, default=42)
+    return parser.parse_args()
 
-    args = parser.parse_args()
 
+if __name__ == "__main__":
+    args = parse_args()
     device = args.device  # XXX: not used
     torch.set_num_threads(args.cpus)
     set_seed(args.seed)

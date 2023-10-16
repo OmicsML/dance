@@ -9,7 +9,8 @@ from dance.modules.multi_modality.match_modality.scmogcn import ScMoGCNWrapper
 from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph
 from dance.utils import set_seed
 
-if __name__ == "__main__":
+
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
     parser.add_argument("-d", "--data_folder", default="./data/modality_matching")
@@ -25,7 +26,11 @@ if __name__ == "__main__":
     parser.add_argument("-tq", "--threshold_quantile", default=0.95, type=float)
     parser.add_argument("--seed", type=int, default=42)
 
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
     torch.set_num_threads(args.cpus)
     set_seed(args.seed)
 

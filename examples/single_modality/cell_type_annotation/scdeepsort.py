@@ -10,7 +10,8 @@ from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeep
 from dance.typing import LogLevel
 from dance.utils import set_seed
 
-if __name__ == "__main__":
+
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=500)
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
@@ -29,8 +30,11 @@ if __name__ == "__main__":
     parser.add_argument("--train_dataset", nargs="+", type=int, default=[1970], help="List of training dataset ids.")
     parser.add_argument("--weight_decay", type=float, default=5e-4, help="Weight for L2 loss")
     parser.add_argument("--seed", type=int, default=42)
+    return parser.parse_args()
 
-    args = parser.parse_args()
+
+if __name__ == "__main__":
+    args = parse_args()
     logger.setLevel(args.log_level)
     set_seed(args.seed)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")

@@ -6,7 +6,8 @@ from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.graphsci import GraphSCI
 from dance.utils import set_seed
 
-if __name__ == '__main__':
+
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dropout", type=float, default=0.1, help="dropout probability")
     parser.add_argument("--gpu", type=int, default=0, help="GPU id, -1 for cpu")
@@ -31,18 +32,21 @@ if __name__ == '__main__':
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--mask", type=bool, default=True, help="Mask data for validation.")
     parser.add_argument("--seed", type=int, default=42)
-    params = parser.parse_args()
-    set_seed(params.seed)
-    print(vars(params))
+    return parser.parse_args()
 
-    dataloader = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset, train_size=params.train_size)
-    preprocessing_pipeline = GraphSCI.preprocessing_pipeline(min_cells=params.min_cells, threshold=params.threshold,
-                                                             mask=params.mask, seed=params.seed,
-                                                             mask_rate=params.mask_rate)
-    data = dataloader.load_data(transform=preprocessing_pipeline, cache=params.cache)
 
-    device = "cpu" if params.gpu == -1 else f"cuda:{params.gpu}"
-    if params.mask:
+if __name__ == '__main__':
+    args = parse_args()
+    set_seed(args.seed)
+    print(vars(args))
+
+    dataloader = ImputationDataset(data_dir=args.data_dir, dataset=args.dataset, train_size=args.train_size)
+    preprocessing_pipeline = GraphSCI.preprocessing_pipeline(min_cells=args.min_cells, threshold=args.threshold,
+                                                             mask=args.mask, seed=args.seed, mask_rate=args.mask_rate)
+    data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
+
+    device = "cpu" if args.gpu == -1 else f"cuda:{args.gpu}"
+    if args.mask:
         X, X_raw, g, mask = data.get_x(return_type="default")
     else:
         mask = None
@@ -53,10 +57,10 @@ if __name__ == '__main__':
     train_idx = data.train_idx
     test_idx = data.test_idx
 
-    model = GraphSCI(num_cells=X.shape[0], num_genes=X.shape[1], dataset=params.dataset, dropout=params.dropout,
-                     gpu=params.gpu, seed=params.seed)
-    model.fit(X, X_raw, g, train_idx, mask, params.le, params.la, params.ke, params.ka, params.n_epochs, params.lr,
-              params.weight_decay)
+    model = GraphSCI(num_cells=X.shape[0], num_genes=X.shape[1], dataset=args.dataset, dropout=args.dropout,
+                     gpu=args.gpu, seed=args.seed)
+    model.fit(X, X_raw, g, train_idx, mask, args.le, args.la, args.ke, args.ka, args.n_epochs, args.lr,
+              args.weight_decay)
     model.load_model()
     imputed_data = model.predict(X, X_raw, g, mask)
     score = model.score(X_raw, imputed_data, test_idx, mask, metric='RMSE')

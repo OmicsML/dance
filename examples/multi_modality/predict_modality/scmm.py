@@ -6,7 +6,8 @@ from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.scmm import MMVAE
 from dance.utils import set_seed
 
-if __name__ == "__main__":
+
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_path", type=str, default="./predict_modality/output", help="outputs path")
     parser.add_argument("--resume", action="store_true")
@@ -36,10 +37,14 @@ if __name__ == "__main__":
     parser.add_argument("--print_freq", type=int, default=0, metavar="f",
                         help="frequency with which to print stats (default: 0)")
     parser.add_argument("--deterministic_warmup", type=int, default=50, metavar="W", help="deterministic warmup")
-    args = parser.parse_args()
+    return parser.parse_args()
 
+
+if __name__ == "__main__":
+    args = parse_args()
     torch.set_num_threads(args.cpus)
     set_seed(args.seed)
+
     dataset = ModalityPredictionDataset(args.subtask, preprocess="feature_selection")
     data = dataset.load_data()
 

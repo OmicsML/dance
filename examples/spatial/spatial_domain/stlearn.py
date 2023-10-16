@@ -6,7 +6,8 @@ from dance.transforms.preprocess import set_seed
 
 MODES = ["louvain", "kmeans"]
 
-if __name__ == "__main__":
+
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--sample_number", type=str, default="151673",
@@ -16,7 +17,11 @@ if __name__ == "__main__":
     parser.add_argument("--n_components", type=int, default=50, help="the number of components in PCA")
     parser.add_argument("--device", type=str, default="cuda", help="device for resnet extract feature")
     parser.add_argument("--seed", type=int, default=42)
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
     set_seed(args.seed)
 
     # Initialize model and get model specific preprocessing pipeline

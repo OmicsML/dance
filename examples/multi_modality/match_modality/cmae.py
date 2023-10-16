@@ -13,7 +13,8 @@ from dance.datasets.multimodality import ModalityMatchingDataset
 from dance.modules.multi_modality.match_modality.cmae import CMAE
 from dance.utils import set_seed
 
-if __name__ == "__main__":
+
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_path", type=str, default="./match_modality/output", help="outputs path")
     parser.add_argument("-d", "--data_folder", default="./data/modality_matching")
@@ -45,17 +46,21 @@ if __name__ == "__main__":
     parser.add_argument("--super_w", default=0.1, type=float, help="weight of supervision loss")
     parser.add_argument("--seed", default=42, type=int)
 
-    opts = parser.parse_args()
-    torch.set_num_threads(opts.cpus)
-    set_seed(opts.seed)
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    torch.set_num_threads(args.cpus)
+    set_seed(args.seed)
 
     # Setup logger and output folders
-    output_directory = os.path.join(opts.output_path, "outputs")
+    output_directory = os.path.join(args.output_path, "outputs")
     checkpoint_directory = os.path.join(output_directory, "checkpoints")
     os.makedirs(checkpoint_directory, exist_ok=True)
 
     # Preprocess and load data
-    dataset = ModalityMatchingDataset(opts.subtask, root=opts.data_folder, preprocess="feature_selection")
+    dataset = ModalityMatchingDataset(args.subtask, root=args.data_folder, preprocess="feature_selection")
     data = dataset.load_data()
 
     # Prepare extra batch features and set data configs
@@ -66,7 +71,7 @@ if __name__ == "__main__":
                     label_channel="labels")
 
     # Obtain training and testing data
-    device = opts.device
+    device = args.device
     (x_train, y_train, batch), _ = data.get_train_data(return_type="torch")
     (x_test, y_test, _), labels = data.get_test_data(return_type="torch")
     batch = batch.long().to(device)
@@ -76,11 +81,11 @@ if __name__ == "__main__":
     y_test = y_test.float().to(device)
     labels = labels.long().to(device)
 
-    config = vars(opts)
+    config = vars(args)
     # Some Fixed Settings
     config["input_dim_a"] = data.mod["mod1"].shape[1]
     config["input_dim_b"] = data.mod["mod2"].shape[1]
-    config["resume"] = opts.resume
+    config["resume"] = args.resume
     config["num_of_classes"] = max(batch) + 1
     config["shared_layer"] = True
     config["gen"] = {

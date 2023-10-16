@@ -10,7 +10,8 @@ from dance.transforms import (AnnDataTransform, CellwiseMaskData, Compose, Filte
                               FilterGenesTopK)
 from dance.utils import set_seed
 
-if __name__ == "__main__":
+
+def parse_args():
     # Parse arguments
     parser = argparse.ArgumentParser(description="Main program for scGNN v2")
     parser.add_argument("--dataset", default='mouse_brain_data', type=str, help="dataset id")
@@ -163,7 +164,11 @@ if __name__ == "__main__":
     parser.add_argument("--deconv_tune_epoch", type=int, default=20, help="(int, default 20) epoch")
     parser.add_argument("--deconv_tune_epsilon", type=float, default=1e-4, help="(float, default) epsilon")
 
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
     set_seed(args.seed)
     logger.info(pformat(vars(args)))
 

@@ -9,11 +9,8 @@ from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.babel import BabelWrapper
 from dance.utils import set_seed
 
-if __name__ == "__main__":
-    OPTIMIZER_DICT = {
-        "adam": torch.optim.Adam,
-        "rmsprop": torch.optim.RMSprop,
-    }
+
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
     parser.add_argument("-device", "--device", default="cuda")
@@ -31,9 +28,14 @@ if __name__ == "__main__":
     parser.add_argument("--seed", default=42, type=int)
     args = parser.parse_args()
     args.resume = True
+    return args
 
+
+if __name__ == "__main__":
+    args = parse_args()
     torch.set_num_threads(args.cpus)
     set_seed(args.seed)
+
     dataset = ModalityPredictionDataset(args.subtask, preprocess="feature_selection")
     data = dataset.load_data()
 

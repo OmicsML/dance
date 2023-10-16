@@ -13,7 +13,8 @@ from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.cmae import CMAE
 from dance.utils import set_seed
 
-if __name__ == "__main__":
+
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_path", type=str, default="./predict_modality/output", help="outputs path")
     parser.add_argument("--resume", action="store_true")
@@ -43,15 +44,18 @@ if __name__ == "__main__":
     parser.add_argument("--supervise", default=1, type=float, help="fraction to supervise")
     parser.add_argument("--super_w", default=0.1, type=float, help="weight of supervision loss")
 
-    opts = parser.parse_args()
-    device = opts.device
+    return parser.parse_args()
 
-    torch.set_num_threads(opts.cpus)
-    set_seed(opts.seed)
-    dataset = ModalityPredictionDataset(opts.subtask, preprocess="feature_selection")
+
+if __name__ == "__main__":
+    args = parse_args()
+    torch.set_num_threads(args.cpus)
+    set_seed(args.seed)
+
+    dataset = ModalityPredictionDataset(args.subtask, preprocess="feature_selection")
     data = dataset.load_data()
 
-    output_directory = os.path.join(opts.output_path, "outputs")
+    output_directory = os.path.join(args.output_path, "outputs")
     checkpoint_directory = os.path.join(output_directory, "checkpoints")
     os.makedirs(checkpoint_directory, exist_ok=True)
 
@@ -64,6 +68,7 @@ if __name__ == "__main__":
                     feature_channel=[None, "batch"], overwrite=True)
 
     # Obtain training and testing data
+    device = args.device
     (x_train, batch), y_train = data.get_train_data(return_type="torch")
     (x_test, _), y_test = data.get_test_data(return_type="torch")
     batch = batch.long().to(device)
@@ -72,11 +77,11 @@ if __name__ == "__main__":
     x_test = x_test.float().to(device)
     y_test = y_test.float().to(device)
 
-    config = vars(opts)
+    config = vars(args)
     # Some Fixed Settings
     config["input_dim_a"] = x_train.shape[1]
     config["input_dim_b"] = y_train.shape[1]
-    config["resume"] = opts.resume
+    config["resume"] = args.resume
     config["num_of_classes"] = max(batch) + 1
     config["shared_layer"] = True
     config["gen"] = {

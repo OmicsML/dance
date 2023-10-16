@@ -6,7 +6,8 @@ from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.deepimpute import DeepImpute
 from dance.utils import set_seed
 
-if __name__ == '__main__':
+
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dropout", type=float, default=0.1, help="dropout probability")
     parser.add_argument("--gpu", type=int, default=0, help="GPU id, -1 for cpu")
@@ -28,17 +29,21 @@ if __name__ == '__main__':
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--mask", type=bool, default=True, help="Mask data for validation.")
     parser.add_argument("--seed", type=int, default=42)
-    params = parser.parse_args()
-    print(vars(params))
-    set_seed(params.seed)
+    return parser.parse_args()
 
-    dataloader = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset, train_size=params.train_size)
-    preprocessing_pipeline = DeepImpute.preprocessing_pipeline(min_cells=params.min_cells, n_top=params.n_top,
-                                                               sub_outputdim=params.sub_outputdim, mask=params.mask,
-                                                               seed=params.seed, mask_rate=params.mask_rate)
-    data = dataloader.load_data(transform=preprocessing_pipeline, cache=params.cache)
 
-    if params.mask:
+if __name__ == '__main__':
+    args = parse_args()
+    print(vars(args))
+    set_seed(args.seed)
+
+    dataloader = ImputationDataset(data_dir=args.data_dir, dataset=args.dataset, train_size=args.train_size)
+    preprocessing_pipeline = DeepImpute.preprocessing_pipeline(min_cells=args.min_cells, n_top=args.n_top,
+                                                               sub_outputdim=args.sub_outputdim, mask=args.mask,
+                                                               seed=args.seed, mask_rate=args.mask_rate)
+    data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
+
+    if args.mask:
         X, X_raw, targets, predictors, mask = data.get_x(return_type="default")
     else:
         mask = None
@@ -48,10 +53,9 @@ if __name__ == '__main__':
     train_idx = data.train_idx
     test_idx = data.test_idx
 
-    model = DeepImpute(predictors, targets, params.dataset, params.sub_outputdim, params.hidden_dim, params.dropout,
-                       params.seed, params.gpu)
-    model.fit(X[train_idx], X[train_idx], train_idx, mask, params.batch_size, params.lr, params.n_epochs,
-              params.patience)
+    model = DeepImpute(predictors, targets, args.dataset, args.sub_outputdim, args.hidden_dim, args.dropout, args.seed,
+                       args.gpu)
+    model.fit(X[train_idx], X[train_idx], train_idx, mask, args.batch_size, args.lr, args.n_epochs, args.patience)
     imputed_data = model.predict(X[test_idx], test_idx, mask)
     score = model.score(X_raw[test_idx], imputed_data, test_idx, mask, metric='RMSE')
     print("RMSE: %.4f" % score)

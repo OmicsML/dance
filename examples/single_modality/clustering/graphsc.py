@@ -6,7 +6,8 @@ from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.graphsc import GraphSC
 from dance.utils import set_seed
 
-if __name__ == "__main__":
+
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--epochs", default=100, type=int)
     parser.add_argument("-dv", "--device", default="auto")
@@ -38,7 +39,11 @@ if __name__ == "__main__":
                         choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
     set_seed(args.seed)
 
     # Load data and perform necessary preprocessing

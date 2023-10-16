@@ -4,7 +4,8 @@ from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdsc import ScDSC
 from dance.utils import set_seed
 
-if __name__ == "__main__":
+
+def parse_args():
     parser = argparse.ArgumentParser()
 
     # model_para = [n_enc_1(n_dec_3), n_enc_2(n_dec_2), n_enc_3(n_dec_1)]
@@ -46,7 +47,11 @@ if __name__ == "__main__":
     parser.add_argument("--sigma", type=float, default=Balance_para[4])
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
     set_seed(args.seed)
 
     # Load data and perform necessary preprocessing

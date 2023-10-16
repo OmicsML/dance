@@ -6,7 +6,8 @@ from dance.datasets.multimodality import ModalityMatchingDataset
 from dance.modules.multi_modality.match_modality.scmm import MMVAE
 from dance.utils import set_seed
 
-if __name__ == "__main__":
+
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_path", type=str, default="./modality_matching/output", help="outputs path")
     parser.add_argument("-d", "--data_folder", default="./data/modality_matching")
@@ -37,8 +38,12 @@ if __name__ == "__main__":
                         help="frequency with which to print stats (default: 0)")
     parser.add_argument("--deterministic_warmup", type=int, default=50, metavar="W", help="deterministic warmup")
     parser.add_argument("--seed", default=42, type=int)
-    args = parser.parse_args()
 
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
     torch.set_num_threads(args.cpus)
     set_seed(args.seed)
 

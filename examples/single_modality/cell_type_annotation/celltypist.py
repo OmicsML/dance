@@ -8,7 +8,8 @@ from dance.modules.single_modality.cell_type_annotation.celltypist import Cellty
 from dance.typing import LogLevel
 from dance.utils import set_seed
 
-if __name__ == "__main__":
+
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--log_level", type=str, default="INFO", choices=get_args(LogLevel))
@@ -23,8 +24,11 @@ if __name__ == "__main__":
     parser.add_argument("--not_use_SGD", action="store_true",
                         help="Training algorithm -- weather it will be stochastic gradient descent.")
     parser.add_argument("--seed", type=int, default=42)
+    return parser.parse_args()
 
-    args = parser.parse_args()
+
+if __name__ == "__main__":
+    args = parse_args()
     logger.setLevel(args.log_level)
     set_seed(args.seed)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
