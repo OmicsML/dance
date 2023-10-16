@@ -38,12 +38,16 @@ def set_seed(rndseed, cuda: bool = True, extreme_mode: bool = False):
     random.seed(rndseed)
     np.random.seed(rndseed)
     torch.manual_seed(rndseed)
-    if cuda:
+
+    if cuda and torch.cuda.is_available():
         torch.cuda.manual_seed(rndseed)
         torch.cuda.manual_seed_all(rndseed)
+
     if extreme_mode:
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
+
     dgl.seed(rndseed)
     dgl.random.seed(rndseed)
+
     logger.info(f"Setting global random seed to {rndseed}")
