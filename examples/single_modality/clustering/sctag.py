@@ -4,9 +4,10 @@ import numpy as np
 
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.sctag import ScTAG
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="scTAG")
 def parse_args():
     parser = argparse.ArgumentParser(description="train", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--data_dir", default="./data", type=str)
@@ -23,7 +24,6 @@ def parse_args():
     parser.add_argument("--alpha", default=1.0, type=float)
     parser.add_argument("--pretrain_epochs", default=200, type=int)
     parser.add_argument("--epochs", default=500, type=int)
-    parser.add_argument("--device", default="auto")
     parser.add_argument("--w_a", default=1, type=float)
     parser.add_argument("--w_x", default=1, type=float)
     parser.add_argument("--w_d", default=0, type=float)
@@ -32,14 +32,11 @@ def parse_args():
     parser.add_argument("--min_dist", default=0.5, type=float)
     parser.add_argument("--max_dist", default=20.0, type=float)
     parser.add_argument("--info_step", default=50, type=int)
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    set_seed(args.seed)
 
     # Load data and perform necessary preprocessing
     dataloader = ClusteringDataset(args.data_dir, args.dataset)

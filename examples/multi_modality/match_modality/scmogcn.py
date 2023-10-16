@@ -7,9 +7,10 @@ import torch.nn.functional as F
 from dance.datasets.multimodality import ModalityMatchingDataset
 from dance.modules.multi_modality.match_modality.scmogcn import ScMoGCNWrapper
 from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="scmogcn", setup_torch_threads=True, default_torch_threads=1)
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
@@ -20,19 +21,13 @@ def parse_args():
     parser.add_argument("-dis", "--disable_propagation", default=0, type=int, choices=[0, 1, 2])
     parser.add_argument("-aux", "--auxiliary_loss", default=True, type=bool)
     parser.add_argument("-pk", "--pickle_suffix", default="_lsi_input_pca_count.pkl")
-    parser.add_argument("-cpu", "--cpus", default=1, type=int)
-    parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-e", "--epochs", default=2000, type=int)
     parser.add_argument("-tq", "--threshold_quantile", default=0.95, type=float)
-    parser.add_argument("--seed", type=int, default=42)
-
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    torch.set_num_threads(args.cpus)
-    set_seed(args.seed)
 
     subtask = args.subtask
     data_folder = args.data_folder

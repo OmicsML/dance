@@ -2,12 +2,12 @@ import argparse
 
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.spagcn import SpaGCN, refine
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="SpaGCN")
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--sample_number", type=str, default="151673",
                         help="12 human dorsolateral prefrontal cortex datasets for the spatial domain task.")
     parser.add_argument("--beta", type=int, default=49, help="")
@@ -23,13 +23,11 @@ def parse_args():
     parser.add_argument("--n_clusters", type=int, default=7, help="the number of clusters")
     parser.add_argument("--step", type=float, default=0.1, help="")
     parser.add_argument("--lr", type=float, default=0.05, help="learning rate")
-    parser.add_argument("--seed", type=int, default=42)
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    set_seed(args.seed)
 
     # Initialize model and get model specific preprocessing pipeline
     model = SpaGCN()

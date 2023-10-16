@@ -1,29 +1,24 @@
 import argparse
-from pprint import pprint
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.spotlight import SPOTlight
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="SPOTLight")
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--dataset", default="CARD_synthetic", choices=CellTypeDeconvoDataset.AVAILABLE_DATA)
     parser.add_argument("--datadir", default="data/spatial", help="Directory to save the data.")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate.")
     parser.add_argument("--rank", type=int, default=2, help="Rank of the NMF module.")
     parser.add_argument("--bias", type=bool, default=False, help="Include/Exclude bias term.")
     parser.add_argument("--max_iter", type=int, default=4000, help="Maximum optimization iteration.")
-    parser.add_argument("--device", default="auto", help="Computation device.")
-    parser.add_argument("--seed", type=int, default=42)
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    set_seed(args.seed)
-    pprint(vars(args))
 
     # Load dataset
     preprocessing_pipeline = SPOTlight.preprocessing_pipeline()

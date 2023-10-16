@@ -1,27 +1,23 @@
 import argparse
-from pprint import pprint
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.card import Card
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="CARD")
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--dataset", default="CARD_synthetic", choices=CellTypeDeconvoDataset.AVAILABLE_DATA)
     parser.add_argument("--datadir", default="data/spatial", help="Directory to save the data.")
     parser.add_argument("--max_iter", type=int, default=10, help="Maximum optimization iteration.")
     parser.add_argument("--epsilon", type=float, default=1e-10, help="Optimization threshold.")
     parser.add_argument("--location_free", action="store_true", help="Do not supply spatial location if set.")
-    parser.add_argument("--seed", type=int, default=42)
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    set_seed(args.seed)
-    pprint(vars(args))
 
     # Load dataset
     preprocessing_pipeline = Card.preprocessing_pipeline()

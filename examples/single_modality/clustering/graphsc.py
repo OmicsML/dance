@@ -4,13 +4,13 @@ import numpy as np
 
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.graphsc import GraphSC
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="graphsc")
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--epochs", default=100, type=int)
-    parser.add_argument("-dv", "--device", default="auto")
     parser.add_argument("-if", "--in_feats", default=50, type=int)
     parser.add_argument("-bs", "--batch_size", default=128, type=int)
     parser.add_argument("-nw", "--normalize_weights", default="log_per_cell", choices=["log_per_cell", "per_cell"])
@@ -29,7 +29,6 @@ def parse_args():
     parser.add_argument("-h1", "--hidden_1", type=int, default=300)
     parser.add_argument("-h2", "--hidden_2", type=int, default=0)
     parser.add_argument("-ng", "--nb_genes", type=int, default=3000)
-    parser.add_argument("-nr", "--num_run", type=int, default=1)
     parser.add_argument("-nbw", "--num_workers", type=int, default=1)
     parser.add_argument("-eve", "--eval_epoch", action="store_true")
     parser.add_argument("-show", "--show_epoch_ari", action="store_true")
@@ -37,14 +36,11 @@ def parse_args():
     parser.add_argument("-dd", "--data_dir", default="./data", type=str)
     parser.add_argument("-data", "--dataset", default="10X_PBMC",
                         choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    set_seed(args.seed)
 
     # Load data and perform necessary preprocessing
     dataloader = ClusteringDataset(args.data_dir, args.dataset)
@@ -59,18 +55,14 @@ if __name__ == "__main__":
     graph, y = data.get_train_data()
     n_clusters = len(np.unique(y))
 
-    # Evaluate model for several runs
-    for run in range(args.num_run):
-        set_seed(args.seed + run)
-        model = GraphSC(agg=args.agg, activation=args.activation, in_feats=args.in_feats, n_hidden=args.n_hidden,
-                        hidden_dim=args.hidden_dim, hidden_1=args.hidden_1, hidden_2=args.hidden_2,
-                        dropout=args.dropout, n_layers=args.n_layers, hidden_relu=args.hidden_relu,
-                        hidden_bn=args.hidden_bn, n_clusters=n_clusters, cluster_method="leiden",
-                        num_workers=args.num_workers, device=args.device)
-        model.fit(graph, epochs=args.epochs, lr=args.learning_rate, show_epoch_ari=args.show_epoch_ari,
-                  eval_epoch=args.eval_epoch)
-        score = model.score(None, y)
-        print(f"{score=:.4f}")
+    model = GraphSC(agg=args.agg, activation=args.activation, in_feats=args.in_feats, n_hidden=args.n_hidden,
+                    hidden_dim=args.hidden_dim, hidden_1=args.hidden_1, hidden_2=args.hidden_2, dropout=args.dropout,
+                    n_layers=args.n_layers, hidden_relu=args.hidden_relu, hidden_bn=args.hidden_bn,
+                    n_clusters=n_clusters, cluster_method="leiden", num_workers=args.num_workers, device=args.device)
+    model.fit(graph, epochs=args.epochs, lr=args.learning_rate, show_epoch_ari=args.show_epoch_ari,
+              eval_epoch=args.eval_epoch)
+    score = model.score(None, y)
+    print(f"{score=:.4f}")
 """ Reproduction information
 10X PBMC:
 python graphsc.py --dataset 10X_PBMC

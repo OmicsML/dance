@@ -1,25 +1,19 @@
 import argparse
-import pprint
-from typing import get_args
 
 import torch
 
-from dance import logger
 from dance.datasets.singlemodality import ScDeepSortDataset
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
-from dance.typing import LogLevel
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="scDeepSort")
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=500)
-    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--dense_dim", type=int, default=400, help="number of hidden gcn units")
-    parser.add_argument("--device", type=str, default="cpu", help="Computation device")
     parser.add_argument("--dropout", type=float, default=0.1, help="dropout probability")
     parser.add_argument("--hidden_dim", type=int, default=200, help="number of hidden gcn units")
-    parser.add_argument("--log_level", type=str, default="INFO", choices=get_args(LogLevel))
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
     parser.add_argument("--n_epochs", type=int, default=300, help="number of training epochs")
     parser.add_argument("--n_layers", type=int, default=1, help="number of hidden gcn layers")
@@ -29,15 +23,11 @@ def parse_args():
     parser.add_argument("--tissue", default="Spleen", type=str)
     parser.add_argument("--train_dataset", nargs="+", type=int, default=[1970], help="List of training dataset ids.")
     parser.add_argument("--weight_decay", type=float, default=5e-4, help="Weight for L2 loss")
-    parser.add_argument("--seed", type=int, default=42)
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    logger.setLevel(args.log_level)
-    set_seed(args.seed)
-    logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
 
     # Initialize model and get model specific preprocessing pipeline
     model = ScDeepSort(args.dense_dim, args.hidden_dim, args.n_layers, args.species, args.tissue, dropout=args.dropout,

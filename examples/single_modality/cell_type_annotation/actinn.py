@@ -1,25 +1,21 @@
 import argparse
 import pprint
-from typing import get_args
 
 import numpy as np
 
 from dance import logger
 from dance.datasets.singlemodality import ScDeepSortDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
-from dance.typing import LogLevel
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="ACTINN")
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--batch_size", type=int, default=1024, help="Batch size")
-    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
-    parser.add_argument("--device", default="cpu", help="Computation device.")
     parser.add_argument("--hidden_dims", nargs="+", type=int, default=[2000], help="Hidden dimensions.")
     parser.add_argument("--lambd", type=float, default=0.01, help="Regularization parameter")
     parser.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate")
-    parser.add_argument("--log_level", type=str, default="INFO", choices=get_args(LogLevel))
     parser.add_argument("--nofilter", action="store_true", help="Disable filtering genes by expression summaries.")
     parser.add_argument(
         "--normalize", action="store_true", help="Whether to perform the normalization described in ACTINN. "
@@ -31,14 +27,12 @@ def parse_args():
     parser.add_argument("--test_dataset", nargs="+", default=[1759], help="List of testing dataset ids.")
     parser.add_argument("--tissue", default="Spleen")
     parser.add_argument("--train_dataset", nargs="+", default=[1970], help="List of training dataset ids.")
-    parser.add_argument("--seed", type=int, default=42)
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
     logger.setLevel(args.log_level)
-    set_seed(args.seed)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
 
     # Initialize model and get model specific preprocessing pipeline

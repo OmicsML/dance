@@ -1,17 +1,16 @@
 import argparse
-from pprint import pprint
 
 import numpy as np
 import torch
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo import DSTG
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="DSTG")
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--dataset", default="CARD_synthetic", choices=CellTypeDeconvoDataset.AVAILABLE_DATA)
     parser.add_argument("--datadir", default="data/spatial", help="Directory to save the data.")
     parser.add_argument("--sc_ref", type=bool, default=True, help="Reference scRNA (True) or cell-mixtures (False).")
@@ -25,15 +24,11 @@ def parse_args():
     parser.add_argument("--nhid", type=int, default=16, help="Number of neurons in latent layer.")
     parser.add_argument("--dropout", type=float, default=0., help="Dropout rate.")
     parser.add_argument("--epochs", type=int, default=25, help="Number of epochs to train the model.")
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--device", default="auto", help="Computation device.")
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    set_seed(args.seed)
-    pprint(vars(args))
 
     # Load dataset
     preprocessing_pipeline = DSTG.preprocessing_pipeline(

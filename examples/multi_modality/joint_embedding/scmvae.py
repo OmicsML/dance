@@ -8,19 +8,17 @@ from sklearn import preprocessing
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.scmvae import scMVAE
 from dance.transforms.preprocess import calculate_log_library_size
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="scmvae")
 def parse_args():
     parser = argparse.ArgumentParser(description="Single cell Multi-omics data analysis")
-
     parser.add_argument("--workdir", "-wk", type=str, default="./new_test", help="work path")
     parser.add_argument("--outdir", "-od", type=str, default="./new_test", help="Output path")
-
     parser.add_argument("--lr", type=float, default=1E-3, help="Learning rate")
     parser.add_argument("--weight_decay", type=float, default=1e-6, help="weight decay")
     parser.add_argument("--eps", type=float, default=0.01, help="eps")
-
     parser.add_argument("--batch_size", "-b", type=int, default=64, help="Batch size")
     parser.add_argument("--latent", "-l", type=int, default=10, help="latent layer dim")
     parser.add_argument("--max_epoch", "-me", type=int, default=25, help="Max epoches")
@@ -30,17 +28,13 @@ def parse_args():
                         help="Epoch per test, must smaller than max iteration.")
     parser.add_argument("--max_ARI", "-ma", type=int, default=-200, help="initial ARI")
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2")
-    parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("--final_rate", type=float, default=1e-4)
     parser.add_argument("--scale_factor", type=float, default=4)
-    parser.add_argument("--seed", type=int, default=42)
-
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    set_seed(args.seed)
     assert args.max_iteration > args.epoch_per_test
 
     dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding", preprocess="feature_selection")
@@ -66,7 +60,6 @@ if __name__ == "__main__":
     Nfeature2 = y_train.shape[1]
 
     device = torch.device(args.device)
-
     model = scMVAE(
         encoder_1=[Nfeature1, 1024, 128, 128],
         hidden_1=128,

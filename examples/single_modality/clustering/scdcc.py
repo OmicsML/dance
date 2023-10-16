@@ -6,9 +6,10 @@ import numpy as np
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdcc import ScDCC
 from dance.transforms.preprocess import generate_random_pair
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="scDCC")
 def parse_args():
     parser = argparse.ArgumentParser(description="train", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--label_cells", default=0.1, type=float)
@@ -31,15 +32,11 @@ def parse_args():
     parser.add_argument("--tol", default=0.00001, type=float)
     parser.add_argument("--ae_weights", default=None)
     parser.add_argument("--ae_weight_file", default="AE_weights.pth.tar")
-    parser.add_argument("--device", default="auto")
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    set_seed(args.seed)
 
     # Load data and perform necessary preprocessing
     dataloader = ClusteringDataset(args.data_dir, args.dataset)

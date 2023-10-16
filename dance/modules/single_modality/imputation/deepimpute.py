@@ -71,8 +71,8 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
 
     patience : int optional
         number of epochs before stopping once loss stops to improve
-    gpu : int optional
-        option to use gpu
+    device : str optional
+        device to use
     loss : string optional
         loss function
     output_prefix : string optinal
@@ -98,7 +98,8 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
 
     """
 
-    def __init__(self, predictors, targets, dataset, sub_outputdim=512, hidden_dim=256, dropout=0.2, seed=1, gpu=-1):
+    def __init__(self, predictors, targets, dataset, sub_outputdim=512, hidden_dim=256, dropout=0.2, seed=1,
+                 device="cpu"):
         super().__init__()
         self.seed = seed
         self.predictors = predictors
@@ -111,7 +112,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         self.save_path = self.prj_path / "deepimpute"
         if not self.save_path.exists():
             self.save_path.mkdir(parents=True)
-        self.device = torch.device(f'cuda:{gpu}' if gpu != -1 and torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(device)
         self.models = self.build([len(genes) for genes in predictors], [len(genes) for genes in targets], self.device)
 
     @staticmethod

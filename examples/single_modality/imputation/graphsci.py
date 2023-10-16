@@ -4,13 +4,13 @@ import torch
 
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.graphsci import GraphSCI
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="graphsci")
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dropout", type=float, default=0.1, help="dropout probability")
-    parser.add_argument("--gpu", type=int, default=0, help="GPU id, -1 for cpu")
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
     parser.add_argument("--train_size", type=float, default=0.9, help="proportion of testing set")
     parser.add_argument("--le", type=float, default=1, help="parameter of expression loss")
@@ -29,28 +29,24 @@ def parse_args():
     parser.add_argument("--mask_rate", type=float, default=.1, help="Masking rate.")
     parser.add_argument("--min_cells", type=float, default=.05,
                         help="Minimum proportion of cells expressed required for a gene to pass filtering")
-    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--mask", type=bool, default=True, help="Mask data for validation.")
-    parser.add_argument("--seed", type=int, default=42)
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    set_seed(args.seed)
-    print(vars(args))
 
     dataloader = ImputationDataset(data_dir=args.data_dir, dataset=args.dataset, train_size=args.train_size)
     preprocessing_pipeline = GraphSCI.preprocessing_pipeline(min_cells=args.min_cells, threshold=args.threshold,
                                                              mask=args.mask, seed=args.seed, mask_rate=args.mask_rate)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
-    device = "cpu" if args.gpu == -1 else f"cuda:{args.gpu}"
     if args.mask:
         X, X_raw, g, mask = data.get_x(return_type="default")
     else:
         mask = None
         X, X_raw, g = data.get_x(return_type="default")
+    device = args.device
     X = torch.tensor(X.toarray()).to(device)
     X_raw = torch.tensor(X_raw.toarray()).to(device)
     g = g.to(device)
@@ -58,7 +54,7 @@ if __name__ == "__main__":
     test_idx = data.test_idx
 
     model = GraphSCI(num_cells=X.shape[0], num_genes=X.shape[1], dataset=args.dataset, dropout=args.dropout,
-                     gpu=args.gpu, seed=args.seed)
+                     device=device, seed=args.seed)
     model.fit(X, X_raw, g, train_idx, mask, args.le, args.la, args.ke, args.ka, args.n_epochs, args.lr,
               args.weight_decay)
     model.load_model()

@@ -6,24 +6,21 @@ This code is based on https://github.com/NVlabs/MUNIT.
 import argparse
 import os
 
-import torch
 from sklearn import preprocessing
 
 from dance.datasets.multimodality import ModalityMatchingDataset
 from dance.modules.multi_modality.match_modality.cmae import CMAE
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="CMAE", setup_torch_threads=True, default_torch_threads=1)
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_path", type=str, default="./match_modality/output", help="outputs path")
     parser.add_argument("-d", "--data_folder", default="./data/modality_matching")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
-    parser.add_argument("-device", "--device", default="cuda")
-    parser.add_argument("-cpu", "--cpus", default=1, type=int)
     parser.add_argument("-pk", "--pickle_suffix", default="_lsi_input_pca_count.pkl")
-
     parser.add_argument("--max_epochs", default=50, type=int, help="maximum number of training epochs")
     parser.add_argument("--batch_size", default=64, type=int, help="batch size")
     parser.add_argument("--log_data", default=True, type=bool, help="take a log1p of the data as input")
@@ -44,15 +41,11 @@ def parse_args():
     parser.add_argument("--recon_kl_w", default=0, type=int, help="weight of KL loss for reconstruction")
     parser.add_argument("--supervise", default=1, type=float, help="fraction to supervise")
     parser.add_argument("--super_w", default=0.1, type=float, help="weight of supervision loss")
-    parser.add_argument("--seed", default=42, type=int)
-
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    torch.set_num_threads(args.cpus)
-    set_seed(args.seed)
 
     # Setup logger and output folders
     output_directory = os.path.join(args.output_path, "outputs")

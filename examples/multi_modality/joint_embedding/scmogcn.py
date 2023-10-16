@@ -6,9 +6,10 @@ import torch
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.scmogcn import ScMoGCNWrapper
 from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="scmogcn", setup_torch_threads=True, default_torch_threads=1)
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2",
@@ -18,19 +19,13 @@ def parse_args():
     parser.add_argument("-csv", "--csv_path", default="decoupled_lsi.csv")
     parser.add_argument("-l", "--layers", default=3, type=int, choices=[3, 4, 5, 6, 7])
     parser.add_argument("-dis", "--disable_propagation", default=0, type=int, choices=[0, 1, 2])
-    parser.add_argument("-cpu", "--cpus", default=1, type=int)
-    parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-bs", "--batch_size", default=512, type=int)
     parser.add_argument("-nm", "--normalize", default=1, type=int, choices=[0, 1])
-    parser.add_argument("--seed", type=int, default=42)
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    device = args.device  # XXX: not used
-    torch.set_num_threads(args.cpus)
-    set_seed(args.seed)
 
     dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess="aux", normalize=True)
     data = dataset.load_data()

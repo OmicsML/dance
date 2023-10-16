@@ -5,9 +5,10 @@ import torch
 
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.jae import JAEWrapper
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="JAE", setup_torch_threads=True, default_torch_threads=1)
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2",
@@ -15,18 +16,13 @@ def parse_args():
     parser.add_argument("-d", "--data_folder", default="./data/joint_embedding")
     parser.add_argument("-pre", "--pretrained_folder", default="./data/joint_embedding/pretrained")
     parser.add_argument("-csv", "--csv_path", default="decoupled_lsi.csv")
-    parser.add_argument("-cpu", "--cpus", default=1, type=int)
-    parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-bs", "--batch_size", default=128, type=int)
     parser.add_argument("-nm", "--normalize", default=1, type=int, choices=[0, 1])
-    parser.add_argument("--seed", default=42, type=int)
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    torch.set_num_threads(args.cpus)
-    set_seed(args.seed)
 
     dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess="aux", normalize=True)
     data = dataset.load_data()

@@ -2,27 +2,24 @@ import argparse
 
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.stlearn import StKmeans, StLouvain
-from dance.transforms.preprocess import set_seed
+from dance.utils.misc import default_parser_processor
 
 MODES = ["louvain", "kmeans"]
 
 
+@default_parser_processor(name="stlearn")
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--sample_number", type=str, default="151673",
                         help="12 human dorsolateral prefrontal cortex datasets for the spatial domain task.")
     parser.add_argument("--mode", type=str, default="louvain", choices=MODES)
     parser.add_argument("--n_clusters", type=int, default=17, help="the number of clusters")
     parser.add_argument("--n_components", type=int, default=50, help="the number of components in PCA")
-    parser.add_argument("--device", type=str, default="cuda", help="device for resnet extract feature")
-    parser.add_argument("--seed", type=int, default=42)
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    set_seed(args.seed)
 
     # Initialize model and get model specific preprocessing pipeline
     if args.mode == "kmeans":

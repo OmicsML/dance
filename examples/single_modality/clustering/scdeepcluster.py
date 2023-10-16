@@ -4,9 +4,10 @@ import numpy as np
 
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdeepcluster import ScDeepCluster
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="scDeepCluster")
 def parse_args():
     parser = argparse.ArgumentParser(description="train", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--knn", default=20, type=int,
@@ -29,15 +30,11 @@ def parse_args():
     parser.add_argument("--tol", default=0.001, type=float,
                         help="tolerance for delta clustering labels to terminate training stage")
     parser.add_argument("--ae_weights", default=None, help="file to pretrained weights, None for a new pretraining")
-    parser.add_argument("--device", default="cuda")
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    set_seed(args.seed)
 
     # Load data and perform necessary preprocessing
     dataloader = ClusteringDataset(args.data_dir, args.dataset)

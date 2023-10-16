@@ -1,21 +1,16 @@
 import argparse
 
-import torch
-
 from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.scmm import MMVAE
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="scmm", setup_torch_threads=True, default_torch_threads=1)
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_path", type=str, default="./predict_modality/output", help="outputs path")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
-    parser.add_argument("-device", "--device", default="cuda")
-    parser.add_argument("-cpu", "--cpus", default=1, type=int)
-    parser.add_argument("--seed", type=int, default=42)
-
     parser.add_argument("--experiment", type=str, default="test", metavar="E", help="experiment name")
     parser.add_argument("--obj", type=str, default="m_elbo_naive_warmup", metavar="O",
                         help="objective to use (default: elbo)")
@@ -37,13 +32,11 @@ def parse_args():
     parser.add_argument("--print_freq", type=int, default=0, metavar="f",
                         help="frequency with which to print stats (default: 0)")
     parser.add_argument("--deterministic_warmup", type=int, default=50, metavar="W", help="deterministic warmup")
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    torch.set_num_threads(args.cpus)
-    set_seed(args.seed)
 
     dataset = ModalityPredictionDataset(args.subtask, preprocess="feature_selection")
     data = dataset.load_data()

@@ -1,16 +1,15 @@
 import argparse
-from pprint import pformat
 
 import scanpy as sc
 
-from dance import logger
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.scgnn2 import ScGNN2
 from dance.transforms import (AnnDataTransform, CellwiseMaskData, Compose, FilterCellsScanpy, FilterGenesScanpy,
                               FilterGenesTopK)
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="scGNN2")
 def parse_args():
     # Parse arguments
     parser = argparse.ArgumentParser(description="Main program for scGNN v2")
@@ -33,7 +32,6 @@ def parse_args():
         "--dropout_prob", type=float, default=0.1,
         help="(float, default 0.1) Probability that a non-zero value in the sc expression matrix will "
         "be set to zero. If this is set to 0, will not perform dropout or compute imputation error ")
-    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--total_epoch", type=int, default=31, help="(int, default 10) Total EM epochs")
     parser.add_argument("--ari_threshold", type=float, default=0.95, help="(float, default 0.95) The threshold for ari")
     parser.add_argument("--graph_change_threshold", type=float, default=0.01,
@@ -164,13 +162,11 @@ def parse_args():
     parser.add_argument("--deconv_tune_epoch", type=int, default=20, help="(int, default 20) epoch")
     parser.add_argument("--deconv_tune_epsilon", type=float, default=1e-4, help="(float, default) epsilon")
 
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    set_seed(args.seed)
-    logger.info(pformat(vars(args)))
 
     preprocessing_pipeline = Compose(
         FilterGenesScanpy(min_cells=0.01),

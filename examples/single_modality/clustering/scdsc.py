@@ -2,9 +2,10 @@ import argparse
 
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdsc import ScDSC
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="scDSC")
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -37,7 +38,6 @@ def parse_args():
     parser.add_argument("--n_z3", default=Cluster_para[2], type=int)
     parser.add_argument("--n_input", type=int, default=Cluster_para[4])
     parser.add_argument("--n_clusters", type=int, default=Cluster_para[5])
-    parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--v", type=int, default=1)
     parser.add_argument("--nb_genes", type=int, default=2000)
     parser.add_argument("--binary_crossentropy_loss", type=float, default=Balance_para[0])
@@ -45,14 +45,11 @@ def parse_args():
     parser.add_argument("--re_loss", type=float, default=Balance_para[2])
     parser.add_argument("--zinb_loss", type=float, default=Balance_para[3])
     parser.add_argument("--sigma", type=float, default=Balance_para[4])
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--cache", action="store_true", help="Cache processed data.")
-    return parser.parse_args()
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    set_seed(args.seed)
 
     # Load data and perform necessary preprocessing
     dataloader = ClusteringDataset(args.data_dir, args.dataset)

@@ -2,19 +2,16 @@ import argparse
 import logging
 import os
 
-import torch
-
 from dance import logger
 from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.babel import BabelWrapper
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="BABEL", setup_torch_threads=True, default_torch_threads=1)
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
-    parser.add_argument("-device", "--device", default="cuda")
-    parser.add_argument("-cpu", "--cpus", default=1, type=int)
     parser.add_argument("-m", "--model_folder", default="./models")
     parser.add_argument("--outdir", "-o", default="./logs", help="Directory to output to")
     parser.add_argument("--lossweight", type=float, default=1., help="Relative loss weight")
@@ -25,21 +22,17 @@ def parse_args():
     parser.add_argument("--naive", "-n", action="store_true", help="Use a naive model instead of lego model")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--max_epochs", type=int, default=500)
-    parser.add_argument("--seed", default=42, type=int)
-    args = parser.parse_args()
-    args.resume = True
-    return args
+    return parser
 
 
 if __name__ == "__main__":
     args = parse_args()
-    torch.set_num_threads(args.cpus)
-    set_seed(args.seed)
+    args.resume = True
 
     dataset = ModalityPredictionDataset(args.subtask, preprocess="feature_selection")
     data = dataset.load_data()
 
-    device = args.device
+    device = args.device  # XXX: not used
     args.outdir = os.path.abspath(args.outdir)
     os.makedirs(args.model_folder, exist_ok=True)
     os.makedirs(args.outdir, exist_ok=True)

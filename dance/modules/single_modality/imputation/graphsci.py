@@ -136,12 +136,12 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         weight decay rate
     dropout : float optional
         probability of weight dropout for training
-    gpu: int optional
-        index of computing device, -1 for cpu.
+    device : str
+        device to use
 
     """
 
-    def __init__(self, num_cells, num_genes, dataset, dropout=0.1, gpu=-1, seed=1):
+    def __init__(self, num_cells, num_genes, dataset, dropout=0.1, device="cpu", seed=1):
         super().__init__()
         self.dataset = dataset
         self.seed = seed
@@ -149,7 +149,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.save_path = self.prj_path / "graphsci"
         if not self.save_path.exists():
             self.save_path.mkdir(parents=True)
-        self.device = torch.device('cpu' if gpu == -1 else f'cuda:{gpu}')
+        self.device = torch.device(device)
         self.gnnmodel = GNNModel(in_feats=num_cells, out_feats=num_genes, dropout=dropout)
         self.aemodel = AEModel(in_feats=num_genes, dropout=dropout)
         self.model_params = list(self.aemodel.parameters()) + list(self.gnnmodel.parameters())

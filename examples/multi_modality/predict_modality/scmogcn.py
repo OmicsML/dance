@@ -12,9 +12,10 @@ from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.scmogcn import ScMoGCNWrapper
 from dance.transforms.cell_feature import BatchFeature
 from dance.transforms.graph import ScMoGNNGraph
-from dance.utils import set_seed
+from dance.utils.misc import default_parser_processor
 
 
+@default_parser_processor(name="scmogcn", setup_torch_threads=True, default_torch_threads=1)
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-prefix", "--prefix", default="dance_openproblems_bmmc_atac2rna_test")
@@ -40,7 +41,6 @@ def parse_args():
     parser.add_argument("-ro", "--readout_layers", default=1, type=int, choices=[1, 2])
     parser.add_argument("-conv", "--conv_layers", default=4, type=int, choices=[1, 2, 3, 4, 5, 6])
     parser.add_argument("-agg", "--agg_function", default="mean", choices=["gcn", "mean"])
-    parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-sb", "--save_best", action="store_true")
     parser.add_argument("-sf", "--save_final", action="store_true")
     parser.add_argument("-lr", "--learning_rate", type=float, default=1e-2)
@@ -50,7 +50,6 @@ def parse_args():
     parser.add_argument("-edd", "--edge_dropout", type=float, default=0.3)
     parser.add_argument("-mdd", "--model_dropout", type=float, default=0.2)
     parser.add_argument("-es", "--early_stopping", type=int, default=0)
-    parser.add_argument("-c", "--cpu", type=int, default=1)
     parser.add_argument("-or", "--output_relu", default="none", choices=["relu", "leaky_relu", "none"])
     parser.add_argument("-i", "--inductive", action="store_true")
     parser.add_argument("-sa", "--subpath_activation", action="store_true")
@@ -62,8 +61,7 @@ def parse_args():
     parser.add_argument("-ns", "--node_sampling_rate", type=float, default=0.5)
     parser.add_argument("-prep", "--preprocessing", default="none", choices=["none", "feature_selection", "svd"])
     parser.add_argument("-lm", "--low_memory", type=bool, default=True)
-    parser.add_argument("--seed", type=int, default=42)
-    return parser.parse_args()
+    return parser
 
 
 def pipeline(inductive=False, verbose=2, logger=None, **kwargs):
@@ -151,9 +149,6 @@ if __name__ == "__main__":
         args.pathway = False
     if args.sampling:
         args.pathway = False
-
-    set_seed(args.seed)
-    torch.set_num_threads(args.cpu)
 
     pipeline(**vars(args))
 """To reproduce scMoGCN on other samples, please refer to command lines belows:
