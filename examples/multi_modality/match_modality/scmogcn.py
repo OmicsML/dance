@@ -1,5 +1,4 @@
 import argparse
-import random
 
 import numpy as np
 import torch
@@ -11,7 +10,6 @@ from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph
 from dance.utils import set_seed
 
 if __name__ == "__main__":
-    rndseed = random.randint(0, 2147483647)
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
     parser.add_argument("-d", "--data_folder", default="./data/modality_matching")
@@ -21,17 +19,15 @@ if __name__ == "__main__":
     parser.add_argument("-dis", "--disable_propagation", default=0, type=int, choices=[0, 1, 2])
     parser.add_argument("-aux", "--auxiliary_loss", default=True, type=bool)
     parser.add_argument("-pk", "--pickle_suffix", default="_lsi_input_pca_count.pkl")
-    parser.add_argument("-seed", "--rnd_seed", default=rndseed, type=int)
+    parser.add_argument("-seed", "--rnd_seed", default=42, type=int)
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-e", "--epochs", default=2000, type=int)
     parser.add_argument("-tq", "--threshold_quantile", default=0.95, type=float)
 
     args = parser.parse_args()
-
     torch.set_num_threads(args.cpus)
-    rndseed = args.rnd_seed
-    set_seed(rndseed)
+    set_seed(args.seed)
 
     subtask = args.subtask
     data_folder = args.data_folder
@@ -86,7 +82,7 @@ if __name__ == "__main__":
     g_mod2 = g_mod2.to(device)
 
     model.fit(g_mod1, g_mod2, labels1, labels2, train_size=train_size)
-    model.load(f"models/model_{rndseed}.pth")
+    model.load(f"models/model_{args.seed}.pth")
 
     test_idx = np.arange(train_size, g_mod1.num_nodes("cell"))
     pred = model.predict(test_idx, enhance=True, batch1=batch_mod1, batch2=batch_mod2,

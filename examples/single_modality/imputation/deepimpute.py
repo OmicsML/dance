@@ -1,6 +1,5 @@
 import argparse
 
-import numpy as np
 import torch
 
 from dance.datasets.singlemodality import ImputationDataset

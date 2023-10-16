@@ -22,7 +22,7 @@ if __name__ == "__main__":
     parser.add_argument("--n_clusters", type=int, default=7, help="the number of clusters")
     parser.add_argument("--step", type=float, default=0.1, help="")
     parser.add_argument("--lr", type=float, default=0.05, help="learning rate")
-    parser.add_argument("--random_state", type=int, default=100, help="")
+    parser.add_argument("--random_state", type=int, default=100)
     args = parser.parse_args()
     set_seed(args.random_state)
 

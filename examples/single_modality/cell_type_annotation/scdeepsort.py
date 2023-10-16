@@ -8,6 +8,7 @@ from dance import logger
 from dance.datasets.singlemodality import ScDeepSortDataset
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
 from dance.typing import LogLevel
+from dance.utils import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -27,9 +28,11 @@ if __name__ == "__main__":
     parser.add_argument("--tissue", default="Spleen", type=str)
     parser.add_argument("--train_dataset", nargs="+", type=int, default=[1970], help="List of training dataset ids.")
     parser.add_argument("--weight_decay", type=float, default=5e-4, help="Weight for L2 loss")
+    parser.add_argument("--random_state", type=int, default=42)
 
     args = parser.parse_args()
     logger.setLevel(args.log_level)
+    set_seed(args.random_state)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
 
     # Initialize model and get model specific preprocessing pipeline

@@ -1,6 +1,5 @@
 import argparse
 
-import numpy as np
 import torch
 
 from dance.datasets.singlemodality import ImputationDataset
@@ -33,8 +32,8 @@ if __name__ == '__main__':
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--mask", type=bool, default=True, help="Mask data for validation.")
     params = parser.parse_args()
-    print(vars(params))
     set_seed(params.random_seed)
+    print(vars(params))
 
     dataloader = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset, train_size=params.train_size)
     preprocessing_pipeline = GraphSCI.preprocessing_pipeline(min_cells=params.min_cells, threshold=params.threshold,

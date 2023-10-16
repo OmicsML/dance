@@ -6,6 +6,7 @@ from dance import logger
 from dance.datasets.singlemodality import ScDeepSortDataset
 from dance.modules.single_modality.cell_type_annotation.singlecellnet import SingleCellNet
 from dance.typing import LogLevel
+from dance.utils import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -25,9 +26,11 @@ if __name__ == "__main__":
                         help="List testing training dataset ids.")
     parser.add_argument("--tissue", default="Spleen", type=str)
     parser.add_argument("--train_dataset", type=int, nargs="+", default=[1970], help="List of training dataset ids.")
+    parser.add_argument("--random_state", type=int, default=42)
 
     args = parser.parse_args()
     logger.setLevel(args.log_level)
+    set_seed(args.random_state)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
 
     # Initialize model and get model specific preprocessing pipeline

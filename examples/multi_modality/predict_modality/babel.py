@@ -1,7 +1,6 @@
 import argparse
 import logging
 import os
-import random
 
 import torch
 
@@ -15,12 +14,11 @@ if __name__ == "__main__":
         "adam": torch.optim.Adam,
         "rmsprop": torch.optim.RMSprop,
     }
-    rndseed = random.randint(0, 2147483647)
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
-    parser.add_argument("-seed", "--rnd_seed", default=rndseed, type=int)
+    parser.add_argument("-seed", "--rnd_seed", default=42, type=int)
     parser.add_argument("-m", "--model_folder", default="./models")
     parser.add_argument("--outdir", "-o", default="./logs", help="Directory to output to")
     parser.add_argument("--lossweight", type=float, default=1., help="Relative loss weight")
@@ -35,8 +33,7 @@ if __name__ == "__main__":
     args.resume = True
 
     torch.set_num_threads(args.cpus)
-    rndseed = args.rnd_seed
-    set_seed(rndseed)
+    set_seed(args.seed)
     dataset = ModalityPredictionDataset(args.subtask, preprocess="feature_selection")
     data = dataset.load_data()
 

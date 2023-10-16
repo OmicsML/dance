@@ -9,9 +9,10 @@ from sklearn import preprocessing
 import dance.utils.metrics as metrics
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.dcca import DCCA
+from dance.utils import set_seed
 
 
-def parameter_setting():
+def parse_args():
     parser = argparse.ArgumentParser(description="Single cell Multi-omics data analysis")
 
     parser.add_argument("--latent_fusion", "-olf1", type=str, default="First_simulate_fusion.csv",
@@ -47,12 +48,12 @@ def parameter_setting():
     parser.add_argument("--final_rate", type=float, default=1e-4)
     parser.add_argument("--scale_factor", type=float, default=4)
 
-    return parser
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    parser = parameter_setting()
-    args = parser.parse_args()
+    args = parse_args()
+    set_seed(args.seed)
 
     args.sf1 = 5
     args.sf2 = 1

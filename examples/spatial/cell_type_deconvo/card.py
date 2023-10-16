@@ -3,6 +3,7 @@ from pprint import pprint
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.card import Card
+from dance.utils import set_seed
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--cache", action="store_true", help="Cache processed data.")
@@ -11,7 +12,9 @@ parser.add_argument("--datadir", default="data/spatial", help="Directory to save
 parser.add_argument("--max_iter", type=int, default=10, help="Maximum optimization iteration.")
 parser.add_argument("--epsilon", type=float, default=1e-10, help="Optimization threshold.")
 parser.add_argument("--location_free", action="store_true", help="Do not supply spatial location if set.")
+parser.add_argument("--random_state", type=int, default=100)
 args = parser.parse_args()
+set_seed(args.random_state)
 pprint(vars(args))
 
 # Load dataset
