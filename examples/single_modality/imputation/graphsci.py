@@ -18,11 +18,11 @@ def parse_args():
     parser.add_argument("--ke", type=float, default=1e2, help="parameter of KL divergence of expression")
     parser.add_argument("--ka", type=float, default=1, help="parameter of KL divergence of adjacency")
     parser.add_argument("--n_epochs", type=int, default=300, help="number of training epochs")
-    parser.add_argument("--data_dir", type=str, default='data', help='test directory')
-    parser.add_argument("--save_dir", type=str, default='result', help='save directory')
-    parser.add_argument("--filetype", type=str, default='h5', choices=['csv', 'gz', 'h5'],
-                        help='data file type, csv, csv.gz, or h5')
-    parser.add_argument("--dataset", default='mouse_brain_data', type=str, help="dataset id")
+    parser.add_argument("--data_dir", type=str, default="data", help="test directory")
+    parser.add_argument("--save_dir", type=str, default="result", help="save directory")
+    parser.add_argument("--filetype", type=str, default="h5", choices=["csv", "gz", "h5"],
+                        help="data file type, csv, csv.gz, or h5")
+    parser.add_argument("--dataset", default="mouse_brain_data", type=str, help="dataset id")
     parser.add_argument("--weight_decay", type=float, default=1e-6, help="Weight decay for exponential LR decay.")
     parser.add_argument("--threshold", type=float, default=.3,
                         help="Lower bound for correlation between genes to determine edges in graph.")
@@ -35,7 +35,7 @@ def parse_args():
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args()
     set_seed(args.seed)
     print(vars(args))
@@ -63,7 +63,7 @@ if __name__ == '__main__':
               args.weight_decay)
     model.load_model()
     imputed_data = model.predict(X, X_raw, g, mask)
-    score = model.score(X_raw, imputed_data, test_idx, mask, metric='RMSE')
+    score = model.score(X_raw, imputed_data, test_idx, mask, metric="RMSE")
     print("RMSE: %.4f" % score)
 """To reproduce GraphSCI benchmarks, please refer to command lines belows:
 

@@ -14,7 +14,7 @@ from dance.utils import set_seed
 def parse_args():
     # Parse arguments
     parser = argparse.ArgumentParser(description="Main program for scGNN v2")
-    parser.add_argument("--dataset", default='mouse_brain_data', type=str, help="dataset id")
+    parser.add_argument("--dataset", default="mouse_brain_data", type=str, help="dataset id")
 
     # Program related
     parser.add_argument(

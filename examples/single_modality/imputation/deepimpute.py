@@ -21,8 +21,8 @@ def parse_args():
     parser.add_argument("--patience", type=int, default=20, help="Early stopping patience")
     parser.add_argument("--min_cells", type=float, default=.05,
                         help="Minimum proportion of cells expressed required for a gene to pass filtering")
-    parser.add_argument("--data_dir", type=str, default='data', help='test directory')
-    parser.add_argument("--dataset", default='mouse_brain_data', type=str, help="dataset id")
+    parser.add_argument("--data_dir", type=str, default="data", help="test directory")
+    parser.add_argument("--dataset", default="mouse_brain_data", type=str, help="dataset id")
     parser.add_argument("--n_top", type=int, default=5, help="Number of predictors.")
     parser.add_argument("--train_size", type=float, default=0.9, help="proportion of testing set")
     parser.add_argument("--mask_rate", type=float, default=.1, help="Masking rate.")
@@ -32,7 +32,7 @@ def parse_args():
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args()
     print(vars(args))
     set_seed(args.seed)
@@ -57,7 +57,7 @@ if __name__ == '__main__':
                        args.gpu)
     model.fit(X[train_idx], X[train_idx], train_idx, mask, args.batch_size, args.lr, args.n_epochs, args.patience)
     imputed_data = model.predict(X[test_idx], test_idx, mask)
-    score = model.score(X_raw[test_idx], imputed_data, test_idx, mask, metric='RMSE')
+    score = model.score(X_raw[test_idx], imputed_data, test_idx, mask, metric="RMSE")
     print("RMSE: %.4f" % score)
 """To reproduce deepimpute benchmarks, please refer to command lines belows:
 
