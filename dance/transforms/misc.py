@@ -110,7 +110,7 @@ class SaveRaw(BaseTransform):
             else:
                 raise AttributeError(f"Raw data attribute already exist and cannot be overwritten.\n{data}"
                                      f"If you wish to overwrite, set 'exist_ok' to True.")
-        data.data.raw = data.data
+        data.data.raw = data.data.copy()
 
 
 class RemoveSplit(BaseTransform):
