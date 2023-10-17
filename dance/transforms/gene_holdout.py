@@ -33,13 +33,14 @@ class GeneHoldout(BaseTransform):
         rng = np.random.default_rng(self.random_state)
         feat = data.get_feature(return_type="numpy")
         num_feat = feat.shape[1]
-        num_batches = np.ceil(num_feat / self.batch_size)
-        targets = np.split(rng.permutation(feat.shape[1]), num_batches)
+        num_batches = np.ceil(num_feat / self.batch_size).astype(int)
+        # targets = np.split(rng.permutation(feat.shape[1]), num_batches)
+        targets = np.split(rng.permutation(feat.shape[1]), range(num_batches, feat.shape[1], num_batches))
 
         # Use covariance to select predictors
         covariance_matrix = np.cov(feat, rowvar=False)
         predictors = []
-        for targs in enumerate(targets):
+        for _, targs in enumerate(targets):         
             genes_not_in_target = np.setdiff1d(range(feat.shape[1]), targs)
             subMatrix = covariance_matrix[targs][:, genes_not_in_target]
             sorted_idx = np.argsort(-subMatrix, axis=0)
