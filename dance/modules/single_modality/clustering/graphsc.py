@@ -179,7 +179,7 @@ class GraphSC(BaseClusteringMethod):
         g.ndata["order"] = g.ndata["label"] = g.ndata["feat_id"]
         train_ids = np.where(g.ndata["label"] != -1)[0]
         sampler = dgl.dataloading.MultiLayerFullNeighborSampler(self.n_layers)
-        dataloader = dgl.dataloading.NodeDataLoader(g, train_ids, sampler, batch_size=batch_size, shuffle=True,
+        dataloader = dgl.dataloading.DataLoader(g, train_ids, sampler, batch_size=batch_size, shuffle=True,
                                                     drop_last=False, num_workers=self.num_workers)
 
         device = get_device(self.device)
@@ -206,7 +206,7 @@ class GraphSC(BaseClusteringMethod):
                 order.extend(blocks[-1].dstdata["order"].cpu().numpy())
 
                 adj = g.adjacency_matrix().to_dense().to(device)
-                adj = adj[g.dstnodes()]
+                adj = adj[g.dstnodes()][:, g.dstnodes()]
                 pos_weight = torch.Tensor([float(adj.shape[0] * adj.shape[0] - adj.sum()) / adj.sum()])
                 factor = float((adj.shape[0] * adj.shape[0] - adj.sum()) * 2)
                 if factor == 0:
