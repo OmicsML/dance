@@ -235,7 +235,6 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
             Y_valid = Y_train = Y
         else:
             rng = np.random.default_rng(self.seed)
-            train_data_masked = train_data
             train_idx_permuted = rng.permutation(range(len(X)))
             train_idx = train_idx_permuted[:int(len(train_idx_permuted) * 0.9)]
             valid_idx = train_idx_permuted[int(len(train_idx_permuted) * 0.9):]
