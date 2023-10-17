@@ -34,43 +34,52 @@ if __name__ == '__main__':
     parser.add_argument("--mask", type=bool, default=True, help="Mask data for validation.")
     params = parser.parse_args()
     print(vars(params))
-    set_seed(params.random_seed)
+    # set_seed(params.random_seed)
+    rmses = []
+    for seed in range(1, 21):
+        set_seed(seed)
 
-    dataloader = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset, train_size=params.train_size)
-    preprocessing_pipeline = GraphSCI.preprocessing_pipeline(min_cells=params.min_cells, threshold=params.threshold,
-                                                             mask=params.mask, seed=params.random_seed,
-                                                             mask_rate=params.mask_rate)
-    data = dataloader.load_data(transform=preprocessing_pipeline, cache=params.cache)
+        dataloader = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset, train_size=params.train_size)
+        preprocessing_pipeline = GraphSCI.preprocessing_pipeline(min_cells=params.min_cells, threshold=params.threshold,
+                                                                mask=params.mask, seed=params.random_seed,
+                                                                mask_rate=params.mask_rate)
+        data = dataloader.load_data(transform=preprocessing_pipeline, cache=params.cache)
 
-    device = "cpu" if params.gpu == -1 else f"cuda:{params.gpu}"
-    if params.mask:
-        X, X_raw, g, mask = data.get_x(return_type="default")
-    else:
-        mask = None
-        X, X_raw, g = data.get_x(return_type="default")
-    X = torch.tensor(X.toarray()).to(device)
-    X_raw = torch.tensor(X_raw.toarray()).to(device)
-    g = g.to(device)
-    train_idx = data.train_idx
-    test_idx = data.test_idx
+        device = "cpu" if params.gpu == -1 else f"cuda:{params.gpu}"
+        if params.mask:
+            X, X_raw, g, mask = data.get_x(return_type="default")
+        else:
+            mask = None
+            X, X_raw, g = data.get_x(return_type="default")
+        X = torch.tensor(X.toarray()).float().to(device)
+        X_raw = torch.tensor(X_raw.toarray()).float().to(device)
+        g = g.to(device)
+        train_idx = data.train_idx
+        test_idx = data.test_idx
 
-    model = GraphSCI(num_cells=X.shape[0], num_genes=X.shape[1], dataset=params.dataset, dropout=params.dropout,
-                     gpu=params.gpu, seed=params.random_seed)
-    model.fit(X, X_raw, g, train_idx, mask, params.le, params.la, params.ke, params.ka, params.n_epochs, params.lr,
-              params.weight_decay)
-    model.load_model()
-    imputed_data = model.predict(X, X_raw, g, mask)
-    score = model.score(X_raw, imputed_data, test_idx, mask, metric='RMSE')
-    print("RMSE: %.4f" % score)
+        model = GraphSCI(num_cells=X.shape[0], num_genes=X.shape[1], dataset=params.dataset, dropout=params.dropout,
+                        gpu=params.gpu, seed=params.random_seed)
+        model.fit(X, X_raw, g, train_idx, mask, params.le, params.la, params.ke, params.ka, params.n_epochs, params.lr,
+                params.weight_decay)
+        model.load_model()
+        imputed_data = model.predict(X, X_raw, g, mask)
+        score = model.score(X_raw, imputed_data, test_idx, mask, metric='RMSE')
+        print("RMSE: %.4f" % score)
+        rmses.append(score)
+    
+    print('graphsci')
+    print(params.dataset)
+    print(f'rmses: {rmses}')
+    print(f'rmses: {np.mean(rmses)} +/- {np.std(rmses)}')
 """To reproduce GraphSCI benchmarks, please refer to command lines belows:
 
 Mouse Brain:
-$ python graphsci.py --dataset mouse_brain_data
+CUDA_VISIBLE_DEVICES=2 python graphsci.py --dataset mouse_brain_data
 
 Mouse Embryo:
-$ python graphsci.py --dataset mouse_embryo_data
+CUDA_VISIBLE_DEVICES=2 python graphsci.py --dataset mouse_embryo_data
 
 PBMC
-$ python graphsci.py --dataset pbmc_data
+CUDA_VISIBLE_DEVICES=2 python graphsci.py --dataset pbmc_data
 
 """
