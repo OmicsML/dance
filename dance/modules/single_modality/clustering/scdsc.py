@@ -187,7 +187,8 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
                     total_size += size
                     total_loss += loss.item() * size
 
-                logger.info(f"Pretrain epoch {epoch + 1:4d}, MSE loss:{total_loss / total_size:.8f}")
+                if epoch % 100 == 0:
+                    logger.info(f"Pretrain epoch {epoch + 1:4d}, MSE loss:{total_loss / total_size:.8f}")
 
     def save_pretrained(self, path):
         torch.save(self.model.ae.state_dict(), path)
@@ -234,7 +235,7 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
 
         """
         adj, x, x_raw, n_counts = inputs
-        self._pretrain(x, batch_size=pt_batch_size, epochs=pt_epochs, lr=pt_lr)
+        self._pretrain(x, batch_size=pt_batch_size, epochs=pt_epochs, lr=pt_lr, force_pretrain=True)
 
         device = self.device
         model = self.model
@@ -266,7 +267,9 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
                     ari = self.score(None, y)
                     aris.append(ari)
                     keys.append(key := f"epoch{epoch}")
-                    logger.info("Epoch %3d, ARI: %.4f, Best ARI: %.4f", epoch + 1, ari, max(aris))
+                    # logger.info("Epoch %3d, ARI: %.4f, Best ARI: %.4f", epoch + 1, ari, max(aris))
+                    if epoch % 100 == 0:
+                        logger.info("Epoch %3d, ARI: %.4f, Best ARI: %.4f", epoch + 1, ari, max(aris))
 
                     P[key] = p
                     Q[key] = tmp_q

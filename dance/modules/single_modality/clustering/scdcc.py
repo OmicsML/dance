@@ -325,7 +325,10 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                logger.info("Pretrain epoch [%2d/%3d], ZINB loss: %.4f", batch_idx + 1, epoch + 1, loss.item())
+
+            if epoch % 100 == 0:
+                # logger.info("Pretrain epoch [%2d/%3d], ZINB loss: %.4f", batch_idx + 1, epoch + 1, loss.item())
+                logger.info("Pretrain epoch [%3d], ZINB loss: %.4f", epoch + 1, loss.item())
 
     def fit(
         self,
@@ -385,7 +388,7 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         """
         X, X_raw, n_counts = inputs
-        self._pretrain(X, X_raw, n_counts, batch_size=pt_batch_size, lr=pt_lr, epochs=pt_epochs)
+        self._pretrain(X, X_raw, n_counts, batch_size=pt_batch_size, lr=pt_lr, epochs=pt_epochs, force_pretrain=True)
 
         X = torch.tensor(X).to(self.device)
         X_raw = torch.tensor(X_raw).to(self.device)
@@ -430,11 +433,12 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 Q = {**Q, **q_}
 
                 # check stop criterion
-                delta_label = np.sum(self.y_pred != self.y_pred_last).astype(np.float32) / num
-                self.y_pred_last = self.y_pred
-                if epoch > 0 and delta_label < tol:
-                    logger.info("Reach tolerance threshold (%.3e < %.3e). Stopping training.", delta_label, tol)
-                    break
+                if False:
+                    delta_label = np.sum(self.y_pred != self.y_pred_last).astype(np.float32) / num
+                    self.y_pred_last = self.y_pred
+                    if epoch > 0 and delta_label < tol:
+                        logger.info("Reach tolerance threshold (%.3e < %.3e). Stopping training.", delta_label, tol)
+                        break
 
                 # calculate ari score for model selection
                 ari = self.score(None, y)
@@ -466,7 +470,8 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 recon_loss_val += recon_loss.data * len(inputs)
                 train_loss = cluster_loss_val + recon_loss_val
 
-            logger.info("#Epoch %3d: Total: %.4f, Clustering Loss: %.4f, ZINB Loss: %.4f", epoch + 1, train_loss / num,
+            if epoch % 50 == 0:
+                logger.info("#Epoch %3d: Total: %.4f, Clustering Loss: %.4f, ZINB Loss: %.4f", epoch + 1, train_loss / num,
                         cluster_loss_val / num, recon_loss_val / num)
 
             ml_loss = 0.0
@@ -511,7 +516,8 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                     optimizer.step()
 
             if ml_num_batch > 0 and cl_num_batch > 0:
-                logger.info("Pairwise Total: %.4f, ML loss: %.4f, CL loss: %.4f",
+                if epoch % 50 == 0:
+                    logger.info("Pairwise Total: %.4f, ML loss: %.4f, CL loss: %.4f",
                             float(ml_loss.cpu()) + float(cl_loss.cpu()), ml_loss.cpu(), cl_loss.cpu())
 
         index = update_interval * np.argmax(aris)
