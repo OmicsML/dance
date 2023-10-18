@@ -6,6 +6,7 @@ from dance import logger
 from dance.datasets.singlemodality import ScDeepSortDataset
 from dance.modules.single_modality.cell_type_annotation.singlecellnet import SingleCellNet
 from dance.typing import LogLevel
+from dance.utils import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -18,7 +19,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_top_gene_pairs", type=int, default=250)
     parser.add_argument("--num_top_genes", type=int, default=100)
     parser.add_argument("--num_trees", type=int, default=1000)
-    parser.add_argument("--random_state", type=int, default=10)
+    parser.add_argument("--seed", type=int, default=10)
     parser.add_argument("--species", default="mouse", type=str)
     parser.add_argument("--stratify", type=bool, default=True)
     parser.add_argument("--test_dataset", type=int, nargs="+", default=[1759],
@@ -27,6 +28,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_dataset", type=int, nargs="+", default=[1970], help="List of training dataset ids.")
 
     args = parser.parse_args()
+    set_seed(args.seed)
     logger.setLevel(args.log_level)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
 
@@ -46,7 +48,7 @@ if __name__ == "__main__":
     x_test, y_test = data.get_test_data(return_type="numpy")
 
     # Train and evaluate the model
-    model.fit(x_train, y_train, stratify=args.stratify, num_rand=args.num_rand, random_state=args.random_state)
+    model.fit(x_train, y_train, stratify=args.stratify, num_rand=args.num_rand, random_state=args.seed)
     score = model.score(x_test, y_test)
     print(f"{score=:.4f}")
 """To reproduce SingleCellNet benchmarks, please refer to command lines below:

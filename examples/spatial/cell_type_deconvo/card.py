@@ -3,6 +3,7 @@ from pprint import pprint
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.card import Card
+from dance.utils import set_seed
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--cache", action="store_true", help="Cache processed data.")
@@ -11,7 +12,9 @@ parser.add_argument("--datadir", default="data/spatial", help="Directory to save
 parser.add_argument("--max_iter", type=int, default=10, help="Maximum optimization iteration.")
 parser.add_argument("--epsilon", type=float, default=1e-10, help="Optimization threshold.")
 parser.add_argument("--location_free", action="store_true", help="Do not supply spatial location if set.")
+parser.add_argument("--seed", type=int, default=42)
 args = parser.parse_args()
+set_seed(args.seed)
 pprint(vars(args))
 
 # Load dataset
@@ -24,7 +27,7 @@ inputs, y = data.get_data(split_name="test", return_type="numpy")
 basis = data.get_feature(return_type="default", channel="CellTopicProfile", channel_type="varm")
 
 # Train and evaluate model
-model = Card(basis)
+model = Card(basis, random_state=args.seed)
 score = model.fit_score(inputs, y, max_iter=args.max_iter, epsilon=args.epsilon, location_free=args.location_free)
 print(f"MSE: {score:7.4f}")
 """To reproduce CARD benchmarks, please refer to command lines belows:

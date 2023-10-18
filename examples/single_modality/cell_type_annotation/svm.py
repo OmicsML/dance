@@ -6,6 +6,7 @@ from dance import logger
 from dance.datasets.singlemodality import ScDeepSortDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
 from dance.typing import LogLevel
+from dance.utils import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -13,18 +14,19 @@ if __name__ == "__main__":
     parser.add_argument("--dense_dim", type=int, default=400, help="dim of PCA")
     parser.add_argument("--gpu", type=int, default=-1, help="GPU id, set to -1 for CPU")
     parser.add_argument("--log_level", type=str, default="INFO", choices=get_args(LogLevel))
-    parser.add_argument("--random_seed", type=int, default=10)
+    parser.add_argument("--seed", type=int, default=10)
     parser.add_argument("--species", default="mouse")
     parser.add_argument("--test_dataset", nargs="+", default=[1759], type=int, help="list of dataset id")
     parser.add_argument("--tissue", default="Spleen")  # TODO: Add option for different tissue name for train/test
     parser.add_argument("--train_dataset", nargs="+", default=[1970], type=int, help="list of dataset id")
 
     args = parser.parse_args()
+    set_seed(args.seed)
     logger.setLevel(args.log_level)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
 
     # Initialize model and get model specific preprocessing pipeline
-    model = SVM(args)  # TODO: get useful args out
+    model = SVM(args, random_state=args.seed)  # TODO: get useful args out
     preprocessing_pipeline = model.preprocessing_pipeline(n_components=args.dense_dim, log_level=args.log_level)
 
     # Load data and perform necessary preprocessing

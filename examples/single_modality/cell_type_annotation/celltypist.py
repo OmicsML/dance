@@ -6,6 +6,7 @@ from dance import logger
 from dance.datasets.singlemodality import ScDeepSortDataset
 from dance.modules.single_modality.cell_type_annotation.celltypist import Celltypist
 from dance.typing import LogLevel
+from dance.utils import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -21,8 +22,10 @@ if __name__ == "__main__":
     parser.add_argument("--train_dataset", nargs="+", default=[1970], help="List of training dataset ids.")
     parser.add_argument("--not_use_SGD", action="store_true",
                         help="Training algorithm -- weather it will be stochastic gradient descent.")
+    parser.add_argument("--seed", type=int, default=42)
 
     args = parser.parse_args()
+    set_seed(args.seed)
     logger.setLevel(args.log_level)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
 

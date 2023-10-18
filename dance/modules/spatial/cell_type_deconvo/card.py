@@ -119,10 +119,11 @@ class Card(BaseRegressionMethod):
 
     """
 
-    def __init__(self, basis: pd.DataFrame):
+    def __init__(self, basis: pd.DataFrame, random_state: Optional[int] = 42):
         self.basis = basis
         self.best_phi = None
         self.best_obj = -np.inf
+        self.random_state = random_state
 
     @staticmethod
     def preprocessing_pipeline(log_level: LogLevel = "INFO"):
@@ -189,7 +190,7 @@ class Card(BaseRegressionMethod):
         b_mat = basis * 0.1 / basis.mean()
 
         # Initialize the proportion matrix
-        rng = np.random.default_rng(20200107)
+        rng = np.random.default_rng(self.random_state)
         Vint1 = rng.dirichlet(np.repeat(10, basis.shape[1], axis=0), x_norm.shape[0])
         phi = [0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99]
 
