@@ -22,7 +22,7 @@ class SpatialLIBDDataset(BaseDataset):
 
     _DISPLAY_ATTRS = ("data_id", )
     URL_DICT = {
-        "151510": "https://www.dropbox.com/sh/41h9brsk6my546x/AADa18mkJge-KQRTndRelTpMa?dl=1",
+        "151510": "https://www.dropbox.com/sh/41h9brsk6my546x/AADa18mkJge-KQRTndRelTpMa?dl=0",
         "151507": "https://www.dropbox.com/sh/m3554vfrdzbwv2c/AACGsFNVKx8rjBgvF7Pcm2L7a?dl=1",
         "151508": "https://www.dropbox.com/sh/tm47u3fre8692zt/AAAJJf8-za_Lpw614ft096qqa?dl=1",
         "151509": "https://www.dropbox.com/sh/hihr7906vyirjet/AACslV5mKIkF2CF5QqE1LE6ya?dl=1",
@@ -34,6 +34,9 @@ class SpatialLIBDDataset(BaseDataset):
         "151674": "https://www.dropbox.com/sh/q7io99psd2xuqgw/AABske8dgX_kc1oaDSxuiqjpa?dl=1",
         "151675": "https://www.dropbox.com/sh/uahka2h5klnrzvj/AABe7K0_ewqOcqKUxHebE6qLa?dl=1",
         "151676": "https://www.dropbox.com/sh/jos5jjurezy5zp1/AAB2uaVm3-Us1a4mDkS1Q-iAa?dl=1",
+        "b004":"https://www.dropbox.com/scl/fo/7vecidftrj5ianbiy5pog/h?rlkey=qxfi8fs1g3o4vm24350gn5dz1&dl=1",
+        "be_ton":"https://www.dropbox.com/scl/fo/m58tb3q8ooe10ic4q0zuk/h?rlkey=rstiq8zd07fuz2hgjs1z1qkli&dl=1",
+        "mpb":"https://www.dropbox.com/scl/fo/psxybrqayr669yeu4ccnc/h?rlkey=9hilmps3wpso1z0xuoceiouq4&dl=1"
     }
     AVAILABLE_DATA = sorted(URL_DICT)
 
@@ -69,7 +72,7 @@ class SpatialLIBDDataset(BaseDataset):
     def is_complete(self):
         check = [
             osp.join(self.data_dir, f"{self.data_id}_raw_feature_bc_matrix.h5"),  # expression
-            osp.join(self.data_dir, f"{self.data_id}_full_image.tif"),  # histology
+            # osp.join(self.data_dir, f"{self.data_id}_full_image.tif"),  # histology
             osp.join(self.data_dir, "tissue_positions_list.txt"),  # positions
         ]
 
@@ -86,14 +89,18 @@ class SpatialLIBDDataset(BaseDataset):
         spatial_path = osp.join(self.data_dir, "tissue_positions_list.txt")
         meta_path = osp.join(self.data_dir, "cluster_labels.csv")
 
-        logger.info(f"Loading image data from {image_path}")
-        img = cv2.imread(image_path)
+      
 
         logger.info(f"Loading expression data from {data_path}")
-        adata = sc.read_10x_h5(data_path)
+        try:
+            adata = sc.read_10x_h5(data_path)
+        except:
+            adata=sc.read_h5ad(data_path)
 
         logger.info(f"Loading spatial info from {spatial_path}")
-        spatial = pd.read_csv(spatial_path, header=None, index_col=0).loc[adata.obs_names]
+        spatial_full = pd.read_csv(spatial_path, header=None, index_col=0)
+        spatial_full.index=spatial_full.index.astype(str)
+        spatial=spatial_full.loc[adata.obs_names]
 
         logger.info(f"Loading label info from {meta_path}")
         meta_df = pd.read_csv(meta_path)
@@ -105,12 +112,21 @@ class SpatialLIBDDataset(BaseDataset):
 
         # Prepare spatial info tables
         xy = spatial[[2, 3]].rename(columns={2: "x", 3: "y"})
-        xy_pixel = spatial[[4, 5]].rename(columns={4: "x_pixel", 5: "y_pixel"})
+        xy_pixel = spatial[[4, 5]].rename(columns={4: "x_pixel", 5: "y_pixel"}).astype(int)
 
         # Prepare meta data and create a column with indexed label info
         label_classes = {j: i for i, j in enumerate(meta_df["ground_truth"].unique())}
         meta_df["label"] = list(map(label_classes.get, meta_df["ground_truth"]))
 
+        logger.info(f"Loading image data from {image_path}")
+        try:
+            img = cv2.imread(image_path)
+        except:
+            # img=np.random.randn(int(max(xy_pixel.loc[:,'x_pixel'])*1.1),int(max(xy_pixel.loc[:,'y_pixel'])*1.1),3)
+            logger.info(f"image doesn't exist,use louvain")
+        if img is None:
+            logger.info(f"image doesn't exist,use louvain")
+        
         return img, adata, xy, xy_pixel, meta_df
 
     def _raw_to_dance(self, raw_data):
@@ -146,6 +162,22 @@ class CellTypeDeconvoDataset(BaseDataset):
         "SPOTLight_synthetic": "https://www.dropbox.com/sh/p1tfb0xe1yl2zpe/AAB6cF-BsdJcHToet_C-AlXAa?dl=1",
         "human PDAC": "https://www.dropbox.com/sh/9py6hk9j1ygyprh/AAAOKTo-TE_eX4JJg0HIFfZ7a?dl=1",
         "mouse brain 1": "https://www.dropbox.com/sh/e2nl247v1jrd7h8/AAC1IUlk_3vXUvfk2fv9L2D3a?dl=1",
+        "lung6":"https://www.dropbox.com/scl/fo/ak4y1nu6ozi93cspmmkm1/h?rlkey=j5m62jxprcozskov3q0pzjdzv&dl=1",
+        "lung9_1":"https://www.dropbox.com/scl/fo/9ektj6rhlnza4ox7a73e2/h?rlkey=kichva2ag2kc2s64vx5wcyt4e&dl=1",
+        "lung9_2":"https://www.dropbox.com/scl/fo/lfhu461ls43ehj3y6uxj1/h?rlkey=7ft9y03rj4klwvdcfm6s6kzvt&dl=1",
+        "hcc_liver":"https://www.dropbox.com/scl/fo/txi4jumgero25n929zssp/h?rlkey=23bzxg1a7f0w1orjkifz8zfo5&dl=1",
+        "normal_liver":"https://www.dropbox.com/scl/fo/23qcxc0ibc6ki3hc3dixo/h?rlkey=0os9js49ut01g1fntn0i5m7zk&dl=1",
+        "kidney_1139":"https://www.dropbox.com/scl/fo/ek7d6sdpugr3wqjf30k3l/h?rlkey=ey0vwkf1v9u5h6ea1hx5ldvsz&dl=1",
+        "kidney_10838":"https://www.dropbox.com/scl/fo/p7vs52wdmqxfl8aah7vx1/h?rlkey=5jqo4p6s8nsqjgjbhzs91sukb&dl=1",
+        "kidney_3323":"https://www.dropbox.com/scl/fo/zmjrg8h8bradykumx60q8/h?rlkey=8amhfq4vljw588l4sr355buk9&dl=1",
+        "kidney_642":"https://www.dropbox.com/scl/fo/6g8eaftskncv8vj2d1zp9/h?rlkey=td5vqltxiyn3mrvlt769n3hyb&dl=1",
+        "kidney_8693":"https://www.dropbox.com/scl/fo/rzujsz9hza1uak1fi3e64/h?rlkey=6bnkqj0isva36wxfol49kxrtl&dl=1",
+        "kidney_2566":"https://www.dropbox.com/scl/fo/f3ms854h7j1j6z78mep92/h?rlkey=id7l6uny3m4ut0bgqc6ozgdkx&dl=1",
+        "kidney_213":"https://www.dropbox.com/scl/fo/1ntibep89ph0wmn5ml6o6/h?rlkey=of0dci4fz50xkur2xkpbdxm7l&dl=1",
+        "kidney_4061":"https://www.dropbox.com/scl/fo/abzhq1dr83n1azhk5v62x/h?rlkey=jrmy26d631wd9y3rmae4stlvi&dl=1",
+        "kidney_1098":"https://www.dropbox.com/scl/fo/lslmdwodhfinnj1v81x5t/h?rlkey=eczhxo4r8flnrg02ub26oxjon&dl=1",
+        "kidney_8471":"https://www.dropbox.com/scl/fo/eoxwm0h5oexv60anhobq9/h?rlkey=wpajrub5kqpz7n0enz6l8zw7i&dl=1"
+
     }
     AVAILABLE_DATA = sorted(URL_DICT)
 
@@ -175,8 +207,10 @@ class CellTypeDeconvoDataset(BaseDataset):
                 continue
             elif ext == ".csv":
                 raw_data_dict[filename] = pd.read_csv(filepath, header=0, index_col=0)
+                raw_data_dict[filename].index=raw_data_dict[filename].index.astype(str)
             elif ext == ".h5ad":
                 raw_data_dict[filename] = sc.read_h5ad(filepath).to_df()
+                raw_data_dict[filename].index=raw_data_dict[filename].index.astype(str)
             else:
                 warnings.warn(f"Unsupported file type {ext!r}. Only csv or h5ad are supported now.")
 
@@ -214,17 +248,18 @@ class CellTypeDeconvoDataset(BaseDataset):
         )
         adata_inf.obsm["cell_type_portion"] = cell_type_portion.astype(np.float32)
         adata_inf.obsm["spatial"] = spatial.astype(np.float32)
+       
         adata_ref = AnnData(
             ref_count.values,
             dtype=np.float32,
             obs=ref_annot,
             var=pd.DataFrame(index=ref_count.columns.tolist()),
         )
-
+        
         # FIX: If we switch the order of the append bewlo, i.e., append inf to ref, we get the following error
         # ValueError: Length mismatch: Expected axis has 520 elements, new values have 10454 elements
         # This is possibly a BUG in the anndata package.
         data = Data(adata_inf, full_split_name="test")
         data.append(Data(adata_ref, full_split_name="ref"), join="outer", label_batch=True)
-
+        # np.save("2003.npy",data.x)
         return data
