@@ -25,7 +25,7 @@ if __name__ == '__main__':
     parser.add_argument("--data_dir", type=str, default='data', help='test directory')
     parser.add_argument("--dataset", default='mouse_brain_data', type=str, help="dataset id")
     parser.add_argument("--n_top", type=int, default=5, help="Number of predictors.")
-    parser.add_argument("--train_size", type=float, default=0.9, help="proportion of testing set")
+    parser.add_argument("--train_size", type=float, default=0.9, help="proportion of training set")
     parser.add_argument("--mask_rate", type=float, default=.1, help="Masking rate.")
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--mask", type=bool, default=True, help="Mask data for validation.")
@@ -49,15 +49,14 @@ if __name__ == '__main__':
             X, X_raw, targets, predictors = data.get_x(return_type="default")
         X = torch.tensor(X.toarray()).float()
         X_raw = torch.tensor(X_raw.toarray()).float()
-        train_idx = data.train_idx
-        test_idx = data.test_idx
-
+        X_train = X * mask
+        X_raw_train = X_raw * mask
         model = DeepImpute(predictors, targets, params.dataset, params.sub_outputdim, params.hidden_dim, params.dropout,
                         params.random_seed, params.gpu)
-        model.fit(X[train_idx], X[train_idx], train_idx, mask, params.batch_size, params.lr, params.n_epochs,
-                params.patience)
-        imputed_data = model.predict(X[test_idx], test_idx, mask)
-        score = model.score(X_raw[test_idx], imputed_data, test_idx, mask, metric='RMSE')
+        
+        model.fit(X_train, X_train, mask, params.batch_size, params.lr, params.n_epochs, params.patience)
+        imputed_data = model.predict(X_train, mask)
+        score = model.score(X, imputed_data, mask, metric='RMSE')
         print("RMSE: %.4f" % score)
         rmses.append(score)
     

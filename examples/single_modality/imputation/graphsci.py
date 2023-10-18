@@ -13,7 +13,7 @@ if __name__ == '__main__':
     parser.add_argument("--dropout", type=float, default=0.1, help="dropout probability")
     parser.add_argument("--gpu", type=int, default=0, help="GPU id, -1 for cpu")
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
-    parser.add_argument("--train_size", type=float, default=0.9, help="proportion of testing set")
+    parser.add_argument("--train_size", type=float, default=0.9, help="proportion of training set")
     parser.add_argument("--le", type=float, default=1, help="parameter of expression loss")
     parser.add_argument("--la", type=float, default=1e-9, help="parameter of adjacency loss")
     parser.add_argument("--ke", type=float, default=1e2, help="parameter of KL divergence of expression")
@@ -51,19 +51,18 @@ if __name__ == '__main__':
         else:
             mask = None
             X, X_raw, g = data.get_x(return_type="default")
-        X = torch.tensor(X.toarray()).float().to(device)
-        X_raw = torch.tensor(X_raw.toarray()).float().to(device)
+        X = torch.tensor(X.toarray()).float()
+        X_raw = torch.tensor(X_raw.toarray()).float()
+        X_train = (X * mask).to(device)
+        X_raw_train = (X_raw * mask).to(device)
         g = g.to(device)
-        train_idx = data.train_idx
-        test_idx = data.test_idx
 
         model = GraphSCI(num_cells=X.shape[0], num_genes=X.shape[1], dataset=params.dataset, dropout=params.dropout,
                         gpu=params.gpu, seed=params.random_seed)
-        model.fit(X, X_raw, g, train_idx, mask, params.le, params.la, params.ke, params.ka, params.n_epochs, params.lr,
-                params.weight_decay)
+        model.fit(X_train, X_raw_train, g, mask, params.le, params.la, params.ke, params.ka, params.n_epochs, params.lr, params.weight_decay)
         model.load_model()
-        imputed_data = model.predict(X, X_raw, g, mask)
-        score = model.score(X_raw, imputed_data, test_idx, mask, metric='RMSE')
+        imputed_data = model.predict(X_train, X_raw_train, g, mask)
+        score = model.score(X, imputed_data, mask, metric='RMSE')
         print("RMSE: %.4f" % score)
         rmses.append(score)
     
