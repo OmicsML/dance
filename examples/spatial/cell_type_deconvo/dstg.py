@@ -24,42 +24,50 @@ parser.add_argument("--nhid", type=int, default=16, help="Number of neurons in l
 parser.add_argument("--dropout", type=float, default=0., help="Dropout rate.")
 parser.add_argument("--epochs", type=int, default=25, help="Number of epochs to train the model.")
 parser.add_argument("--seed", type=int, default=17, help="Random seed.")
+parser.add_argument("--num_runs", type=int, default=1)
 parser.add_argument("--device", default="auto", help="Computation device.")
 args = parser.parse_args()
-set_seed(args.seed)
 pprint(vars(args))
 
-# Load dataset
-preprocessing_pipeline = DSTG.preprocessing_pipeline(
-    n_pseudo=args.num_pseudo,
-    n_top_genes=args.n_hvg,
-    k_filter=args.k_filter,
-    num_cc=args.num_cc,
-)
-dataset = CellTypeDeconvoDataset(data_dir=args.datadir, data_id=args.dataset)
-data = dataset.load_data(transform=preprocessing_pipeline, cache=args.cache)
+scores = []
+for seed in range(args.seed, args.seed + args.num_runs):
+    set_seed(seed)
 
-(adj, x), y = data.get_data(return_type="default")
-x, y = torch.FloatTensor(x), torch.FloatTensor(y.values)
-adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
-                               torch.FloatTensor(adj.data.astype(np.int32)))
-train_mask = data.get_split_mask("pseudo", return_type="torch")
-inputs = (adj, x, train_mask)
+    # Load dataset
+    preprocessing_pipeline = DSTG.preprocessing_pipeline(
+        n_pseudo=args.num_pseudo,
+        n_top_genes=args.n_hvg,
+        k_filter=args.k_filter,
+        num_cc=args.num_cc,
+    )
+    dataset = CellTypeDeconvoDataset(data_dir=args.datadir, data_id=args.dataset)
+    data = dataset.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
-# Train and evaluate model
-model = DSTG(nhid=args.nhid, bias=args.bias, dropout=args.dropout, device=args.device)
-pred = model.fit_predict(inputs, y, lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
-test_mask = data.get_split_mask("test", return_type="torch")
-score = model.default_score_func(y[test_mask], pred[test_mask])
-print(f"MSE: {score:7.4f}")
+    (adj, x), y = data.get_data(return_type="default")
+    x, y = torch.FloatTensor(x), torch.FloatTensor(y.values)
+    adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
+                                   torch.FloatTensor(adj.data.astype(np.int32)))
+    train_mask = data.get_split_mask("pseudo", return_type="torch")
+    inputs = (adj, x, train_mask)
+
+    # Train and evaluate model
+    model = DSTG(nhid=args.nhid, bias=args.bias, dropout=args.dropout, device=args.device)
+    pred = model.fit_predict(inputs, y, lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
+    test_mask = data.get_split_mask("test", return_type="torch")
+    score = model.default_score_func(y[test_mask], pred[test_mask])
+    scores.append(score)
+    print(f"MSE: {score:7.4f}")
+print(f"DSTG {args.dataset}:")
+print(f"{scores}\n{np.mean(scores):.5f} +/- {np.std(scores):.5f}")
 """To reproduce DSTG benchmarks, please refer to command lines belows:
 
-CARD synthetic $ python dstg.py --dataset CARD_synthetic --nhid 16 --lr .001 --k_filter
-50
+GSE174746:
+$ python dstg.py --dataset GSE174746 --nhid 16 --lr .0001 --k_filter 50
 
-GSE174746 $ python dstg.py --dataset GSE174746 --nhid 16 --lr .0001 --k_filter 50
+CARD synthetic:
+$ python dstg.py --dataset CARD_synthetic --nhid 16 --lr .001 --k_filter 50
 
-SPOTLight synthetic $ python dstg.py --dataset SPOTLight_synthetic --nhid 32 --lr .1
---epochs 25
+SPOTLight synthetic:
+$ python dstg.py --dataset SPOTLight_synthetic --nhid 32 --lr .1 --epochs 25
 
 """
