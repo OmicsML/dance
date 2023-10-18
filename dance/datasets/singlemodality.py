@@ -22,8 +22,8 @@ from dance.utils.download import download_file, download_unzip
 from dance.utils.preprocess import cell_label_to_df
 
 
-@register_dataset("scdeepsort")
-class ScDeepSortDataset(BaseDataset):
+@register_dataset("CellTypeAnnotation")
+class CellTypeAnnotationDataset(BaseDataset):
 
     _DISPLAY_ATTRS = ("species", "tissue", "train_dataset", "test_dataset")
     ALL_URL_DICT: Dict[str, str] = {

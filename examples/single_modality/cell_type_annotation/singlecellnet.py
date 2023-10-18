@@ -5,7 +5,7 @@ from typing import get_args
 import numpy as np
 
 from dance import logger
-from dance.datasets.singlemodality import ScDeepSortDataset
+from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.singlecellnet import SingleCellNet
 from dance.typing import LogLevel
 from dance.utils import set_seed
@@ -16,7 +16,7 @@ if __name__ == "__main__":
     parser.add_argument("--log_level", type=str, default="INFO", choices=get_args(LogLevel))
     parser.add_argument(
         "--normalize", action="store_true", help="Whether to perform the normalization for SingleCellNet. "
-        "Disabled by default since the scDeepSort data is already normalized")
+        "Disabled by default since the CellTypeAnnotation data is already normalized")
     parser.add_argument("--num_rand", type=int, default=100)
     parser.add_argument("--num_top_gene_pairs", type=int, default=250)
     parser.add_argument("--num_top_genes", type=int, default=100)
@@ -45,8 +45,8 @@ if __name__ == "__main__":
                                                               num_top_gene_pairs=args.num_top_gene_pairs)
 
         # Load data and perform necessary preprocessing
-        dataloader = ScDeepSortDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
-                                       species=args.species, tissue=args.tissue)
+        dataloader = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
+                                               species=args.species, tissue=args.tissue)
         data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
         # Obtain training and testing data

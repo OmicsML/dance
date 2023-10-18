@@ -5,7 +5,7 @@ from typing import get_args
 import numpy as np
 
 from dance import logger
-from dance.datasets.singlemodality import ScDeepSortDataset
+from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.celltypist import Celltypist
 from dance.typing import LogLevel
 from dance.utils import set_seed
@@ -40,8 +40,8 @@ if __name__ == "__main__":
         preprocessing_pipeline = model.preprocessing_pipeline()
 
         # Load data and perform necessary preprocessing
-        dataloader = ScDeepSortDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
-                                       species=args.species, tissue=args.tissue)
+        dataloader = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
+                                               species=args.species, tissue=args.tissue)
         data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
         # Obtain training and testing data
