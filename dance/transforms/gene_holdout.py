@@ -32,10 +32,7 @@ class GeneHoldout(BaseTransform):
     def __call__(self, data):
         rng = np.random.default_rng(self.random_state)
         feat = data.get_feature(return_type="numpy")
-        num_feat = feat.shape[1]
-        num_batches = np.ceil(num_feat / self.batch_size).astype(int)
-        # targets = np.split(rng.permutation(feat.shape[1]), num_batches)
-        targets = np.split(rng.permutation(feat.shape[1]), range(num_batches, feat.shape[1], num_batches))
+        targets = np.split(rng.permutation(feat.shape[1]), range(self.batch_size, feat.shape[1], self.batch_size))
 
         # Use covariance to select predictors
         covariance_matrix = np.cov(feat, rowvar=False)
