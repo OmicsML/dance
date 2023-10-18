@@ -343,7 +343,8 @@ class Louvain(BaseClusteringMethod):
         return Compose(
             FilterGenesMatch(prefixes=["ERCC", "MT-"]),
             AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
-            AnnDataTransform(sc.pp.log1p),
+            AnnDataTransform(sc.pp.scale),
+            # AnnDataTransform(sc.pp.log1p),
             CellPCA(n_components=dim),
             NeighborGraph(n_neighbors=n_neighbors),
             SetConfig({
