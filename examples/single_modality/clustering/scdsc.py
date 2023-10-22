@@ -1,4 +1,5 @@
 import argparse
+import numpy as np
 
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdsc import ScDSC
@@ -61,10 +62,11 @@ if __name__ == "__main__":
         # inputs: adj, x, x_raw, n_counts
         inputs, y = data.get_data(return_type="default")
         args.n_input = inputs[1].shape[1]
+        n_clusters = len(np.unique(y))
 
         model = ScDSC(pretrain_path=f"scdsc_{args.dataset}_pre.pkl", sigma=args.sigma, n_enc_1=args.n_enc_1,
                     n_enc_2=args.n_enc_2, n_enc_3=args.n_enc_3, n_dec_1=args.n_dec_1, n_dec_2=args.n_dec_2,
-                    n_dec_3=args.n_dec_3, n_z1=args.n_z1, n_z2=args.n_z2, n_z3=args.n_z3, n_clusters=args.n_clusters,
+                    n_dec_3=args.n_dec_3, n_z1=args.n_z1, n_z2=args.n_z2, n_z3=args.n_z3, n_clusters=n_clusters, #args.n_clusters,
                     n_input=args.n_input, v=args.v, device=args.device)
 
         # Build and train model
@@ -77,14 +79,13 @@ if __name__ == "__main__":
         print(f"{score=:.4f}")
         aris.append(score)
     
-    import numpy as np
     print('scdsc')
     print(args.dataset)
     print(f'aris: {aris}')
     print(f'aris: {np.mean(aris)} +/- {np.std(aris)}')
 """Reproduction information
 10X PBMC:
-python scdsc.py --dataset 10X_PBMC --method cosine --topk 30 --v 7 --binary_crossentropy_loss 0.75 --ce_loss 0.5 --re_loss 0.1 --zinb_loss 2.5 --sigma 0.4
+python scdsc.py --dataset 10X_PBMC --sigma 0.5 --topk 10 --pretrain_epochs 100 --v 3 --n_enc_1 1024 --n_enc_3 64 --n_dec_1 64 --n_z1 64
 
 Mouse Bladder:
 python scdsc.py --dataset mouse_bladder_cell --sigma 0.5 --topk 50 --pretrain_epochs 100 --v 7 
@@ -93,5 +94,5 @@ Mouse ES:
 python scdsc.py --dataset mouse_ES_cell --sigma 0.1 --topk 10 --pretrain_epochs 50 --v 2 
 
 Worm Neuron:
-python scdsc.py --dataset worm_neuron_cell --pretrain_epochs 100 --v 3 --n_enc_3 64 --n_dec_1 64 --n_z1 64 --n_z2 64
+python scdsc.py --dataset worm_neuron_cell --sigma 0.5 --topk 10 --pretrain_epochs 100 --v 3 --n_enc_3 64 --n_dec_1 64 --n_z1 64 --n_z2 64
 """
