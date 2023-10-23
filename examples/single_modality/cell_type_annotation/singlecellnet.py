@@ -54,6 +54,10 @@ if __name__ == "__main__":
         y_train = y_train.argmax(1)  # convert one-hot representation into label index representation
         x_test, y_test = data.get_test_data(return_type="numpy")
 
+        # XXX: last column for 'unsure' label by the model
+        # TODO: add option to base model score function to account for unsure
+        y_test = np.hstack([y_test, np.zeros((y_test.shape[0], 1))])
+
         # Train and evaluate the model
         model.fit(x_train, y_train, stratify=args.stratify, num_rand=args.num_rand, random_state=args.seed)
         score = model.score(x_test, y_test)
