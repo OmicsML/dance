@@ -2,7 +2,7 @@ import argparse
 import logging
 import os
 import random
-
+import pandas as pd
 import torch
 
 from dance import logger
@@ -21,6 +21,7 @@ if __name__ == "__main__":
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
     parser.add_argument("-seed", "--rnd_seed", default=rndseed, type=int)
+    parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("-m", "--model_folder", default="./models")
     parser.add_argument("--outdir", "-o", default="./logs", help="Directory to output to")
     parser.add_argument("--lossweight", type=float, default=1., help="Relative loss weight")
@@ -58,10 +59,20 @@ if __name__ == "__main__":
     x_test, y_test = data.get_test_data(return_type="torch")
 
     # Train and evaluate the model
-    model = BabelWrapper(args, dim_in=x_train.shape[1], dim_out=y_train.shape[1])
-    model.fit(x_train, y_train, val_ratio=0.15)
-    print(model.predict(x_test))
-    print(model.score(x_test, y_test))
+    res = pd.DataFrame({'rmse': [], 'seed': [], 'subtask': [], 'method': []})
+    for k in range(args.runs):
+        set_seed(args.rnd_seed + k)
+        model = BabelWrapper(args, dim_in=x_train.shape[1], dim_out=y_train.shape[1])
+        model.fit(x_train, y_train, val_ratio=0.15)
+        print(model.predict(x_test))
+        res = res.append({
+            'rmse': model.score(x_test, y_test),
+            'seed': k,
+            'subtask': args.subtask,
+            'method': 'babel',
+        }, ignore_index=True)
+    print(res)
+
 """To reproduce BABEL on other samples, please refer to command lines belows:
 GEX to ADT (subset):
 python babel.py --subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda

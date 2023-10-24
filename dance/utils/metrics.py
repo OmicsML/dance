@@ -98,10 +98,13 @@ def get_bipartite_matching_adjacency_matrix_mk3(raw_logits, threshold_quantile=0
     graph = bipartite.matrix.from_biadjacency_matrix(weights_sparse)
     #explicitly combining top nodes in once component or networkx freaks tf out
     u = [n for n in graph.nodes if graph.nodes[n]['bipartite'] == 0]
-    matches = bipartite.matching.minimum_weight_full_matching(graph, top_nodes=u)
-    best_matches = np.array([matches[x] - len(u) for x in u])
-    bipartite_matching_adjacency = np.zeros(raw_logits.shape)
-    bipartite_matching_adjacency[np.arange(raw_logits.shape[0]), best_matches] = 1
+    try:
+        matches = bipartite.matching.minimum_weight_full_matching(graph, top_nodes=u)
+        best_matches = np.array([matches[x] - len(u) for x in u])
+        bipartite_matching_adjacency = np.zeros(raw_logits.shape)
+        bipartite_matching_adjacency[np.arange(raw_logits.shape[0]), best_matches] = 1
+    except:
+        bipartite_matching_adjacency = weights_sparse/np.sum(1,keepdims=True)
     return bipartite_matching_adjacency
 
 
@@ -128,4 +131,82 @@ def labeled_clustering_evaluate(adata: ad.AnnData, test_sol: ad.AnnData, cluster
     ARI_score = round(adjusted_rand_score(true_labels, pred_labels), 3)
 
     print('NMI: ' + str(NMI_score) + ' ARI: ' + str(ARI_score))
-    return NMI_score, ARI_score
+    return {'dance_nmi': NMI_score, 'dance_ari': ARI_score}
+
+# Reference: https://github.com/openproblems-bio/neurips2021_multimodal_viash/tree/main/src/joint_embedding/metrics
+def integration_openproblems_evaluate(adata: ad.AnnData):
+    import scib
+    import scanpy as sc
+    score = {}
+    if 'X_emb' not in adata.obsm:
+        adata.obsm['X_emb'] = adata.X
+    score['asw_batch'] = scib.me.silhouette_batch(
+                adata,
+                batch_key='batch',
+                group_key='cell_type',
+                embed='X_emb',
+                verbose=False
+            )
+    score['asw_label'] = scib.me.silhouette(adata, group_key='cell_type', embed='X_emb')
+    # nmi
+    sc.pp.neighbors(adata, use_rep='X_emb')
+    scib.cl.opt_louvain(
+                adata,
+                label_key='cell_type',
+                cluster_key='cluster',
+                plot=False,
+                inplace=True,
+                force=True
+            )
+    score['nmi'] = scib.me.nmi(adata, group1='cluster', group2='cell_type')
+    # cc_cons
+    recompute_cc = 'S_score' not in adata.obs_keys() or \
+                    'G2M_score' not in adata.obs_keys()
+    score['cc_cons'] = scib.me.cell_cycle(
+                adata_pre=adata,
+                adata_post=adata,
+                batch_key='batch',
+                embed='X_emb',
+                recompute_cc=recompute_cc,
+                organism=adata.uns['organism']
+            )
+    # ti_cons
+    obs_keys = adata.obs_keys()
+    adt_atac_trajectory = 'pseudotime_order_ATAC' if 'pseudotime_order_ATAC' in obs_keys else 'pseudotime_order_ADT'
+    if 'pseudotime_order_GEX' in obs_keys:
+        score_rna = scib.me.trajectory_conservation(
+                        adata_pre=adata,
+                        adata_post=adata,
+                        label_key='cell_type',
+                        pseudotime_key='pseudotime_order_GEX'
+                    )
+        score_rna_batch = scib.me.trajectory_conservation(
+                        adata_pre=adata,
+                        adata_post=adata,
+                        label_key='cell_type',
+                        batch_key='batch',
+                        pseudotime_key='pseudotime_order_GEX'
+                    )
+    else:
+        score_rna = score_rna_batch = np.nan
+    if adt_atac_trajectory in obs_keys:
+        score_adt_atac = scib.me.trajectory_conservation(
+                            adata_pre=adata,
+                            adata_post=adata,
+                            label_key='cell_type',
+                            pseudotime_key=adt_atac_trajectory
+                        )
+        score_adt_atac_batch = scib.me.trajectory_conservation(
+                        adata_pre=adata,
+                        adata_post=adata,
+                        label_key='cell_type',
+                        batch_key='batch',
+                        pseudotime_key=adt_atac_trajectory
+                    )
+    else:
+        score_adt_atac = score_adt_atac_batch = np.nan
+    #score['ti_cons_mean'] = (score_rna + score_adt_atac) / 2
+    score['ti_cons_batch_mean'] = (score_rna_batch + score_adt_atac) / 2
+    score['graph_conn'] = scib.me.graph_connectivity(adata, label_key='cell_type')
+    score['final_scores'] = sum(score.values())/len(score)
+    return score

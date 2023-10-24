@@ -30,8 +30,9 @@ from torch.distributions import Normal
 from torch.distributions import kl_divergence as kl
 from torch.nn import functional as F
 from tqdm import trange
-
+from copy import deepcopy
 from dance.utils.loss import GMM_loss
+from dance.utils.metrics import integration_openproblems_evaluate
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -717,10 +718,10 @@ class scMVAE(nn.Module):
                                 break
 
                             if test_like_max > test_loss.item():
+                                best_dict = deepcopy(self.state_dict())
                                 test_like_max = test_loss.item()
                                 epoch_count = 0
-
-                                save_checkpoint(self)
+                                best_dict = deepcopy(self.state_dict())
 
                                 print(
                                     str(epoch) + "   " + str(loss.item()) + "   " + str(test_loss.item()) + "   " +
@@ -747,8 +748,9 @@ class scMVAE(nn.Module):
         duration = time.time() - start
         print('Finish training, total time: ' + str(duration) + 's' + " epoch: " + str(reco_epoch_test) + " status: " +
               status)
+        self.load_state_dict(best_dict)
 
-        load_checkpoint('./saved_model/model_best.pth.tar', self, device)
+#         load_checkpoint('./saved_model/model_best.pth.tar', self, device)
 
     def predict(self, X1, X2, out='Z', device='cpu'):
         """Predict function to get prediction.
@@ -795,7 +797,7 @@ class scMVAE(nn.Module):
                 # output.append(self.get_gamma(z)[0].cpu().detach())
                 return None
 
-    def score(self, X1, X2, labels):
+    def score(self, X1, X2, labels, adata_sol=None, metric='clustering'):
         """Score function to get score of prediction.
 
         Parameters
@@ -816,16 +818,24 @@ class scMVAE(nn.Module):
 
         """
 
-        emb = self.predict(X1, X2).cpu().numpy()
-        kmeans = KMeans(n_clusters=10, n_init=5, random_state=200)
+        if metric == 'clustering':
+            emb = self.predict(X1, X2).cpu().numpy()
+            kmeans = KMeans(n_clusters=10, n_init=5, random_state=200)
 
-        true_labels = labels.numpy()
-        pred_labels = kmeans.fit_predict(emb)
+            true_labels = labels.numpy()
+            pred_labels = kmeans.fit_predict(emb)
 
-        NMI_score = round(normalized_mutual_info_score(true_labels, pred_labels, average_method='max'), 3)
-        ARI_score = round(adjusted_rand_score(true_labels, pred_labels), 3)
+            NMI_score = round(normalized_mutual_info_score(true_labels, pred_labels, average_method='max'), 3)
+            ARI_score = round(adjusted_rand_score(true_labels, pred_labels), 3)
 
-        return NMI_score, ARI_score
+            return {'nmi_dance': NMI_score, 'ari_dance': ARI_score}
+        elif metric == 'openproblems':
+            emb = self.predict(X1, X2).cpu().numpy()
+            assert adata_sol, 'adata_sol is required by `openproblems` evaluation but not provided.'
+            adata_sol.obsm['X_emb'] = emb
+            return integration_openproblems_evaluate(adata_sol)
+        else:
+            raise NotImplementedError
 
 
 class ProductOfExperts(nn.Module):

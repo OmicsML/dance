@@ -1,8 +1,9 @@
 import argparse
 import random
-
+import pandas as pd
 import numpy as np
 import torch
+import os
 import torch.nn.functional as F
 
 from dance.datasets.multimodality import ModalityMatchingDataset
@@ -86,7 +87,7 @@ if __name__ == "__main__":
     g_mod2 = g_mod2.to(device)
 
     model.fit(g_mod1, g_mod2, labels1, labels2, train_size=train_size)
-    model.load(f"models/model_{rndseed}.pth")
+#     model.load(f"models/model_{rndseed}.pth")
 
     test_idx = np.arange(train_size, g_mod1.num_nodes("cell"))
     pred = model.predict(test_idx, enhance=True, batch1=batch_mod1, batch2=batch_mod2,
@@ -96,6 +97,24 @@ if __name__ == "__main__":
 
     print(pred)
     print(score)
+        
+    if os.path.exists('results/modality_matching.csv'):
+        res = {
+            'rmse': score,
+            'seed': args.rnd_seed,
+            'subtask': args.subtask,
+            'method': 'scmogcn',
+        }
+        res = pd.read_csv('results/modality_matching.csv').append(res, ignore_index=True)
+    else:
+        res = pd.DataFrame({
+                'rmse': [score],
+                'seed': [args.rnd_seed],
+                'subtask': [args.subtask],
+                'method': ['scmogcn'],
+            })
+    res.to_csv('results/modality_matching.csv', index=False)
+    
 """To reproduce scMoGCN on other samples, please refer to command lines belows:
 
 GEX-ADT (subset):

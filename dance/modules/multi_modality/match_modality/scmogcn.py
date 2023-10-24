@@ -8,7 +8,7 @@ arXiv:2203.01884 (2022).
 """
 import math
 import os
-
+from copy import deepcopy
 import dgl.nn.pytorch as dglnn
 import numpy as np
 import torch
@@ -260,6 +260,7 @@ class ScMoGCNWrapper:
                 if not os.path.exists('models'):
                     os.mkdir('models')
                 torch.save(self.model.state_dict(), f'models/model_{self.args.rnd_seed}.pth')
+                best_dict = deepcopy(self.model.state_dict())
                 weight_record = [wt[0].detach(), wt[1].detach()]
 
             if max(vals) != max(vals[-20:]):
@@ -269,6 +270,7 @@ class ScMoGCNWrapper:
         logger.info(f'Valid: {maxval}')
 
         self.wt = weight_record
+        self.model.load_state_dict(best_dict)
         return self
 
     def predict(self, idx, enhance=False, batch1=None, batch2=None, threshold_quantile=0.95):

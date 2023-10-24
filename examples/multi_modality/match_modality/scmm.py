@@ -1,7 +1,8 @@
 import argparse
 import random
-
+import pandas as pd
 import torch
+import os
 
 from dance.datasets.multimodality import ModalityMatchingDataset
 from dance.modules.multi_modality.match_modality.scmm import MMVAE
@@ -67,6 +68,25 @@ if __name__ == "__main__":
     model.fit(x_train, y_train)
     print(model.predict(x_test, y_test))
     print(model.score(x_test, y_test, labels))
+    
+    if os.path.exists('results/modality_matching.csv'):
+        res = {
+            'rmse': model.score(x_test, y_test, labels),
+            'seed': args.rnd_seed,
+            'subtask': args.subtask,
+            'method': 'scmm',
+        }
+        res = pd.read_csv('results/modality_matching.csv').append(res, ignore_index=True)
+    else:
+        res = pd.DataFrame({
+                'rmse': [model.score(x_test, y_test, labels)],
+                'seed': [args.rnd_seed],
+                'subtask': [args.subtask],
+                'method': ['scmm'],
+            })
+    res.to_csv('results/modality_matching.csv', index=False)
+    
+    
 """To reproduce scMM on other samples, please refer to command lines belows:
 
 GEX-ADT (subset):

@@ -16,7 +16,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import adjusted_rand_score
 from sklearn.metrics.cluster import normalized_mutual_info_score
 from torch.utils.data import DataLoader
-
+from copy import deepcopy
 from dance import logger
 from dance.utils import SimpleIndexDataset
 
@@ -207,12 +207,15 @@ class ScMoGCNWrapper:
                     os.mkdir('models')
                 torch.save(self.model.state_dict(), f'models/model_joint_embedding_{self.args.rnd_seed}.pth')
                 weight_record = wt.detach()
+                best_dict = deepcopy(self.model.state_dict())
 
             if min(vals) != min(vals[-10:]):
+                print('Early stopped.')
                 break
 
         self.wt = weight_record
         self.fitted = True
+        self.model.load_state_dict(best_dict)
 
     def to(self, device):
         """Performs device conversion.
@@ -324,7 +327,7 @@ class ScMoGCNWrapper:
                 loss4 = mse(output[3], phase_score[idx]).item()
 
                 return loss1, loss2, loss3, loss4
-            else:
+            elif metric == 'clustering':
                 emb = self.predict(idx).cpu().numpy()
                 kmeans = KMeans(n_clusters=10, n_init=5, random_state=200)
 
@@ -337,7 +340,10 @@ class ScMoGCNWrapper:
 
                 # print('ARI: ' + str(ARI_score) + ' NMI: ' + str(NMI_score))
                 return NMI_score, ARI_score
-
+            elif metric == 'openproblems':
+                pass
+            else:
+                raise NotImplementedError
 
 class ScMoGCN(nn.Module):
 

@@ -46,16 +46,21 @@ if __name__ == "__main__":
     phase_score = torch.cat([S_score[:, None], G2M_score[:, None]], 1)
     model = JAEWrapper(args, num_celL_types=int(cell_type.max() + 1), num_batches=int(batch_label.max() + 1),
                        num_phases=phase_score.shape[1], num_features=X_train.shape[1])
-    model.fit(X_train, cell_type, batch_label, phase_score)
-    model.load(f"models/model_joint_embedding_{rndseed}.pth")
-
+    model.fit(X_train, cell_type, batch_label, phase_score, max_epochs=50)
+#     model.load(f"models/model_joint_embedding_{rndseed}.pth")
+    
     with torch.no_grad():
         X_test = torch.cat([X_mod1_test, X_mod2_test], dim=1).float().to(device)
         test_id = np.arange(X_test.shape[0])
         labels = cell_type_test.numpy()
         embeds = model.predict(X_test, test_id).cpu().numpy()
         print(embeds)
+        
+        adata_sol = data.data['test_sol'][data._split_idx_dict['test']]
+        print(model.score(X_test, test_id, labels, adata_sol = adata_sol, metric="openproblems"))#"clustering"))
+
         print(model.score(X_test, test_id, labels, metric="clustering"))
+            
 """To reproduce JAE on other samples, please refer to command lines belows:
 
 GEX-ADT:

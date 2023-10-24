@@ -18,7 +18,6 @@ import torch.nn.init as init
 from torch.autograd import Variable
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
-
 from dance.utils import SimpleIndexDataset
 
 

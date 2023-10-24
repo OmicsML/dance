@@ -4,7 +4,9 @@ import numpy as np
 import torch
 import torch.utils.data as data_utils
 from sklearn import preprocessing
-
+import os
+import pandas as pd
+from dance.utils import set_seed
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.scmvae import scMVAE
 from dance.transforms.preprocess import calculate_log_library_size
@@ -21,12 +23,12 @@ def parameter_setting():
     parser.add_argument("--eps", type=float, default=0.01, help="eps")
 
     parser.add_argument("--batch_size", "-b", type=int, default=64, help="Batch size")
-    parser.add_argument("--seed", type=int, default=200, help="Random seed for repeat results")
+    parser.add_argument('-seed', '--rnd_seed', type=int, default=200, help='Random seed for repeat results')
     parser.add_argument("--latent", "-l", type=int, default=10, help="latent layer dim")
     parser.add_argument("--max_epoch", "-me", type=int, default=25, help="Max epoches")
     parser.add_argument("--max_iteration", "-mi", type=int, default=3000, help="Max iteration")
     parser.add_argument("--anneal_epoch", "-ae", type=int, default=200, help="Anneal epoch")
-    parser.add_argument("--epoch_per_test", "-ept", type=int, default=5,
+    parser.add_argument("--epoch_per_test", "-ept", type=int, default=1,
                         help="Epoch per test, must smaller than max iteration.")
     parser.add_argument("--max_ARI", "-ma", type=int, default=-200, help="initial ARI")
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2")
@@ -40,6 +42,7 @@ def parameter_setting():
 if __name__ == "__main__":
     parser = parameter_setting()
     args = parser.parse_args()
+    set_seed(args.rnd_seed)
     assert args.max_iteration > args.epoch_per_test
 
     dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding", preprocess="feature_selection")
@@ -109,10 +112,27 @@ if __name__ == "__main__":
     model.fit(args, train, valid, args.final_rate, args.scale_factor, device)
 
     embeds = model.predict(torch.cat([x_train, x_test]), torch.cat([y_train, y_test])).cpu().numpy()
-    print(embeds)
-
-    nmi_score, ari_score = model.score(x_test, y_test, labels)
-    print(f"NMI: {nmi_score:.3f}, ARI: {ari_score:.3f}")
+    print(embeds.shape)
+    x_test = torch.cat([x_train, x_test])
+    y_test = torch.cat([y_train, y_test])
+    labels = torch.from_numpy(le.fit_transform(data.mod["test_sol"].obs["cell_type"]))
+    
+    score = model.score(x_test, y_test, labels)
+    score.update(model.score(x_test, y_test, labels, data.data['test_sol'], metric="openproblems"))#"clustering"))
+    score.update({
+        'seed': args.rnd_seed,
+        'subtask': args.subtask,
+        'method': 'scmvae',
+    })
+    
+    if os.path.exists('results/joint_embedding.csv'):
+        res = pd.read_csv('results/joint_embedding.csv').append(score, ignore_index=True)
+    else:
+        for k in score:
+            score[k] = [score[k]]
+        res = pd.DataFrame(score)
+    res.to_csv('results/joint_embedding.csv', index=False)
+    
 """To reproduce scMVAE on other samples, please refer to command lines belows:
 
 GEX-ADT:

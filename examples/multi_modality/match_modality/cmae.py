@@ -6,7 +6,7 @@ This code is based on https://github.com/NVlabs/MUNIT.
 import argparse
 import os
 import random
-
+import pandas as pd
 import torch
 from sklearn import preprocessing
 
@@ -47,20 +47,20 @@ if __name__ == "__main__":
     parser.add_argument("--supervise", default=1, type=float, help="fraction to supervise")
     parser.add_argument("--super_w", default=0.1, type=float, help="weight of supervision loss")
 
-    opts = parser.parse_args()
+    args = parser.parse_args()
 
-    torch.set_num_threads(opts.cpus)
-    rndseed = opts.rnd_seed
-    device = opts.device
+    torch.set_num_threads(args.cpus)
+    rndseed = args.rnd_seed
+    device = args.device
     set_seed(rndseed)
 
     # Setup logger and output folders
-    output_directory = os.path.join(opts.output_path, "outputs")
+    output_directory = os.path.join(args.output_path, "outputs")
     checkpoint_directory = os.path.join(output_directory, "checkpoints")
     os.makedirs(checkpoint_directory, exist_ok=True)
 
     # Preprocess and load data
-    dataset = ModalityMatchingDataset(opts.subtask, root=opts.data_folder, preprocess="feature_selection")
+    dataset = ModalityMatchingDataset(args.subtask, root=args.data_folder, preprocess="feature_selection")
     data = dataset.load_data()
 
     # Prepare extra batch features and set data configs
@@ -80,11 +80,11 @@ if __name__ == "__main__":
     y_test = y_test.float().to(device)
     labels = labels.long().to(device)
 
-    config = vars(opts)
+    config = vars(args)
     # Some Fixed Settings
     config["input_dim_a"] = data.mod["mod1"].shape[1]
     config["input_dim_b"] = data.mod["mod2"].shape[1]
-    config["resume"] = opts.resume
+    config["resume"] = args.resume
     config["num_of_classes"] = max(batch) + 1
     config["shared_layer"] = True
     config["gen"] = {
@@ -105,6 +105,23 @@ if __name__ == "__main__":
     model.fit(x_train, y_train, checkpoint_directory=checkpoint_directory)
     print(model.predict(x_test, y_test))
     print(model.score(x_test, y_test, labels))
+    if os.path.exists('results/modality_matching.csv'):
+        res = {
+            'rmse': model.score(x_test, y_test, labels),
+            'seed': args.rnd_seed,
+            'subtask': args.subtask,
+            'method': 'cmae',
+        }
+        res = pd.read_csv('results/modality_matching.csv').append(res, ignore_index=True)
+    else:
+        res = pd.DataFrame({
+                'rmse': [model.score(x_test, y_test, labels)],
+                'seed': [args.rnd_seed],
+                'subtask': [args.subtask],
+                'method': ['cmae'],
+            })
+    res.to_csv('results/modality_matching.csv', index=False)
+    
 """To reproduce CMAE on other samples, please refer to command lines belows:
 
 GEX-ADT (subset):
