@@ -886,7 +886,7 @@ class DCCA(nn.Module):
                       str(ARI_score2) + ' NMI: ' + str(NMI_score2))
                 return NMI_score1, ARI_score1, NMI_score2, ARI_score2
         elif metric == 'openproblems':
-            pass
+            raise NotImplementedError
         else:
             raise NotImplementedError
 

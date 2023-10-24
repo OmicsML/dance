@@ -828,7 +828,7 @@ class scMVAE(nn.Module):
             NMI_score = round(normalized_mutual_info_score(true_labels, pred_labels, average_method='max'), 3)
             ARI_score = round(adjusted_rand_score(true_labels, pred_labels), 3)
 
-            return {'nmi_dance': NMI_score, 'ari_dance': ARI_score}
+            return {'dance_nmi': NMI_score, 'dance_ari': ARI_score}
         elif metric == 'openproblems':
             emb = self.predict(X1, X2).cpu().numpy()
             assert adata_sol, 'adata_sol is required by `openproblems` evaluation but not provided.'

@@ -285,7 +285,7 @@ class ScMoGCNWrapper:
 
         return self.model.encoder(X)
 
-    def score(self, idx, cell_type, phase_score=None, metric='loss'):
+    def score(self, idx, cell_type, phase_score=None, adata_sol=None, metric='loss'):
         """Score function to get score of prediction.
 
         Parameters
@@ -339,9 +339,12 @@ class ScMoGCNWrapper:
                 ARI_score = round(adjusted_rand_score(true_labels, pred_labels), 3)
 
                 # print('ARI: ' + str(ARI_score) + ' NMI: ' + str(NMI_score))
-                return NMI_score, ARI_score
+                return {'dance_nmi': NMI_score, 'dance_ari': ARI_score}
             elif metric == 'openproblems':
-                pass
+                emb = self.predict(idx).cpu().numpy()
+                assert adata_sol, 'adata_sol is required by `openproblems` evaluation but not provided.'
+                adata_sol.obsm['X_emb'] = emb
+                return integration_openproblems_evaluate(adata_sol)
             else:
                 raise NotImplementedError
 

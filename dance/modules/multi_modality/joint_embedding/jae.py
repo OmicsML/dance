@@ -253,7 +253,7 @@ class JAEWrapper:
                 ARI_score = round(adjusted_rand_score(true_labels, pred_labels), 3)
 
                 # print('ARI: ' + str(ARI_score) + ' NMI: ' + str(NMI_score))
-                return NMI_score, ARI_score
+                return {'dance_nmi': NMI_score, 'dance_ari': ARI_score}
             elif metric == 'openproblems':
                 emb = self.predict(inputs, idx).cpu().numpy()
                 assert adata_sol, 'adata_sol is required by `openproblems` evaluation but not provided.'
