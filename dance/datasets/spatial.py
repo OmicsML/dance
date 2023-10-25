@@ -288,5 +288,4 @@ class CellTypeDeconvoDataset(BaseDataset):
         # This is possibly a BUG in the anndata package.
         data = Data(adata_inf, full_split_name="test")
         data.append(Data(adata_ref, full_split_name="ref"), join="outer", label_batch=True)
-        # np.save("2003.npy",data.x)
         return data
