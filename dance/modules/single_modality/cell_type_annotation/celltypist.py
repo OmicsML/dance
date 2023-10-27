@@ -722,7 +722,8 @@ class Celltypist(BaseClassificationMethod):
                 predictions = self._majority_voting(predictions, clf, over_clustering, min_prop)
 
         if not as_obj:
-            predictions = np.array(predictions.predicted_labels["predicted_labels"].values)
+            col = "majority_voting" if self.majority_voting else "predicted_labels"
+            predictions = np.array(predictions.predicted_labels[col].values)
 
         return predictions
 
