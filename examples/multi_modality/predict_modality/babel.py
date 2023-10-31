@@ -15,12 +15,11 @@ if __name__ == "__main__":
         "adam": torch.optim.Adam,
         "rmsprop": torch.optim.RMSprop,
     }
-    rndseed = random.randint(0, 2147483647)
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
-    parser.add_argument("-seed", "--rnd_seed", default=rndseed, type=int)
+    parser.add_argument("-seed", "--rnd_seed", default=1, type=int)
     parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("-m", "--model_folder", default="./models")
     parser.add_argument("--outdir", "-o", default="./logs", help="Directory to output to")

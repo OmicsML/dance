@@ -204,7 +204,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
 
         return X_masked, submask, counter_submask
 
-    def fit(self, X, Y, mask=None, batch_size=64, lr=1e-3, n_epochs=100, patience=5, train_idx=None):
+    def fit(self, X, Y, train_idx, mask=None, batch_size=64, lr=1e-3, n_epochs=100, patience=5):
         """Train model.
 
         Parameters
@@ -337,7 +337,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         model.load_state_dict(state[model_string])
         return model
 
-    def predict(self, X_test, mask=None, test_idx=None, predict_raw=False):
+    def predict(self, X_test, test_idx, mask=None):
         """Get predictions from the trained model.
 
         Parameters
@@ -372,12 +372,11 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         Y_pred = Y_pred[:, gene_order]
 
         # Convert back to counts
-        if predict_raw:
-            Y_pred = torch.expm1(Y_pred)
+        Y_pred = torch.expm1(Y_pred)
 
         return Y_pred
 
-    def score(self, true_expr, imputed_expr, mask=None, metric="MSE", test_idx=None):
+    def score(self, true_expr, imputed_expr, test_idx, mask=None, metric="MSE"):
         """Scoring function of model.
 
         Parameters
@@ -401,8 +400,6 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         if metric not in allowd_metrics:
             raise ValueError("scoring metric %r." % allowd_metrics)
 
-        if test_idx is None:
-            test_idx = range(len(true_expr))
         true_target = true_expr.to(self.device)
         imputed_target = imputed_expr.to(self.device)
         if mask is not None:  # and metric == 'MSE':

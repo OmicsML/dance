@@ -9,14 +9,13 @@ from dance.modules.multi_modality.predict_modality.scmm import MMVAE
 from dance.utils import set_seed
 
 if __name__ == "__main__":
-    rndseed = random.randint(0, 2147483647)
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_path", type=str, default="./predict_modality/output", help="outputs path")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
-    parser.add_argument("-seed", "--rnd_seed", default=rndseed, type=int)
+    parser.add_argument("-seed", "--rnd_seed", default=1, type=int)
     parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("--experiment", type=str, default="test", metavar="E", help="experiment name")
     parser.add_argument("--obj", type=str, default="m_elbo_naive_warmup", metavar="O",

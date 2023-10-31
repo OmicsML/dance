@@ -15,7 +15,6 @@ from dance.modules.multi_modality.match_modality.cmae import CMAE
 from dance.utils import set_seed
 
 if __name__ == "__main__":
-    rndseed = random.randint(0, 2147483647)
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_path", type=str, default="./match_modality/output", help="outputs path")
     parser.add_argument("-d", "--data_folder", default="./data/modality_matching")
@@ -23,7 +22,8 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
-    parser.add_argument("-seed", "--rnd_seed", default=rndseed, type=int)
+    parser.add_argument("-seed", "--rnd_seed", default=1, type=int)
+    parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("-pk", "--pickle_suffix", default="_lsi_input_pca_count.pkl")
 
     parser.add_argument("--max_epochs", default=50, type=int, help="maximum number of training epochs")
@@ -99,28 +99,21 @@ if __name__ == "__main__":
         "gan_type": "lsgan",
     }  # GAN loss [lsgan/nsgan]
 
-    model = CMAE(config)
-    model.to(device)
+    res = pd.DataFrame({'score': [], 'seed': [], 'subtask': [], 'method': []})
+    for k in range(args.runs):
+        set_seed(args.rnd_seed + k)
+        model = CMAE(config)
+        model.to(device)
 
-    model.fit(x_train, y_train, checkpoint_directory=checkpoint_directory)
-    print(model.predict(x_test, y_test))
-    print(model.score(x_test, y_test, labels))
-    if os.path.exists('results/modality_matching.csv'):
-        res = {
-            'rmse': model.score(x_test, y_test, labels),
-            'seed': args.rnd_seed,
+        model.fit(x_train, y_train, checkpoint_directory=checkpoint_directory)
+        print(model.predict(x_test, y_test))
+        res = res.append({
+            'score': model.score(x_test, y_test, labels),
+            'seed': k,
             'subtask': args.subtask,
             'method': 'cmae',
-        }
-        res = pd.read_csv('results/modality_matching.csv').append(res, ignore_index=True)
-    else:
-        res = pd.DataFrame({
-                'rmse': [model.score(x_test, y_test, labels)],
-                'seed': [args.rnd_seed],
-                'subtask': [args.subtask],
-                'method': ['cmae'],
-            })
-    res.to_csv('results/modality_matching.csv', index=False)
+        }, ignore_index=True)
+    print(res)
     
 """To reproduce CMAE on other samples, please refer to command lines belows:
 

@@ -5,10 +5,9 @@ from typing import get_args
 import numpy as np
 
 from dance import logger
-from dance.datasets.singlemodality import CellTypeAnnotationDataset
+from dance.datasets.singlemodality import ScDeepSortDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.typing import LogLevel
-from dance.utils import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -22,15 +21,15 @@ if __name__ == "__main__":
     parser.add_argument("--nofilter", action="store_true", help="Disable filtering genes by expression summaries.")
     parser.add_argument(
         "--normalize", action="store_true", help="Whether to perform the normalization described in ACTINN. "
-        "Disabled by default since the CellTypeAnnotation data is already normalized")
+        "Disabled by default since the scDeepSort data is already normalized")
     parser.add_argument("--num_epochs", type=int, default=50, help="Number of epochs")
     parser.add_argument("--print_cost", action="store_true", help="Print cost when training")
+    parser.add_argument("--runs", type=int, default=10, help="Number of repetitions")
+    parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
     parser.add_argument("--species", default="mouse")
     parser.add_argument("--test_dataset", nargs="+", default=[1759], help="List of testing dataset ids.")
     parser.add_argument("--tissue", default="Spleen")
     parser.add_argument("--train_dataset", nargs="+", default=[1970], help="List of training dataset ids.")
-    parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
-    parser.add_argument("--num_runs", type=int, default=1, help="Number of repetitions")
 
     args = parser.parse_args()
     logger.setLevel(args.log_level)
@@ -41,8 +40,8 @@ if __name__ == "__main__":
     preprocessing_pipeline = model.preprocessing_pipeline(normalize=args.normalize, filter_genes=not args.nofilter)
 
     # Load data and perform necessary preprocessing
-    dataloader = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
-                                           tissue=args.tissue, species=args.species)
+    dataloader = ScDeepSortDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset, tissue=args.tissue,
+                                   species=args.species)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
     # Obtain training and testing data
@@ -51,15 +50,12 @@ if __name__ == "__main__":
 
     # Train and evaluate models for several rounds
     scores = []
-    for seed in range(args.seed, args.seed + args.num_runs):
-        set_seed(seed)
-
-        model.fit(x_train, y_train, seed=seed, lr=args.learning_rate, num_epochs=args.num_epochs,
+    for k in range(args.runs):
+        model.fit(x_train, y_train, seed=args.seed + k, lr=args.learning_rate, num_epochs=args.num_epochs,
                   batch_size=args.batch_size, print_cost=args.print_cost)
         scores.append(score := model.score(x_test, y_test))
         print(f"{score=:.4f}")
-    print(f"ACTINN {args.species} {args.tissue} {args.test_dataset}:")
-    print(f"{scores}\n{np.mean(scores):.5f} +/- {np.std(scores):.5f}")
+    print(f"Score: {np.mean(scores):04.3f} +/- {np.std(scores):04.3f}")
 """To reproduce ACTINN benchmarks, please refer to command lines below:
 
 Mouse Brain

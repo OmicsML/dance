@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import torch.utils.data as data_utils
 from sklearn import preprocessing
-
+import pandas as pd
 import dance.utils.metrics as metrics
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.dcca import DCCA
@@ -36,6 +36,7 @@ def parameter_setting():
     parser.add_argument("--batch_size", "-b", type=int, default=64, help="Batch size")
 
     parser.add_argument("--seed", type=int, default=1, help="Random seed for repeat results")
+    parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("--latent", "-l", type=int, default=10, help="latent layer dim")
     parser.add_argument("--max_epoch", "-me", type=int, default=10, help="Max epoches")
     parser.add_argument("--max_iteration", "-mi", type=int, default=3000, help="Max iteration")
@@ -84,12 +85,6 @@ if __name__ == "__main__":
     Nfeature2 = y_train.shape[1]
 
     device = torch.device(args.device)
-
-    model = DCCA(layer_e_1=[Nfeature1, 128], hidden1_1=128, Zdim_1=4, layer_d_1=[4, 128], hidden2_1=128,
-                 layer_e_2=[Nfeature2, 1500, 128], hidden1_2=128, Zdim_2=4, layer_d_2=[4], hidden2_2=4, args=args,
-                 Type_1="NB", Type_2="Bernoulli", ground_truth1=torch.cat([train_labels, test_labels]), cycle=1,
-                 attention_loss="Eucli")  # yapf: disable
-    model.to(device)
     train = data_utils.TensorDataset(x_train.float(), x_train_raw, x_train_size.float(), y_train.float(), y_train_raw,
                                      y_train_size.float())
 
@@ -108,27 +103,46 @@ if __name__ == "__main__":
 
     total_loader = data_utils.DataLoader(total, batch_size=args.batch_size, shuffle=False)
 
-    model.fit(train_loader, test_loader, total_loader, "RNA")
-
-    with torch.no_grad():
-        emb1, emb2 = model.predict(total_loader)
-
-    embeds = np.concatenate([emb1, emb2], 1)
-    print(embeds)
-    print(model.score(total_loader))
-
-    mod1_obs = data.mod["mod1"].obs
-    mod1_uns = data.mod["mod1"].uns
-    adata = ad.AnnData(
-        X=embeds,
-        obs=mod1_obs,
-        uns={
-            "dataset_id": mod1_uns["dataset_id"],
-            "method_id": "scmogcn",
-        },
-    )
 
     metrics.labeled_clustering_evaluate(adata, data.mod["test_sol"])
+
+    res = None
+    for k in range(args.runs):
+        set_seed(args.rnd_seed + k)
+        model = DCCA(layer_e_1=[Nfeature1, 128], hidden1_1=128, Zdim_1=4, layer_d_1=[4, 128], hidden2_1=128,
+                     layer_e_2=[Nfeature2, 1500, 128], hidden1_2=128, Zdim_2=4, layer_d_2=[4], hidden2_2=4, args=args,
+                     Type_1="NB", Type_2="Bernoulli", ground_truth1=torch.cat([train_labels, test_labels]), cycle=1,
+                     attention_loss="Eucli")  # yapf: disable
+        model.to(device)
+        model.fit(train_loader, test_loader, total_loader, "RNA")
+
+        emb1, emb2 = model.predict(total_loader)
+        embeds = np.concatenate([emb1, emb2], 1)
+        print(embeds)
+
+        adata = ad.AnnData(
+            X=embeds,
+            obs=mod1_obs,
+        )
+        adata_sol = dataset.test_sol
+        adata = adata[adata_sol.obs_names]
+        adata_sol.obsm['X_emb'] = adata.X
+        score = metrics.labeled_clustering_evaluate(adata, dataset)
+        score.update(metrics.integration_openproblems_evaluate(adata_sol))
+        score.update({
+            'seed': k,
+            'subtask': args.subtask,
+            'method': 'dcca',
+        })
+
+        if res:
+            res = res.append(score, ignore_index=True)
+        else:
+            for s in score:
+                score[s] = [score[s]]
+            res = pd.DataFrame(score)
+    print(res)
+
 """To reproduce DCCA on other samples, please refer to command lines belows:
 
 GEX-ADT:

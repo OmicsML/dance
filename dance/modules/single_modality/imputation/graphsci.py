@@ -194,8 +194,8 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
 
         return X_masked
 
-    def fit(self, train_data, train_data_raw, graph, mask=None, le=1, la=1, ke=1, ka=1, n_epochs=100,
-            lr=1e-3, weight_decay=1e-5, train_idx=None):
+    def fit(self, train_data, train_data_raw, graph, train_idx, mask=None, le=1, la=1, ke=1, ka=1, n_epochs=100,
+            lr=1e-3, weight_decay=1e-5):
         """Data fitting function.
 
         Parameters
@@ -233,8 +233,6 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
 
         rng = np.random.default_rng(self.seed)
         # Specify train validation split
-        if train_idx is None:
-            train_idx = range(len(train_data))
         if mask is not None:
             train_data_masked = self.maskdata(train_data, mask)
             graph.ndata["feat"] = train_data_masked.float().T
@@ -485,7 +483,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.aemodel.load_state_dict(state['aemodel'])
         self.gnnmodel.load_state_dict(state['gnnmodel'])
 
-    def score(self, true_expr, imputed_expr, mask=None, metric="MSE", log1p=True, test_idx=None):
+    def score(self, true_expr, imputed_expr, test_idx, mask=None, metric="MSE"):
         """Scoring function of model.
 
         Parameters
@@ -509,12 +507,8 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         if metric not in allowd_metrics:
             raise ValueError("scoring metric %r." % allowd_metrics)
 
-        if test_idx is None:
-            test_idx = range(len(true_expr))
-        true_target = true_expr[test_idx].to(self.device)
-        imputed_target = imputed_expr[test_idx].to(self.device)
-        if log1p:
-            imputed_target = torch.log1p(imputed_target)
+        true_target = true_expr[test_idx]
+        imputed_target = imputed_expr[test_idx]
         if mask is not None:  # and metric == 'MSE':
             # true_target = true_target[~mask[test_idx]]
             # imputed_target = imputed_target[~mask[test_idx]]

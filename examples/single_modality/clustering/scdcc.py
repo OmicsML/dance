@@ -88,14 +88,14 @@ if __name__ == "__main__":
     print(f'aris: {np.mean(aris)} +/- {np.std(aris)}')
 """ Reproduction information
 10X PBMC:
-python scdcc.py --dataset 10X_PBMC --label_cells_files label_10X_PBMC.txt --pretrain_epochs 300 --epochs 100 --sigma 2 --n_pairwise 10000 --cache
+python scdcc.py --dataset 10X_PBMC --label_cells_files label_10X_PBMC.txt --pretrain_epochs 300 --epochs 100 --sigma 2
 
 Mouse ES:
-python scdcc.py --dataset mouse_ES_cell --label_cells_files label_mouse_ES_cell.txt --pretrain_epochs 300 --epochs 100 --sigma 1.75 --encodeLayer 512 256  --n_pairwise 10000 --cache
+python scdcc.py --dataset mouse_ES_cell --label_cells_files label_mouse_ES_cell.txt --pretrain_epochs 300 --epochs 100 --sigma 1.75 --encodeLayer 512 256
 
 Worm Neuron:
-python scdcc.py --dataset worm_neuron_cell --label_cells_files label_worm_neuron_cell.txt --pretrain_epochs 300 --epochs 100 --n_pairwise 20000 --cache   
+python scdcc.py --dataset worm_neuron_cell --label_cells_files label_worm_neuron_cell.txt --pretrain_epochs 300 --epochs 100
 
 Mouse Bladder:
-python scdcc.py --dataset mouse_bladder_cell --label_cells_files label_mouse_bladder_cell.txt --pretrain_epochs 300 --epochs 100 --sigma 3.25 --n_pairwise 10000 --cache
+python scdcc.py --dataset mouse_bladder_cell --label_cells_files label_mouse_bladder_cell.txt --pretrain_epochs 300 --epochs 100 --sigma 3.25
 """

@@ -128,7 +128,7 @@ if __name__ == "__main__":
     parser.add_argument("-ci", "--cell_init", default="none", choices=["none", "svd"])
     parser.add_argument("-bas", "--batch_seperation", action="store_true")
     parser.add_argument("-pwpath", "--pathway_path", default="./data/h.all.v7.4")
-    parser.add_argument("-seed", "--rnd_seed", type=int, default=777)
+    parser.add_argument("-seed", "--rnd_seed", type=int, default=1)
     parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("-ws", "--weighted_sum", action="store_true")
     parser.add_argument("-samp", "--sampling", action="store_true")
