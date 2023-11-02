@@ -1,8 +1,12 @@
 import numba
 import numpy as np
 import torch
-
+import scipy.stats
 from dance.typing import NormMode
+from collections import Counter
+from math import isclose
+from statistics import stdev, variance
+from typing import Sequence, Iterator
 
 
 def normalize(mat, *, mode: NormMode = "normalize", axis: int = 0, eps: float = -1.0):
@@ -73,12 +77,55 @@ def euclidean_distance(t1, t2):
     for i in range(t1.shape[0]):
         sum += (t1[i] - t2[i])**2
     return np.sqrt(sum)
+    
+@numba.njit("f4(f4[:], f4[:])")
+def pearson_distance(a, b):
+    a_avg = np.sum(a) / len(a)
+    b_avg = np.sum(b) / len(b)
+    cov_ab1 = [x-a_avg for x in a]
+    cov_ab2 = [y-b_avg for y in b]
+    cov_ab  = np.sum(np.array([cov_ab1[i]*cov_ab2[i] for i in range(len(cov_ab1))]))
+    sq = (np.sum(np.array([(x - a_avg) ** 2 for x in a])) * np.sum(np.array([(x - b_avg) ** 2 for x in b]))) ** 0.5
+    corr_factor = cov_ab / sq
+    return 1-corr_factor
+
+
+def rank_series(values: Sequence[float]) -> Iterator[float]:
+    rank_by_value = {}
+    index = 0
+    for x, n in sorted(Counter(values).items()):
+        rank_by_value[x] = index + (1 + n)/2
+        index += n
+    for x in values:
+        yield rank_by_value[x]
+
+
+@numba.njit("f4(f4[:], f4[:])")
+def spearman_distance(x, y):
+    """
+    The Spearman rank correlation is used to evaluate if the relationship between two variables,
+    X and Y is monotonic. The rank correlation measures how closely related the ordering of one
+    variable to the other variable, with no regard to the actual values of the variables.
+    """
+    if len(x) != len(y):
+        raise ValueError(f'X length {len(x)} does not match Y length {len(y)}')
+    x_ranks = np.argsort(np.argsort(x))+1.0
+    y_ranks = np.argsort(np.argsort(y))+1.0
+    covxy = np.cov(x_ranks, y_ranks)
+    stdx = np.sqrt(((x_ranks- np.mean(x_ranks)) ** 2).sum() / (x_ranks.size - 1))
+    stdy = np.sqrt(((y_ranks- np.mean(y_ranks)) ** 2).sum() / (y_ranks.size - 1))
+    r = covxy/stdx/stdy
+    return 1-r[0,1]
 
 
 @numba.njit("f4[:,:](f4[:,:], u4)", parallel=True, nogil=True)
 def pairwise_distance(x, dist_func_id=0):
     if dist_func_id == 0:  # Euclidean distance
         dist = euclidean_distance
+    elif dist_func_id==1:
+        dist=pearson_distance
+    elif dist_func_id==2:
+        dist=spearman_distance
     else:
         raise ValueError("Unknown distance function ID")
 
