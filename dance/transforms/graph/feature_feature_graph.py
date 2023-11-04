@@ -3,9 +3,9 @@ import dgl.nn as dglnn
 import torch
 from scipy.sparse import coo_matrix
 from torch.nn import functional as F
-from dance.utils.matrix import pairwise_distance
 
 from dance.transforms.base import BaseTransform
+from dance.utils.matrix import pairwise_distance
 
 
 class FeatureFeatureGraph(BaseTransform):
@@ -16,12 +16,12 @@ class FeatureFeatureGraph(BaseTransform):
         self.threshold = threshold
         self.normalize_edges = normalize_edges
 
-    def __call__(self, data,dist_func_id=0):
+    def __call__(self, data, dist_func_id=0):
         feat = data.get_feature(return_type="torch")
 
         # Calculate correlation between features
         #TODO get more distance options
-        corr = torch.from_numpy(pairwise_distance(feat.T.detach().numpy(),dist_func_id=dist_func_id))
+        corr = torch.from_numpy(pairwise_distance(feat.T.detach().numpy(), dist_func_id=dist_func_id))
         corr_sub = F.threshold(corr, self.threshold, 0) - F.threshold(-corr, self.threshold, 0)
         corr_coo = coo_matrix(corr_sub)
 
