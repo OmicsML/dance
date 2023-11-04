@@ -36,7 +36,6 @@ class SpaGCNGraph(BaseTransform):
         xy_pixel = data.get_feature(return_type="numpy", channel=self.channels[1], channel_type=self.channel_types[1])
         img = data.get_feature(return_type="numpy", channel=self.channels[2], channel_type=self.channel_types[2])
         self.logger.info("Start calculating the adjacency matrix using the histology image")
-
         g = np.zeros((xy.shape[0], 3))
         beta_half = round(self.beta / 2)
         x_lim, y_lim = img.shape[:2]
