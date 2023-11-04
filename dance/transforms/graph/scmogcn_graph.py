@@ -124,18 +124,18 @@ def create_pathway_graph(gex_features: scipy.sparse.spmatrix, gene_names: Union[
                         if j != k:
                             uu.append(j)
                             vv.append(k)
-                            ee.append(1-corr[j][k])
+                            ee.append(1 - corr[j][k])
         elif pathway_weight == 'spearman':
-            spe=scipy.stats.spearmanr(gex_features.toarray())[0]
-            if gex_features.toarray().shape[0]==2:
-                spe=np.array([[1,spe],[spe,1]])
+            spe = scipy.stats.spearmanr(gex_features.toarray())[0]
+            if gex_features.toarray().shape[0] == 2:
+                spe = np.array([[1, spe], [spe, 1]])
             for i in new_pw:
                 for j in i:
                     for k in i:
                         if j != k:
                             uu.append(j)
                             vv.append(k)
-                            ee.append(1-spe[j][k])
+                            ee.append(1 - spe[j][k])
 
         pickle.dump([uu, vv, ee], open(pk_path, 'wb'))
 
@@ -200,7 +200,7 @@ def construct_enhanced_feature_graph(u, v, e, train_size, feature_size, cell_nod
             graph.nodes['cell'].data['id'] = cell_node_features[:train_size] if not _test_graph else cell_node_features
         else:
             graph.nodes['cell'].data['id'] = cell_node_features
-        feature_size=min(graph.num_nodes('feature'),feature_size)
+        feature_size = min(graph.num_nodes('feature'), feature_size)
         graph.nodes['feature'].data['id'] = torch.arange(feature_size).long()
         graph.edges['feature2cell'].data['weight'] = e
         graph.edges['cell2feature'].data['weight'] = e[:graph.edges(etype='cell2feature')[0].shape[0]]
