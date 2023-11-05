@@ -9,10 +9,10 @@ import dgl
 import networkx as nx
 import numpy as np
 import pandas as pd
+import scipy.stats
 import sklearn
 import torch
 from dgl import nn as dglnn
-import scipy.stats
 from scipy import sparse as sp
 from scipy.sparse import csc_matrix
 from scipy.spatial import distance, distance_matrix, minkowski_distance
@@ -277,18 +277,18 @@ def construct_pathway_graph(gex_data, **kwargs):
                         if j != k:
                             uu.append(j)
                             vv.append(k)
-                            ee.append(1-corr[j][k])
+                            ee.append(1 - corr[j][k])
         elif pww == 'spearman':
-            spe=scipy.stats.spearmanr(gex_features.toarray())[0]
-            if gex_features.toarray().shape[0]==2:
-                spe=np.array([[1,spe],[spe,1]])
+            spe = scipy.stats.spearmanr(gex_features.toarray())[0]
+            if gex_features.toarray().shape[0] == 2:
+                spe = np.array([[1, spe], [spe, 1]])
             for i in new_pw:
                 for j in i:
                     for k in i:
                         if j != k:
                             uu.append(j)
                             vv.append(k)
-                            ee.append(1-spe[j][k])
+                            ee.append(1 - spe[j][k])
 
         pickle.dump([uu, vv, ee], open(pk_path, 'wb'))
 
