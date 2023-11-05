@@ -43,12 +43,11 @@ class MorphologyFeature(BaseTransform):
         cs = self.crop_size
         ts = self.target_size
 
-        img = image[x - cs:x + cs, y - cs:y + cs, :]
+        img = image[int(x - cs):int(x + cs), int(y - cs):int(y + cs), :]
         img = cv2.resize(img, (ts, ts))
         img = (img - self.mean) / self.std
         img = img.transpose((2, 0, 1))
         img = torch.FloatTensor(img).unsqueeze(0)
-
         return img
 
     def __call__(self, data):
