@@ -9,6 +9,7 @@ from dance.transforms.misc import Compose, RemoveSplit, SaveRaw, SetConfig
 from dance.transforms.normalize import ScaleFeature
 from dance.transforms.pseudo_gen import CellTopicProfile, PseudoMixture
 from dance.transforms.scn_feature import SCNFeature
+from dance.transforms.sc3_feature import SC3Feature
 from dance.transforms.spatial_feature import MorphologyFeature, SMEFeature
 from dance.transforms.stats import GeneStats
 
@@ -33,6 +34,7 @@ __all__ = [
     "PseudoMixture",
     "RemoveSplit",
     "SCNFeature",
+    ”SC3Feature",
     "SMEFeature",
     "SaveRaw",
     "ScaleFeature",
