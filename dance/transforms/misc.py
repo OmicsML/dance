@@ -62,6 +62,7 @@ class Compose(BaseTransform):
         self.logger.info(f"Applying composed transformations:\n{self!r}")
         for transform in self.transforms:
             transform(data)
+            # print(data.x)
 
 
 class SetConfig(BaseTransform):
