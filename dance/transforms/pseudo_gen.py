@@ -183,7 +183,6 @@ def get_ct_profile(
     # Aggregate profile for each selected cell types
     logger.info(f"Generating cell-type profiles ({method!r} aggregation) for {ct_select}")
     ct_profile = np.zeros((x.shape[1], len(ct_select)), dtype=np.float32)  # gene x cell
-    print(np.isfinite(x).all())
     for i, ct in enumerate(ct_select):
         ct_index = np.where(annot == ct)[0]
         logger.info(f"Aggregating {ct!r} profiles over {ct_index.size:,} samples")
