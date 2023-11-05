@@ -90,7 +90,9 @@ def calculate_log_library_size(Dataset):
     # Dataset is raw read counts, and should be cells * features
 
     Nsamples = np.shape(Dataset)[0]
-    library_sum = np.log(np.sum(Dataset, axis=1))
+    t=np.sum(Dataset, axis=1).astype(np.float64)
+    t[t==0]=0.1
+    library_sum = np.log(t)
 
     lib_mean = np.full((Nsamples, 1), np.mean(library_sum))
     lib_var = np.full((Nsamples, 1), np.var(library_sum))
@@ -124,6 +126,11 @@ class lsiTransformer():
         if not self.fitted:
             raise RuntimeError('Transformer was not fitted on any data')
         X = self.tfidfTransformer.transform(adata.layers['counts'])
+        print(type(X))
+        X=X.toarray()
+        X=np.nan_to_num(X)
+        t=np.isfinite(X).all()
+        X=sp.csc_matrix(X)
         X_norm = self.normalizer.transform(X)
         X_norm = np.log1p(X_norm * 1e4)
         X_lsi = self.pcaTransformer.transform(X_norm)
