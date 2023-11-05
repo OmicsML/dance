@@ -16,7 +16,7 @@ class AnnDataTransform(BaseTransform):
 
     where ``data`` is a dance data object, e.g., :class:`dance.data.Data`. Calling the above function is effectively
     equivalent to calling
-
+        
     >>> scanpy.pp.normalize_total(data.data, target_sum=10000)
 
     """
