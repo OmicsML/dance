@@ -34,7 +34,7 @@ __all__ = [
     "PseudoMixture",
     "RemoveSplit",
     "SCNFeature",
-    ”SC3Feature",
+    "SC3Feature",
     "SMEFeature",
     "SaveRaw",
     "ScaleFeature",
