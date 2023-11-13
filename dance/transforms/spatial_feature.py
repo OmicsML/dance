@@ -1,10 +1,15 @@
+import logging
+from typing import Union
 import cv2
 import numpy as np
+import patsy
 import torch
 import torchvision as tv
 from sklearn.decomposition import PCA
 from tqdm import tqdm, trange
-
+import pandas as pd
+from dance.data.base import Data
+from dance.typing import LogLevel, Optional
 from dance.transforms.base import BaseTransform
 from dance.typing import Optional, Sequence
 from dance.utils.matrix import normalize
@@ -108,3 +113,66 @@ class SMEFeature(BaseTransform):
             sme_feat = pca.fit_transform(sme_feat)
 
         data.data.obsm[self.out] = sme_feat
+
+class SpatialIDEFeature(BaseTransform):
+    def __init__(self, channels: Sequence[Optional[str]] = (None, "spatial"),
+                 channel_types: Sequence[Optional[str]] = (None, "obsm"), **kwargs):
+        super().__init__(**kwargs)
+        self.channels=channels
+        self.channel_types=channel_types
+    def regress_out(self,sample_info, expression_matrix, covariate_formula, design_formula='1', rcond=-1):
+        ''' Implementation of limma's removeBatchEffect function
+        '''
+        # Ensure intercept is not part of covariates
+        covariate_formula += ' - 1'
+
+        covariate_matrix = patsy.dmatrix(covariate_formula, sample_info)
+        design_matrix = patsy.dmatrix(design_formula, sample_info)
+
+        design_batch = np.hstack((design_matrix, covariate_matrix))
+
+        coefficients, res, rank, s = np.linalg.lstsq(design_batch, expression_matrix.T, rcond=rcond)
+        beta = coefficients[design_matrix.shape[1]:]
+        regressed = expression_matrix - covariate_matrix.dot(beta).T
+
+        return regressed
+
+
+    def stabilize(self,expression_matrix):
+        ''' Use Anscombes approximation to variance stabilize Negative Binomial data
+
+        See https://f1000research.com/posters/4-1041 for motivation.
+
+        Assumes columns are samples, and rows are genes
+        '''
+        from scipy import optimize
+        phi_hat, _ = optimize.curve_fit(lambda mu, phi: mu + phi * mu ** 2, expression_matrix.mean(1), expression_matrix.var(1))
+
+        return np.log(expression_matrix + 1. / (2 * phi_hat[0]))
+    def __call__(self, data):
+        counts = data.get_feature(return_type="numpy", channel=self.channels[0], channel_type=self.channel_types[0])
+        xy = data.get_feature(return_type="numpy", channel=self.channels[1], channel_type=self.channel_types[1])
+        norm_expr =self.stabilize(counts.T).T
+        sample_info=pd.DataFrame(xy,columns=['x','y'])
+        sample_info['total_counts']=np.sum(counts,axis=1)
+        resid_expr = self.regress_out(sample_info, norm_expr.T, 'np.log(total_counts)').T
+        data.data.obsm[self.out] = resid_expr
+class TangramFeature(BaseTransform):
+    def __init__(self,channel: Optional[str] = None,
+        channel_type: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.channel=channel
+        self.channel_type=channel_type
+    def __call__(self, data: Data) -> Data:
+        x = data.get_feature(return_type="default", channel=self.channel, channel_type=self.channel_type)
+        data.data.obs["uniform_density"] = np.ones(x.shape[0]) / x.shape[0]
+        logging.info(
+            f"uniform based density prior is calculated and saved in `obs``uniform_density` of the spatial Anndata."
+        )
+
+        # Calculate rna_count_based density prior as % of rna molecule count
+        rna_count_per_spot = np.array(x.sum(axis=1)).squeeze()
+        data.data.obs["rna_count_based_density"] = rna_count_per_spot / np.sum(rna_count_per_spot)
+        logging.info(
+            f"rna count based density prior is calculated and saved in `obs``rna_count_based_density` of the spatial Anndata."
+        )
