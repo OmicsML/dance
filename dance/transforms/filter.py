@@ -6,12 +6,13 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import scipy.sparse as sp
+from sklearn.preprocessing import MinMaxScaler
 
 from dance import logger as default_logger
 from dance.exceptions import DevError
 from dance.transforms.base import BaseTransform
 from dance.typing import Dict, GeneSummaryMode, List, Literal, Logger, Optional, Tuple, Union
-
+from scipy.stats import rankdata
 
 def get_count(count_or_ratio: Optional[Union[float, int]], total: int) -> Optional[int]:
     """Get the count from a count or ratio.
@@ -546,7 +547,7 @@ class FilterGenesMarker(BaseTransform):
 
     @staticmethod
     def get_marker_genes(
-        ct_profile: np.ndarray,  # gene x cell
+        ct_profile: np.ndarray,  # gene x celltype
         cell_types: List[str],
         genes: List[str],
         *,
@@ -595,3 +596,146 @@ class FilterGenesMarker(BaseTransform):
 
         if self.subset:  # inplace subset the variables
             data.data._inplace_subset_var(marker_genes)
+
+class FilterGenesMarkerGini(BaseTransform):
+    def __init__(
+        self,
+        *,
+        ct_profile_channel: str = "CellGiottoTopicProfile",
+        ct_profile_detection_channel:str="CellGiottoDetectionTopicProfile",
+        subset: bool = True,
+        label: Optional[str] = None,
+        threshold: float = 0.04,
+        eps: float = 1e-6,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.ct_profile_channel = ct_profile_channel
+        self.ct_profile_detection_channel=ct_profile_detection_channel
+        self.subset = subset
+        self.label = label
+        self.threshold = threshold
+        self.eps = eps
+
+    def __call__(self, data,logger: Logger = default_logger,):
+        ct_profile_df = data.get_feature(channel=self.ct_profile_channel, channel_type="varm", return_type="default")
+        ct_profile_detection_df = data.get_feature(channel=self.ct_profile_detection_channel, channel_type="varm", return_type="default")
+        cell_type_nums_df=data.get_feature(channel="cell_nums",channel_type="uns", return_type="default")
+        ct_profile = ct_profile_df.values
+        ct_profile_detection=ct_profile_detection_df.values
+        cell_types = ct_profile_df.columns.tolist()
+        genes = ct_profile_df.index.tolist()
+        marker_gene_ind_df = pd.DataFrame(False, index=genes, columns=cell_types)
+        ans_gene=[]
+        if (num_cts := len(cell_types)) < 2:
+            raise ValueError(f"Need at least two cell types to find marker genes, got {num_cts}:\n{cell_types}")
+        for i, ct in enumerate(cell_types):
+            other_ct_profile=np.zeros_like(ct_profile[:,i])
+            other_detection_ct_profile=np.zeros_like(ct_profile[:,i])
+            other_sum=0
+
+            for j in range(num_cts):
+                if j != i:
+                    other=cell_type_nums_df.loc[cell_types[j],"nums"]
+                    other_ct_profile+=ct_profile[:,j]*other
+                    other_detection_ct_profile+=ct_profile_detection[:,j]*other
+                    other_sum+=other
+            other_ct_profile=other_ct_profile/other_sum
+            other_detection_ct_profile=other_detection_ct_profile/other_sum
+            top_genes_scores_filtered= get_marker_genes_giotto(ct_profile[:,i],other_ct_profile,ct_profile_detection[:,i],other_detection_ct_profile,genes=genes)
+            markers_idx=np.array(top_genes_scores_filtered.index)
+            top_genes_scores_filtered["cellType"]=ct
+            ans_gene.append(top_genes_scores_filtered)
+            if markers_idx.size > 0:
+                marker_gene_ind_df.iloc[markers_idx, i] = True
+                markers = marker_gene_ind_df.iloc[markers_idx].index.tolist()
+                logger.info(f"Found {len(markers):,} marker genes for cell type {ct!r}")
+                logger.debug(f"{markers=}")
+            else:
+                logger.info(f"No marker genes found for cell type {ct!r}")
+             # Combine all marker genes
+        is_marker = marker_gene_ind_df.max(1)
+        marker_genes = is_marker[is_marker].index.tolist()
+        # Save marker gene info to data
+        data.data.uns[self.out] =pd.concat(ans_gene,axis=0)
+        if self.label is not None:
+            data.data.var[self.label] = pd.concat(marker_gene_ind_df.max(1))
+
+        if self.subset:  # inplace subset the variables
+            data.data._inplace_subset_var(marker_genes)
+        
+                
+def get_marker_genes_giotto(group1,group2,group_detection_1,group_detection_2,min_expr_gini_score = 0.2, min_det_gini_score = 0.2, 
+  rank_score = 1, min_genes = 5,genes=None ):
+    gene_nums=group1.shape[0]
+    gene_detection_gini_score=np.zeros((2,gene_nums))
+    gene_gini_score=np.zeros((2,gene_nums))
+    gene_rank_score=np.zeros((2,gene_nums))
+    expressions=np.zeros((2,gene_nums))
+    detections=np.zeros((2,gene_nums))
+    gene_detection_rank_score=np.zeros((2,gene_nums))
+    scaler = MinMaxScaler(feature_range=(0.1,1))#inverse
+    for i in range(gene_nums):
+        gene_gini_score[:,i]=[mygini_fun([group1[i],group2[i]])]*2
+        expressions[:,i]=[group1[i],group2[i]]
+        gene_detection_gini_score[:,i]=[mygini_fun([group_detection_1[i],group_detection_2[i]])]*2
+        detections[:,i]=[group_detection_1[i],group_detection_2[i]]
+
+        gene_rank_score[:,i]=rankdata(np.array([group1[i],group2[i]]))#inverse
+        gene_detection_rank_score[:,i]=rankdata(np.array([group_detection_1[i],group_detection_2[i]]))
+    gene_rank_score=scaler.fit_transform(gene_rank_score)
+    gene_detection_rank_score=scaler.fit_transform(gene_detection_rank_score)
+    ans_score= (gene_detection_gini_score*gene_gini_score*gene_rank_score*gene_detection_rank_score)[0]
+    ans_rank=np.argsort(np.argsort(-ans_score))+1
+    ans_df=pd.DataFrame(False,index=[i for i in range(gene_nums)],columns=["ans_score","ans_rank","expression","detection","expression_gini","detection_gini","gene_rank_score","gene_detection_rank_score","gene_name"])
+    ans_df.loc[:,["ans_score"]]=ans_score
+    ans_df.loc[:,["ans_rank"]]=ans_rank
+    ans_df.loc[:,["expression"]]=expressions[0]
+    ans_df.loc[:,["detection"]]=detections[0]
+    ans_df.loc[:,["expression_gini"]]=gene_gini_score[0]
+    ans_df.loc[:,["detection_gini"]]=gene_detection_gini_score[0]
+    ans_df.loc[:,["gene_rank_score"]]=gene_rank_score[0]
+    ans_df.loc[:,["gene_detection_rank_score"]]=gene_detection_rank_score[0]
+    ans_df.loc[:,["gene_name"]]=genes
+    # Filter on combined rank or individual ranks
+    top_genes_scores = ans_df[(ans_df['ans_rank'] <= min_genes) |  
+                                (ans_df['gene_rank_score'] <= rank_score) &
+                                (ans_df['gene_detection_rank_score'] <= rank_score)]
+
+    # Further filter on expression and detection gini score  
+    top_genes_scores_filtered = top_genes_scores[
+    (top_genes_scores['ans_rank'] <= min_genes) |
+    (top_genes_scores['expression'] > min_expr_gini_score) & 
+    (top_genes_scores['detection'] > min_det_gini_score)
+    ]
+    return top_genes_scores_filtered
+    
+
+def mygini_fun(x, weights=None):
+    if weights is None:
+        weights=np.ones(len(x))
+    dataset = np.column_stack((x, weights))
+    ord_x = np.argsort(x) 
+    dataset_ord = dataset[ord_x]
+    x = dataset_ord[:,0]
+    weights = dataset_ord[:,1]
+
+    N = np.sum(weights)
+    xw = x * weights
+    C_i = np.cumsum(weights)  
+    num_1 = np.sum(xw * C_i)
+    num_2 = np.sum(xw)
+    num_3 = np.sum(xw * weights)
+
+    G_num = (2/N**2) * num_1 - (1/N) * num_2 - (1/N**2) * num_3
+
+    t_neg = xw[xw<=0]
+    T_neg = np.sum(t_neg)
+    T_pos = np.sum(xw) + np.abs(T_neg)
+
+    n_RSV = 2 * (T_pos + np.abs(T_neg)) / N
+    mean_RSV = n_RSV / 2
+
+    G_RSV = G_num / mean_RSV
+
+    return G_RSV
