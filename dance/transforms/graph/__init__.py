@@ -4,6 +4,7 @@ from dance.transforms.graph.feature_feature_graph import FeatureFeatureGraph
 from dance.transforms.graph.neighbor_graph import NeighborGraph
 from dance.transforms.graph.scmogcn_graph import ScMoGNNGraph
 from dance.transforms.graph.spatial_graph import SMEGraph, SpaGCNGraph, SpaGCNGraph2D, StagateGraph
+from dance.transforms.graph.RESEPT_graph import RESEPTGraph
 
 __all__ = [
     "CellFeatureGraph",
@@ -11,6 +12,7 @@ __all__ = [
     "FeatureFeatureGraph",
     "NeighborGraph",
     "PCACellFeatureGraph",
+    "RESEPTGraph",
     "SMEGraph",
     "ScMoGNNGraph",
     "SpaGCNGraph",
