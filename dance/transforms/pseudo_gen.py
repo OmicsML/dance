@@ -92,8 +92,7 @@ class PseudoMixture(BaseTransform):
         pseudo_data = Data(ad.AnnData(mix_x, obs=obs, var=data.data.var, obsm={"cell_type_portion": ct_portion_df}))
         data.append(pseudo_data, join="outer", mode="new_split", new_split_name=self.out_split_name,
                     label_batch=self.label_batch)
-
-
+        
 class CellTopicProfile(BaseTransform):
 
     _DISPLAY_ATTRS = ("ct_select", "ct_key", "split_name", "method")
@@ -140,15 +139,6 @@ class CellTopicProfile(BaseTransform):
         data.data.varm[self.out] = ct_profile_df
 
 
-def get_cell_types(ct_select: Union[Literal["auto"], List[str]], annot: np.ndarray) -> List[str]:
-    all_cts = sorted(np.unique(annot))
-    if ct_select == "auto":
-        ct_select = all_cts
-    elif len(missed := sorted(set(ct_select) - set(all_cts))) > 0:
-        raise ValueError(f"Unknown cell types selected: {missed}. Available options are: {all_cts}")
-    return ct_select
-
-
 def get_agg_func(name: str, *, default: Optional[str] = None) -> Callable[[np.ndarray], np.ndarray]:
     if name == "default":
         if default is None:
@@ -163,7 +153,6 @@ def get_agg_func(name: str, *, default: Optional[str] = None) -> Callable[[np.nd
         raise ValueError(f"Unknown aggregation method {name!r}. Available options are: 'median', 'mena'")
 
     return agg_func
-
 
 def get_ct_profile(
     x: np.ndarray,
@@ -205,5 +194,99 @@ def get_ct_profile(
         ct_profile[:, i] = agg_func(sub_ct_profile) * agg_func(sub_ct_mean_lib_sizes)
 
     logger.info("Cell-type profile generated")
+
+    return ct_profile
+
+
+
+
+class CellGiottoTopicProfile(BaseTransform):
+
+
+    def __init__(
+        self,
+        *,
+        ct_select: Union[Literal["auto"], List[str]] = "auto",
+        ct_key: str = "cellType",
+        split_name: Optional[str] = None,
+        channel: Optional[str] = None,
+        channel_type: str = "X",
+        detection_threshold=-1,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        self.ct_select = ct_select
+        self.ct_key = ct_key
+        self.split_name = split_name
+        self.channel = channel
+        self.channel_type = channel_type
+        self.detection_threshold=detection_threshold
+    def __call__(self, data):
+        x = data.get_feature(split_name=self.split_name, channel=self.channel, channel_type=self.channel_type,
+                             return_type="numpy")
+        annot = data.get_feature(split_name=self.split_name, channel=self.ct_key, channel_type="obs",
+                                 return_type="numpy")
+        ct_select = get_cell_types(self.ct_select, annot)
+        ct_profile = get_giotto_dt(x, annot, ct_select=ct_select, detection_threshold=self.detection_threshold,
+                                    logger=self.logger)
+        ct_profile_df = pd.DataFrame(ct_profile, index=data.data.var_names, columns=ct_select)
+        data.data.varm[self.out] = ct_profile_df
+
+
+
+def get_cell_types(ct_select: Union[Literal["auto"], List[str]], annot: np.ndarray) -> List[str]:
+    all_cts = sorted(np.unique(annot))
+    if ct_select == "auto":
+        ct_select = all_cts
+    elif len(missed := sorted(set(ct_select) - set(all_cts))) > 0:
+        raise ValueError(f"Unknown cell types selected: {missed}. Available options are: {all_cts}")
+    return ct_select
+
+class CellTypeNums(BaseTransform):
+    def __init__(
+        self,
+        *,
+        ct_select: Union[Literal["auto"], List[str]] = "auto",
+        ct_key: str = "cellType",
+        split_name: Optional[str] = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        self.ct_select = ct_select
+        self.ct_key = ct_key
+        self.split_name = split_name
+    def __call__(self, data):
+        annot = data.get_feature(split_name=self.split_name, channel=self.ct_key, channel_type="obs",
+                                 return_type="numpy")
+        ct_select = get_cell_types(self.ct_select, annot)
+        celltype_df=pd.DataFrame(False,index=ct_select,columns=["nums"])
+        for ct in ct_select:
+            ct_index = np.where(annot == ct)[0]
+            celltype_df.loc[ct]=len(ct_index)
+        data.data.uns["cell_nums"]=celltype_df
+
+
+def get_giotto_dt(
+    x: np.ndarray,
+    annot: np.ndarray,
+    detection_threshold:float=-1,
+    *,
+    ct_select: Union[Literal["auto"], List[str]] = "auto",
+    logger: Optional[Logger] = None,
+) -> np.ndarray:
+    logger = logger or native_logger
+    ct_select = get_cell_types(ct_select, annot)
+    # Aggregate profile for each selected cell types
+    ct_profile = np.zeros((x.shape[1], len(ct_select)), dtype=np.float32)  # gene x cell
+    
+    for i, ct in enumerate(ct_select):
+        ct_index = np.where(annot == ct)[0]
+        logger.info(f"Aggregating {ct!r} profiles over {ct_index.size:,} samples")
+        if detection_threshold>=0:
+            ct_profile[:, i] = np.mean(x[ct_index]>detection_threshold,axis=0)
+        else:
+            ct_profile[:, i] = np.mean(x[ct_index],axis=0)
 
     return ct_profile
