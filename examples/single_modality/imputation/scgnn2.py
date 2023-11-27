@@ -164,6 +164,7 @@ if __name__ == "__main__":
     parser.add_argument("--deconv_tune_epsilon", type=float, default=1e-4, help="(float, default) epsilon")
     parser.add_argument("--data_dir", type=str, default='data', help='test directory')
     parser.add_argument("--dataset", default='mouse_brain_data', type=str, help="dataset id")
+    parser.add_argument("--train_size", type=float, default=0.9, help="proportion of training set")
 
     args = parser.parse_args()
     # set_seed(args.seed)
@@ -175,12 +176,12 @@ if __name__ == "__main__":
         preprocessing_pipeline = Compose(
             FilterGenesScanpy(min_cells=0.01),
             FilterCellsScanpy(min_genes=0.01),
-            FilterGenesTopK(num_genes=2000, mode="var"),
+            # FilterGenesTopK(num_genes=2000, mode="var"),
             CellwiseMaskData(),
             AnnDataTransform(sc.pp.log1p),
             log_level="INFO",
         )
-        dataloader = ImputationDataset(data_dir=args.data_dir, dataset=args.dataset)
+        dataloader = ImputationDataset(data_dir=args.data_dir, dataset=args.dataset, train_size=args.train_size)
         data = dataloader.load_data(transform=preprocessing_pipeline)
 
         x_train = data.data.X.A * data.data.layers["train_mask"]
@@ -190,7 +191,7 @@ if __name__ == "__main__":
 
         model.fit(x_train)
         test_mse = ((data.data.X.A[test_mask] - model.predict()[test_mask])**2).mean()
-        print(f"MSE: {test_mse:.4f}")
+        print(f"MSE: {test_mse:.4f}, RMSE: {np.sqrt(test_mse):.4f}")
         rmses.append(np.sqrt(test_mse))
     
     print('scgnn')
