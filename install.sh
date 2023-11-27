@@ -4,7 +4,7 @@
 # as PyTorch, Pytorch Geometric (PYG), and Deep Graph Library (DGL).
 #
 # Example:
-# $ source install.sh cu117  # install dance with CUDA 11.7
+# $ source install.sh cu118  # install dance with CUDA 11.8
 #
 # To uninstall and remove the dance environment:
 # $ conda remove -n dance --all
@@ -13,7 +13,7 @@ trap "echo Try using source instead of sh? && trap - ERR && return 1" ERR
 
 # Check required version specification input
 if [ -z $1 ]; then
-    echo "ERROR: Please provide CUDA information, available options are [cpu,cu117]"
+    echo "ERROR: Please provide CUDA information, available options are [cpu,cu118]"
     return 1
 fi
 
@@ -27,11 +27,11 @@ else
 fi
 
 # Torch related dependency versions
-PYTORCH_VERSION=2.0.0
-TORCHVISION_VERSION=0.15.0
-TORCHAUDIO_VERSION=2.0.0
-PYG_VERSION=2.3.0
-DGL_VERSION=1.0.1
+PYTORCH_VERSION=2.0.1
+TORCHVISION_VERSION=0.15.2
+TORCHAUDIO_VERSION=2.0.2
+PYG_VERSION=2.3.1
+DGL_VERSION=1.1.2
 
 # Set CUDA variable (use CPU if not set)
 CUDA_VERSION=${1:-cpu}
@@ -41,9 +41,9 @@ case $CUDA_VERSION in
         PYTORCH_CUDA_OPT="cpuonly -c pytorch"
         DGL_CHANNEL="dglteam"
         ;;
-    cu117)
-        PYTORCH_CUDA_OPT="pytorch-cuda=11.7 -c pytorch -c nvidia"
-        DGL_CHANNEL="dglteam/label/cu117"
+    cu118)
+        PYTORCH_CUDA_OPT="pytorch-cuda=11.8 -c pytorch -c nvidia"
+        DGL_CHANNEL="dglteam/label/cu118"
         ;;
     *)
         echo "ERROR: Unrecognized CUDA_VERSION=${CUDA_VERSION}"
@@ -52,7 +52,7 @@ case $CUDA_VERSION in
 esac
 
 # Create environment
-conda create -n ${envname} python=3.8 -y
+conda create -n ${envname} python=3.9 -y
 conda activate ${envname}
 
 # Install CUDA enabled dependencies

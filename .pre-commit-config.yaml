@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v4.5.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -13,13 +13,13 @@ repos:
         args: [-c=.yamllint.yml]
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.7.0
+    rev: v3.15.0
     hooks:
       - id: pyupgrade
         args: [--py3-plus]
 
   - repo: https://github.com/google/yapf
-    rev: v0.40.0
+    rev: v0.40.2
     hooks:
       - id: yapf
         name: Format code
@@ -33,7 +33,7 @@ repos:
         args: [--line-width, "120"]
 
   - repo: https://github.com/PyCQA/docformatter
-    rev: v1.7.3
+    rev: v1.7.5
     hooks:
       - id: docformatter
         name: Format docstring
@@ -41,7 +41,7 @@ repos:
         args: [--config, pyproject.toml]
 
   - repo: https://github.com/executablebooks/mdformat
-    rev: 0.7.16
+    rev: 0.7.17
     hooks:
       - id: mdformat
         name: Format markdown

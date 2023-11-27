@@ -110,8 +110,8 @@ as well as easily reproducible experiments by providing unified tools for
 The full installation process might be a bit tedious and could involve some debugging when using CUDA enabled packages.
 Thus, we provide an `install.sh` script that simplifies the installation process, assuming the user have [conda](https://conda.io/projects/conda/en/latest/index.html) set up on their machines.
 The installation script creates a conda environment `dance` and install the DANCE package along with all its dependencies with a apseicifc CUDA version.
-Currently, two options are accepted: `cpu` and  `cu117`.
-For example, to install the DANCE package using CUDA11.7 in a `dance-env` conda environment, simply run:
+Currently, two options are accepted: `cpu` and  `cu118`.
+For example, to install the DANCE package using CUDA 11.8 in a `dance-env` conda environment, simply run:
 
 ```bash
 # Clone the repository via SSH
@@ -120,7 +120,7 @@ git clone git@github.com:OmicsML/dance.git && cd dance
 # git clone https://github.com/OmicsML/dance.git  && cd dance
 
 # Run the auto installation script to install DANCE and its dependencies in a conda environment
-source install.sh cu117 dance-env
+source install.sh cu118 dance-env
 ```
 
 **Note**: the first argument for cuda version is mandatory, while the second argument for conda environment name is optional (default is `dance`).
@@ -134,23 +134,23 @@ source install.sh cu117 dance-env
 First create a conda environment for dance (optional)
 
 ```bash
-conda create -n dance python=3.8 -y && conda activate dance-dev
+conda create -n dance python=3.8 -y && conda activate dance
 ```
 
 Then, install CUDA enabled packages (PyTorch, PyG, DGL):
 
 ```bash
-conda install pytorch=2.0.0 torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvidia -y
-conda install pyg=2.3.0 -c pyg -y
-conda install dgl=1.0.1 -c dglteam/label/cu117 -y
+conda install pytorch=2.0.1 torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia -y
+conda install pyg=2.3.1 -c pyg -y
+conda install dgl=1.1.2 -c dglteam/label/cu118 -y
 ```
 
 Alternatively, install these dependencies for CPU only:
 
 ```bash
-conda install pytorch=2.0.0 torchvision torchaudio cpuonly -c pytorch -y
-conda install pyg=2.3.0 -c pyg -y
-conda install dgl -c dglteam -y
+conda install pytorch=2.0.1 torchvision torchaudio cpuonly -c pytorch -y
+conda install pyg=2.3.1 -c pyg -y
+conda install dgl=1.1.2 -c dglteam -y
 ```
 
 For more information about installation or other CUDA version options, check out the installation pages for the corresponding packages
