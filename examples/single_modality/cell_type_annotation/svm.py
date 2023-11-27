@@ -3,7 +3,7 @@ import pprint
 from typing import get_args
 
 from dance import logger
-from dance.datasets.singlemodality import ScDeepSortDataset
+from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
 from dance.typing import LogLevel
 
@@ -28,8 +28,8 @@ if __name__ == "__main__":
     preprocessing_pipeline = model.preprocessing_pipeline(n_components=args.dense_dim, log_level=args.log_level)
 
     # Load data and perform necessary preprocessing
-    dataloader = ScDeepSortDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
-                                   species=args.species, tissue=args.tissue)
+    dataloader = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
+                                           species=args.species, tissue=args.tissue)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
     # Obtain training and testing data

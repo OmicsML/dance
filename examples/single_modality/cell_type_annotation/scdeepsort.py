@@ -5,7 +5,7 @@ from typing import get_args
 import torch
 
 from dance import logger
-from dance.datasets.singlemodality import ScDeepSortDataset
+from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
 from dance.typing import LogLevel
 
@@ -38,8 +38,8 @@ if __name__ == "__main__":
     preprocessing_pipeline = model.preprocessing_pipeline(n_components=args.dense_dim)
 
     # Load data and perform necessary preprocessing
-    dataloader = ScDeepSortDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
-                                   train_dataset=args.train_dataset)
+    dataloader = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
+                                           train_dataset=args.train_dataset)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
     # Obtain training and testing data

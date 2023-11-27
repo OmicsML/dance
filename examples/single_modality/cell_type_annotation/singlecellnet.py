@@ -3,7 +3,7 @@ import pprint
 from typing import get_args
 
 from dance import logger
-from dance.datasets.singlemodality import ScDeepSortDataset
+from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.singlecellnet import SingleCellNet
 from dance.typing import LogLevel
 
@@ -36,8 +36,8 @@ if __name__ == "__main__":
                                                           num_top_gene_pairs=args.num_top_gene_pairs)
 
     # Load data and perform necessary preprocessing
-    dataloader = ScDeepSortDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
-                                   species=args.species, tissue=args.tissue)
+    dataloader = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
+                                           species=args.species, tissue=args.tissue)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
     # Obtain training and testing data

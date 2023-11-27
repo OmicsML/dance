@@ -5,7 +5,7 @@ from typing import get_args
 import numpy as np
 
 from dance import logger
-from dance.datasets.singlemodality import ScDeepSortDataset
+from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.typing import LogLevel
 
@@ -40,8 +40,8 @@ if __name__ == "__main__":
     preprocessing_pipeline = model.preprocessing_pipeline(normalize=args.normalize, filter_genes=not args.nofilter)
 
     # Load data and perform necessary preprocessing
-    dataloader = ScDeepSortDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset, tissue=args.tissue,
-                                   species=args.species)
+    dataloader = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
+                                           tissue=args.tissue, species=args.species)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
     # Obtain training and testing data
