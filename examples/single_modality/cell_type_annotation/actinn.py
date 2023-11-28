@@ -12,12 +12,12 @@ from dance.utils import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--batch_size", type=int, default=1024, help="Batch size")
+    parser.add_argument("--batch_size", type=int, default=128, help="Batch size")
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--device", default="cpu", help="Computation device.")
     parser.add_argument("--hidden_dims", nargs="+", type=int, default=[2000], help="Hidden dimensions.")
-    parser.add_argument("--lambd", type=float, default=0.01, help="Regularization parameter")
-    parser.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate")
+    parser.add_argument("--lambd", type=float, default=0.005, help="Regularization parameter")
+    parser.add_argument("--learning_rate", type=float, default=0.0001, help="Learning rate")
     parser.add_argument("--log_level", type=str, default="INFO", choices=get_args(LogLevel))
     parser.add_argument("--nofilter", action="store_true", help="Disable filtering genes by expression summaries.")
     parser.add_argument(
