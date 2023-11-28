@@ -32,7 +32,7 @@ if __name__ == "__main__":
             model = StLouvain(resolution=0.6)
         else:
             raise ValueError(f"Unknown mode {args.mode!r}, available options are {MODES}")
-        preprocessing_pipeline = model.preprocessing_pipeline()
+        preprocessing_pipeline = model.preprocessing_pipeline(device=args.device)
 
         # Load data and perform necessary preprocessing
         dataloader = SpatialLIBDDataset(data_id=args.sample_number)

@@ -24,6 +24,7 @@ if __name__ == "__main__":
     parser.add_argument("--n_clusters", type=int, default=7, help="the number of clusters")
     parser.add_argument("--step", type=float, default=0.1, help="")
     parser.add_argument("--lr", type=float, default=0.05, help="learning rate")
+    parser.add_argument("--device", default="cpu", help="Computation device.")
     parser.add_argument("--seed", type=int, default=100, help="")
     parser.add_argument("--num_runs", type=int, default=1)
     args = parser.parse_args()
@@ -33,7 +34,7 @@ if __name__ == "__main__":
         set_seed(seed)
 
         # Initialize model and get model specific preprocessing pipeline
-        model = SpaGCN()
+        model = SpaGCN(device=args.device)
         preprocessing_pipeline = model.preprocessing_pipeline(alpha=args.alpha, beta=args.beta)
 
         # Load data and perform necessary preprocessing
