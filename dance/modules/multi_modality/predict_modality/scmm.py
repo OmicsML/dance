@@ -9,6 +9,7 @@ Minoura, Kodai, et al. "A mixture-of-experts deep generative model for integrate
 """
 import math
 import os
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
@@ -22,7 +23,7 @@ from pyro.distributions.zero_inflated import ZeroInflatedNegativeBinomial
 from sklearn.cluster import DBSCAN, KMeans
 from torch import optim
 from torch.utils.data import DataLoader
-from copy import deepcopy
+
 from dance.utils import SimpleIndexDataset
 
 
@@ -567,6 +568,7 @@ class MMVAE(nn.Module):
                 if vals[-1] == min(vals):
                     if not os.path.exists('models'):
                         os.mkdir('models')
+
     #                 torch.save(self.state_dict(), f'models/model_{self.params.rnd_seed}.pth')
                     best_dict = deepcopy(self.state_dict())
 
@@ -575,7 +577,7 @@ class MMVAE(nn.Module):
 
                 if epoch > start_early_stop and min(vals) != min(vals[-10:]):
                     print('Early stopped.')
-    #                 self.load_state_dict(torch.load(f'models/model_{self.params.rnd_seed}.pth'))
+                    #                 self.load_state_dict(torch.load(f'models/model_{self.params.rnd_seed}.pth'))
                     break
         except:
             pass

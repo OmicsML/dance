@@ -266,14 +266,14 @@ class ModalityMatchingDataset(MultiModalityDataset):
         train_mod1, train_mod2, train_label, test_mod1, test_mod2, test_label = self._maybe_preprocess(raw_data)
         # Align matched cells
         train_mod2 = train_mod2[train_label.to_df().values.argmax(1)]
-        
+
         mod1 = ad.concat((train_mod1, test_mod1))
         mod2 = ad.concat((train_mod2, test_mod2))
         mod1.var_names_make_unique()
         mod2.var_names_make_unique()
         mod2.obs_names = mod1.obs_names
         train_size = train_mod1.shape[0]
-        
+
         mod1.obsm["labels"] = np.concatenate([np.zeros(train_size), np.argmax(test_label.X.toarray(), 1)])
 
         # Combine modalities into mudata

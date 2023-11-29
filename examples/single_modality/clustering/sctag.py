@@ -42,7 +42,7 @@ if __name__ == "__main__":
         # Load data and perform necessary preprocessing
         dataloader = ClusteringDataset(args.data_dir, args.dataset)
         preprocessing_pipeline = ScTAG.preprocessing_pipeline(n_top_genes=args.highly_genes, n_components=args.pca_dim,
-                                                            n_neighbors=args.k_neighbor)
+                                                              n_neighbors=args.k_neighbor)
         data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
         # inputs: adj, x, x_raw, n_counts
@@ -51,17 +51,17 @@ if __name__ == "__main__":
 
         # Build and train model
         model = ScTAG(n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
-                    dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha,
-                    pretrain_path=f"sctag_{args.dataset}_pre.pkl")
+                      dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha,
+                      pretrain_path=f"sctag_{args.dataset}_pre.pkl")
         model.fit(inputs, y, epochs=args.epochs, pretrain_epochs=args.pretrain_epochs, lr=args.lr, w_a=args.w_a,
-                w_x=args.w_x, w_c=args.w_c, w_d=args.w_d, info_step=args.info_step, max_dist=args.max_dist,
-                min_dist=args.min_dist)
+                  w_x=args.w_x, w_c=args.w_c, w_d=args.w_d, info_step=args.info_step, max_dist=args.max_dist,
+                  min_dist=args.min_dist)
 
         # Evaluate model predictions
         score = model.score(None, y)
         print(f"{score=:.4f}")
         aris.append(score)
-    
+
     print('sctag')
     print(args.dataset)
     print(f'aris: {aris}')

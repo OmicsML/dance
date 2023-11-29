@@ -41,8 +41,8 @@ if __name__ == '__main__':
 
         dataloader = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset, train_size=params.train_size)
         preprocessing_pipeline = GraphSCI.preprocessing_pipeline(min_cells=params.min_cells, threshold=params.threshold,
-                                                                mask=params.mask, seed=params.random_seed,
-                                                                mask_rate=params.mask_rate)
+                                                                 mask=params.mask, seed=params.random_seed,
+                                                                 mask_rate=params.mask_rate)
         data = dataloader.load_data(transform=preprocessing_pipeline, cache=params.cache)
 
         device = "cpu" if params.gpu == -1 else f"cuda:{params.gpu}"
@@ -58,14 +58,15 @@ if __name__ == '__main__':
         g = g.to(device)
 
         model = GraphSCI(num_cells=X.shape[0], num_genes=X.shape[1], dataset=params.dataset, dropout=params.dropout,
-                        gpu=params.gpu, seed=params.random_seed)
-        model.fit(X_train, X_raw_train, g, mask, params.le, params.la, params.ke, params.ka, params.n_epochs, params.lr, params.weight_decay)
+                         gpu=params.gpu, seed=params.random_seed)
+        model.fit(X_train, X_raw_train, g, mask, params.le, params.la, params.ke, params.ka, params.n_epochs, params.lr,
+                  params.weight_decay)
         model.load_model()
         imputed_data = model.predict(X_train, X_raw_train, g, mask)
         score = model.score(X, imputed_data, mask, metric='RMSE')
         print("RMSE: %.4f" % score)
         rmses.append(score)
-    
+
     print('graphsci')
     print(params.dataset)
     print(f'rmses: {rmses}')

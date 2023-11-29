@@ -477,8 +477,8 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 train_loss += loss.item() * len(inputs)
 
             if epoch % 50 == 0:
-                logger.info("Epoch %3d: Total: %.8f, Clustering Loss: %.8f, ZINB Loss: %.8f", epoch + 1, train_loss / num,
-                            cluster_loss_val / num, recon_loss_val / num)
+                logger.info("Epoch %3d: Total: %.8f, Clustering Loss: %.8f, ZINB Loss: %.8f", epoch + 1,
+                            train_loss / num, cluster_loss_val / num, recon_loss_val / num)
 
         index = update_interval * np.argmax(aris)
         self.q = Q[f"epoch{index}"]

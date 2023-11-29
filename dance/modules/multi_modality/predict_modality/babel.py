@@ -9,8 +9,9 @@ multiomic profiles at single-cell resolution." Proceedings of the National Acade
 
 """
 import math
-from typing import Callable, List, Tuple, Union
 from copy import deepcopy
+from typing import Callable, List, Tuple, Union
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

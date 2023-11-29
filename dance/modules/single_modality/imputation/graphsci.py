@@ -194,8 +194,8 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
 
         return X_masked
 
-    def fit(self, train_data, train_data_raw, graph, mask=None, le=1, la=1, ke=1, ka=1, n_epochs=100,
-            lr=1e-3, weight_decay=1e-5, train_idx=None):
+    def fit(self, train_data, train_data_raw, graph, mask=None, le=1, la=1, ke=1, ka=1, n_epochs=100, lr=1e-3,
+            weight_decay=1e-5, train_idx=None):
         """Data fitting function.
 
         Parameters

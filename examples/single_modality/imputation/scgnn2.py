@@ -1,5 +1,6 @@
 import argparse
 from pprint import pformat
+
 import numpy as np
 import scanpy as sc
 
@@ -193,7 +194,7 @@ if __name__ == "__main__":
         test_mse = ((data.data.X.A[test_mask] - model.predict()[test_mask])**2).mean()
         print(f"MSE: {test_mse:.4f}, RMSE: {np.sqrt(test_mse):.4f}")
         rmses.append(np.sqrt(test_mse))
-    
+
     print('scgnn')
     print(args.dataset)
     print(f'rmses: {rmses}')

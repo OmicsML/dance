@@ -36,7 +36,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     aris = []
     for seed in range(1, 21):
-    # for seed in range(1, 2):
+        # for seed in range(1, 2):
         # set_seed(args.seed)
         set_seed(seed)
 
@@ -51,17 +51,18 @@ if __name__ == "__main__":
         in_dim = inputs[0].shape[1]
 
         # Build and train model
-        model = ScDeepCluster(input_dim=in_dim, z_dim=args.z_dim, encodeLayer=args.encodeLayer, decodeLayer=args.encodeLayer[::-1], 
-                              sigma=args.sigma, gamma=args.gamma, device=args.device, pretrain_path=f"scdeepcluster_{args.dataset}_pre.pkl")
+        model = ScDeepCluster(input_dim=in_dim, z_dim=args.z_dim, encodeLayer=args.encodeLayer,
+                              decodeLayer=args.encodeLayer[::-1], sigma=args.sigma, gamma=args.gamma,
+                              device=args.device, pretrain_path=f"scdeepcluster_{args.dataset}_pre.pkl")
         model.fit(inputs, y, n_clusters=n_clusters, y_pred_init=None, lr=args.lr, batch_size=args.batch_size,
-                epochs=args.epochs, update_interval=args.update_interval, tol=args.tol, pt_batch_size=args.batch_size,
-                pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
+                  epochs=args.epochs, update_interval=args.update_interval, tol=args.tol, pt_batch_size=args.batch_size,
+                  pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
 
         # Evaluate model predictions
         score = model.score(None, y)
         print(f"{score=:.4f}")
         aris.append(score)
-    
+
     print('scdeepcluster')
     print(args.dataset)
     print(f'aris: {aris}')

@@ -41,7 +41,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     aris = []
     for seed in range(1, 21):
-    # for seed in range(1, 2):
+        # for seed in range(1, 2):
         # set_seed(args.seed)
         set_seed(seed)
 
@@ -67,11 +67,11 @@ if __name__ == "__main__":
                         hidden_bn=args.hidden_bn, n_clusters=n_clusters, cluster_method="leiden",
                         num_workers=args.num_workers, device=args.device)
         model.fit(graph, epochs=args.epochs, lr=args.learning_rate, show_epoch_ari=args.show_epoch_ari,
-                eval_epoch=args.eval_epoch)
+                  eval_epoch=args.eval_epoch)
         score = model.score(None, y)
         print(f"{score=:.4f}")
         aris.append(score)
-    
+
     print('graphsc')
     print(args.dataset)
     print(f'aris: {aris}')

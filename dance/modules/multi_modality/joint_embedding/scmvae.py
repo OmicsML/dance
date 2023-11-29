@@ -13,6 +13,7 @@ import math
 import os
 import time
 import warnings
+from copy import deepcopy
 
 import numpy as np
 import scipy.stats as stats
@@ -30,7 +31,7 @@ from torch.distributions import Normal
 from torch.distributions import kl_divergence as kl
 from torch.nn import functional as F
 from tqdm import trange
-from copy import deepcopy
+
 from dance.utils.loss import GMM_loss
 from dance.utils.metrics import integration_openproblems_evaluate
 
@@ -749,6 +750,7 @@ class scMVAE(nn.Module):
         print('Finish training, total time: ' + str(duration) + 's' + " epoch: " + str(reco_epoch_test) + " status: " +
               status)
         self.load_state_dict(best_dict)
+
 
 #         load_checkpoint('./saved_model/model_best.pth.tar', self, device)
 

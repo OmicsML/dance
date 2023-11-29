@@ -471,8 +471,8 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 train_loss = cluster_loss_val + recon_loss_val
 
             if epoch % 50 == 0:
-                logger.info("#Epoch %3d: Total: %.4f, Clustering Loss: %.4f, ZINB Loss: %.4f", epoch + 1, train_loss / num,
-                        cluster_loss_val / num, recon_loss_val / num)
+                logger.info("#Epoch %3d: Total: %.4f, Clustering Loss: %.4f, ZINB Loss: %.4f", epoch + 1,
+                            train_loss / num, cluster_loss_val / num, recon_loss_val / num)
 
             ml_loss = 0.0
             if epoch % update_ml == 0:
@@ -518,7 +518,7 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
             if ml_num_batch > 0 and cl_num_batch > 0:
                 if epoch % 50 == 0:
                     logger.info("Pairwise Total: %.4f, ML loss: %.4f, CL loss: %.4f",
-                            float(ml_loss.cpu()) + float(cl_loss.cpu()), ml_loss.cpu(), cl_loss.cpu())
+                                float(ml_loss.cpu()) + float(cl_loss.cpu()), ml_loss.cpu(), cl_loss.cpu())
 
         index = update_interval * np.argmax(aris)
         self.q = Q[f"epoch{index}"]

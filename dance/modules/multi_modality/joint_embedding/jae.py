@@ -10,13 +10,14 @@ Nature machine intelligence, 2021, 3(6): 536-544.
 """
 
 import os
+from copy import deepcopy
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from copy import deepcopy
+
 from dance.utils import SimpleIndexDataset
 from dance.utils.metrics import *
 
@@ -128,6 +129,8 @@ class JAEWrapper:
                 if not os.path.exists('models'):
                     os.mkdir('models')
                 best_dict = deepcopy(self.model.state_dict())
+
+
 #                 torch.save(self.model.state_dict(), f'models/model_joint_embedding_{self.args.rnd_seed}.pth')
 
             if min(vals) != min(vals[-10:]):
@@ -261,6 +264,7 @@ class JAEWrapper:
                 return integration_openproblems_evaluate(adata_sol)
             else:
                 raise NotImplementedError
+
 
 class JAE(nn.Module):
 

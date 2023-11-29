@@ -14,6 +14,7 @@ import os
 import time
 import warnings
 from collections import OrderedDict
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
@@ -29,7 +30,7 @@ from torch.autograd import Variable
 from torch.distributions import Normal
 from torch.distributions import kl_divergence as kl
 from torch.nn import functional as F
-from copy import deepcopy 
+
 # from DCCA.loss_function import log_zinb_positive, log_nb_positive, binary_cross_entropy, mse_loss, KL_diver
 from dance.utils.loss import Attention, Correlation, Eucli_dis, FactorTransfer, KL_diver, L1_dis, NSTLoss, Similarity
 
@@ -645,6 +646,7 @@ class VAE(nn.Module):
 
         print('train likelihood is :  ' + str(test_like_max) + ' epoch: ' + str(reco_epoch_test))
 
+
 class DCCA(nn.Module):
     """DCCA class.
 
@@ -889,7 +891,6 @@ class DCCA(nn.Module):
             raise NotImplementedError
         else:
             raise NotImplementedError
-
 
     def _encodeBatch(self, total_loader):
         """Helper function to get latent representation, normalized representation and

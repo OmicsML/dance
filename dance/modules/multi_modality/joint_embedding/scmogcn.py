@@ -6,6 +6,7 @@ Wen, Hongzhi, et al. "Graph Neural Networks for Multimodal Single-Cell Data Inte
 
 """
 import os
+from copy import deepcopy
 
 import dgl.nn.pytorch as dglnn
 import numpy as np
@@ -16,10 +17,11 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import adjusted_rand_score
 from sklearn.metrics.cluster import normalized_mutual_info_score
 from torch.utils.data import DataLoader
-from copy import deepcopy
+
 from dance import logger
 from dance.utils import SimpleIndexDataset
 from dance.utils.metrics import *
+
 
 def propagation_layer_combination(X, idx, wt, from_logits=True):
     if from_logits:
@@ -347,6 +349,7 @@ class ScMoGCNWrapper:
                 return integration_openproblems_evaluate(adata_sol)
             else:
                 raise NotImplementedError
+
 
 class ScMoGCN(nn.Module):
 

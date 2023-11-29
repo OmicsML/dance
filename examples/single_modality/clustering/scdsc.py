@@ -1,4 +1,5 @@
 import argparse
+
 import numpy as np
 
 from dance.datasets.singlemodality import ClusteringDataset
@@ -50,7 +51,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     aris = []
     for seed in range(1, 21):
-    # for seed in range(1, 2):
+        # for seed in range(1, 2):
         # set_seed(args.seed)
         set_seed(seed)
 
@@ -64,21 +65,33 @@ if __name__ == "__main__":
         args.n_input = inputs[1].shape[1]
         n_clusters = len(np.unique(y))
 
-        model = ScDSC(pretrain_path=f"scdsc_{args.dataset}_pre.pkl", sigma=args.sigma, n_enc_1=args.n_enc_1,
-                    n_enc_2=args.n_enc_2, n_enc_3=args.n_enc_3, n_dec_1=args.n_dec_1, n_dec_2=args.n_dec_2,
-                    n_dec_3=args.n_dec_3, n_z1=args.n_z1, n_z2=args.n_z2, n_z3=args.n_z3, n_clusters=n_clusters, #args.n_clusters,
-                    n_input=args.n_input, v=args.v, device=args.device)
+        model = ScDSC(
+            pretrain_path=f"scdsc_{args.dataset}_pre.pkl",
+            sigma=args.sigma,
+            n_enc_1=args.n_enc_1,
+            n_enc_2=args.n_enc_2,
+            n_enc_3=args.n_enc_3,
+            n_dec_1=args.n_dec_1,
+            n_dec_2=args.n_dec_2,
+            n_dec_3=args.n_dec_3,
+            n_z1=args.n_z1,
+            n_z2=args.n_z2,
+            n_z3=args.n_z3,
+            n_clusters=n_clusters,  #args.n_clusters,
+            n_input=args.n_input,
+            v=args.v,
+            device=args.device)
 
         # Build and train model
         model.fit(inputs, y, lr=args.lr, epochs=args.epochs, bcl=args.binary_crossentropy_loss, cl=args.ce_loss,
-                rl=args.re_loss, zl=args.zinb_loss, pt_epochs=args.pretrain_epochs, pt_batch_size=args.batch_size,
-                pt_lr=args.pretrain_lr)
+                  rl=args.re_loss, zl=args.zinb_loss, pt_epochs=args.pretrain_epochs, pt_batch_size=args.batch_size,
+                  pt_lr=args.pretrain_lr)
 
         # Evaluate model predictions
         score = model.score(None, y)
         print(f"{score=:.4f}")
         aris.append(score)
-    
+
     print('scdsc')
     print(args.dataset)
     print(f'aris: {aris}')
@@ -88,10 +101,10 @@ if __name__ == "__main__":
 python scdsc.py --dataset 10X_PBMC --sigma 0.5 --topk 10 --pretrain_epochs 100 --v 3 --n_enc_1 1024 --n_enc_3 64 --n_dec_1 64 --n_z1 64
 
 Mouse Bladder:
-python scdsc.py --dataset mouse_bladder_cell --sigma 0.5 --topk 50 --pretrain_epochs 100 --v 7 
+python scdsc.py --dataset mouse_bladder_cell --sigma 0.5 --topk 50 --pretrain_epochs 100 --v 7
 
 Mouse ES:
-python scdsc.py --dataset mouse_ES_cell --sigma 0.1 --topk 10 --pretrain_epochs 50 --v 2 
+python scdsc.py --dataset mouse_ES_cell --sigma 0.1 --topk 10 --pretrain_epochs 50 --v 2
 
 Worm Neuron:
 python scdsc.py --dataset worm_neuron_cell --sigma 0.5 --topk 10 --pretrain_epochs 100 --v 3 --n_enc_3 64 --n_dec_1 64 --n_z1 64 --n_z2 64

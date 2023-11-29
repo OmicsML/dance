@@ -38,7 +38,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     aris = []
     for seed in range(1, 21):
-    # for seed in range(1, 2):
+        # for seed in range(1, 2):
         # set_seed(args.seed)
         set_seed(seed)
 
@@ -62,7 +62,7 @@ if __name__ == "__main__":
 
         if args.n_pairwise > 0:
             ml_ind1, ml_ind2, cl_ind1, cl_ind2, error_num = generate_random_pair(y, label_cell_indx, args.n_pairwise,
-                                                                                args.n_pairwise_error)
+                                                                                 args.n_pairwise_error)
             print("Must link paris: %d" % ml_ind1.shape[0])
             print("Cannot link paris: %d" % cl_ind1.shape[0])
             print("Number of error pairs: %d" % error_num)
@@ -70,18 +70,18 @@ if __name__ == "__main__":
             ml_ind1, ml_ind2, cl_ind1, cl_ind2 = np.array([]), np.array([]), np.array([]), np.array([])
 
         # Build and train moodel
-        model = ScDCC(input_dim=in_dim, z_dim=args.z_dim, n_clusters=n_clusters, encodeLayer=args.encodeLayer, 
-                      decodeLayer=args.encodeLayer[::-1], sigma=args.sigma, gamma=args.gamma, ml_weight=args.ml_weight, 
+        model = ScDCC(input_dim=in_dim, z_dim=args.z_dim, n_clusters=n_clusters, encodeLayer=args.encodeLayer,
+                      decodeLayer=args.encodeLayer[::-1], sigma=args.sigma, gamma=args.gamma, ml_weight=args.ml_weight,
                       cl_weight=args.ml_weight, device=args.device, pretrain_path=f"scdcc_{args.dataset}_pre.pkl")
-        model.fit(inputs, y, lr=args.lr, batch_size=args.batch_size, epochs=args.epochs, ml_ind1=ml_ind1, ml_ind2=ml_ind2,
-                cl_ind1=cl_ind1, cl_ind2=cl_ind2, update_interval=args.update_interval, tol=args.tol,
-                pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
+        model.fit(inputs, y, lr=args.lr, batch_size=args.batch_size, epochs=args.epochs, ml_ind1=ml_ind1,
+                  ml_ind2=ml_ind2, cl_ind1=cl_ind1, cl_ind2=cl_ind2, update_interval=args.update_interval, tol=args.tol,
+                  pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
 
         # Evaluate model predictions
         score = model.score(None, y)
         print(f"{score=:.4f}")
         aris.append(score)
-    
+
     print('scdcc')
     print(args.dataset)
     print(f'aris: {aris}')
@@ -94,7 +94,7 @@ Mouse ES:
 python scdcc.py --dataset mouse_ES_cell --label_cells_files label_mouse_ES_cell.txt --pretrain_epochs 300 --epochs 100 --sigma 1.75 --encodeLayer 512 256  --n_pairwise 10000 --cache
 
 Worm Neuron:
-python scdcc.py --dataset worm_neuron_cell --label_cells_files label_worm_neuron_cell.txt --pretrain_epochs 300 --epochs 100 --n_pairwise 20000 --cache   
+python scdcc.py --dataset worm_neuron_cell --label_cells_files label_worm_neuron_cell.txt --pretrain_epochs 300 --epochs 100 --n_pairwise 20000 --cache
 
 Mouse Bladder:
 python scdcc.py --dataset mouse_bladder_cell --label_cells_files label_mouse_bladder_cell.txt --pretrain_epochs 300 --epochs 100 --sigma 3.25 --n_pairwise 10000 --cache

@@ -38,8 +38,8 @@ if __name__ == '__main__':
 
         dataloader = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset, train_size=params.train_size)
         preprocessing_pipeline = DeepImpute.preprocessing_pipeline(min_cells=params.min_cells, n_top=params.n_top,
-                                                                sub_outputdim=params.sub_outputdim, mask=params.mask,
-                                                                seed=params.random_seed, mask_rate=params.mask_rate)
+                                                                   sub_outputdim=params.sub_outputdim, mask=params.mask,
+                                                                   seed=params.random_seed, mask_rate=params.mask_rate)
         data = dataloader.load_data(transform=preprocessing_pipeline, cache=params.cache)
 
         if params.mask:
@@ -52,14 +52,14 @@ if __name__ == '__main__':
         X_train = X * mask
         X_raw_train = X_raw * mask
         model = DeepImpute(predictors, targets, params.dataset, params.sub_outputdim, params.hidden_dim, params.dropout,
-                        params.random_seed, params.gpu)
-        
+                           params.random_seed, params.gpu)
+
         model.fit(X_train, X_train, mask, params.batch_size, params.lr, params.n_epochs, params.patience)
         imputed_data = model.predict(X_train, mask)
         score = model.score(X, imputed_data, mask, metric='RMSE')
         print("RMSE: %.4f" % score)
         rmses.append(score)
-    
+
     print('deepimpute')
     print(params.dataset)
     print(f'rmses: {rmses}')

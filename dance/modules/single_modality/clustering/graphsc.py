@@ -180,7 +180,7 @@ class GraphSC(BaseClusteringMethod):
         train_ids = np.where(g.ndata["label"] != -1)[0]
         sampler = dgl.dataloading.MultiLayerFullNeighborSampler(self.n_layers)
         dataloader = dgl.dataloading.DataLoader(g, train_ids, sampler, batch_size=batch_size, shuffle=True,
-                                                    drop_last=False, num_workers=self.num_workers)
+                                                drop_last=False, num_workers=self.num_workers)
 
         device = get_device(self.device)
         optim = torch.optim.Adam(self.model.parameters(), lr=lr)
