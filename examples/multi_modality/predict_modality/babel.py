@@ -60,16 +60,17 @@ if __name__ == "__main__":
     # Train and evaluate the model
     res = pd.DataFrame({'rmse': [], 'seed': [], 'subtask': [], 'method': []})
     for k in range(args.runs):
-        set_seed(args.rnd_seed + k)
+        set_seed(args.rnd_seed)
         model = BabelWrapper(args, dim_in=x_train.shape[1], dim_out=y_train.shape[1])
         model.fit(x_train, y_train, val_ratio=0.15)
         print(model.predict(x_test))
         res = res.append({
             'rmse': model.score(x_test, y_test),
-            'seed': k,
+            'seed': args.rnd_seed,
             'subtask': args.subtask,
             'method': 'babel',
         }, ignore_index=True)
+        args.rnd_seed = args.rnd_seed + 1
     print(res)
 
 """To reproduce BABEL on other samples, please refer to command lines belows:

@@ -44,10 +44,11 @@ if __name__ == "__main__":
     (X_mod1_test, X_mod2_test), (cell_type_test, _, _, _, _) = data.get_test_data(return_type="torch")
     X_train = torch.cat([X_mod1_train, X_mod2_train], dim=1)
     phase_score = torch.cat([S_score[:, None], G2M_score[:, None]], 1)
-    X_test = torch.cat([X_mod1_test, X_mod2_test], dim=1).float().to(device)
+    X_test = torch.cat([X_mod1_test, X_mod2_test], dim=1)
+    X_test = torch.cat([X_train, X_test]).float().to(device)
     test_id = np.arange(X_test.shape[0])
-    labels = cell_type_test.numpy()
-    adata_sol = data.data['test_sol'][data._split_idx_dict['test']]
+    labels = torch.cat([cell_type, cell_type_test]).numpy()
+    adata_sol = data.data['test_sol']#[data._split_idx_dict['test']]
 
     res = None
     for k in range(args.runs):
@@ -63,12 +64,12 @@ if __name__ == "__main__":
         score.update(
             model.score(X_test, test_id, labels, adata_sol=adata_sol, metric="openproblems"))
         score.update({
-            'seed': k,
+            'seed': args.rnd_seed + k,
             'subtask': args.subtask,
             'method': 'jae',
         })
 
-        if res:
+        if res is not None:
             res = res.append(score, ignore_index=True)
         else:
             for s in score:

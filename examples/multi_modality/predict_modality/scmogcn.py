@@ -20,9 +20,6 @@ def pipeline(inductive=False, verbose=2, logger=None, **kwargs):
     os.makedirs(kwargs["log_folder"], exist_ok=True)
     os.makedirs(kwargs["model_folder"], exist_ok=True)
     os.makedirs(kwargs["result_folder"], exist_ok=True)
-    if verbose > 1:
-        logger = open(f"{kwargs['log_folder']}/{PREFIX}.log", "w")
-        logger.write(str(kwargs) + "\n")
 
     subtask = kwargs["subtask"]
     dataset = ModalityPredictionDataset(subtask, preprocess=kwargs["preprocessing"])
@@ -69,8 +66,11 @@ def pipeline(inductive=False, verbose=2, logger=None, **kwargs):
 
     res = pd.DataFrame({'rmse': [], 'seed': [], 'subtask': [], 'method': []})
     for k in range(args.runs):
-        set_seed(args.rnd_seed+k)
+        set_seed(args.rnd_seed)
         model = ScMoGCNWrapper(Namespace(**kwargs))
+        if verbose > 1:
+            logger = open(f"{kwargs['log_folder']}/{PREFIX}.log", "w")
+            logger.write(str(kwargs) + "\n")
 
         if kwargs["sampling"]:
             model.fit_with_sampling(g, y_train, split, not inductive, verbose, y_test, logger)
@@ -80,11 +80,13 @@ def pipeline(inductive=False, verbose=2, logger=None, **kwargs):
         print(model.predict(g, np.arange(kwargs["TRAIN_SIZE"], kwargs["CELL_SIZE"]), device="cpu"))
         res = res.append({
             'rmse': model.score(g, np.arange(kwargs["TRAIN_SIZE"], kwargs["CELL_SIZE"]), y_test, device="cpu"),
-            'seed': k,
+            'seed': args.rnd_seed,
             'subtask': args.subtask,
             'method': 'scmogcn',
         }, ignore_index=True)
+        args.rnd_seed = args.rnd_seed+1
     print(res)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

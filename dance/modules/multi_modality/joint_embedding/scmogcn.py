@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader
 from copy import deepcopy
 from dance import logger
 from dance.utils import SimpleIndexDataset
-
+from dance.utils.metrics import *
 
 def propagation_layer_combination(X, idx, wt, from_logits=True):
     if from_logits:
@@ -283,7 +283,7 @@ class ScMoGCNWrapper:
         with torch.no_grad():
             X = propagation_layer_combination(inputs, idx, wt)
 
-        return self.model.encoder(X)
+            return self.model.encoder(X)
 
     def score(self, idx, cell_type, phase_score=None, adata_sol=None, metric='loss'):
         """Score function to get score of prediction.

@@ -125,12 +125,12 @@ if __name__ == "__main__":
         score.update(
             model.score(x_test, y_test, labels, adata_sol=data.data['test_sol'], metric="openproblems"))
         score.update({
-            'seed': k,
+            'seed': args.rnd_seed + k,
             'subtask': args.subtask,
             'method': 'scmvae',
         })
 
-        if res:
+        if res is not None:
             res = res.append(score, ignore_index=True)
         else:
             for s in score:

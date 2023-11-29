@@ -103,7 +103,7 @@ if __name__ == "__main__":
         print(model.predict(x_test))
         res = res.append({
             'rmse': model.score(x_test, y_test),
-            'seed': k,
+            'seed': args.rnd_seed + k,
             'subtask': args.subtask,
             'method': 'cmae',
         }, ignore_index=True)

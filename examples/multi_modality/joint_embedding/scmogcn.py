@@ -47,9 +47,9 @@ if __name__ == "__main__":
     )
     (x_mod1, x_mod2), (cell_type, batch_label, phase_label, S_score, G2M_score) = data.get_data(return_type="torch")
     phase_score = torch.cat([S_score[:, None], G2M_score[:, None]], 1)
-    test_id = np.arange(train_size, x_mod1.shape[0])
-    labels = cell_type.numpy()[test_id]
-    adata_sol = data.data['test_sol'][data._split_idx_dict['test']]
+    test_id = np.arange(x_mod1.shape[0])
+    labels = cell_type.numpy()
+    adata_sol = data.data['test_sol']#[data._split_idx_dict['test']]
 
     res = None
     for k in range(args.runs):
@@ -71,12 +71,12 @@ if __name__ == "__main__":
         score.update(
             model.score(test_id, labels, adata_sol=adata_sol, metric="openproblems"))
         score.update({
-            'seed': k,
+            'seed': args.rnd_seed + k,
             'subtask': args.subtask,
             'method': 'scmogcn',
         })
 
-        if res:
+        if res is not None:
             res = res.append(score, ignore_index=True)
         else:
             for s in score:

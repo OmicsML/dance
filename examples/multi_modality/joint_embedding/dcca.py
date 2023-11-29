@@ -9,7 +9,7 @@ import pandas as pd
 import dance.utils.metrics as metrics
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.dcca import DCCA
-
+from dance.utils import set_seed
 
 def parameter_setting():
     parser = argparse.ArgumentParser(description="Single cell Multi-omics data analysis")
@@ -35,7 +35,7 @@ def parameter_setting():
 
     parser.add_argument("--batch_size", "-b", type=int, default=64, help="Batch size")
 
-    parser.add_argument("--seed", type=int, default=1, help="Random seed for repeat results")
+    parser.add_argument("--rnd_seed", type=int, default=1, help="Random seed for repeat results")
     parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("--latent", "-l", type=int, default=10, help="latent layer dim")
     parser.add_argument("--max_epoch", "-me", type=int, default=10, help="Max epoches")
@@ -103,16 +103,17 @@ if __name__ == "__main__":
 
     total_loader = data_utils.DataLoader(total, batch_size=args.batch_size, shuffle=False)
 
-
-    metrics.labeled_clustering_evaluate(adata, data.mod["test_sol"])
-
     res = None
     for k in range(args.runs):
         set_seed(args.rnd_seed + k)
-        model = DCCA(layer_e_1=[Nfeature1, 128], hidden1_1=128, Zdim_1=4, layer_d_1=[4, 128], hidden2_1=128,
-                     layer_e_2=[Nfeature2, 1500, 128], hidden1_2=128, Zdim_2=4, layer_d_2=[4], hidden2_2=4, args=args,
-                     Type_1="NB", Type_2="Bernoulli", ground_truth1=torch.cat([train_labels, test_labels]), cycle=1,
-                     attention_loss="Eucli")  # yapf: disable
+#         model = DCCA(layer_e_1=[Nfeature1, 128], hidden1_1=128, Zdim_1=4, layer_d_1=[4, 128], hidden2_1=128,
+#                      layer_e_2=[Nfeature2, 1500, 128], hidden1_2=128, Zdim_2=4, layer_d_2=[4], hidden2_2=4, args=args,
+#                      Type_1="NB", Type_2="Bernoulli", ground_truth1=torch.cat([train_labels, test_labels]), cycle=1,
+#                      attention_loss="Eucli")  # yapf: disable
+        model = DCCA(layer_e_1=[Nfeature1, 128], hidden1_1=128, Zdim_1=50, layer_d_1=[50, 128], hidden2_1=128,
+                 layer_e_2=[Nfeature2, 1500, 128], hidden1_2=128, Zdim_2=50, layer_d_2=[50], hidden2_2=50, args=args,
+                 ground_truth1=torch.cat([train_labels, test_labels]), Type_1="NB", Type_2="Bernoulli",
+                 cycle=1, attention_loss="Eucli").to(device)
         model.to(device)
         model.fit(train_loader, test_loader, total_loader, "RNA")
 
@@ -122,20 +123,20 @@ if __name__ == "__main__":
 
         adata = ad.AnnData(
             X=embeds,
-            obs=mod1_obs,
+            obs=data.mod["mod1"].obs,
         )
-        adata_sol = dataset.test_sol
+        adata_sol = data.mod["test_sol"]
         adata = adata[adata_sol.obs_names]
         adata_sol.obsm['X_emb'] = adata.X
-        score = metrics.labeled_clustering_evaluate(adata, dataset)
+        score = metrics.labeled_clustering_evaluate(adata, adata_sol)
         score.update(metrics.integration_openproblems_evaluate(adata_sol))
         score.update({
-            'seed': k,
+            'seed': args.rnd_seed + k,
             'subtask': args.subtask,
             'method': 'dcca',
         })
 
-        if res:
+        if res is not None:
             res = res.append(score, ignore_index=True)
         else:
             for s in score:
