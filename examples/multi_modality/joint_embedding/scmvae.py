@@ -1,15 +1,15 @@
 import argparse
 
 import numpy as np
+import pandas as pd
 import torch
 import torch.utils.data as data_utils
 from sklearn import preprocessing
-import os
-import pandas as pd
-from dance.utils import set_seed
+
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.scmvae import scMVAE
 from dance.transforms.preprocess import calculate_log_library_size
+from dance.utils import set_seed
 
 
 def parameter_setting():
@@ -24,7 +24,7 @@ def parameter_setting():
     parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
 
     parser.add_argument("--batch_size", "-b", type=int, default=64, help="Batch size")
-    parser.add_argument('-seed', '--rnd_seed', type=int, default=1, help='Random seed for repeat results')
+    parser.add_argument('-seed', '--seed', type=int, default=1, help='Random seed for repeat results')
     parser.add_argument("--latent", "-l", type=int, default=10, help="latent layer dim")
     parser.add_argument("--max_epoch", "-me", type=int, default=25, help="Max epoches")
     parser.add_argument("--max_iteration", "-mi", type=int, default=3000, help="Max iteration")
@@ -43,7 +43,7 @@ def parameter_setting():
 if __name__ == "__main__":
     parser = parameter_setting()
     args = parser.parse_args()
-    set_seed(args.rnd_seed)
+    set_seed(args.seed)
     assert args.max_iteration > args.epoch_per_test
 
     dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding", preprocess="feature_selection")
@@ -72,7 +72,6 @@ if __name__ == "__main__":
     args.lr = 0.001
     args.anneal_epoch = 200
 
-
     train_size = len(data.get_split_idx("train"))
     train = data_utils.TensorDataset(x_train, lib_mean1[:train_size], lib_var1[:train_size], lib_mean2[:train_size],
                                      lib_var2[:train_size], y_train)
@@ -90,7 +89,7 @@ if __name__ == "__main__":
 
     res = None
     for k in range(args.runs):
-        set_seed(args.rnd_seed + k)
+        set_seed(args.seed + k)
         model = scMVAE(
             encoder_1=[Nfeature1, 1024, 128, 128],
             hidden_1=128,
@@ -122,10 +121,9 @@ if __name__ == "__main__":
         embeds = model.predict(x_test, y_test).cpu().numpy()
         print(embeds.shape)
         score = model.score(x_test, y_test, labels)
-        score.update(
-            model.score(x_test, y_test, labels, adata_sol=data.data['test_sol'], metric="openproblems"))
+        score.update(model.score(x_test, y_test, labels, adata_sol=data.data['test_sol'], metric="openproblems"))
         score.update({
-            'seed': args.rnd_seed + k,
+            'seed': args.seed + k,
             'subtask': args.subtask,
             'method': 'scmvae',
         })
@@ -137,13 +135,12 @@ if __name__ == "__main__":
                 score[s] = [score[s]]
             res = pd.DataFrame(score)
     print(res)
-
 """To reproduce scMVAE on other samples, please refer to command lines belows:
 
 GEX-ADT:
-python scmvae.py --subtask openproblems_bmmc_cite_phase2 --device cuda
+$ python scmvae.py --subtask openproblems_bmmc_cite_phase2 --device cuda
 
 GEX-ATAC:
-python scmvae.py --subtask openproblems_bmmc_multiome_phase2 --device cuda
+$ python scmvae.py --subtask openproblems_bmmc_multiome_phase2 --device cuda
 
 """

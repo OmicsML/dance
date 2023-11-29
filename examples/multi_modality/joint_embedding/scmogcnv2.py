@@ -2,9 +2,6 @@ import argparse
 import random
 
 import anndata as ad
-import dgl
-import numpy as np
-import scanpy as sc
 import torch
 
 import dance.utils.metrics as metrics
@@ -48,7 +45,7 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--data_folder', default='./data/joint_embedding')
     parser.add_argument('-pre', '--pretrained_folder', default='./data/joint_embedding/pretrained')
     parser.add_argument('-csv', '--csv_path', default='decoupled_lsi.csv')
-    parser.add_argument('-seed', '--rnd_seed', default=rndseed, type=int)
+    parser.add_argument('-seed', '--seed', default=rndseed, type=int)
     parser.add_argument('-cpu', '--cpus', default=1, type=int)
     parser.add_argument('-bs', '--batch_size', default=512, type=int)
     parser.add_argument('-prefix', '--prefix', default='dance_openproblems_bmmc_atac2rna_test')
@@ -93,18 +90,17 @@ if __name__ == '__main__':
     parser.add_argument('-ws', '--weighted_sum', action='store_true')
 
     args = parser.parse_args()
-    args.rnd_seed = 1507659161
+    args.seed = 1507659161
 
     device = args.device
     torch.set_num_threads(args.cpus)
-    rndseed = args.rnd_seed
+    rndseed = args.seed
     set_seed(rndseed)
 
     args.no_pathway = True
-    args.no_batch_features = True  #False
+    args.no_batch_features = True  # False
     args.weighted_sum = True
     args.hidden_size = 56
-
 
     dataset = JointEmbeddingNIPSDataset(args.subtask, data_dir=args.data_folder).load_data()\
         .load_metadata().load_sol().preprocess('aux', args.pretrained_folder)
@@ -147,4 +143,4 @@ if __name__ == '__main__':
     adata.write_h5ad(f'./joint_embedding_{rndseed}.h5ad', compression="gzip")
 
     # scmvae test
-    metrics.labeled_clustering_evaluate(adata, dataset)  #, 45)
+    metrics.labeled_clustering_evaluate(adata, dataset)  # , 45)

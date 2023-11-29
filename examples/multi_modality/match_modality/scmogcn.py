@@ -1,9 +1,8 @@
 import argparse
-import random
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 import torch
-import os
 import torch.nn.functional as F
 
 from dance.datasets.multimodality import ModalityMatchingDataset
@@ -21,7 +20,7 @@ if __name__ == "__main__":
     parser.add_argument("-dis", "--disable_propagation", default=0, type=int, choices=[0, 1, 2])
     parser.add_argument("-aux", "--auxiliary_loss", default=True, type=bool)
     parser.add_argument("-pk", "--pickle_suffix", default="_lsi_input_pca_count.pkl")
-    parser.add_argument("-seed", "--rnd_seed", default=1, type=int)
+    parser.add_argument("-seed", "--seed", default=1, type=int)
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-e", "--epochs", default=2000, type=int)
@@ -31,7 +30,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     torch.set_num_threads(args.cpus)
-    rndseed = args.rnd_seed
+    rndseed = args.seed
     set_seed(rndseed)
 
     subtask = args.subtask
@@ -56,20 +55,20 @@ if __name__ == "__main__":
         LATENT_SIZE = 64
         TEMPERATURE = 2.739896
         LAYERS = [
-                [(g_mod1.num_nodes("feature"), 512, 0.25), (512, 512, 0.25), (512, LATENT_SIZE)],
-                [(g_mod2.num_nodes("feature"), 512, 0.2), (512, 512, 0.2), (512, LATENT_SIZE)],
-                [(LATENT_SIZE, 512, 0.2), (512, g_mod1.num_nodes("feature"))],
-                [(LATENT_SIZE, 512, 0.2), (512, g_mod2.num_nodes("feature"))],
-            ]
+            [(g_mod1.num_nodes("feature"), 512, 0.25), (512, 512, 0.25), (512, LATENT_SIZE)],
+            [(g_mod2.num_nodes("feature"), 512, 0.2), (512, 512, 0.2), (512, LATENT_SIZE)],
+            [(LATENT_SIZE, 512, 0.2), (512, g_mod1.num_nodes("feature"))],
+            [(LATENT_SIZE, 512, 0.2), (512, g_mod2.num_nodes("feature"))],
+        ]
     else:
         LATENT_SIZE = 256
         TEMPERATURE = 3.065016
         LAYERS = [
-                [(g_mod1.num_nodes("feature"), 1024, 0.5), (1024, 1024, 0.5), (1024, LATENT_SIZE)],
-                [(g_mod2.num_nodes("feature"), 2048, 0.5), (2048, LATENT_SIZE)],
-                [(LATENT_SIZE, 512, 0.2), (512, g_mod1.num_nodes("feature"))],
-                [(LATENT_SIZE, 512, 0.2), (512, g_mod2.num_nodes("feature"))],
-            ]
+            [(g_mod1.num_nodes("feature"), 1024, 0.5), (1024, 1024, 0.5), (1024, LATENT_SIZE)],
+            [(g_mod2.num_nodes("feature"), 2048, 0.5), (2048, LATENT_SIZE)],
+            [(LATENT_SIZE, 512, 0.2), (512, g_mod1.num_nodes("feature"))],
+            [(LATENT_SIZE, 512, 0.2), (512, g_mod2.num_nodes("feature"))],
+        ]
 
     train_size = len(data.get_split_idx("train"))
     z_test = F.one_hot(torch.from_numpy(z[train_size:]).long())
@@ -81,7 +80,7 @@ if __name__ == "__main__":
 
     res = pd.DataFrame({'score': [], 'seed': [], 'subtask': [], 'method': []})
     for k in range(args.runs):
-        set_seed(args.rnd_seed + k)
+        set_seed(args.seed + k)
         model = ScMoGCNWrapper(
             args,
             LAYERS,
@@ -103,16 +102,15 @@ if __name__ == "__main__":
             'method': 'scmogcn',
         }, ignore_index=True)
     print(res)
-    
 """To reproduce scMoGCN on other samples, please refer to command lines belows:
 
 GEX-ADT (subset):
-python scmogcn.py --subtask openproblems_bmmc_cite_phase2_rna_subset --threshold_quantile 0.85 --device cuda
+$ python scmogcn.py --subtask openproblems_bmmc_cite_phase2_rna_subset --threshold_quantile 0.85 --device cuda
 
 GEX-ADT:
-python scmogcn.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda
+$ python scmogcn.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda
 
 GEX-ATAC:
-python scmogcn.py --subtask openproblems_bmmc_multiome_phase2_rna --device cuda
+$ python scmogcn.py --subtask openproblems_bmmc_multiome_phase2_rna --device cuda
 
 """

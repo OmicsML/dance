@@ -1,10 +1,11 @@
 import argparse
 import os
 from argparse import Namespace
-import pandas as pd
+
 import anndata
 import mudata
 import numpy as np
+import pandas as pd
 import torch
 
 from dance.data import Data
@@ -66,7 +67,7 @@ def pipeline(inductive=False, verbose=2, logger=None, **kwargs):
 
     res = pd.DataFrame({'rmse': [], 'seed': [], 'subtask': [], 'method': []})
     for k in range(args.runs):
-        set_seed(args.rnd_seed)
+        set_seed(args.seed)
         model = ScMoGCNWrapper(Namespace(**kwargs))
         if verbose > 1:
             logger = open(f"{kwargs['log_folder']}/{PREFIX}.log", "w")
@@ -78,13 +79,14 @@ def pipeline(inductive=False, verbose=2, logger=None, **kwargs):
             model.fit(g, y_train, split, not inductive, verbose, y_test, logger)
 
         print(model.predict(g, np.arange(kwargs["TRAIN_SIZE"], kwargs["CELL_SIZE"]), device="cpu"))
-        res = res.append({
-            'rmse': model.score(g, np.arange(kwargs["TRAIN_SIZE"], kwargs["CELL_SIZE"]), y_test, device="cpu"),
-            'seed': args.rnd_seed,
-            'subtask': args.subtask,
-            'method': 'scmogcn',
-        }, ignore_index=True)
-        args.rnd_seed = args.rnd_seed+1
+        res = res.append(
+            {
+                'rmse': model.score(g, np.arange(kwargs["TRAIN_SIZE"], kwargs["CELL_SIZE"]), y_test, device="cpu"),
+                'seed': args.seed,
+                'subtask': args.subtask,
+                'method': 'scmogcn',
+            }, ignore_index=True)
+        args.seed = args.seed + 1
     print(res)
 
 
@@ -130,7 +132,7 @@ if __name__ == "__main__":
     parser.add_argument("-ci", "--cell_init", default="none", choices=["none", "svd"])
     parser.add_argument("-bas", "--batch_seperation", action="store_true")
     parser.add_argument("-pwpath", "--pathway_path", default="./data/h.all.v7.4")
-    parser.add_argument("-seed", "--rnd_seed", type=int, default=1)
+    parser.add_argument("-seed", "--seed", type=int, default=1)
     parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("-ws", "--weighted_sum", action="store_true")
     parser.add_argument("-samp", "--sampling", action="store_true")
@@ -162,20 +164,21 @@ if __name__ == "__main__":
     torch.set_num_threads(args.cpu)
 
     pipeline(**vars(args))
-
 """To reproduce scMoGCN on other samples, please refer to command lines belows:
+
 GEX to ADT (subset):
-python scmogcn.py --subtask oopenproblems_bmmc_cite_phase2_rna_subset --device cuda
+$ python scmogcn.py --subtask oopenproblems_bmmc_cite_phase2_rna_subset --device cuda
 
 GEX to ADT:
-python scmogcn.py --subtask oopenproblems_bmmc_cite_phase2_rna --device cuda -inres -sb -hid=256 -wd 1e-4 -pww 'cos' -es 200 -pwth 0.1 -ws -edd 0.4 -mdd 0.3
+$ python scmogcn.py --subtask oopenproblems_bmmc_cite_phase2_rna --device cuda -inres -sb -hid=256 -wd 1e-4 -pww 'cos' -es 200 -pwth 0.1 -ws -edd 0.4 -mdd 0.3
 
 ADT to GEX:
-python scmogcn.py --subtask openproblems_bmmc_cite_phase2_mod2 --device cuda -es 300
+$ python scmogcn.py --subtask openproblems_bmmc_cite_phase2_mod2 --device cuda -es 300
 
 GEX to ATAC:
-python scmogcn.py --subtask openproblems_bmmc_multiome_phase2_rna --device cuda -es 300
+$ python scmogcn.py --subtask openproblems_bmmc_multiome_phase2_rna --device cuda -es 300
 
 ATAC to GEX:
-python scmogcn.py --subtask openproblems_bmmc_multiome_phase2_mod2 --device cuda -es 1000 -e 3000 -edd 0
+$ python scmogcn.py --subtask openproblems_bmmc_multiome_phase2_mod2 --device cuda -es 1000 -e 3000 -edd 0
+
 """

@@ -1,7 +1,7 @@
 import argparse
 import logging
 import os
-import random
+
 import pandas as pd
 import torch
 
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
-    parser.add_argument("-seed", "--rnd_seed", default=1, type=int)
+    parser.add_argument("-seed", "--seed", default=1, type=int)
     parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("-m", "--model_folder", default="./models")
     parser.add_argument("--outdir", "-o", default="./logs", help="Directory to output to")
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     args.resume = True
 
     torch.set_num_threads(args.cpus)
-    rndseed = args.rnd_seed
+    rndseed = args.seed
     set_seed(rndseed)
     dataset = ModalityPredictionDataset(args.subtask, preprocess="feature_selection")
     data = dataset.load_data()
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     os.makedirs(args.outdir, exist_ok=True)
 
     # Specify output log file
-    fh = logging.FileHandler(f"{args.outdir}/training_{args.subtask}_{args.rnd_seed}.log", "w")
+    fh = logging.FileHandler(f"{args.outdir}/training_{args.subtask}_{args.seed}.log", "w")
     fh.setLevel(logging.INFO)
     logger.addHandler(fh)
 
@@ -60,32 +60,34 @@ if __name__ == "__main__":
     # Train and evaluate the model
     res = pd.DataFrame({'rmse': [], 'seed': [], 'subtask': [], 'method': []})
     for k in range(args.runs):
-        set_seed(args.rnd_seed)
+        set_seed(args.seed)
         model = BabelWrapper(args, dim_in=x_train.shape[1], dim_out=y_train.shape[1])
         model.fit(x_train, y_train, val_ratio=0.15)
         print(model.predict(x_test))
-        res = res.append({
-            'rmse': model.score(x_test, y_test),
-            'seed': args.rnd_seed,
-            'subtask': args.subtask,
-            'method': 'babel',
-        }, ignore_index=True)
-        args.rnd_seed = args.rnd_seed + 1
+        res = res.append(
+            {
+                'rmse': model.score(x_test, y_test),
+                'seed': args.seed,
+                'subtask': args.subtask,
+                'method': 'babel',
+            }, ignore_index=True)
+        args.seed = args.seed + 1
     print(res)
-
 """To reproduce BABEL on other samples, please refer to command lines belows:
+
 GEX to ADT (subset):
-python babel.py --subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda
+$ python babel.py --subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda
 
 GEX to ADT:
-python babel.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda
+$ python babel.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda
 
 ADT to GEX:
-python babel.py --subtask openproblems_bmmc_cite_phase2_mod2 --device cuda
+$ python babel.py --subtask openproblems_bmmc_cite_phase2_mod2 --device cuda
 
 GEX to ATAC:
-python babel.py --subtask openproblems_bmmc_multiome_phase2_rna --device cuda
+$ python babel.py --subtask openproblems_bmmc_multiome_phase2_rna --device cuda
 
 ATAC to GEX:
-python babel.py --subtask openproblems_bmmc_multiome_phase2_mod2 --device cuda
+$ python babel.py --subtask openproblems_bmmc_multiome_phase2_mod2 --device cuda
+
 """

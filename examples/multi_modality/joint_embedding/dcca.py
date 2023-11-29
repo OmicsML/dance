@@ -2,14 +2,16 @@ import argparse
 
 import anndata as ad
 import numpy as np
+import pandas as pd
 import torch
 import torch.utils.data as data_utils
 from sklearn import preprocessing
-import pandas as pd
+
 import dance.utils.metrics as metrics
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.dcca import DCCA
 from dance.utils import set_seed
+
 
 def parameter_setting():
     parser = argparse.ArgumentParser(description="Single cell Multi-omics data analysis")
@@ -35,7 +37,7 @@ def parameter_setting():
 
     parser.add_argument("--batch_size", "-b", type=int, default=64, help="Batch size")
 
-    parser.add_argument("--rnd_seed", type=int, default=1, help="Random seed for repeat results")
+    parser.add_argument("--seed", type=int, default=1, help="Random seed for repeat results")
     parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("--latent", "-l", type=int, default=10, help="latent layer dim")
     parser.add_argument("--max_epoch", "-me", type=int, default=10, help="Max epoches")
@@ -105,15 +107,15 @@ if __name__ == "__main__":
 
     res = None
     for k in range(args.runs):
-        set_seed(args.rnd_seed + k)
-#         model = DCCA(layer_e_1=[Nfeature1, 128], hidden1_1=128, Zdim_1=4, layer_d_1=[4, 128], hidden2_1=128,
-#                      layer_e_2=[Nfeature2, 1500, 128], hidden1_2=128, Zdim_2=4, layer_d_2=[4], hidden2_2=4, args=args,
-#                      Type_1="NB", Type_2="Bernoulli", ground_truth1=torch.cat([train_labels, test_labels]), cycle=1,
-#                      attention_loss="Eucli")  # yapf: disable
+        set_seed(args.seed + k)
+        #         model = DCCA(layer_e_1=[Nfeature1, 128], hidden1_1=128, Zdim_1=4, layer_d_1=[4, 128], hidden2_1=128,
+        #                      layer_e_2=[Nfeature2, 1500, 128], hidden1_2=128, Zdim_2=4, layer_d_2=[4], hidden2_2=4, args=args,
+        #                      Type_1="NB", Type_2="Bernoulli", ground_truth1=torch.cat([train_labels, test_labels]), cycle=1,
+        #                      attention_loss="Eucli")  # yapf: disable
         model = DCCA(layer_e_1=[Nfeature1, 128], hidden1_1=128, Zdim_1=50, layer_d_1=[50, 128], hidden2_1=128,
-                 layer_e_2=[Nfeature2, 1500, 128], hidden1_2=128, Zdim_2=50, layer_d_2=[50], hidden2_2=50, args=args,
-                 ground_truth1=torch.cat([train_labels, test_labels]), Type_1="NB", Type_2="Bernoulli",
-                 cycle=1, attention_loss="Eucli").to(device)
+                     layer_e_2=[Nfeature2, 1500, 128], hidden1_2=128, Zdim_2=50, layer_d_2=[50], hidden2_2=50,
+                     args=args, ground_truth1=torch.cat([train_labels, test_labels]), Type_1="NB", Type_2="Bernoulli",
+                     cycle=1, attention_loss="Eucli").to(device)
         model.to(device)
         model.fit(train_loader, test_loader, total_loader, "RNA")
 
@@ -131,7 +133,7 @@ if __name__ == "__main__":
         score = metrics.labeled_clustering_evaluate(adata, adata_sol)
         score.update(metrics.integration_openproblems_evaluate(adata_sol))
         score.update({
-            'seed': args.rnd_seed + k,
+            'seed': args.seed + k,
             'subtask': args.subtask,
             'method': 'dcca',
         })
@@ -147,9 +149,9 @@ if __name__ == "__main__":
 """To reproduce DCCA on other samples, please refer to command lines belows:
 
 GEX-ADT:
-python dcca.py --subtask openproblems_bmmc_cite_phase2 --device cuda
+$ python dcca.py --subtask openproblems_bmmc_cite_phase2 --device cuda
 
 GEX-ATAC:
-python dcca.py --subtask openproblems_bmmc_multiome_phase2 --device cuda
+$ python dcca.py --subtask openproblems_bmmc_multiome_phase2 --device cuda
 
 """

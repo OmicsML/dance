@@ -5,7 +5,7 @@ This code is based on https://github.com/NVlabs/MUNIT.
 """
 import argparse
 import os
-import random
+
 import pandas as pd
 import torch
 from sklearn import preprocessing
@@ -21,7 +21,7 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
-    parser.add_argument("-seed", "--rnd_seed", default=1, type=int)
+    parser.add_argument("-seed", "--seed", default=1, type=int)
     parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("--max_epochs", default=100, type=int, help="maximum number of training epochs")
     parser.add_argument("--batch_size", default=64, type=int, help="batch size")
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     device = args.device
 
     torch.set_num_threads(args.cpus)
-    rndseed = args.rnd_seed
+    rndseed = args.seed
     set_seed(rndseed)
     dataset = ModalityPredictionDataset(args.subtask, preprocess="feature_selection")
     data = dataset.load_data()
@@ -95,33 +95,35 @@ if __name__ == "__main__":
 
     res = pd.DataFrame({'rmse': [], 'seed': [], 'subtask': [], 'method': []})
     for k in range(args.runs):
-        set_seed(args.rnd_seed + k)
+        set_seed(args.seed + k)
         model = CMAE(config)
         model.to(device)
 
         model.fit(x_train, y_train, batch, checkpoint_directory)
         print(model.predict(x_test))
-        res = res.append({
-            'rmse': model.score(x_test, y_test),
-            'seed': args.rnd_seed + k,
-            'subtask': args.subtask,
-            'method': 'cmae',
-        }, ignore_index=True)
+        res = res.append(
+            {
+                'rmse': model.score(x_test, y_test),
+                'seed': args.seed + k,
+                'subtask': args.subtask,
+                'method': 'cmae',
+            }, ignore_index=True)
     print(res)
-    
 """To reproduce CMAE on other samples, please refer to command lines belows:
+
 GEX to ADT (subset):
-python cmae.py --subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda
+$ python cmae.py --subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda
 
 GEX to ADT:
-python cmae.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda
+$ python cmae.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda
 
 ADT to GEX:
-python cmae.py --subtask openproblems_bmmc_cite_phase2_mod2 --device cuda
+$ python cmae.py --subtask openproblems_bmmc_cite_phase2_mod2 --device cuda
 
 GEX to ATAC:
-python cmae.py --subtask openproblems_bmmc_multiome_phase2_rna --device cuda
+$ python cmae.py --subtask openproblems_bmmc_multiome_phase2_rna --device cuda
 
 ATAC to GEX:
-python cmae.py --subtask openproblems_bmmc_multiome_phase2_mod2 --device cuda
+$ python cmae.py --subtask openproblems_bmmc_multiome_phase2_mod2 --device cuda
+
 """

@@ -1,9 +1,9 @@
 import argparse
-import random
 
 import numpy as np
-import torch
 import pandas as pd
+import torch
+
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.scmogcn import ScMoGCNWrapper
 from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph
@@ -18,7 +18,7 @@ if __name__ == "__main__":
     parser.add_argument("-csv", "--csv_path", default="decoupled_lsi.csv")
     parser.add_argument("-l", "--layers", default=3, type=int, choices=[3, 4, 5, 6, 7])
     parser.add_argument("-dis", "--disable_propagation", default=0, type=int, choices=[0, 1, 2])
-    parser.add_argument("-seed", "--rnd_seed", default=1, type=int)
+    parser.add_argument("-seed", "--seed", default=1, type=int)
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-bs", "--batch_size", default=512, type=int)
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     device = args.device
     pre_normalize = bool(args.normalize)
     torch.set_num_threads(args.cpus)
-    rndseed = args.rnd_seed
+    rndseed = args.seed
     set_seed(rndseed)
 
     dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess="aux", normalize=True)
@@ -49,11 +49,11 @@ if __name__ == "__main__":
     phase_score = torch.cat([S_score[:, None], G2M_score[:, None]], 1)
     test_id = np.arange(x_mod1.shape[0])
     labels = cell_type.numpy()
-    adata_sol = data.data['test_sol']#[data._split_idx_dict['test']]
+    adata_sol = data.data['test_sol']  # [data._split_idx_dict['test']]
 
     res = None
     for k in range(args.runs):
-        set_seed(args.rnd_seed + k)
+        set_seed(args.seed + k)
         model = ScMoGCNWrapper(args, num_celL_types=int(cell_type.max() + 1), num_batches=int(batch_label.max() + 1),
                                num_phases=phase_score.shape[1], num_features=x_mod1.shape[1] + x_mod2.shape[1])
         model.fit(
@@ -68,10 +68,9 @@ if __name__ == "__main__":
         embeds = model.predict(test_id).cpu().numpy()
         print(embeds)
         score = model.score(test_id, labels, metric="clustering")
-        score.update(
-            model.score(test_id, labels, adata_sol=adata_sol, metric="openproblems"))
+        score.update(model.score(test_id, labels, adata_sol=adata_sol, metric="openproblems"))
         score.update({
-            'seed': args.rnd_seed + k,
+            'seed': args.seed + k,
             'subtask': args.subtask,
             'method': 'scmogcn',
         })
@@ -86,9 +85,9 @@ if __name__ == "__main__":
 """To reproduce scMoGCN on other samples, please refer to command lines belows:
 
 GEX-ADT:
-python scmogcn.py --subtask openproblems_bmmc_cite_phase2 --device cuda
+$ python scmogcn.py --subtask openproblems_bmmc_cite_phase2 --device cuda
 
 GEX-ATAC:
-python scmogcn.py --subtask openproblems_bmmc_multiome_phase2 --device cuda
+$ python scmogcn.py --subtask openproblems_bmmc_multiome_phase2 --device cuda
 
 """

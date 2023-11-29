@@ -1,8 +1,7 @@
 import argparse
-import random
+
 import pandas as pd
 import torch
-import os
 
 from dance.datasets.multimodality import ModalityMatchingDataset
 from dance.modules.multi_modality.match_modality.scmm import MMVAE
@@ -16,7 +15,7 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
-    parser.add_argument("-seed", "--rnd_seed", default=1, type=int)
+    parser.add_argument("-seed", "--seed", default=1, type=int)
     parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
 
     parser.add_argument("--experiment", type=str, default="test", metavar="E", help="experiment name")
@@ -43,7 +42,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     torch.set_num_threads(args.cpus)
-    rndseed = args.rnd_seed
+    rndseed = args.seed
     set_seed(rndseed)
     subtask = args.subtask
     device = args.device
@@ -65,29 +64,28 @@ if __name__ == "__main__":
     model_class = "rna-protein" if subtask == "openproblems_bmmc_cite_phase2_rna" else "rna-dna"
     res = pd.DataFrame({'score': [], 'seed': [], 'subtask': [], 'method': []})
     for k in range(args.runs):
-        set_seed(args.rnd_seed + k)
+        set_seed(args.seed + k)
         model = MMVAE(model_class, args).to(device)
 
         model.fit(x_train, y_train)
         print(model.predict(x_test, y_test))
-        res = res.append({
-            'score': model.score(x_test, y_test, labels),
-            'seed': k,
-            'subtask': args.subtask,
-            'method': 'scmm',
-        }, ignore_index=True)
+        res = res.append(
+            {
+                'score': model.score(x_test, y_test, labels),
+                'seed': k,
+                'subtask': args.subtask,
+                'method': 'scmm',
+            }, ignore_index=True)
     print(res)
-    
-    
 """To reproduce scMM on other samples, please refer to command lines belows:
 
 GEX-ADT (subset):
-python scmm.py --subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda
+$ python scmm.py --subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda
 
 GEX-ADT:
-python scmm.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda
+$ python scmm.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda
 
 GEX-ATAC:
-python scmm.py --subtask openproblems_bmmc_multiome_phase2_rna --device cuda
+$ python scmm.py --subtask openproblems_bmmc_multiome_phase2_rna --device cuda
 
 """
