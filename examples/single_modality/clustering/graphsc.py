@@ -39,24 +39,28 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     args = parser.parse_args()
-    set_seed(args.seed)
+    aris = []
+    for seed in range(1, 21):
+        # for seed in range(1, 2):
+        # set_seed(args.seed)
+        set_seed(seed)
 
-    # Load data and perform necessary preprocessing
-    dataloader = ClusteringDataset(args.data_dir, args.dataset)
-    preprocessing_pipeline = GraphSC.preprocessing_pipeline(
-        n_top_genes=args.nb_genes,
-        normalize_weights=args.normalize_weights,
-        n_components=args.in_feats,
-        normalize_edges=args.edge_norm,
-    )
-    data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
+        # Load data and perform necessary preprocessing
+        dataloader = ClusteringDataset(args.data_dir, args.dataset)
+        preprocessing_pipeline = GraphSC.preprocessing_pipeline(
+            n_top_genes=args.nb_genes,
+            normalize_weights=args.normalize_weights,
+            n_components=args.in_feats,
+            normalize_edges=args.edge_norm,
+        )
+        data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
-    graph, y = data.get_train_data()
-    n_clusters = len(np.unique(y))
+        graph, y = data.get_train_data()
+        n_clusters = len(np.unique(y))
 
-    # Evaluate model for several runs
-    for run in range(args.num_run):
-        set_seed(args.seed + run)
+        # Evaluate model for several runs
+        # for run in range(args.num_run):
+        # set_seed(args.seed + run)
         model = GraphSC(agg=args.agg, activation=args.activation, in_feats=args.in_feats, n_hidden=args.n_hidden,
                         hidden_dim=args.hidden_dim, hidden_1=args.hidden_1, hidden_2=args.hidden_2,
                         dropout=args.dropout, n_layers=args.n_layers, hidden_relu=args.hidden_relu,
@@ -66,9 +70,15 @@ if __name__ == "__main__":
                   eval_epoch=args.eval_epoch)
         score = model.score(None, y)
         print(f"{score=:.4f}")
+        aris.append(score)
+
+    print('graphsc')
+    print(args.dataset)
+    print(f'aris: {aris}')
+    print(f'aris: {np.mean(aris)} +/- {np.std(aris)}')
 """ Reproduction information
 10X PBMC:
-python graphsc.py --dataset 10X_PBMC
+python graphsc.py --dataset 10X_PBMC --dropout 0.5
 
 Mouse ES:
 python graphsc.py --dataset mouse_ES_cell

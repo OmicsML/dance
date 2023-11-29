@@ -264,6 +264,8 @@ class ModalityMatchingDataset(MultiModalityDataset):
 
     def _raw_to_dance(self, raw_data):
         train_mod1, train_mod2, train_label, test_mod1, test_mod2, test_label = self._maybe_preprocess(raw_data)
+        # Align matched cells
+        train_mod2 = train_mod2[train_label.to_df().values.argmax(1)]
 
         mod1 = ad.concat((train_mod1, test_mod1))
         mod2 = ad.concat((train_mod2, test_mod2))
@@ -272,8 +274,6 @@ class ModalityMatchingDataset(MultiModalityDataset):
         mod2.obs_names = mod1.obs_names
         train_size = train_mod1.shape[0]
 
-        # Align matched cells
-        train_mod2 = train_mod2[train_label.to_df().values.argmax(1)]
         mod1.obsm["labels"] = np.concatenate([np.zeros(train_size), np.argmax(test_label.X.toarray(), 1)])
 
         # Combine modalities into mudata

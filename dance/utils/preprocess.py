@@ -5,7 +5,7 @@ from dance import logger
 from dance.typing import List, Optional, Sequence, Set, Union
 
 
-def cell_label_to_df(cell_labels: List[Optional[Union[str, Set[str]]]], idx_to_label: List[str],
+def cell_label_to_df(cell_labels: List[Optional[Union[str, Set[str]]]], idx_to_label: Optional[List[str]] = None,
                      index: Optional[Union[Sequence[str], Index]] = None) -> DataFrame:
     """Convert cell labels into AnnData of label matrix.
 
@@ -15,9 +15,10 @@ def cell_label_to_df(cell_labels: List[Optional[Union[str, Set[str]]]], idx_to_l
         List of str or set of str (or ``None`` if the cell type information is not available or do not match the
         training cell type data). Each corresponds to the relevant cell type(s) for that cell.
     idx_to_label
-        List of cell type names, used to define the column orders in the label matrix.
-    obs
-        Observation matrix to use. If not set, use ordered integer as cell indices.
+        List of cell type names, used to define the column orders in the label matrix. If not set, then use the sorted
+        unique items.
+    index
+        Index to use for setting the observation matrix. If not set, then use range.
 
     Returns
     -------
@@ -27,6 +28,9 @@ def cell_label_to_df(cell_labels: List[Optional[Union[str, Set[str]]]], idx_to_l
         to zero.
 
     """
+    if idx_to_label is None:
+        idx_to_label = sorted(set(cell_labels))
+
     num_samples = len(cell_labels)
     num_labels = len(idx_to_label)
     label_to_idx = {j: i for i, j in enumerate(idx_to_label)}

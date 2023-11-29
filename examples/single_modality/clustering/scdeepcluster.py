@@ -30,40 +30,53 @@ if __name__ == "__main__":
     parser.add_argument("--ae_weights", default=None, help="file to pretrained weights, None for a new pretraining")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--z_dim", type=int, default=32)
+    parser.add_argument("--encodeLayer", type=int, nargs='+', default=[256, 64])
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     args = parser.parse_args()
-    set_seed(args.seed)
+    aris = []
+    for seed in range(1, 21):
+        # for seed in range(1, 2):
+        # set_seed(args.seed)
+        set_seed(seed)
 
-    # Load data and perform necessary preprocessing
-    dataloader = ClusteringDataset(args.data_dir, args.dataset)
-    preprocessing_pipeline = ScDeepCluster.preprocessing_pipeline()
-    data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
+        # Load data and perform necessary preprocessing
+        dataloader = ClusteringDataset(args.data_dir, args.dataset)
+        preprocessing_pipeline = ScDeepCluster.preprocessing_pipeline()
+        data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
-    # inputs: x, x_raw, n_counts
-    inputs, y = data.get_train_data()
-    n_clusters = len(np.unique(y))
-    in_dim = inputs[0].shape[1]
+        # inputs: x, x_raw, n_counts
+        inputs, y = data.get_train_data()
+        n_clusters = len(np.unique(y))
+        in_dim = inputs[0].shape[1]
 
-    # Build and train model
-    model = ScDeepCluster(input_dim=in_dim, z_dim=32, encodeLayer=[256, 64], decodeLayer=[64, 256], sigma=args.sigma,
-                          gamma=args.gamma, device=args.device, pretrain_path=f"scdeepcluster_{args.dataset}_pre.pkl")
-    model.fit(inputs, y, n_clusters=n_clusters, y_pred_init=None, lr=args.lr, batch_size=args.batch_size,
-              epochs=args.epochs, update_interval=args.update_interval, tol=args.tol, pt_batch_size=args.batch_size,
-              pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
+        # Build and train model
+        model = ScDeepCluster(input_dim=in_dim, z_dim=args.z_dim, encodeLayer=args.encodeLayer,
+                              decodeLayer=args.encodeLayer[::-1], sigma=args.sigma, gamma=args.gamma,
+                              device=args.device, pretrain_path=f"scdeepcluster_{args.dataset}_pre.pkl")
+        model.fit(inputs, y, n_clusters=n_clusters, y_pred_init=None, lr=args.lr, batch_size=args.batch_size,
+                  epochs=args.epochs, update_interval=args.update_interval, tol=args.tol, pt_batch_size=args.batch_size,
+                  pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
 
-    # Evaluate model predictions
-    score = model.score(None, y)
-    print(f"{score=:.4f}")
+        # Evaluate model predictions
+        score = model.score(None, y)
+        print(f"{score=:.4f}")
+        aris.append(score)
+
+    print('scdeepcluster')
+    print(args.dataset)
+    print(f'aris: {aris}')
+    print(f'aris: {np.mean(aris)} +/- {np.std(aris)}')
 """ Reproduction information
 10X PBMC:
-python scdeepcluster.py --dataset 10X_PBMC
+python scdeepcluster.py --dataset 10X_PBMC --pretrain_epochs 300 --epochs 100 --sigma 2
 
 Mouse ES:
-python scdeepcluster.py --dataset mouse_ES_cell
+python scdeepcluster.py --dataset mouse_ES_cell --pretrain_epochs 300 --epochs 100 --sigma 1.75 --encodeLayer 512 256
 
 Worm Neuron:
-python scdeepcluster.py --dataset worm_neuron_cell --pretrain_epochs 300
+python scdeepcluster.py --dataset worm_neuron_cell --pretrain_epochs 300 --epochs 100 --sigma 1.5
 
 Mouse Bladder:
-python scdeepcluster.py --dataset mouse_bladder_cell --pretrain_epochs 300 --sigma 2.75
+python scdeepcluster.py --dataset mouse_bladder_cell --pretrain_epochs 300 --sigma 2 --epochs 100
 """

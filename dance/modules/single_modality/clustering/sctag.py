@@ -308,7 +308,7 @@ class ScTAG(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         adj, x, x_raw, n_counts = inputs
         self.init_model(adj, x)
         self._pretrain(adj, x, x_raw, n_counts, epochs=pretrain_epochs, info_step=info_step, lr=lr, w_a=w_a, w_x=w_x,
-                       w_d=w_d, min_dist=min_dist, max_dist=max_dist, force_pretrain=force_pretrain)
+                       w_d=w_d, min_dist=min_dist, max_dist=max_dist, force_pretrain=True)
 
         x = torch.Tensor(x).to(self.device)
         x_raw = torch.Tensor(x_raw).to(self.device)

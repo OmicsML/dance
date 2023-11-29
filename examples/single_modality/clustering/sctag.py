@@ -34,29 +34,38 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     args = parser.parse_args()
-    set_seed(args.seed)
+    aris = []
+    for seed in range(1, 21):
+        # set_seed(args.seed)
+        set_seed(seed)
 
-    # Load data and perform necessary preprocessing
-    dataloader = ClusteringDataset(args.data_dir, args.dataset)
-    preprocessing_pipeline = ScTAG.preprocessing_pipeline(n_top_genes=args.highly_genes, n_components=args.pca_dim,
-                                                          n_neighbors=args.k_neighbor)
-    data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
+        # Load data and perform necessary preprocessing
+        dataloader = ClusteringDataset(args.data_dir, args.dataset)
+        preprocessing_pipeline = ScTAG.preprocessing_pipeline(n_top_genes=args.highly_genes, n_components=args.pca_dim,
+                                                              n_neighbors=args.k_neighbor)
+        data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
-    # inputs: adj, x, x_raw, n_counts
-    inputs, y = data.get_train_data()
-    n_clusters = len(np.unique(y))
+        # inputs: adj, x, x_raw, n_counts
+        inputs, y = data.get_train_data()
+        n_clusters = len(np.unique(y))
 
-    # Build and train model
-    model = ScTAG(n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
-                  dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha,
-                  pretrain_path=f"sctag_{args.dataset}_pre.pkl")
-    model.fit(inputs, y, epochs=args.epochs, pretrain_epochs=args.pretrain_epochs, lr=args.lr, w_a=args.w_a,
-              w_x=args.w_x, w_c=args.w_c, w_d=args.w_d, info_step=args.info_step, max_dist=args.max_dist,
-              min_dist=args.min_dist)
+        # Build and train model
+        model = ScTAG(n_clusters=n_clusters, k=args.k, hidden_dim=args.hidden_dim, latent_dim=args.latent_dim,
+                      dec_dim=args.dec_dim, dropout=args.dropout, device=args.device, alpha=args.alpha,
+                      pretrain_path=f"sctag_{args.dataset}_pre.pkl")
+        model.fit(inputs, y, epochs=args.epochs, pretrain_epochs=args.pretrain_epochs, lr=args.lr, w_a=args.w_a,
+                  w_x=args.w_x, w_c=args.w_c, w_d=args.w_d, info_step=args.info_step, max_dist=args.max_dist,
+                  min_dist=args.min_dist)
 
-    # Evaluate model predictions
-    score = model.score(None, y)
-    print(f"{score=:.4f}")
+        # Evaluate model predictions
+        score = model.score(None, y)
+        print(f"{score=:.4f}")
+        aris.append(score)
+
+    print('sctag')
+    print(args.dataset)
+    print(f'aris: {aris}')
+    print(f'aris: {np.mean(aris)} +/- {np.std(aris)}')
 """Reproduction information
 10X PBMC:
 python sctag.py --dataset 10X_PBMC --pretrain_epochs 100 --w_a 0.01 --w_x 3 --w_c 0.1 --dropout 0.5

@@ -10,6 +10,7 @@ Nature machine intelligence, 2021, 3(6): 536-544.
 """
 
 import os
+from copy import deepcopy
 
 import numpy as np
 import torch
@@ -45,7 +46,7 @@ class JAEWrapper:
         print(num_celL_types, num_batches, num_phases, num_features)
         self.args = args
 
-    def fit(self, inputs, cell_type, batch_label, phase_score):
+    def fit(self, inputs, cell_type, batch_label, phase_score, max_epochs=60):
         """Fit function for training.
 
         Parameters
@@ -85,7 +86,7 @@ class JAEWrapper:
         optimizer = torch.optim.Adam([{'params': self.model.parameters()}], lr=1e-4)
         vals = []
 
-        for epoch in range(60):
+        for epoch in range(max_epochs):
             self.model.train()
             total_loss = [0] * 5
             print('epoch', epoch)
@@ -127,10 +128,15 @@ class JAEWrapper:
             if min(vals) == vals[-1]:
                 if not os.path.exists('models'):
                     os.mkdir('models')
-                torch.save(self.model.state_dict(), f'models/model_joint_embedding_{self.args.rnd_seed}.pth')
+                best_dict = deepcopy(self.model.state_dict())
+
+
+#                 torch.save(self.model.state_dict(), f'models/model_joint_embedding_{self.args.rnd_seed}.pth')
 
             if min(vals) != min(vals[-10:]):
+                print('Early stopped.')
                 break
+        self.model.load_state_dict(best_dict)
 
     def to(self, device):
         """Performs device conversion.
@@ -191,7 +197,7 @@ class JAEWrapper:
             prediction = self.model.encoder(inputs[idx])
         return prediction
 
-    def score(self, inputs, idx, cell_type, batch_label=None, phase_score=None, metric='loss'):
+    def score(self, inputs, idx, cell_type, batch_label=None, phase_score=None, adata_sol=None, metric='loss'):
         """Score function to get score of prediction.
 
         Parameters
@@ -206,6 +212,8 @@ class JAEWrapper:
             Cell cycle phase labels.
         metric : str optional
             The type of evaluation metric, by default to be 'loss'.
+        adata_sol : anndata.AnnData optional
+            The solution anndata containing cell stypes, phase scores and batches. Required by 'openproblems' evaluation.
 
         Returns
         -------
@@ -234,7 +242,7 @@ class JAEWrapper:
                 loss4 = mse(output[3], phase_score[idx]).item()
 
                 return loss1, loss2, loss3, loss4
-            else:
+            elif metric == 'clustering':
                 emb = self.predict(inputs, idx).cpu().numpy()
 
                 kmeans = KMeans(n_clusters=10, n_init=5, random_state=200)
@@ -248,7 +256,14 @@ class JAEWrapper:
                 ARI_score = round(adjusted_rand_score(true_labels, pred_labels), 3)
 
                 # print('ARI: ' + str(ARI_score) + ' NMI: ' + str(NMI_score))
-                return NMI_score, ARI_score
+                return {'dance_nmi': NMI_score, 'dance_ari': ARI_score}
+            elif metric == 'openproblems':
+                emb = self.predict(inputs, idx).cpu().numpy()
+                assert adata_sol, 'adata_sol is required by `openproblems` evaluation but not provided.'
+                adata_sol.obsm['X_emb'] = emb
+                return integration_openproblems_evaluate(adata_sol)
+            else:
+                raise NotImplementedError
 
 
 class JAE(nn.Module):

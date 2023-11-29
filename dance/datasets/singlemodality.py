@@ -39,8 +39,8 @@ def _load_scdeepsort_metadata():
     return bench_url_dict, available_data
 
 
-@register_dataset("scdeepsort")
-class ScDeepSortDataset(BaseDataset):
+@register_dataset("CellTypeAnnotation")
+class CellTypeAnnotationDataset(BaseDataset):
     _DISPLAY_ATTRS = ("species", "tissue", "train_dataset", "test_dataset")
     ALL_URL_DICT: Dict[str, str] = {
         "train_human_cell_atlas": "https://www.dropbox.com/s/1itq1pokplbqxhx?dl=1",
@@ -84,7 +84,7 @@ class ScDeepSortDataset(BaseDataset):
 
     def get_all_filenames(self, filetype: str = "csv", feat_suffix: str = "data", label_suffix: str = "celltype"):
         filenames = []
-        for id in self.train_dataset:
+        for id in self.train_dataset + self.test_dataset:
             filenames.append(f"{self.species}_{self.tissue}{id}_{feat_suffix}.{filetype}")
             filenames.append(f"{self.species}_{self.tissue}{id}_{label_suffix}.{filetype}")
         return filenames
@@ -123,8 +123,10 @@ class ScDeepSortDataset(BaseDataset):
     def is_complete(self):
         """Check if benchmarking data is complete."""
         for name in self.BENCH_URL_DICT:
+            if any(i not in name for i in (self.species, self.tissue)):
+                continue
             filename = name[name.find(self.species):]
-            file_i = osp.join(self.data_dir, *name.split("_")[:2], filename)
+            file_i = osp.join(self.data_dir, *(name.split("_"))[:2], filename)
             if not osp.exists(file_i):
                 logger.info(file_i)
                 logger.info(f"file {filename} doesn't exist")

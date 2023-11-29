@@ -342,7 +342,8 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 loss.backward()
                 optimizer.step()
                 loss_val += loss.item() * len(x_batch)
-            logger.info("Pretrain epoch %3d, ZINB loss: %.8f", epoch + 1, loss_val / x.shape[0])
+            if epoch % 100 == 0:
+                logger.info("Pretrain epoch %3d, ZINB loss: %.8f", epoch + 1, loss_val / x.shape[0])
 
     def fit(
         self,
@@ -393,7 +394,7 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         """
         x, x_raw, n_counts = inputs
-        self._pretrain(x, x_raw, n_counts, batch_size=pt_batch_size, lr=pt_lr, epochs=pt_epochs)
+        self._pretrain(x, x_raw, n_counts, batch_size=pt_batch_size, lr=pt_lr, epochs=pt_epochs, force_pretrain=True)
 
         self.train()
         x = torch.tensor(x, dtype=torch.float32)
@@ -437,11 +438,12 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 Q = {**Q, **q_}
 
                 # check stop criterion
-                delta_label = np.sum(self.y_pred != self.y_pred_last).astype(np.float32) / num
-                self.y_pred_last = self.y_pred
-                if epoch > 0 and delta_label < tol:
-                    logger.info("Reach tolerance threshold (%.3e < %.3e). Stopping training.", delta_label, tol)
-                    break
+                if False:
+                    delta_label = np.sum(self.y_pred != self.y_pred_last).astype(np.float32) / num
+                    self.y_pred_last = self.y_pred
+                    if epoch > 0 and delta_label < tol:
+                        logger.info("Reach tolerance threshold (%.3e < %.3e). Stopping training.", delta_label, tol)
+                        break
 
                 # calculate ari score for model selection
                 ari = self.score(None, y)
@@ -474,8 +476,9 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                 recon_loss_val += recon_loss.item() * len(inputs)
                 train_loss += loss.item() * len(inputs)
 
-            logger.info("Epoch %3d: Total: %.8f, Clustering Loss: %.8f, ZINB Loss: %.8f", epoch + 1, train_loss / num,
-                        cluster_loss_val / num, recon_loss_val / num)
+            if epoch % 50 == 0:
+                logger.info("Epoch %3d: Total: %.8f, Clustering Loss: %.8f, ZINB Loss: %.8f", epoch + 1,
+                            train_loss / num, cluster_loss_val / num, recon_loss_val / num)
 
         index = update_interval * np.argmax(aris)
         self.q = Q[f"epoch{index}"]

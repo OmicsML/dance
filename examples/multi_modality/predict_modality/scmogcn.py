@@ -5,6 +5,7 @@ from argparse import Namespace
 import anndata
 import mudata
 import numpy as np
+import pandas as pd
 import torch
 
 from dance.data import Data
@@ -20,9 +21,6 @@ def pipeline(inductive=False, verbose=2, logger=None, **kwargs):
     os.makedirs(kwargs["log_folder"], exist_ok=True)
     os.makedirs(kwargs["model_folder"], exist_ok=True)
     os.makedirs(kwargs["result_folder"], exist_ok=True)
-    if verbose > 1:
-        logger = open(f"{kwargs['log_folder']}/{PREFIX}.log", "w")
-        logger.write(str(kwargs) + "\n")
 
     subtask = kwargs["subtask"]
     dataset = ModalityPredictionDataset(subtask, preprocess=kwargs["preprocessing"])
@@ -67,15 +65,29 @@ def pipeline(inductive=False, verbose=2, logger=None, **kwargs):
         else:
             g.nodes["cell"].data["bf"] = batch_features
 
-    model = ScMoGCNWrapper(Namespace(**kwargs))
+    res = pd.DataFrame({'rmse': [], 'seed': [], 'subtask': [], 'method': []})
+    for k in range(args.runs):
+        set_seed(args.seed)
+        model = ScMoGCNWrapper(Namespace(**kwargs))
+        if verbose > 1:
+            logger = open(f"{kwargs['log_folder']}/{PREFIX}.log", "w")
+            logger.write(str(kwargs) + "\n")
 
-    if kwargs["sampling"]:
-        model.fit_with_sampling(g, y_train, split, not inductive, verbose, y_test, logger)
-    else:
-        model.fit(g, y_train, split, not inductive, verbose, y_test, logger)
+        if kwargs["sampling"]:
+            model.fit_with_sampling(g, y_train, split, not inductive, verbose, y_test, logger)
+        else:
+            model.fit(g, y_train, split, not inductive, verbose, y_test, logger)
 
-    print(model.predict(g, np.arange(kwargs["TRAIN_SIZE"], kwargs["CELL_SIZE"]), device="cpu"))
-    print(model.score(g, np.arange(kwargs["TRAIN_SIZE"], kwargs["CELL_SIZE"]), y_test, device="cpu"))
+        print(model.predict(g, np.arange(kwargs["TRAIN_SIZE"], kwargs["CELL_SIZE"]), device="cpu"))
+        res = res.append(
+            {
+                'rmse': model.score(g, np.arange(kwargs["TRAIN_SIZE"], kwargs["CELL_SIZE"]), y_test, device="cpu"),
+                'seed': args.seed,
+                'subtask': args.subtask,
+                'method': 'scmogcn',
+            }, ignore_index=True)
+        args.seed = args.seed + 1
+    print(res)
 
 
 if __name__ == "__main__":
@@ -87,14 +99,14 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--log_folder", default="./logs")
     parser.add_argument("-m", "--model_folder", default="./models")
     parser.add_argument("-r", "--result_folder", default="./results")
-    parser.add_argument("-e", "--epoch", type=int, default=10000)
+    parser.add_argument("-e", "--epoch", type=int, default=15000)
     parser.add_argument("-nbf", "--no_batch_features", action="store_true")
     parser.add_argument("-npw", "--pathway", action="store_true")
     parser.add_argument("-res", "--residual", default="res_cat", choices=["none", "res_add", "res_cat"])
     parser.add_argument("-inres", "--initial_residual", action="store_true")
     parser.add_argument("-pwagg", "--pathway_aggregation", default="alpha",
                         choices=["sum", "attention", "two_gate", "one_gate", "alpha", "cat"])
-    parser.add_argument("-pwalpha", "--pathway_alpha", type=float, default=0.5)
+    parser.add_argument("-pwalpha", "--pathway_alpha", type=float, default=0.25)
     parser.add_argument("-nrc", "--no_readout_concatenate", action="store_true")
     parser.add_argument("-bs", "--batch_size", default=1000, type=int)
     parser.add_argument("-nm", "--normalization", default="group", choices=["batch", "layer", "group", "none"])
@@ -112,7 +124,7 @@ if __name__ == "__main__":
     parser.add_argument("-hid", "--hidden_size", type=int, default=48)
     parser.add_argument("-edd", "--edge_dropout", type=float, default=0.3)
     parser.add_argument("-mdd", "--model_dropout", type=float, default=0.2)
-    parser.add_argument("-es", "--early_stopping", type=int, default=0)
+    parser.add_argument("-es", "--early_stopping", type=int, default=200)
     parser.add_argument("-c", "--cpu", type=int, default=1)
     parser.add_argument("-or", "--output_relu", default="none", choices=["relu", "leaky_relu", "none"])
     parser.add_argument("-i", "--inductive", action="store_true")
@@ -120,12 +132,13 @@ if __name__ == "__main__":
     parser.add_argument("-ci", "--cell_init", default="none", choices=["none", "svd"])
     parser.add_argument("-bas", "--batch_seperation", action="store_true")
     parser.add_argument("-pwpath", "--pathway_path", default="./data/h.all.v7.4")
-    parser.add_argument("-seed", "--random_seed", type=int, default=777)
+    parser.add_argument("-seed", "--seed", type=int, default=1)
+    parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("-ws", "--weighted_sum", action="store_true")
     parser.add_argument("-samp", "--sampling", action="store_true")
     parser.add_argument("-ns", "--node_sampling_rate", type=float, default=0.5)
     parser.add_argument("-prep", "--preprocessing", default="none", choices=["none", "feature_selection", "svd"])
-    parser.add_argument("-lm", "--low_memory", type=bool, default=True)
+    parser.add_argument("-lm", "--low_memory", type=bool, default=False)
 
     args = parser.parse_args()
 
@@ -137,35 +150,35 @@ if __name__ == "__main__":
         args.sampling = True
         args.batch_size = 10000
         args.epoch = 10
-    elif args.subtask == "openproblems_bmmc_multiome_phase2_mod2":
-        args.preprocessing = "feature_selection"
-    elif args.subtask in ["openproblems_bmmc_cite_phase2_mod2", "openproblems_bmmc_multiome_phase2_rna"]:
-        args.sampling = True
-        args.edge_dropout = 0
 
     # Regular settings
+    if args.subtask in ["openproblems_bmmc_cite_phase2_mod2", "openproblems_bmmc_multiome_phase2_mod2"]:
+        args.preprocessing = "feature_selection"
+    elif args.subtask in ["openproblems_bmmc_multiome_phase2_rna"]:
+        args.preprocessing = 'svd'
     if args.subtask.find("rna") == -1:
         args.pathway = False
     if args.sampling:
         args.pathway = False
 
-    set_seed(args.random_seed)
     torch.set_num_threads(args.cpu)
 
     pipeline(**vars(args))
 """To reproduce scMoGCN on other samples, please refer to command lines belows:
+
 GEX to ADT (subset):
-python scmogcn.py --subtask oopenproblems_bmmc_cite_phase2_rna_subset --device cuda
+$ python scmogcn.py --subtask oopenproblems_bmmc_cite_phase2_rna_subset --device cuda
 
 GEX to ADT:
-python scmogcn.py --subtask oopenproblems_bmmc_cite_phase2_rna --device cuda
+$ python scmogcn.py --subtask oopenproblems_bmmc_cite_phase2_rna --device cuda -inres -sb -hid=256 -wd 1e-4 -pww 'cos' -es 200 -pwth 0.1 -ws -edd 0.4 -mdd 0.3
 
 ADT to GEX:
-python scmogcn.py --subtask openproblems_bmmc_cite_phase2_mod2 --device cuda
+$ python scmogcn.py --subtask openproblems_bmmc_cite_phase2_mod2 --device cuda -es 300
 
 GEX to ATAC:
-python scmogcn.py --subtask openproblems_bmmc_multiome_phase2_rna --device cuda
+$ python scmogcn.py --subtask openproblems_bmmc_multiome_phase2_rna --device cuda -es 300
 
 ATAC to GEX:
-python scmogcn.py --subtask openproblems_bmmc_multiome_phase2_mod2 --device cuda
+$ python scmogcn.py --subtask openproblems_bmmc_multiome_phase2_mod2 --device cuda -es 1000 -e 3000 -edd 0
+
 """

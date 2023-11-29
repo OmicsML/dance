@@ -152,6 +152,7 @@ class ACTINN(BaseClassificationMethod):
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.95)
 
         # Start training loop
+        global_steps = 0
         for epoch in range(num_epochs):
             epoch_seed = seed if seed is None else seed + epoch
             batches = self.random_batches(x_train, y_train, batch_size, epoch_seed)
@@ -165,7 +166,10 @@ class ACTINN(BaseClassificationMethod):
                 optimizer.zero_grad()
                 batch_cost.backward()
                 optimizer.step()
-                lr_scheduler.step()
+
+                global_steps += 1
+                if global_steps % 1000 == 0:
+                    lr_scheduler.step()
 
             if print_cost and (epoch % 10 == 0):
                 print(f"Epoch: {epoch:>4d} Loss: {tot_cost / tot_size:6.4f}")

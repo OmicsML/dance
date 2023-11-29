@@ -1,5 +1,7 @@
 import argparse
 
+import numpy as np
+
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdsc import ScDSC
 from dance.utils import set_seed
@@ -47,40 +49,63 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     args = parser.parse_args()
-    set_seed(args.seed)
+    aris = []
+    for seed in range(1, 21):
+        # for seed in range(1, 2):
+        # set_seed(args.seed)
+        set_seed(seed)
 
-    # Load data and perform necessary preprocessing
-    dataloader = ClusteringDataset(args.data_dir, args.dataset)
-    preprocessing_pipeline = ScDSC.preprocessing_pipeline(n_top_genes=args.nb_genes, n_neighbors=args.topk)
-    data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
+        # Load data and perform necessary preprocessing
+        dataloader = ClusteringDataset(args.data_dir, args.dataset)
+        preprocessing_pipeline = ScDSC.preprocessing_pipeline(n_top_genes=args.nb_genes, n_neighbors=args.topk)
+        data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
-    # inputs: adj, x, x_raw, n_counts
-    inputs, y = data.get_data(return_type="default")
-    args.n_input = inputs[1].shape[1]
+        # inputs: adj, x, x_raw, n_counts
+        inputs, y = data.get_data(return_type="default")
+        args.n_input = inputs[1].shape[1]
+        n_clusters = len(np.unique(y))
 
-    model = ScDSC(pretrain_path=f"scdsc_{args.dataset}_pre.pkl", sigma=args.sigma, n_enc_1=args.n_enc_1,
-                  n_enc_2=args.n_enc_2, n_enc_3=args.n_enc_3, n_dec_1=args.n_dec_1, n_dec_2=args.n_dec_2,
-                  n_dec_3=args.n_dec_3, n_z1=args.n_z1, n_z2=args.n_z2, n_z3=args.n_z3, n_clusters=args.n_clusters,
-                  n_input=args.n_input, v=args.v, device=args.device)
+        model = ScDSC(
+            pretrain_path=f"scdsc_{args.dataset}_pre.pkl",
+            sigma=args.sigma,
+            n_enc_1=args.n_enc_1,
+            n_enc_2=args.n_enc_2,
+            n_enc_3=args.n_enc_3,
+            n_dec_1=args.n_dec_1,
+            n_dec_2=args.n_dec_2,
+            n_dec_3=args.n_dec_3,
+            n_z1=args.n_z1,
+            n_z2=args.n_z2,
+            n_z3=args.n_z3,
+            n_clusters=n_clusters,  #args.n_clusters,
+            n_input=args.n_input,
+            v=args.v,
+            device=args.device)
 
-    # Build and train model
-    model.fit(inputs, y, lr=args.lr, epochs=args.epochs, bcl=args.binary_crossentropy_loss, cl=args.ce_loss,
-              rl=args.re_loss, zl=args.zinb_loss, pt_epochs=args.pretrain_epochs, pt_batch_size=args.batch_size,
-              pt_lr=args.pretrain_lr)
+        # Build and train model
+        model.fit(inputs, y, lr=args.lr, epochs=args.epochs, bcl=args.binary_crossentropy_loss, cl=args.ce_loss,
+                  rl=args.re_loss, zl=args.zinb_loss, pt_epochs=args.pretrain_epochs, pt_batch_size=args.batch_size,
+                  pt_lr=args.pretrain_lr)
 
-    # Evaluate model predictions
-    score = model.score(None, y)
-    print(f"{score=:.4f}")
+        # Evaluate model predictions
+        score = model.score(None, y)
+        print(f"{score=:.4f}")
+        aris.append(score)
+
+    print('scdsc')
+    print(args.dataset)
+    print(f'aris: {aris}')
+    print(f'aris: {np.mean(aris)} +/- {np.std(aris)}')
 """Reproduction information
 10X PBMC:
-python scdsc.py --dataset 10X_PBMC --method cosine --topk 30 --v 7 --binary_crossentropy_loss 0.75 --ce_loss 0.5 --re_loss 0.1 --zinb_loss 2.5 --sigma 0.4
+python scdsc.py --dataset 10X_PBMC --sigma 0.5 --topk 10 --pretrain_epochs 100 --v 3 --n_enc_1 1024 --n_enc_3 64 --n_dec_1 64 --n_z1 64
 
 Mouse Bladder:
-python scdsc.py --dataset mouse_bladder_cell --topk 50 --v 7 --binary_crossentropy_loss 2.5 --ce_loss 0.1 --re_loss 0.5 --zinb_loss 1.5 --sigma 0.6
+python scdsc.py --dataset mouse_bladder_cell --sigma 0.5 --topk 50 --pretrain_epochs 100 --v 7
 
 Mouse ES:
-python scdsc.py --dataset mouse_ES_cell --topk 50 --v 7 --binary_crossentropy_loss 0.1 --ce_loss 0.01 --re_loss 1.5 --zinb_loss 0.5 --sigma 0.1
+python scdsc.py --dataset mouse_ES_cell --sigma 0.1 --topk 10 --pretrain_epochs 50 --v 2
 
 Worm Neuron:
-python scdsc.py --dataset worm_neuron_cell --topk 20 --v 7 --binary_crossentropy_loss 2 --ce_loss 2 --re_loss 3 --zinb_loss 0.1 --sigma 0.4
+python scdsc.py --dataset worm_neuron_cell --sigma 0.5 --topk 10 --pretrain_epochs 100 --v 3 --n_enc_3 64 --n_dec_1 64 --n_z1 64 --n_z2 64
 """

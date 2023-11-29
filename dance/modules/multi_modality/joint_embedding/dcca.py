@@ -14,6 +14,7 @@ import os
 import time
 import warnings
 from collections import OrderedDict
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
@@ -618,6 +619,7 @@ class VAE(nn.Module):
                             test_like_max = test_loss.item()
                             reco_epoch_test = epoch
                             patience_epoch = 0
+                            best_dict = deepcopy(self.state_dict())
 
             if flag_break == 1:
                 print("containin NA")
@@ -636,6 +638,7 @@ class VAE(nn.Module):
                     break
 
         duration = time.time() - start
+        self.load_state_dict(best_dict)
 
         print('Finish training, total time is: ' + str(duration) + 's')
         self.eval()
@@ -823,7 +826,7 @@ class DCCA(nn.Module):
 
             used_cycle = used_cycle + 1
 
-    def score(self, dataloader):
+    def score(self, dataloader, metric='clustering'):
         """Score function to get score of prediction.
 
         Parameters
@@ -844,45 +847,50 @@ class DCCA(nn.Module):
 
         """
 
-        self.model1.eval()
-        self.model2.eval()
+        if metric == 'clustering':
+            self.model1.eval()
+            self.model2.eval()
 
-        with torch.no_grad():
+            with torch.no_grad():
 
-            kmeans1 = KMeans(n_clusters=self.args.cluster1, n_init=5, random_state=200)
-            kmeans2 = KMeans(n_clusters=self.args.cluster2, n_init=5, random_state=200)
+                kmeans1 = KMeans(n_clusters=self.args.cluster1, n_init=5, random_state=200)
+                kmeans2 = KMeans(n_clusters=self.args.cluster2, n_init=5, random_state=200)
 
-            latent_code_rna = []
-            latent_code_atac = []
+                latent_code_rna = []
+                latent_code_atac = []
 
-            for batch_idx, (X1, _, size_factor1, X2, _, size_factor2) in enumerate(dataloader):
+                for batch_idx, (X1, _, size_factor1, X2, _, size_factor2) in enumerate(dataloader):
 
-                X1, size_factor1 = X1.to(self.args.device), size_factor1.to(self.args.device)
-                X2, size_factor2 = X2.to(self.args.device), size_factor2.to(self.args.device)
+                    X1, size_factor1 = X1.to(self.args.device), size_factor1.to(self.args.device)
+                    X2, size_factor2 = X2.to(self.args.device), size_factor2.to(self.args.device)
 
-                X1, size_factor1 = Variable(X1), Variable(size_factor1)
-                X2, size_factor2 = Variable(X2), Variable(size_factor2)
+                    X1, size_factor1 = Variable(X1), Variable(size_factor1)
+                    X2, size_factor2 = Variable(X2), Variable(size_factor2)
 
-                result1 = self.model1.inference(X1, size_factor1)
-                result2 = self.model2.inference(X2, size_factor2)
+                    result1 = self.model1.inference(X1, size_factor1)
+                    result2 = self.model2.inference(X2, size_factor2)
 
-                latent_code_rna.append(result1["latent_z1"].data.cpu().numpy())
-                latent_code_atac.append(result2["latent_z1"].data.cpu().numpy())
+                    latent_code_rna.append(result1["latent_z1"].data.cpu().numpy())
+                    latent_code_atac.append(result2["latent_z1"].data.cpu().numpy())
 
-            latent_code_rna = np.concatenate(latent_code_rna)
-            latent_code_atac = np.concatenate(latent_code_atac)
+                latent_code_rna = np.concatenate(latent_code_rna)
+                latent_code_atac = np.concatenate(latent_code_atac)
 
-            pred_z1 = kmeans1.fit_predict(latent_code_rna)
-            NMI_score1 = round(normalized_mutual_info_score(self.ground_truth1, pred_z1, average_method='max'), 3)
-            ARI_score1 = round(metrics.adjusted_rand_score(self.ground_truth1, pred_z1), 3)
+                pred_z1 = kmeans1.fit_predict(latent_code_rna)
+                NMI_score1 = round(normalized_mutual_info_score(self.ground_truth1, pred_z1, average_method='max'), 3)
+                ARI_score1 = round(metrics.adjusted_rand_score(self.ground_truth1, pred_z1), 3)
 
-            pred_z2 = kmeans1.fit_predict(latent_code_atac)
-            NMI_score2 = round(normalized_mutual_info_score(self.ground_truth1, pred_z2, average_method='max'), 3)
-            ARI_score2 = round(metrics.adjusted_rand_score(self.ground_truth1, pred_z2), 3)
+                pred_z2 = kmeans1.fit_predict(latent_code_atac)
+                NMI_score2 = round(normalized_mutual_info_score(self.ground_truth1, pred_z2, average_method='max'), 3)
+                ARI_score2 = round(metrics.adjusted_rand_score(self.ground_truth1, pred_z2), 3)
 
-            print('scRNA-ARI: ' + str(ARI_score1) + ' NMI: ' + str(NMI_score1) + ' scEpigenomics-ARI: ' +
-                  str(ARI_score2) + ' NMI: ' + str(NMI_score2))
-            return NMI_score1, ARI_score1, NMI_score2, ARI_score2
+                print('scRNA-ARI: ' + str(ARI_score1) + ' NMI: ' + str(NMI_score1) + ' scEpigenomics-ARI: ' +
+                      str(ARI_score2) + ' NMI: ' + str(NMI_score2))
+                return NMI_score1, ARI_score1, NMI_score2, ARI_score2
+        elif metric == 'openproblems':
+            raise NotImplementedError
+        else:
+            raise NotImplementedError
 
     def _encodeBatch(self, total_loader):
         """Helper function to get latent representation, normalized representation and

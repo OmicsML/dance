@@ -32,58 +32,70 @@ if __name__ == "__main__":
     parser.add_argument("--ae_weight_file", default="AE_weights.pth.tar")
     parser.add_argument("--device", default="auto")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--z_dim", type=int, default=32)
+    parser.add_argument("--encodeLayer", type=int, nargs='+', default=[256, 64])
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     args = parser.parse_args()
-    set_seed(args.seed)
+    aris = []
+    for seed in range(1, 21):
+        # for seed in range(1, 2):
+        # set_seed(args.seed)
+        set_seed(seed)
 
-    # Load data and perform necessary preprocessing
-    dataloader = ClusteringDataset(args.data_dir, args.dataset)
-    preprocessing_pipeline = ScDCC.preprocessing_pipeline()
-    data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
+        # Load data and perform necessary preprocessing
+        dataloader = ClusteringDataset(args.data_dir, args.dataset)
+        preprocessing_pipeline = ScDCC.preprocessing_pipeline()
+        data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
-    # inputs: x, x_raw, n_counts
-    inputs, y = data.get_train_data()
-    n_clusters = len(np.unique(y))
-    in_dim = inputs[0].shape[1]
+        # inputs: x, x_raw, n_counts
+        inputs, y = data.get_train_data()
+        n_clusters = len(np.unique(y))
+        in_dim = inputs[0].shape[1]
 
-    # Generate random pairs
-    if not os.path.exists(args.label_cells_files):
-        indx = np.arange(len(y))
-        np.random.shuffle(indx)
-        label_cell_indx = indx[0:int(np.ceil(args.label_cells * len(y)))]
-    else:
-        label_cell_indx = np.loadtxt(args.label_cells_files, dtype=np.int)
+        # Generate random pairs
+        if not os.path.exists(args.label_cells_files):
+            indx = np.arange(len(y))
+            np.random.shuffle(indx)
+            label_cell_indx = indx[0:int(np.ceil(args.label_cells * len(y)))]
+        else:
+            label_cell_indx = np.loadtxt(args.label_cells_files, dtype=np.int)
 
-    if args.n_pairwise > 0:
-        ml_ind1, ml_ind2, cl_ind1, cl_ind2, error_num = generate_random_pair(y, label_cell_indx, args.n_pairwise,
-                                                                             args.n_pairwise_error)
-        print("Must link paris: %d" % ml_ind1.shape[0])
-        print("Cannot link paris: %d" % cl_ind1.shape[0])
-        print("Number of error pairs: %d" % error_num)
-    else:
-        ml_ind1, ml_ind2, cl_ind1, cl_ind2 = np.array([]), np.array([]), np.array([]), np.array([])
+        if args.n_pairwise > 0:
+            ml_ind1, ml_ind2, cl_ind1, cl_ind2, error_num = generate_random_pair(y, label_cell_indx, args.n_pairwise,
+                                                                                 args.n_pairwise_error)
+            print("Must link paris: %d" % ml_ind1.shape[0])
+            print("Cannot link paris: %d" % cl_ind1.shape[0])
+            print("Number of error pairs: %d" % error_num)
+        else:
+            ml_ind1, ml_ind2, cl_ind1, cl_ind2 = np.array([]), np.array([]), np.array([]), np.array([])
 
-    # Build and train moodel
-    model = ScDCC(input_dim=in_dim, z_dim=32, n_clusters=n_clusters, encodeLayer=[256, 64], decodeLayer=[64, 256],
-                  sigma=args.sigma, gamma=args.gamma, ml_weight=args.ml_weight, cl_weight=args.ml_weight,
-                  device=args.device, pretrain_path=f"scdcc_{args.dataset}_pre.pkl")
-    model.fit(inputs, y, lr=args.lr, batch_size=args.batch_size, epochs=args.epochs, ml_ind1=ml_ind1, ml_ind2=ml_ind2,
-              cl_ind1=cl_ind1, cl_ind2=cl_ind2, update_interval=args.update_interval, tol=args.tol,
-              pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
+        # Build and train moodel
+        model = ScDCC(input_dim=in_dim, z_dim=args.z_dim, n_clusters=n_clusters, encodeLayer=args.encodeLayer,
+                      decodeLayer=args.encodeLayer[::-1], sigma=args.sigma, gamma=args.gamma, ml_weight=args.ml_weight,
+                      cl_weight=args.ml_weight, device=args.device, pretrain_path=f"scdcc_{args.dataset}_pre.pkl")
+        model.fit(inputs, y, lr=args.lr, batch_size=args.batch_size, epochs=args.epochs, ml_ind1=ml_ind1,
+                  ml_ind2=ml_ind2, cl_ind1=cl_ind1, cl_ind2=cl_ind2, update_interval=args.update_interval, tol=args.tol,
+                  pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
 
-    # Evaluate model predictions
-    score = model.score(None, y)
-    print(f"{score=:.4f}")
+        # Evaluate model predictions
+        score = model.score(None, y)
+        print(f"{score=:.4f}")
+        aris.append(score)
+
+    print('scdcc')
+    print(args.dataset)
+    print(f'aris: {aris}')
+    print(f'aris: {np.mean(aris)} +/- {np.std(aris)}')
 """ Reproduction information
 10X PBMC:
-python scdcc.py --dataset 10X_PBMC --label_cells_files label_10X_PBMC.txt --gamma=1.5
+python scdcc.py --dataset 10X_PBMC --label_cells_files label_10X_PBMC.txt --pretrain_epochs 300 --epochs 100 --sigma 2 --n_pairwise 10000 --cache
 
 Mouse ES:
-python scdcc.py --dataset mouse_ES_cell --label_cells_files label_mouse_ES_cell.txt --gamma 1 --ml_weight 0.8 --cl_weight 0.8
+python scdcc.py --dataset mouse_ES_cell --label_cells_files label_mouse_ES_cell.txt --pretrain_epochs 300 --epochs 100 --sigma 1.75 --encodeLayer 512 256  --n_pairwise 10000 --cache
 
 Worm Neuron:
-python scdcc.py --dataset worm_neuron_cell --label_cells_files label_worm_neuron_cell.txt --gamma 1 --pretrain_epochs 300
+python scdcc.py --dataset worm_neuron_cell --label_cells_files label_worm_neuron_cell.txt --pretrain_epochs 300 --epochs 100 --n_pairwise 20000 --cache
 
 Mouse Bladder:
-python scdcc.py --dataset mouse_bladder_cell --label_cells_files label_mouse_bladder_cell.txt --gamma 1.5 --pretrain_epochs 100 --sigma 3
+python scdcc.py --dataset mouse_bladder_cell --label_cells_files label_mouse_bladder_cell.txt --pretrain_epochs 300 --epochs 100 --sigma 3.25 --n_pairwise 10000 --cache
 """

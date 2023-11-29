@@ -5,8 +5,8 @@ This code is based on https://github.com/NVlabs/MUNIT.
 """
 import argparse
 import os
-import random
 
+import pandas as pd
 import torch
 from sklearn import preprocessing
 
@@ -15,7 +15,6 @@ from dance.modules.multi_modality.match_modality.cmae import CMAE
 from dance.utils import set_seed
 
 if __name__ == "__main__":
-    rndseed = random.randint(0, 2147483647)
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_path", type=str, default="./match_modality/output", help="outputs path")
     parser.add_argument("-d", "--data_folder", default="./data/modality_matching")
@@ -23,7 +22,8 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2_rna")
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
-    parser.add_argument("-seed", "--rnd_seed", default=rndseed, type=int)
+    parser.add_argument("-seed", "--seed", default=1, type=int)
+    parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("-pk", "--pickle_suffix", default="_lsi_input_pca_count.pkl")
 
     parser.add_argument("--max_epochs", default=50, type=int, help="maximum number of training epochs")
@@ -47,20 +47,20 @@ if __name__ == "__main__":
     parser.add_argument("--supervise", default=1, type=float, help="fraction to supervise")
     parser.add_argument("--super_w", default=0.1, type=float, help="weight of supervision loss")
 
-    opts = parser.parse_args()
+    args = parser.parse_args()
 
-    torch.set_num_threads(opts.cpus)
-    rndseed = opts.rnd_seed
-    device = opts.device
+    torch.set_num_threads(args.cpus)
+    rndseed = args.seed
+    device = args.device
     set_seed(rndseed)
 
     # Setup logger and output folders
-    output_directory = os.path.join(opts.output_path, "outputs")
+    output_directory = os.path.join(args.output_path, "outputs")
     checkpoint_directory = os.path.join(output_directory, "checkpoints")
     os.makedirs(checkpoint_directory, exist_ok=True)
 
     # Preprocess and load data
-    dataset = ModalityMatchingDataset(opts.subtask, root=opts.data_folder, preprocess="feature_selection")
+    dataset = ModalityMatchingDataset(args.subtask, root=args.data_folder, preprocess="feature_selection")
     data = dataset.load_data()
 
     # Prepare extra batch features and set data configs
@@ -80,11 +80,11 @@ if __name__ == "__main__":
     y_test = y_test.float().to(device)
     labels = labels.long().to(device)
 
-    config = vars(opts)
+    config = vars(args)
     # Some Fixed Settings
     config["input_dim_a"] = data.mod["mod1"].shape[1]
     config["input_dim_b"] = data.mod["mod2"].shape[1]
-    config["resume"] = opts.resume
+    config["resume"] = args.resume
     config["num_of_classes"] = max(batch) + 1
     config["shared_layer"] = True
     config["gen"] = {
@@ -99,21 +99,31 @@ if __name__ == "__main__":
         "gan_type": "lsgan",
     }  # GAN loss [lsgan/nsgan]
 
-    model = CMAE(config)
-    model.to(device)
+    res = pd.DataFrame({'score': [], 'seed': [], 'subtask': [], 'method': []})
+    for k in range(args.runs):
+        set_seed(args.seed + k)
+        model = CMAE(config)
+        model.to(device)
 
-    model.fit(x_train, y_train, checkpoint_directory=checkpoint_directory)
-    print(model.predict(x_test, y_test))
-    print(model.score(x_test, y_test, labels))
+        model.fit(x_train, y_train, checkpoint_directory=checkpoint_directory)
+        print(model.predict(x_test, y_test))
+        res = res.append(
+            {
+                'score': model.score(x_test, y_test, labels),
+                'seed': k,
+                'subtask': args.subtask,
+                'method': 'cmae',
+            }, ignore_index=True)
+    print(res)
 """To reproduce CMAE on other samples, please refer to command lines belows:
 
 GEX-ADT (subset):
-python cmae.py --subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda
+$ python cmae.py --subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda
 
 GEX-ADT:
-python cmae.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda
+$ python cmae.py --subtask openproblems_bmmc_cite_phase2_rna --device cuda
 
 GEX-ATAC:
-python cmae.py --subtask openproblems_bmmc_multiome_phase2_rna --device cuda
+$ python cmae.py --subtask openproblems_bmmc_multiome_phase2_rna --device cuda
 
 """
