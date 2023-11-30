@@ -2,7 +2,8 @@ h5py==3.10.0
 igraph==0.10.8
 leidenalg==0.10.1
 mudata==0.2.3
-networkx==3.2.1
+networkx==3.1; python_version < "3.9"
+networkx==3.2.1; python_version >= "3.9"
 numba==0.58.0
 numpy==1.24.4; python_version < "3.9"
 numpy==1.25.2; python_version >= "3.9"
