@@ -600,7 +600,23 @@ class FilterGenesMarker(BaseTransform):
 
 
 class FilterGenesMarkerGini(BaseTransform):
+ """Select marker genes based on log fold-change.
+    https://rdrr.io/github/RubD/Giotto/man/findGiniMarkers_one_vs_all.html
+    Parameters
+    ----------
+    ct_profile_channel
+        Name of the ``.varm`` channel that contains the cell-topic profile which will be used to compute the log
+        fold-changes for each cell-topic (e.g., cell type).
+    ct_profile_detection_channel
+        Name of the ``.varm`` channel that contains the cell-topic profile nums which greater than some value which will be used to compute the log
+        fold-changes for each cell-topic (e.g., cell type).
+    subset
+        If set to :obj:`True`, then inplace subset the variables to only contain the markers.
+    label
+        If set, e.g., to :obj:`'marker'`, then save the marker indicator to the :obj:`.obs` column named as
+        :obj:`marker`.
 
+    """
     def __init__(
         self,
         *,
@@ -608,8 +624,6 @@ class FilterGenesMarkerGini(BaseTransform):
         ct_profile_detection_channel: str = "CellGiottoDetectionTopicProfile",
         subset: bool = True,
         label: Optional[str] = None,
-        threshold: float = 0.04,
-        eps: float = 1e-6,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -617,8 +631,6 @@ class FilterGenesMarkerGini(BaseTransform):
         self.ct_profile_detection_channel = ct_profile_detection_channel
         self.subset = subset
         self.label = label
-        self.threshold = threshold
-        self.eps = eps
 
     def __call__(
         self,
