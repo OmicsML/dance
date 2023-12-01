@@ -111,12 +111,14 @@ class CellSVD(BaseTransform):
 
 
 class CellReduction(BaseTransform):
-"""
-Provide Three methods of dimensionality reduction. https://github.com/xy-chen16/EnClaSC
- The following is the method：
+"""Provide Three methods of dimensionality reduction.
+
+https://github.com/xy-chen16/EnClaSC
+The following is the method：
 1EnClaSC
 2Seurat v3.0
 3scmap
+
 """
     _DISPLAY_ATTRS = ("n_components", )
 
