@@ -7,7 +7,13 @@ from dance.transforms.base import BaseTransform
 
 
 class RESEPTGraph(BaseTransform):
-
+"""
+https://www.biorxiv.org/content/10.1101/2021.07.08.451210v1.full
+Spatial transcriptomics data are converted as an RGB image by mapping a low dimensional embedding to color channels via a spatial retained graph neural network.
+This image represents various spatial contexts together with expression abundance faithfully, and it resists robustly to noises due to limitations of measuring technology.
+fiducial_diameter_fullres：diameter
+tissue_hires_scalef：scale
+"""
     def __init__(self, fiducial_diameter_fullres=144.56835055243283, tissue_hires_scalef=0.150015, **kwargs):
         super().__init__(**kwargs)
         self.fiducial_diameter_fullres = fiducial_diameter_fullres
