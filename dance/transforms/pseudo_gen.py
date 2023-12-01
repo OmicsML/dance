@@ -201,7 +201,10 @@ def get_ct_profile(
 
 
 class CellGiottoTopicProfile(BaseTransform):
-
+"""
+get the cell profile which greater than detection_threshold
+https://rubd.github.io/Giotto_site/reference/findGiniMarkers_one_vs_all.html
+"""
     def __init__(
         self,
         *,
