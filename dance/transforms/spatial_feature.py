@@ -117,12 +117,19 @@ class SMEFeature(BaseTransform):
 
 
 class SpatialIDEFeature(BaseTransform):
-    """
-    The SpatialDE model is based on the assumption of normally distributed residual noise and independent observations across cells. 
-    To meet these requirements with spatial expression count data, we identified two normalization steps (Supplementary Note 1). First, we use a variance-stabilizing transformation for negative-binomial-distributed data to satisfy the first
-    condition,known as Anscombe's transformation. Second, we noticed that generally the expression level of a given gene correlates with the total count in a cell or spatial location. To ensure that SpatialDE captures the spatial covariance for
-    each gene beyond this effect, we regress log total count values out from the Anscombe-transformed expression values before fitting the spatial models.
+    """The SpatialDE model is based on the assumption of normally distributed residual
+    noise and independent observations across cells.
+
+    To meet these requirements with spatial expression count data, we identified two
+    normalization steps (Supplementary Note 1). First, we use a variance-stabilizing
+    transformation for negative-binomial-distributed data to satisfy the first
+    condition,known as Anscombe's transformation. Second, we noticed that generally the
+    expression level of a given gene correlates with the total count in a cell or
+    spatial location. To ensure that SpatialDE captures the spatial covariance for each
+    gene beyond this effect, we regress log total count values out from the Anscombe-
+    transformed expression values before fitting the spatial models.
     https://www.nature.com/articles/nmeth.4636#Sec2
+
     """
 
     def __init__(self, channels: Sequence[Optional[str]] = (None, "spatial"),
