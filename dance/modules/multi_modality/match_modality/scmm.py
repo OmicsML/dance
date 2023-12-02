@@ -269,8 +269,7 @@ class ATAC(VAE):
 
     def forward(self, x):
         read_count = self.enc.read_count(x)
-        t1, t2 = self.enc(x)
-        self._qz_x_params = tuple([t1, t2])
+        self._qz_x_params = self.enc(x)
         qz_x = self.qz_x(*self._qz_x_params)
         zs = qz_x.rsample()
         r, p, g = self.dec(zs)
@@ -311,8 +310,7 @@ class Protein(VAE):
     def forward(self, x):
         read_count = self.enc.read_count(x)
         # self._qz_x_params = self.enc(x)
-        t1, t2 = self.enc(x)
-        self._qz_x_params = tuple([t1, t2])
+        self._qz_x_params = self.enc(x)
         qz_x = self.qz_x(*self._qz_x_params)
         zs = qz_x.rsample()
         r, _ = self.dec(zs)
@@ -356,8 +354,7 @@ class RNA(VAE):
     def forward(self, x):
         read_count = self.enc.read_count(x)
         # self._qz_x_params = self.enc(x)
-        t1, t2 = self.enc(x)
-        self._qz_x_params = tuple([t1, t2])
+        self._qz_x_params = self.enc(x)
         qz_x = self.qz_x(*self._qz_x_params)
         zs = qz_x.rsample()
         r, _ = self.dec(zs)
