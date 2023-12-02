@@ -46,13 +46,12 @@ if __name__ == "__main__":
     parser.add_argument("--re_loss", type=float, default=Balance_para[2])
     parser.add_argument("--zinb_loss", type=float, default=Balance_para[3])
     parser.add_argument("--sigma", type=float, default=Balance_para[4])
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
+    parser.add_argument("--num_runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     args = parser.parse_args()
     aris = []
-    for seed in range(1, 21):
-        # for seed in range(1, 2):
-        # set_seed(args.seed)
+    for seed in range(args.seed, args.seed + args.num_runs):
         set_seed(seed)
 
         # Load data and perform necessary preprocessing
