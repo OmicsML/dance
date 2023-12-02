@@ -569,7 +569,7 @@ class MMVAE(nn.Module):
                     if not os.path.exists('models'):
                         os.mkdir('models')
 
-    #                 torch.save(self.state_dict(), f'models/model_{self.params.rnd_seed}.pth')
+    #                 torch.save(self.state_dict(), f'models/model_{self.params.seed}.pth')
                     best_dict = deepcopy(self.state_dict())
 
                 if epoch % 10 == 0:
@@ -577,7 +577,7 @@ class MMVAE(nn.Module):
 
                 if epoch > start_early_stop and min(vals) != min(vals[-10:]):
                     print('Early stopped.')
-                    #                 self.load_state_dict(torch.load(f'models/model_{self.params.rnd_seed}.pth'))
+                    #                 self.load_state_dict(torch.load(f'models/model_{self.params.seed}.pth'))
                     break
         except:
             pass
