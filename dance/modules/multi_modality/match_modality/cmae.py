@@ -172,10 +172,7 @@ class VAEGen(nn.Module):
     def encode(self, images):
         hiddens = self.enc(images)
         device_index = hiddens.data.get_device()
-        if device_index < 0:
-            noise = Variable(torch.randn(hiddens.size()))
-        else:
-            noise = Variable(torch.randn(hiddens.size()).cuda(device_index))
+        noise=torch.randn_like((hiddens.size())
         return hiddens, noise
 
     def decode(self, hiddens):
