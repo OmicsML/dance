@@ -29,7 +29,7 @@ light_options_dict: Dict[str, Tuple[str, str]] = {
     "cell_type_annotation-svm-spleen": "--species mouse --tissue Spleen --train_dataset 1970 --test_dataset 1759",
     "clustering-graphsc-10X_PBMC": "--dataset 10X_PBMC --epochs 2",
     "clustering-scdcc-10X_PBMC": "--dataset 10X_PBMC --label_cells_files label_10X_PBMC.txt --gamma 1.5 --epochs 2 --pretrain_epochs 2",
-    "clustering-scdeepcluster-10X_PBMC": "--dataset 10X_PBMC --pretrain_epochs 2",
+    "clustering-scdeepcluster-10X_PBMC": "--dataset 10X_PBMC --pretrain_epochs 2 --epochs 2",
     "clustering-scdsc-10X_PBMC": "--dataset 10X_PBMC --method cosine --topk 30 --v 7 --binary_crossentropy_loss 0.75 --ce_loss 0.5 --re_loss 0.1 --zinb_loss 2.5 --sigma 0.4 --epochs 2 --pretrain_epochs 2",
     "clustering-sctag-10X_PBMC": "--pretrain_epochs 2 --epochs 2 --dataset 10X_PBMC --w_a 0.01 --w_x 3 --w_c 0.1 --dropout 0.5",
     "imputation-deepimpute-brain": "--train_dataset mouse_brain_data --filetype h5 --hidden_dim 200 --dropout 0.4 --n_epochs 2 --gpu 0",
