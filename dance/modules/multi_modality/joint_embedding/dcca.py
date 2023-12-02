@@ -164,8 +164,6 @@ class Encoder(nn.Module):
             h = self.fc1(x)
         else:
             h = x
-        for p in self.fc1.named_parameters():
-            pass
         mean_x = self.fc_means(h)
         logvar_x = self.fc_logvar(h)
         latent = self.reparametrize(mean_x, logvar_x)
