@@ -34,7 +34,7 @@ light_options_dict: Dict[str, Tuple[str, str]] = {
     "clustering-sctag-10X_PBMC": "--pretrain_epochs 2 --epochs 2 --dataset 10X_PBMC --w_a 0.01 --w_x 3 --w_c 0.1 --dropout 0.5",
     "imputation-deepimpute-brain": "--train_dataset mouse_brain_data --filetype h5 --hidden_dim 200 --dropout 0.4 --n_epochs 2 --gpu 0",
     "imputation-graphsci-brain": "--train_dataset mouse_brain_data --gpu 0 --n_epochs 2",
-    "imputation-scgnn-brain": "--train_dataset mouse_brain_data --Regu_epochs 2 --EM_epochs 2 --cluster_epochs 2 --GAEepochs 2 --gpu 0",
+    "imputation-scgnn2-brain": "--dataset mouse_brain_data --total_epoch 2 --feature_AE_epoch 2 2 --graph_AE_epoch 2 --cluster_AE_epoch 2 --GAEepochs 2",
     # Multi modality
     "joint_embedding-dcca-gex_adt": "--subtask openproblems_bmmc_cite_phase2 --device cuda --max_epoch 2 --max_iteration 10 --anneal_epoch 2 --epoch_per_test 2",
     "joint_embedding-jae-gex_adt": "--subtask openproblems_bmmc_cite_phase2 --device cuda",
@@ -99,8 +99,8 @@ full_options_dict: Dict[str, Tuple[str, str]] = {
     "imputation-deepimpute-embryo": "--train_dataset mouse_embryo_data --filetype gz --hidden_dim 200 --dropout 0.4",
     "imputation-graphsci-brain": "--train_dataset mouse_brain_data --gpu 0",
     "imputation-graphsci-embryo": "--train_dataset mouse_embryo_data --gpu 0",
-    "imputation-scgnn-brain": "--train_dataset mouse_brain_data --gpu 0",
-    "imputation-scgnn-embryo": "--train_dataset mouse_embryo_data --gpu 0",
+    "imputation-scgnn2-brain": "--dataset mouse_brain_data",
+    "imputation-scgnn2-embryo": "--dataset mouse_embryo_data",
     # Multi modality
     "joint_embedding-dcca-gex_adt": "--subtask openproblems_bmmc_cite_phase2 --device cuda",
     "joint_embedding-dcca-gex_atac": "--subtask openproblems_bmmc_multiome_phase2 --device cuda",
