@@ -104,7 +104,8 @@ def get_bipartite_matching_adjacency_matrix_mk3(raw_logits, threshold_quantile=0
         bipartite_matching_adjacency = np.zeros(raw_logits.shape)
         bipartite_matching_adjacency[np.arange(raw_logits.shape[0]), best_matches] = 1
     except:
-        bipartite_matching_adjacency = weights_sparse / np.sum(1, keepdims=True)
+        # bipartite_matching_adjacency = weights_sparse / np.sum(1, keepdims=True)
+        bipartite_matching_adjacency = weights_sparse.toarray()
     return bipartite_matching_adjacency
 
 
