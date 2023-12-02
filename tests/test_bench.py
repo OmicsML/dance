@@ -22,7 +22,7 @@ SKIP_LIST: List[str] = [
 light_options_dict: Dict[str, Tuple[str, str]] = {
     # {task}-{method}-{dataset}: {command_line_options}
     # Single modality
-    "cell_type_annotation-actinn-spleen": "--species mouse --tissue Spleen --train_dataset 1970 --test_dataset 1759 --lambd 0.0001 --device cuda --num_epochs 2 --runs 1",
+    "cell_type_annotation-actinn-spleen": "--species mouse --tissue Spleen --train_dataset 1970 --test_dataset 1759 --lambd 0.0001 --device cuda --num_epochs 2 --num_runs 1",
     "cell_type_annotation-celltypist-spleen": "--species mouse --tissue Kidney --train_dataset 4682 --test_dataset 203",
     "cell_type_annotation-scdeepsort-spleen": "--tissue Spleen --test_data 1759 --device cuda --n_epochs 2",
     "cell_type_annotation-singlecellnet-spleen": "--species mouse --tissue Spleen --train_dataset 1970 --test_dataset 1759",
