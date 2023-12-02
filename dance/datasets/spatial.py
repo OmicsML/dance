@@ -141,7 +141,7 @@ class SpatialLIBDDataset(BaseDataset):
         meta_df["label"] = list(map(label_classes.get, meta_df["ground_truth"]))
 
         logger.info(f"Loading image data from {image_path}")
-       
+
         img = cv2.imread(image_path)
         if (img == 0).all():
             with tifffile.TiffFile(image_path) as tif:
@@ -149,7 +149,7 @@ class SpatialLIBDDataset(BaseDataset):
         img = img.squeeze()
         if len(img.shape) == 2:
             img = np.stack([img, img, img], axis=2)
-        
+
         if img is None:
             logger.info(f"image doesn't exist,use louvain")
 
