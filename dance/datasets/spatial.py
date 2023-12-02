@@ -11,6 +11,7 @@ import scipy
 import tifffile
 from anndata import AnnData
 from matplotlib import pyplot as plt
+import h5py
 
 from dance import logger
 from dance.data import Data
@@ -114,9 +115,10 @@ class SpatialLIBDDataset(BaseDataset):
         meta_path = osp.join(self.data_dir, "cluster_labels.csv")
 
         logger.info(f"Loading expression data from {data_path}")
-        try:
+        f=h5py.File(data_path,"r")
+        if "matrix" in list(f.keys()):
             adata = sc.read_10x_h5(data_path)
-        except:
+        else:
             adata = sc.read_h5ad(data_path)
 
         logger.info(f"Loading spatial info from {spatial_path}")
