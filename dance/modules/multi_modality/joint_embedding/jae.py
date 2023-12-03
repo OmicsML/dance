@@ -131,7 +131,7 @@ class JAEWrapper:
                 best_dict = deepcopy(self.model.state_dict())
 
 
-#                 torch.save(self.model.state_dict(), f'models/model_joint_embedding_{self.args.rnd_seed}.pth')
+#                 torch.save(self.model.state_dict(), f'models/model_joint_embedding_{self.args.seed}.pth')
 
             if min(vals) != min(vals[-10:]):
                 print('Early stopped.')

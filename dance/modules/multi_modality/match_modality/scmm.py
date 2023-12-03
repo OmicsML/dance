@@ -562,7 +562,7 @@ class MMVAE(nn.Module):
             if vals[-1] == min(vals):
                 if not os.path.exists('models'):
                     os.mkdir('models')
-                torch.save(self.state_dict(), f'models/model_{self.params.rnd_seed}.pth')
+                torch.save(self.state_dict(), f'models/model_{self.params.seed}.pth')
                 best_dict = deepcopy(self.state_dict())
 
             if epoch % 10 == 0:

@@ -31,12 +31,12 @@ if __name__ == "__main__":
     parser.add_argument("--min_dist", default=0.5, type=float)
     parser.add_argument("--max_dist", default=20.0, type=float)
     parser.add_argument("--info_step", default=50, type=int)
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
+    parser.add_argument("--num_runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     args = parser.parse_args()
     aris = []
-    for seed in range(1, 21):
-        # set_seed(args.seed)
+    for seed in range(args.seed, args.seed + args.num_runs):
         set_seed(seed)
 
         # Load data and perform necessary preprocessing

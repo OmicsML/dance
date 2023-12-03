@@ -36,13 +36,12 @@ if __name__ == "__main__":
     parser.add_argument("-dd", "--data_dir", default="./data", type=str)
     parser.add_argument("-data", "--dataset", default="10X_PBMC",
                         choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
+    parser.add_argument("--num_runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     args = parser.parse_args()
     aris = []
-    for seed in range(1, 21):
-        # for seed in range(1, 2):
-        # set_seed(args.seed)
+    for seed in range(args.seed, args.seed + args.num_runs):
         set_seed(seed)
 
         # Load data and perform necessary preprocessing

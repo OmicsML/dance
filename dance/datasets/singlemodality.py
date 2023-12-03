@@ -302,6 +302,8 @@ class ImputationDataset(BaseDataset):
             "pbmc_data", "mouse_brain_data", "mouse_embryo_data", "human_stemcell_data", "human_breast_TGFb_data",
             "human_breast_Dox_data", "human_melanoma_data", "mouse_visual_data"
         ]
+        assert self.dataset in gene_class
+        class_name = self.dataset
 
         file_name = {
             "pbmc_data": "5k.zip?dl=0",
@@ -331,38 +333,30 @@ class ImputationDataset(BaseDataset):
             if not osp.exists(self.data_dir + "/train"):
                 os.system("mkdir " + self.data_dir + "/train")
 
-            for class_name in gene_class:
-                if self.dataset == gene_class:
-                    if not any(map(osp.exists, glob(osp.join(self.data_dir, "train", class_name,
-                                                             dl_files[class_name])))):
-                        os.system("mkdir " + self.data_dir + "/train/" + class_name)
-                        os.system("wget " + self.URL[class_name])  # assumes linux... mac needs to install
-                        os.system("unzip " + file_name[class_name])
-                        os.system("rm " + file_name[class_name])
-                        os.system("mv " + dl_files[class_name] + " " + self.data_dir + "/train/" + class_name + "/")
+            if not any(map(osp.exists, glob(osp.join(self.data_dir, "train", class_name, dl_files[class_name])))):
+                os.system("mkdir " + self.data_dir + "/train/" + class_name)
+                os.system("wget " + self.URL[class_name])  # assumes linux... mac needs to install
+                os.system("unzip " + file_name[class_name])
+                os.system("rm " + file_name[class_name])
+                os.system("mv " + dl_files[class_name] + " " + self.data_dir + "/train/" + class_name + "/")
             os.system("cp -r " + self.data_dir + "/train/ " + self.data_dir + "/test")
-        if sys.platform == 'win32':
+        else:
             if not osp.exists(self.data_dir):
                 os.system("mkdir " + self.data_dir)
             if not osp.exists(self.data_dir + "/train"):
                 os.mkdir(self.data_dir + "/train")
-            for class_name in gene_class:
-                if self.dataset == gene_class:
-                    if not any(map(osp.exists, glob(osp.join(self.data_dir, "train", class_name,
-                                                             dl_files[class_name])))):
-                        os.mkdir(self.data_dir + "/train/" + class_name)
-                        os.system("curl " + self.URL[class_name])
-                        os.system("tar -xf " + file_name[class_name])
-                        os.system("del -R " + file_name[class_name])
-                        os.system("move " + dl_files[class_name] + " " + self.data_dir + "/train/" + class_name + "/")
+
+            if not any(map(osp.exists, glob(osp.join(self.data_dir, "train", class_name, dl_files[class_name])))):
+                os.mkdir(self.data_dir + "/train/" + class_name)
+                os.system("curl " + self.URL[class_name])
+                os.system("tar -xf " + file_name[class_name])
+                os.system("del -R " + file_name[class_name])
+                os.system("move " + dl_files[class_name] + " " + self.data_dir + "/train/" + class_name + "/")
             os.system("copy /r " + self.data_dir + "/train/ " + self.data_dir + "/test")
 
     def is_complete(self):
         # check whether data is complete or not
-        check = [
-            self.data_dir + "/train",
-            self.data_dir + "/test",
-        ]
+        check = [osp.join(self.data_dir, i, self.dataset) for i in ("train", "test")]
 
         for i in check:
             if not osp.exists(i):

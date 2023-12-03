@@ -260,7 +260,7 @@ class ScMoGCNWrapper:
                 maxval = vals[-1]
                 if not os.path.exists('models'):
                     os.mkdir('models')
-                torch.save(self.model.state_dict(), f'models/model_{self.args.rnd_seed}.pth')
+                torch.save(self.model.state_dict(), f'models/model_{self.args.seed}.pth')
                 best_dict = deepcopy(self.model.state_dict())
                 weight_record = [wt[0].detach(), wt[1].detach()]
 

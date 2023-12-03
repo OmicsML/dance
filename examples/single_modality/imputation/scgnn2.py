@@ -32,8 +32,6 @@ if __name__ == "__main__":
         "--dropout_prob", type=float, default=0.1,
         help="(float, default 0.1) Probability that a non-zero value in the sc expression matrix will "
         "be set to zero. If this is set to 0, will not perform dropout or compute imputation error ")
-    parser.add_argument("--seed", type=int, default=1,
-                        help="(int, default 1) Seed for torch and numpy random generators")
     parser.add_argument("--total_epoch", type=int, default=31, help="(int, default 10) Total EM epochs")
     parser.add_argument("--ari_threshold", type=float, default=0.95, help="(float, default 0.95) The threshold for ari")
     parser.add_argument("--graph_change_threshold", type=float, default=0.01,
@@ -166,11 +164,12 @@ if __name__ == "__main__":
     parser.add_argument("--data_dir", type=str, default='data', help='test directory')
     parser.add_argument("--dataset", default='mouse_brain_data', type=str, help="dataset id")
     parser.add_argument("--train_size", type=float, default=0.9, help="proportion of training set")
+    parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
+    parser.add_argument("--num_runs", type=int, default=1, help="Number of repetitions")
 
     args = parser.parse_args()
-    # set_seed(args.seed)
     rmses = []
-    for seed in range(1, 21):
+    for seed in range(args.seed, args.seed + args.num_runs):
         set_seed(seed)
         logger.info(pformat(vars(args)))
 

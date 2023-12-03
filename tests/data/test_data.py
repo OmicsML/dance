@@ -101,7 +101,7 @@ def test_get_data(subtests):
         assert y_test.tolist() == [[2]]
 
         # Validation set not set
-        pytest.raises(KeyError, data.get_val_data)
+        pytest.raises(RuntimeError, data.get_val_data)
 
     with subtests.test("Multi feature"):
         data = Data(adata.copy(), train_size=2)

@@ -207,7 +207,7 @@ class ScMoGCNWrapper:
             if min(vals) == vals[-1]:
                 if not os.path.exists('models'):
                     os.mkdir('models')
-                torch.save(self.model.state_dict(), f'models/model_joint_embedding_{self.args.rnd_seed}.pth')
+                torch.save(self.model.state_dict(), f'models/model_joint_embedding_{self.args.seed}.pth')
                 weight_record = wt.detach()
                 best_dict = deepcopy(self.model.state_dict())
 
