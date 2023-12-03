@@ -483,9 +483,9 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
         "GSE140203_SKIN_atac2gex":
         "https://www.dropbox.com/scl/fi/xsmtygbyhh1otog7qg2i6/GSE140203_SKIN_atac2gex.zip?rlkey=4d3n1mtflrysryqxxnjad8uob&dl=1",
         "openproblems_2022_cite_gex2adt":
-        "https://www.dropbox.com/scl/fi/72im374cu0eqbjm7wuj0p/openproblems_2022_cite_gex2adt.zip?rlkey=qnj0emjx07z7z0eakv1qwgi7z&dl=1",
+        "https://www.dropbox.com/scl/fi/j3att18aems8ve8qhykeu/openproblems_2022_cite_gex2adt.zip?rlkey=i85wjp8iqkpxhbknywmwz8mz6&dl=1",
         "openproblems_2022_multi_atac2gex":
-        "https://www.dropbox.com/scl/fi/flxh0cou1z740dqk927dj/openproblems_2022_multi_atac2gex.zip?rlkey=78y8b7vg8ggn5904kmba4jg78&dl=1"
+        "https://www.dropbox.com/scl/fi/fcw493eef1kmegwh9dpq9/openproblems_2022_multi_atac2gex.zip?rlkey=sd0dxbb9iadj84f84ai5cm5q5&dl=1"
     }
     SUBTASK_NAME_MAP = {
         "adt": "openproblems_bmmc_cite_phase2",
