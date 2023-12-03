@@ -9,13 +9,10 @@ Iscience 24.5 (2021): 102393.
 
 """
 
-import time
 from pathlib import Path
 
-import dgl
 import dgl.nn as dglnn
 import numpy as np
-import pandas as pd
 import scanpy as sc
 import torch
 import torch.nn as nn
@@ -25,7 +22,7 @@ from dance.modules.base import BaseRegressionMethod
 from dance.transforms import (AnnDataTransform, CellwiseMaskData, Compose, FilterCellsScanpy, FilterGenesScanpy,
                               SaveRaw, SetConfig)
 from dance.transforms.graph import FeatureFeatureGraph
-from dance.typing import Any, List, LogLevel, Optional, Tuple
+from dance.typing import LogLevel
 
 
 def buildNetwork(layers, dropout=0., activation=nn.ReLU()):
@@ -259,6 +256,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.weight_decay = weight_decay
         self.optimizer = torch.optim.Adam(self.model_params, lr=lr, weight_decay=weight_decay)
 
+        self.save_model()  # NOTE: prevent non-existing model loading error
         for epoch in range(n_epochs):
             self.train(train_data_masked, train_data_raw, graph, train_mask, valid_mask, le, la, ke, ka)
             if not epoch:
