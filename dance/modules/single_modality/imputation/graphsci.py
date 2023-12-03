@@ -145,7 +145,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         super().__init__()
         self.dataset = dataset
         self.seed = seed
-        self.prj_path = Path(__file__).parent.resolve()
+        self.prj_path = Path().resolve()
         self.save_path = self.prj_path / "graphsci"
         if not self.save_path.exists():
             self.save_path.mkdir(parents=True)
