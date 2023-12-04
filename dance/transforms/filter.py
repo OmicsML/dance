@@ -600,8 +600,9 @@ class FilterGenesMarker(BaseTransform):
 
 
 class FilterGenesMarkerGini(BaseTransform):
- """Select marker genes based on log fold-change.
-    https://rdrr.io/github/RubD/Giotto/man/findGiniMarkers_one_vs_all.html
+ """Select marker genes based on log fold-change.Identify marker genes for all clusters in a one vs all manner based on gini detection and expression scores.
+    The Gini coefficient is the most common way of measuring inequality.
+    For more details, see the [findGiniMarkers_one_vs_all](https://rdrr.io/github/RubD/Giotto/man/findGiniMarkers_one_vs_all.html)
     Parameters
     ----------
     ct_profile_channel
