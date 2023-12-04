@@ -36,7 +36,7 @@ tissue_hires_scalef：scale
         X_transform[:, 2] = self.scale_to_RGB(X_transform[:, 2], 100)
         radius = int(0.5 * self.fiducial_diameter_fullres + 1)
         max_row = max_col = int(2000 / self.tissue_hires_scalef + 1)
-        high_img = self.save_transformed_RGB_to_image_and_csv(xy_pixel[:, 0], xy_pixel[:, 1], max_row, max_col,
+        high_img = self.transformed_RGB_to_image(xy_pixel[:, 0], xy_pixel[:, 1], max_row, max_col,
                                                               X_transform, plot_spot_radius=radius)
         data.data.uns[self.out] = high_img
         return data
