@@ -41,7 +41,7 @@ tissue_hires_scalef：scale
         data.data.uns[self.out] = high_img
         return data
 
-    def save_transformed_RGB_to_image_and_csv(
+    def transformed_RGB_to_image(
         self,
         spot_row_in_fullres,
         spot_col_in_fullres,
