@@ -22,13 +22,16 @@ def normalized_laplacian(adj_matrix):
 
 
 class SC3Feature(BaseTransform):
-"""
-SC3 computes a consensus matrix using the cluster-based similarity partitioning algorithm (CSPA)33. For each individual clustering result,a binary similarity matrix is constructed from the corresponding cell labels: if two cells belong to
-the same cluster, their similarity is 1; otherwise, the similarity is 0. A consensus matrix is calculated by averaging all similarity matrices of individual clusterings. To reduce computational time, if the length of the d range 
+"""SC3 computes a consensus matrix using the cluster-based similarity partitioning
+algorithm (CSPA)33.
+
+For each individual clustering result,a binary similarity matrix is constructed from the corresponding cell labels: if two cells belong to
+the same cluster, their similarity is 1; otherwise, the similarity is 0. A consensus matrix is calculated by averaging all similarity matrices of individual clusterings. To reduce computational time, if the length of the d range
 is more than 15, a random subset of 15 values selected uniformly from the d range is used.
 For more details,see the [SC3: consensus clustering of single-cell RNA-seq data](https://www.nature.com/articles/nmeth.4236#Sec2)
 n_cluster:the number of clusters in kmeans
 d:number of cells selected
+
 """
     def __init__(self, n_cluster: int = 3,d=None **kwargs):
         super().__init__(**kwargs)
