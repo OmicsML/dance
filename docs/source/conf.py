@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 project = 'dance'
 copyright = '2022, OmicsML'
 author = 'DANCE Team'
-release = '1.0.1'
+release = '1.1.0.dev'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
