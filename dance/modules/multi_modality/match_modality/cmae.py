@@ -588,6 +588,3 @@ class CMAE(nn.Module):
             if iterations >= hyperparameters['max_epochs']:
                 print('Finish training')
                 return self
-
-
-s
