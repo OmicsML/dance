@@ -179,8 +179,12 @@ class SpatialIDEFeature(BaseTransform):
 
 
 class TangramFeature(BaseTransform):
-"""Tangram needs to compute the cell density inside each voxel,and then cell density distributions are compared using Kullback-Leibler (KL) divergence, whereas geneexpression is assessed via cosine similarity.
+"""Tangram needs to compute the cell density inside each voxel,and then cell density
+distributions are compared using Kullback-Leibler (KL) divergence, whereas
+geneexpression is assessed via cosine similarity.
+
 For more details see[Deep learning and alignment of spatially-resolved whole transcriptomes of single cells in the mouse brain with Tangram](https://github.com/broadinstitute/Tangram)
+
 """
     def __init__(self, channel: Optional[str] = None, channel_type: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
