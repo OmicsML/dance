@@ -2,28 +2,32 @@ import dgl
 import dgl.nn as dglnn
 import torch
 from scipy.sparse import coo_matrix
-from torch.nn import functional as F
 
 from dance.transforms.base import BaseTransform
 from dance.utils.matrix import pairwise_distance
 
-dist_id_func=["euclidean_distance","pearson_distance","spearman_distance"]
-class FeatureFeatureGraph(BaseTransform):
 
-    def __init__(self, threshold: float = 0.3, *, normalize_edges: bool = True, dist_func="euclidean_distance",**kwargs):
+class FeatureFeatureGraph(BaseTransform):
+    """Feature-feature correlation graph."""
+
+    DIST_FUNC_ID = ["euclidean_distance", "pearson_distance", "spearman_distance"]
+
+    def __init__(self, threshold: float = 0.3, *, normalize_edges: bool = True, dist_func="euclidean_distance",
+                 **kwargs):
         super().__init__(**kwargs)
 
         self.threshold = threshold
         self.normalize_edges = normalize_edges
-        self.dist_func_id=dist_id_func.index(dist_func)
+        self.dist_func_id = self.DIST_FUNC_ID.index(dist_func)
+
     def __call__(self, data):
         feat = data.get_feature(return_type="torch")
 
         # Calculate correlation between features
-        #TODO get more distance options
+        # TODO: get more distance options
         corr = torch.from_numpy(pairwise_distance(feat.T.detach().numpy(), dist_func_id=self.dist_func_id))
-        corr_sub = F.threshold(corr, self.threshold, 0) - F.threshold(-corr, self.threshold, 0)
-        corr_coo = coo_matrix(corr_sub)
+        corr[-self.threshold < corr < self.threshold] = 0  # apply threashold
+        corr_coo = coo_matrix(corr)
 
         # Initialize graph
         graph_data = (torch.from_numpy(corr_coo.row).int(), torch.from_numpy(corr_coo.col).int())
