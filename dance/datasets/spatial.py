@@ -115,7 +115,7 @@ class SpatialLIBDDataset(BaseDataset):
         meta_path = osp.join(self.data_dir, "cluster_labels.csv")
 
         logger.info(f"Loading expression data from {data_path}")
-        f=h5py.File(data_path,"r")
+        f = h5py.File(data_path, "r")
         if "matrix" in list(f.keys()):
             adata = sc.read_10x_h5(data_path)
         else:
