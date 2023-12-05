@@ -25,7 +25,10 @@ class FeatureFeatureGraph(BaseTransform):
 
         # Calculate correlation between features
         # TODO: get more distance options
-        corr = torch.from_numpy(1/(pairwise_distance(feat.T.detach().numpy(), dist_func_id=self.dist_func_id)+1e-7))
+
+        dist_data=pairwise_distance(feat.T.detach().numpy(), dist_func_id=self.dist_func_id)
+        scaled_data = (dist_data - np.min(dist_data)) / (np.max(dist_data) - np.min(dist_data))
+        corr = torch.from_numpy(scaled_data)
         corr[-self.threshold < corr < self.threshold] = 0  # apply threashold
         corr_coo = coo_matrix(corr)
 
