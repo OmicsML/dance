@@ -1,5 +1,4 @@
 import logging
-from typing import Union
 
 import cv2
 import numpy as np
@@ -12,7 +11,7 @@ from tqdm import tqdm, trange
 
 from dance.data.base import Data
 from dance.transforms.base import BaseTransform
-from dance.typing import LogLevel, Optional, Sequence
+from dance.typing import Optional, Sequence
 from dance.utils.matrix import normalize
 
 
@@ -185,24 +184,29 @@ class TangramFeature(BaseTransform):
 
     Reference
     ---------
-    https://github.com/broadinstitute/Tangram
     https://www.nature.com/articles/s41592-021-01264-7
 
     """
 
-    def __init__(self, uniform_density=False,channel: Optional[str] = None, channel_type: Optional[str] = None, **kwargs):
+    def __init__(self, density_mode: str = "uniform", channel: Optional[str] = None, channel_type: Optional[str] = None,
+                 **kwargs):
         super().__init__(**kwargs)
         self.channel = channel
         self.channel_type = channel_type
-        self.uniform_density=uniform_density
+        self.density_mode = density_mode
 
     def __call__(self, data: Data) -> Data:
         x = data.get_feature(return_type="default", channel=self.channel, channel_type=self.channel_type)
-        if self.uniform_density:
-            data.data.obs["uniform_density"] = np.ones(x.shape[0]) / x.shape[0]
-            logging.info("uniform based density prior is calculated and saved in uniform_density obs.")
-        else:
+        if self.density_mode == "uniform":
+            logging.info("Calculating uniform based density prior.")
+            density = np.ones(x.shape[0]) / x.shape[0]
+        elif self.density_mode == "rna_count":
             # Calculate rna_count_based density prior as % of rna molecule count
+            logging.info("Calculating rna count based density prior.")
             rna_count_per_spot = np.array(x.sum(axis=1)).squeeze()
-            data.data.obs["rna_count_based_density"] = rna_count_per_spot / np.sum(rna_count_per_spot)
-            logging.info("rna count based density prior is calculated and saved in rna_count_based_density obs.")
+            density = rna_count_per_spot / np.sum(rna_count_per_spot)
+        else:
+            raise ValueError(f"Unknwon density mode {self.density_mode!r}, "
+                             "supported options are: 'uniform', 'rna_count'")
+        data.data.obs[self.out] = density
+        return data
