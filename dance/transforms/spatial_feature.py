@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import patsy
 import torch
-import torchvision as tv
 from sklearn.decomposition import PCA
 from tqdm import tqdm, trange
 
@@ -24,6 +23,8 @@ class MorphologyFeature(BaseTransform):
                  crop_size: int = 20, target_size: int = 299, device: str = "cpu",
                  channels: Sequence[str] = ("spatial_pixel", "image"), channel_types: Sequence[str] = ("obsm", "uns"),
                  **kwargs):
+        import torchvision as tv
+
         super().__init__(**kwargs)
 
         self.model_name = model_name
