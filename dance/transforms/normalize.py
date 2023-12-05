@@ -96,7 +96,7 @@ class ScaleFeature(BaseTransform):
             data.data.X[idx] = normalize(data.data.X[idx], mode=self.mode, axis=self.axis, eps=self.eps)
 
 
-class ScTransform2(BaseTransform):
+class ScTransformR(BaseTransform):
     """ScTransform normalization and variance stabiliation.
 
     Note
