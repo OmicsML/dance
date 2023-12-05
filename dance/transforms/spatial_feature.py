@@ -190,17 +190,19 @@ class TangramFeature(BaseTransform):
 
     """
 
-    def __init__(self, channel: Optional[str] = None, channel_type: Optional[str] = None, **kwargs):
+    def __init__(self, uniform_density=False,channel: Optional[str] = None, channel_type: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
         self.channel = channel
         self.channel_type = channel_type
+        self.uniform_density=uniform_density
 
     def __call__(self, data: Data) -> Data:
         x = data.get_feature(return_type="default", channel=self.channel, channel_type=self.channel_type)
-        data.data.obs["uniform_density"] = np.ones(x.shape[0]) / x.shape[0]
-        logging.info("uniform based density prior is calculated and saved in uniform_density obs.")
-
-        # Calculate rna_count_based density prior as % of rna molecule count
-        rna_count_per_spot = np.array(x.sum(axis=1)).squeeze()
-        data.data.obs["rna_count_based_density"] = rna_count_per_spot / np.sum(rna_count_per_spot)
-        logging.info("rna count based density prior is calculated and saved in rna_count_based_density obs.")
+        if self.uniform_density:
+            data.data.obs["uniform_density"] = np.ones(x.shape[0]) / x.shape[0]
+            logging.info("uniform based density prior is calculated and saved in uniform_density obs.")
+        else:
+            # Calculate rna_count_based density prior as % of rna molecule count
+            rna_count_per_spot = np.array(x.sum(axis=1)).squeeze()
+            data.data.obs["rna_count_based_density"] = rna_count_per_spot / np.sum(rna_count_per_spot)
+            logging.info("rna count based density prior is calculated and saved in rna_count_based_density obs.")
