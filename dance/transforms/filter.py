@@ -744,7 +744,7 @@ class FilterGenesMarkerGini(BaseTransform):
         ct_profile_df = data.get_feature(channel=self.ct_profile_channel, channel_type="varm", return_type="default")
         ct_profile_detection_df = data.get_feature(channel=self.ct_profile_detection_channel, channel_type="varm",
                                                    return_type="default")
-        cell_type_nums_df = data.get_feature(channel="cell_nums", channel_type="uns", return_type="default")
+        cell_type_nums_df = data.get_feature(channel="CellTypeNums", channel_type="uns", return_type="default")
 
         ct_profile = ct_profile_df.values
         ct_profile_detection = ct_profile_detection_df.values

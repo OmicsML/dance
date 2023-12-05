@@ -11,6 +11,7 @@ from dance.typing import Callable, Dict, List, Literal, Logger, Optional, Tuple,
 
 
 class PseudoMixture(BaseTransform):
+    """Pseudo mixture generation."""
 
     _DISPLAY_ATTRS = ("n_pseudo", "nc_min", "nc_max", "ct_select")
 
@@ -92,9 +93,11 @@ class PseudoMixture(BaseTransform):
         pseudo_data = Data(ad.AnnData(mix_x, obs=obs, var=data.data.var, obsm={"cell_type_portion": ct_portion_df}))
         data.append(pseudo_data, join="outer", mode="new_split", new_split_name=self.out_split_name,
                     label_batch=self.label_batch)
+        return data
 
 
 class CellTopicProfile(BaseTransform):
+    """Cell topic profile."""
 
     _DISPLAY_ATTRS = ("ct_select", "ct_key", "split_name", "method")
 
@@ -138,6 +141,7 @@ class CellTopicProfile(BaseTransform):
         ct_profile_df = pd.DataFrame(ct_profile, index=data.data.var_names, columns=ct_select)
 
         data.data.varm[self.out] = ct_profile_df
+        return data
 
 
 def get_agg_func(name: str, *, default: Optional[str] = None) -> Callable[[np.ndarray], np.ndarray]:
@@ -201,10 +205,14 @@ def get_ct_profile(
 
 
 class CellGiottoTopicProfile(BaseTransform):
-"""
-get the cell profile which greater than detection_threshold
-https://rubd.github.io/Giotto_site/reference/findGiniMarkers_one_vs_all.html
-"""
+    """Giotto cell topic profile.
+
+    Reference
+    ---------
+    https://rubd.github.io/Giotto_site/reference/findGiniMarkers_one_vs_all.html
+
+    """
+
     def __init__(
         self,
         *,
@@ -213,7 +221,7 @@ https://rubd.github.io/Giotto_site/reference/findGiniMarkers_one_vs_all.html
         split_name: Optional[str] = None,
         channel: Optional[str] = None,
         channel_type: str = "X",
-        detection_threshold=-1,
+        detection_threshold: float = -1,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -235,6 +243,7 @@ https://rubd.github.io/Giotto_site/reference/findGiniMarkers_one_vs_all.html
                                    logger=self.logger)
         ct_profile_df = pd.DataFrame(ct_profile, index=data.data.var_names, columns=ct_select)
         data.data.varm[self.out] = ct_profile_df
+        return data
 
 
 def get_cell_types(ct_select: Union[Literal["auto"], List[str]], annot: np.ndarray) -> List[str]:
@@ -247,6 +256,7 @@ def get_cell_types(ct_select: Union[Literal["auto"], List[str]], annot: np.ndarr
 
 
 class CellTypeNums(BaseTransform):
+    """Number of cell types."""
 
     def __init__(
         self,
@@ -270,7 +280,8 @@ class CellTypeNums(BaseTransform):
         for ct in ct_select:
             ct_index = np.where(annot == ct)[0]
             celltype_df.loc[ct] = len(ct_index)
-        data.data.uns["cell_nums"] = celltype_df
+        data.data.uns[self.out] = celltype_df
+        return data
 
 
 def get_giotto_dt(

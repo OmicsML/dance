@@ -117,17 +117,16 @@ class SMEFeature(BaseTransform):
 
 
 class SpatialIDEFeature(BaseTransform):
-    """The SpatialDE model is based on the assumption of normally distributed residual
-    noise and independent observations across cells.
+    """Spatial IDE feature.
 
-    To meet these requirements with spatial expression count data, we identified two
-    normalization steps (Supplementary Note 1). First, we use a variance-stabilizing
-    transformation for negative-binomial-distributed data to satisfy the first
-    condition,known as Anscombe's transformation. Second, we noticed that generally the
-    expression level of a given gene correlates with the total count in a cell or
-    spatial location. To ensure that SpatialDE captures the spatial covariance for each
-    gene beyond this effect, we regress log total count values out from the Anscombe-
-    transformed expression values before fitting the spatial models.
+    The SpatialDE model is based on the assumption of normally distributed residual noise and independent observations
+    across cells. There are two normalization steps:
+
+        1. Variance-stabilizing transformation for negative-binomial-distributed data (Anscombe's transformation).
+        2. Regress log total count values out from the Anscombe-transformed expression values.
+
+    Reference
+    ---------
     https://www.nature.com/articles/nmeth.4636#Sec2
 
     """
@@ -179,13 +178,18 @@ class SpatialIDEFeature(BaseTransform):
 
 
 class TangramFeature(BaseTransform):
-"""Tangram needs to compute the cell density inside each voxel,and then cell density
-distributions are compared using Kullback-Leibler (KL) divergence, whereas
-geneexpression is assessed via cosine similarity.
+    """Tangram spatial features.
 
-For more details see[Deep learning and alignment of spatially-resolved whole transcriptomes of single cells in the mouse brain with Tangram](https://github.com/broadinstitute/Tangram)
+    First, compute the cell density inside each voxel. Then, the cell density distributions are compared using
+    Kullback-Leibler (KL) divergence, whereas gene expression is assessed via cosine similarity.
 
-"""
+    Reference
+    ---------
+    https://github.com/broadinstitute/Tangram
+    https://www.nature.com/articles/s41592-021-01264-7
+
+    """
+
     def __init__(self, channel: Optional[str] = None, channel_type: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
         self.channel = channel
@@ -194,12 +198,9 @@ For more details see[Deep learning and alignment of spatially-resolved whole tra
     def __call__(self, data: Data) -> Data:
         x = data.get_feature(return_type="default", channel=self.channel, channel_type=self.channel_type)
         data.data.obs["uniform_density"] = np.ones(x.shape[0]) / x.shape[0]
-        logging.info(
-            f"uniform based density prior is calculated and saved in `obs``uniform_density` of the spatial Anndata.")
+        logging.info("uniform based density prior is calculated and saved in uniform_density obs.")
 
         # Calculate rna_count_based density prior as % of rna molecule count
         rna_count_per_spot = np.array(x.sum(axis=1)).squeeze()
         data.data.obs["rna_count_based_density"] = rna_count_per_spot / np.sum(rna_count_per_spot)
-        logging.info(
-            f"rna count based density prior is calculated and saved in `obs``rna_count_based_density` of the spatial Anndata."
-        )
+        logging.info("rna count based density prior is calculated and saved in rna_count_based_density obs.")
