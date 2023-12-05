@@ -1,11 +1,6 @@
-import math
-
 import numpy as np
 import pandas as pd
-from sklearn import linear_model
 from sklearn.decomposition import PCA, TruncatedSVD
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import PolynomialFeatures
 
 from dance.transforms.base import BaseTransform
 from dance.typing import Optional
@@ -59,6 +54,14 @@ class WeightedFeaturePCA(BaseTransform):
 
 
 class CellPCA(BaseTransform):
+    """Reduce cell feature matrix with PCA.
+
+    Parameters
+    ----------
+    n_components
+        Number of PCA components to use.
+
+    """
 
     _DISPLAY_ATTRS = ("n_components", )
 
@@ -85,6 +88,14 @@ class CellPCA(BaseTransform):
 
 
 class CellSVD(BaseTransform):
+    """Reduce cell feature matrix with SVD.
+
+    Parameters
+    ----------
+    n_components
+        Number of SVD components to take.
+
+    """
 
     _DISPLAY_ATTRS = ("n_components", )
 
@@ -107,104 +118,6 @@ class CellSVD(BaseTransform):
 
         data.data.obsm[self.out] = cell_feat
 
-        return data
-
-
-class CellReduction(BaseTransform):
-"""Provide Three methods of dimensionality reduction.
-
-https://github.com/xy-chen16/EnClaSC
-The following is the method：
-1EnClaSC
-2Seurat v3.0
-3scmap
-
-"""
-    _DISPLAY_ATTRS = ("n_components", )
-
-    def __init__(self, method: str, n_components: int = 400, *, channel: Optional[str] = None,
-                 mod: Optional[str] = None, **kwargs):
-        super().__init__(**kwargs)
-
-        self.n_components = n_components
-        self.channel = channel
-        self.mod = mod
-        self.method = method
-
-    def __call__(self, data):
-        feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod).T
-        if self.method == "Seurat":
-            data_original = np.exp(feat) - 1
-            data_train_mean = np.mean(data_original, 1)
-            data_train_var = np.var(data_original, 1)
-            data_train_mean_log = np.log(data_train_mean + 1)
-            data_train_var_log = np.log(data_train_var + 1)
-            ploy_reg = PolynomialFeatures(degree=2)
-            x_ = ploy_reg.fit_transform(data_train_mean_log.reshape(-1, 1))
-            regr2 = linear_model.LinearRegression()
-            regr2.fit(x_, data_train_var_log)
-            y_pred = regr2.predict(x_)
-            filter_scores = (data_train_var_log - y_pred).reshape(-1)
-            ind_romanov = np.argpartition(filter_scores, -self.n_components)[-self.n_components:].tolist()
-            filtered_data_train = feat[ind_romanov, :].T
-        elif self.method == "EnClaSc":
-            feature_number = len(feat)
-            zeisel_scores = np.zeros(feature_number) - 100
-            data_original = np.exp(feat) - 1
-            drop_feature = []
-            X1 = []
-            Y = []
-            X2 = []
-            feature_index_dict = []
-            for feature in data_original:
-                drop_feature.append(np.sum(feature == 0) / feature.shape[0])
-            data_train_mean = np.mean(data_original, 1)
-            for i in range(len(drop_feature)):
-                if (drop_feature[i] != 1 and drop_feature[i] != 0):
-                    feature_index_dict.append(i)
-                    Y.append(np.log(data_train_mean[i] + 1))
-                    X1.append(np.mean(feat[i, :]))
-                    X2.append(np.log(drop_feature[i]))
-            Y = np.array(Y).reshape(-1, 1)
-            X1 = np.array(X1).reshape(-1, 1)
-            X2 = np.array(X2).reshape(-1, 1)
-            lr = LinearRegression()
-            lr.fit(X2, Y)
-            predictions = lr.predict(X2)
-            residuals = (Y - predictions).reshape(-1) + (Y - X1).reshape(-1)
-            zeisel_scores[feature_index_dict] = residuals
-            ind_romanov = np.argpartition(zeisel_scores, -self.n_components)[-self.n_components:].tolist()
-            filtered_data_train = feat[ind_romanov, :].T
-        elif self.method == "scmap":
-            feature_number = len(feat)
-            romanov_scores = np.zeros(feature_number) - 100
-            data_original = np.exp(feat) - 1
-            data_original_mean = np.mean(data_original, 1)
-            drop_feature = []
-            for feature in data_original:
-                drop_feature.append(np.sum(feature == 0) / feature.shape[0])
-            feature_index_dict = []
-            train_E = []
-            train_D = []
-            for i in range(len(drop_feature)):
-                if (drop_feature[i] != 1 and drop_feature[i] != 0):
-                    feature_index_dict.append(i)
-                    train_E.append(data_original_mean[i])
-                    train_D.append(drop_feature[i])
-            train_E = np.array(train_E)
-            train_D = np.array(train_D)
-            train_E = np.log(train_E + 1).reshape(-1, 1) * math.log(2.7) / math.log(2)
-            train_D = np.log(100 * train_D).reshape(-1, 1) * math.log(2.7) / math.log(2)
-
-            lr = LinearRegression()
-            lr.fit(train_E, train_D)
-            predictions = lr.predict(train_E)
-            residuals = (train_D - predictions).reshape(-1)
-            #residuals = np.abs(residuals)
-            romanov_scores[feature_index_dict] = residuals
-            ind_romanov = np.argpartition(romanov_scores, -self.n_components)[-self.n_components:].tolist()
-            filtered_data_train = feat[ind_romanov, :].T
-        data.data.obsm[self.out] = filtered_data_train
         return data
 
 

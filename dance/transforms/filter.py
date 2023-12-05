@@ -1,3 +1,4 @@
+import warnings
 from abc import ABC
 from typing import get_args
 
@@ -7,7 +8,8 @@ import pandas as pd
 import scanpy as sc
 import scipy.sparse as sp
 from scipy.stats import rankdata
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import MinMaxScaler, PolynomialFeatures
 
 from dance import logger as default_logger
 from dance.exceptions import DevError
@@ -599,25 +601,126 @@ class FilterGenesMarker(BaseTransform):
             data.data._inplace_subset_var(marker_genes)
 
 
+class FilterGenesRegression(BaseTransform):
+    """Select genes based on regression.
+
+    Parameters
+    ----------
+    method
+        What regression based gene selection methtod to use. Supported options are: ``"enclasc"``, ``"seurat3"``, and
+        ``"scmap"``.
+    num_genes
+        Number of genes to select.
+
+    Note
+    ----
+    The implementation is adapted from the EnClaSC GitHub repo: https://github.com/xy-chen16/EnClaSC
+
+    Reference
+    ---------
+    https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-020-03679-z
+
+    """
+    _DISPLAY_ATTRS = ("num_genes", )
+
+    def __init__(self, method: str, num_genes: int = 400, *, channel: Optional[str] = None, mod: Optional[str] = None,
+                 skip_count_check: bool = False, **kwargs):
+        super().__init__(**kwargs)
+
+        self.num_genes = num_genes
+        self.channel = channel
+        self.mod = mod
+        self.method = method
+
+    def __call__(self, data):
+        feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod).T
+
+        if not self.skip_count_check and np.mod(feat, 1).sum():
+            warnings.warn("Expecting count data as input, but the input feature matrix does not appear to be count."
+                          "Please make sure the input is indeed a count matrix.")
+
+        func_dict = {"enclasc": self._filter_enclasc, "seurat3": self._filter_seurat3, "scmap": self._filter_scmap}
+        if (filter_func := func_dict.get(self.method)) is None:
+            raise ValueError(f"Unknown method {self.method}, supported options are: {list(func_dict)}.")
+
+        data.data.obsm[self.out] = filter_func(feat)
+        return data
+
+    def _filter_enclasc(feat: np.ndarray, num_genes: int, logger: Logger, no_check: bool = False) -> np.ndarray:
+        logger.info("Start generating cell features using EnClaSC")
+
+        num_feat = feat.shape[1]
+        scores = np.zeros(num_feat) - 100
+
+        feat_mean = feat.mean(0)
+        drop_feat = (feat == 0).mean(0)
+        select_index = 0 < drop_feat < 1
+
+        x1 = feat_mean[select_index].reshape(-1, 1)
+        x2 = feat_mean[select_index].reshape(-1, 1)
+        y = np.log(feat_mean + 1)[select_index].reshape(-1, 1)
+
+        y_pred = LinearRegression(x2, y).predict(x2)
+        scores[select_index] = (2 * y - y_pred - x1).ravel()
+        feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
+        return feat[:, feat_index]
+
+    def _filter_seurat3(feat: np.ndarray, num_genes: int, logger: Logger, no_check: bool = False) -> np.ndarray:
+        logger.info("Start generating cell features using Seurat v3.0")
+
+        feat_mean_log = np.log(feat.mean(0) + 1)
+        feat_var_log = np.log(feat.var(0) + 1)
+        x = PolynomialFeatures(degree=2).fit_transform(feat_mean_log.reshape(-1, 1))
+
+        y_pred = LinearRegression().fit(x, feat_var_log).predict(x)
+        scores = (feat_var_log - y_pred).ravel()
+        feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
+        return feat[:, feat_index]
+
+    def _filter_scmap(feat: np.ndarray, num_genes: int, logger: Logger, no_check: bool = False) -> np.ndarray:
+        logger.info("Start generating cell features using scmap")
+
+        num_feat = feat.shape[1]
+        scores = np.zeros(num_feat) - 100
+
+        feat_mean = feat.mean(0)
+        drop_feat = (feat == 0).mean(0).tolist()
+        select_index = 0 < drop_feat < 1
+
+        x = np.log(feat_mean[select_index] + 1).reshape(-1, 1) * np.log(2.7) / np.log(2)
+        y = np.log(drop_feat[select_index] * 100).reshape(-1, 1) * np.log(2.7) / np.log(2)
+
+        y_pred = LinearRegression().fit(x, y).y_pred(x)
+        scores[select_index] = (y - y_pred).ravel()
+        feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
+        return feat[:, feat_index]
+
+
 class FilterGenesMarkerGini(BaseTransform):
- """Select marker genes based on log fold-change.Identify marker genes for all clusters in a one vs all manner based on gini detection and expression scores.
-    The Gini coefficient is the most common way of measuring inequality.
-    For more details, see the [findGiniMarkers_one_vs_all](https://rdrr.io/github/RubD/Giotto/man/findGiniMarkers_one_vs_all.html)
+    """Select marker genes based on Gini coefficient.
+
+    Identfy marker genes for all clusters in a one vs all manner based on Gini coefficients, a measure for inequality.
+
     Parameters
     ----------
     ct_profile_channel
         Name of the ``.varm`` channel that contains the cell-topic profile which will be used to compute the log
         fold-changes for each cell-topic (e.g., cell type).
     ct_profile_detection_channel
-        Name of the ``.varm`` channel that contains the cell-topic profile nums which greater than some value which will be used to compute the log
-        fold-changes for each cell-topic (e.g., cell type).
+        Name of the ``.varm`` channel that contains the cell-topic profile nums which greater than some value which
+        will be used to compute the log fold-changes for each cell-topic (e.g., cell type).
     subset
         If set to :obj:`True`, then inplace subset the variables to only contain the markers.
     label
         If set, e.g., to :obj:`'marker'`, then save the marker indicator to the :obj:`.obs` column named as
         :obj:`marker`.
 
+    Reference
+    ---------
+    https://genomebiology.biomedcentral.com/articles/10.1186/s13059-016-1010-4?ref=https://githubhelp.com
+
     """
+
     def __init__(
         self,
         *,
@@ -642,14 +745,17 @@ class FilterGenesMarkerGini(BaseTransform):
         ct_profile_detection_df = data.get_feature(channel=self.ct_profile_detection_channel, channel_type="varm",
                                                    return_type="default")
         cell_type_nums_df = data.get_feature(channel="cell_nums", channel_type="uns", return_type="default")
+
         ct_profile = ct_profile_df.values
         ct_profile_detection = ct_profile_detection_df.values
         cell_types = ct_profile_df.columns.tolist()
         genes = ct_profile_df.index.tolist()
         marker_gene_ind_df = pd.DataFrame(False, index=genes, columns=cell_types)
+
         ans_gene = []
         if (num_cts := len(cell_types)) < 2:
             raise ValueError(f"Need at least two cell types to find marker genes, got {num_cts}:\n{cell_types}")
+
         for i, ct in enumerate(cell_types):
             other_ct_profile = np.zeros_like(ct_profile[:, i])
             other_detection_ct_profile = np.zeros_like(ct_profile[:, i])
@@ -676,9 +782,11 @@ class FilterGenesMarkerGini(BaseTransform):
                 logger.debug(f"{markers=}")
             else:
                 logger.info(f"No marker genes found for cell type {ct!r}")
-            # Combine all marker genes
+
+        # Combine all marker genes
         is_marker = marker_gene_ind_df.max(1)
         marker_genes = is_marker[is_marker].index.tolist()
+
         # Save marker gene info to data
         data.data.uns[self.out] = pd.concat(ans_gene, axis=0)
         if self.label is not None:
@@ -697,14 +805,14 @@ def get_marker_genes_giotto(group1, group2, group_detection_1, group_detection_2
     expressions = np.zeros((2, gene_nums))
     detections = np.zeros((2, gene_nums))
     gene_detection_rank_score = np.zeros((2, gene_nums))
-    scaler = MinMaxScaler(feature_range=(0.1, 1))  #inverse
+    scaler = MinMaxScaler(feature_range=(0.1, 1))  # inverse
     for i in range(gene_nums):
-        gene_gini_score[:, i] = [mygini_fun([group1[i], group2[i]])] * 2
+        gene_gini_score[:, i] = [gini_func([group1[i], group2[i]])] * 2
         expressions[:, i] = [group1[i], group2[i]]
-        gene_detection_gini_score[:, i] = [mygini_fun([group_detection_1[i], group_detection_2[i]])] * 2
+        gene_detection_gini_score[:, i] = [gini_func([group_detection_1[i], group_detection_2[i]])] * 2
         detections[:, i] = [group_detection_1[i], group_detection_2[i]]
 
-        gene_rank_score[:, i] = rankdata(np.array([group1[i], group2[i]]))  #inverse
+        gene_rank_score[:, i] = rankdata(np.array([group1[i], group2[i]]))  # inverse
         gene_detection_rank_score[:, i] = rankdata(np.array([group_detection_1[i], group_detection_2[i]]))
     gene_rank_score = scaler.fit_transform(gene_rank_score)
     gene_detection_rank_score = scaler.fit_transform(gene_detection_rank_score)
@@ -735,7 +843,7 @@ def get_marker_genes_giotto(group1, group2, group_detection_1, group_detection_2
     return top_genes_scores_filtered
 
 
-def mygini_fun(x, weights=None):
+def gini_func(x, weights=None):
     if weights is None:
         weights = np.ones(len(x))
     dataset = np.column_stack((x, weights))
