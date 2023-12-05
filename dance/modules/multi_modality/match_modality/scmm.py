@@ -10,6 +10,7 @@ data. Cell reports methods 1.5 (2021): 100071.
 """
 import math
 import os
+from copy import deepcopy
 
 import numpy as np
 import torch
@@ -566,7 +567,8 @@ class MMVAE(nn.Module):
             if vals[-1] == min(vals):
                 if not os.path.exists('models'):
                     os.mkdir('models')
-                torch.save(self.state_dict(), f'models/model_{self.params.rnd_seed}.pth')
+                torch.save(self.state_dict(), f'models/model_{self.params.seed}.pth')
+                best_dict = deepcopy(self.state_dict())
 
             if epoch % 10 == 0:
                 print('Valid Matching score:',
@@ -574,8 +576,8 @@ class MMVAE(nn.Module):
 
             if epoch > start_early_stop and min(vals) != min(vals[-10:]):
                 print('Early stopped.')
-                self.load_state_dict(torch.load(f'models/model_{self.params.rnd_seed}.pth'))
                 break
+        self.load_state_dict(best_dict)
 
     def score(self, mod1, mod2, labels=None, metric='minkowski'):
         """Score function to get score of prediction.

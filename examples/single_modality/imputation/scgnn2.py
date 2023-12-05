@@ -1,6 +1,7 @@
 import argparse
 from pprint import pformat
 
+import numpy as np
 import scanpy as sc
 
 from dance import logger
@@ -13,7 +14,6 @@ from dance.utils import set_seed
 if __name__ == "__main__":
     # Parse arguments
     parser = argparse.ArgumentParser(description="Main program for scGNN v2")
-    parser.add_argument("--dataset", default='mouse_brain_data', type=str, help="dataset id")
 
     # Program related
     parser.add_argument(
@@ -32,8 +32,6 @@ if __name__ == "__main__":
         "--dropout_prob", type=float, default=0.1,
         help="(float, default 0.1) Probability that a non-zero value in the sc expression matrix will "
         "be set to zero. If this is set to 0, will not perform dropout or compute imputation error ")
-    parser.add_argument("--seed", type=int, default=1,
-                        help="(int, default 1) Seed for torch and numpy random generators")
     parser.add_argument("--total_epoch", type=int, default=31, help="(int, default 10) Total EM epochs")
     parser.add_argument("--ari_threshold", type=float, default=0.95, help="(float, default 0.95) The threshold for ari")
     parser.add_argument("--graph_change_threshold", type=float, default=0.01,
@@ -163,39 +161,52 @@ if __name__ == "__main__":
                         help="(float, default 1e-2) learning rate")
     parser.add_argument("--deconv_tune_epoch", type=int, default=20, help="(int, default 20) epoch")
     parser.add_argument("--deconv_tune_epsilon", type=float, default=1e-4, help="(float, default) epsilon")
+    parser.add_argument("--data_dir", type=str, default='data', help='test directory')
+    parser.add_argument("--dataset", default='mouse_brain_data', type=str, help="dataset id")
+    parser.add_argument("--train_size", type=float, default=0.9, help="proportion of training set")
+    parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
+    parser.add_argument("--num_runs", type=int, default=1, help="Number of repetitions")
 
     args = parser.parse_args()
-    set_seed(args.seed)
-    logger.info(pformat(vars(args)))
+    rmses = []
+    for seed in range(args.seed, args.seed + args.num_runs):
+        set_seed(seed)
+        logger.info(pformat(vars(args)))
 
-    preprocessing_pipeline = Compose(
-        FilterGenesScanpy(min_cells=0.01),
-        FilterCellsScanpy(min_genes=0.01),
-        FilterGenesTopK(num_genes=2000, mode="var"),
-        CellwiseMaskData(),
-        AnnDataTransform(sc.pp.log1p),
-        log_level="INFO",
-    )
-    dataloader = ImputationDataset(data_dir="tmp_data", dataset="mouse_embryo_data")
-    data = dataloader.load_data(transform=preprocessing_pipeline)
+        preprocessing_pipeline = Compose(
+            FilterGenesScanpy(min_cells=0.01),
+            FilterCellsScanpy(min_genes=0.01),
+            # FilterGenesTopK(num_genes=2000, mode="var"),
+            CellwiseMaskData(),
+            AnnDataTransform(sc.pp.log1p),
+            log_level="INFO",
+        )
+        dataloader = ImputationDataset(data_dir=args.data_dir, dataset=args.dataset, train_size=args.train_size)
+        data = dataloader.load_data(transform=preprocessing_pipeline)
 
-    x_train = data.data.X.A * data.data.layers["train_mask"]
-    test_mask = data.data.layers["valid_mask"]
+        x_train = data.data.X.A * data.data.layers["train_mask"]
+        test_mask = data.data.layers["valid_mask"]
 
-    model = ScGNN2(args)
+        model = ScGNN2(args)
 
-    model.fit(x_train)
-    test_mse = ((data.data.X.A[test_mask] - model.predict()[test_mask])**2).mean()
-    print(f"MSE: {test_mse:.4f}")
+        model.fit(x_train)
+        test_mse = ((data.data.X.A[test_mask] - model.predict()[test_mask])**2).mean()
+        print(f"MSE: {test_mse:.4f}, RMSE: {np.sqrt(test_mse):.4f}")
+        rmses.append(np.sqrt(test_mse))
+
+    print('scgnn')
+    print(args.dataset)
+    print(f'rmses: {rmses}')
+    print(f'rmses: {np.mean(rmses)} +/- {np.std(rmses)}')
 """
 
 Mouse Brain
-$ python scgnn2.py --dataset mouse_brain_data --feature_AE_epoch 20 10 --cluster_AE_epoch 20 --total_epoch 2
+CUDA_VISIBLE_DEVICES=1 python scgnn2.py --dataset mouse_brain_data --feature_AE_epoch 20 10 --cluster_AE_epoch 20 --total_epoch 2
 
 Mouse Embryo
-$ python scgnn2.py --dataset mouse_embryo_data --feature_AE_epoch 20 10 --cluster_AE_epoch 20 --total_epoch 2
+CUDA_VISIBLE_DEVICES=1 python scgnn2.py --dataset mouse_embryo_data --feature_AE_epoch 20 10 --cluster_AE_epoch 20 --total_epoch 2
 
 PBMC
-$ python scgnn2.py --dataset pbmc_data --feature_AE_epoch 20 10 --cluster_AE_epoch 20 --total_epoch 2
+CUDA_VISIBLE_DEVICES=6 python scgnn2.py --dataset pbmc_data --feature_AE_epoch 20 10 --cluster_AE_epoch 20 --total_epoch 2
 
 """

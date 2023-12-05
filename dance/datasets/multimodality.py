@@ -376,6 +376,8 @@ class ModalityMatchingDataset(MultiModalityDataset):
 
     def _raw_to_dance(self, raw_data):
         train_mod1, train_mod2, train_label, test_mod1, test_mod2, test_label = self._maybe_preprocess(raw_data)
+        # Align matched cells
+        train_mod2 = train_mod2[train_label.to_df().values.argmax(1)]
 
         mod1 = ad.concat((train_mod1, test_mod1))
         mod2 = ad.concat((train_mod2, test_mod2))
@@ -384,8 +386,6 @@ class ModalityMatchingDataset(MultiModalityDataset):
         mod2.obs_names = mod1.obs_names
         train_size = train_mod1.shape[0]
 
-        # Align matched cells
-        train_mod2 = train_mod2[train_label.to_df().values.argmax(1)]
         mod1.obsm["labels"] = np.concatenate([np.zeros(train_size), np.argmax(test_label.X.toarray(), 1)])
 
         # Combine modalities into mudata
@@ -428,7 +428,8 @@ class ModalityMatchingDataset(MultiModalityDataset):
                     m2_train = lsi_transformer_atac.fit_transform(modalities[1]).values
                     m2_test = lsi_transformer_atac.transform(modalities[3]).values
 
-                elif self.subtask in ("GSE117089_mouse_gex2atac","GSE117089_sciCAR_gex2atac","GSE127064_AdBrain_gex2atac","GSE127064_p0Brain_gex2atac"):
+                elif self.subtask in ("GSE117089_mouse_gex2atac", "GSE117089_sciCAR_gex2atac",
+                                      "GSE127064_AdBrain_gex2atac", "GSE127064_p0Brain_gex2atac"):
                     lsi_transformer_gex = lsiTransformer(n_components=256, drop_first=True)
                     m1_train = lsi_transformer_gex.fit_transform(modalities[0]).values
                     m1_test = lsi_transformer_gex.transform(modalities[2]).values

@@ -123,7 +123,7 @@ class ScDeepSort(BaseClassificationMethod):
         self.device = device
 
         self.postfix = time.strftime("%d_%m_%Y") + "_" + time.strftime("%H:%M:%S")
-        self.prj_path = Path(__file__).resolve().parents[4]
+        self.prj_path = Path().resolve()
         self.save_path = (self.prj_path / "saved_models" / "single_modality" / "cell_type_annotation" / "pretrained" /
                           self.species / "models")
 

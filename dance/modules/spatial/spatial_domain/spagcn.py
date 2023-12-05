@@ -486,9 +486,10 @@ class SpaGCN(BaseClusteringMethod):
 
     """
 
-    def __init__(self, l=None):
+    def __init__(self, l=None, device="cpu"):
         self.l = l
         self.res = None
+        self.device = device
 
     @staticmethod
     def preprocessing_pipeline(alpha: float = 1, beta: int = 49, dim: int = 50, log_level: LogLevel = "INFO"):
@@ -636,7 +637,7 @@ class SpaGCN(BaseClusteringMethod):
         if self.l is None:
             raise ValueError("l should be set before fitting the model!")
 
-        self.model = SimpleGCDEC(embed.shape[1], embed.shape[1])
+        self.model = SimpleGCDEC(embed.shape[1], embed.shape[1], device=self.device)
         adj_exp = self.calc_adj_exp(adj)
         self.model.fit(embed, adj_exp, lr=self.lr, epochs=self.epochs, weight_decay=self.weight_decay, opt=self.opt,
                        init_spa=self.init_spa, init=self.init, n_neighbors=self.n_neighbors, n_clusters=self.n_clusters,

@@ -483,7 +483,7 @@ class ScMoGCNWrapper:
             if min(vals) == vals[-1]:
                 if not os.path.exists('models'):
                     os.mkdir('models')
-                torch.save(self.model.state_dict(), f'models/model_joint_embedding_{self.args.rnd_seed}.pth')
+                torch.save(self.model.state_dict(), f'models/model_joint_embedding_{self.args.seed}.pth')
 
             if epoch > self.args.early_stopping and min(vals) != min(vals[-self.args.early_stopping:]):
                 print('Early stopped.')
@@ -1091,7 +1091,7 @@ class ScMoGCNWrapper:
             if min(vals) == vals[-1]:
                 if not os.path.exists('models'):
                     os.mkdir('models')
-                torch.save(self.model.state_dict(), f'models/model_joint_embedding_{self.args.rnd_seed}.pth')
+                torch.save(self.model.state_dict(), f'models/model_joint_embedding_{self.args.seed}.pth')
 
             if epoch > self.args.early_stopping and min(vals) != min(vals[-self.args.early_stopping:]):
                 print('Early stopped.')

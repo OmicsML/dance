@@ -6,6 +6,7 @@ Wen, Hongzhi, et al. "Graph Neural Networks for Multimodal Single-Cell Data Inte
 
 """
 import os
+from copy import deepcopy
 
 import dgl.nn.pytorch as dglnn
 import numpy as np
@@ -19,6 +20,7 @@ from torch.utils.data import DataLoader
 
 from dance import logger
 from dance.utils import SimpleIndexDataset
+from dance.utils.metrics import *
 
 
 def propagation_layer_combination(X, idx, wt, from_logits=True):
@@ -205,14 +207,17 @@ class ScMoGCNWrapper:
             if min(vals) == vals[-1]:
                 if not os.path.exists('models'):
                     os.mkdir('models')
-                torch.save(self.model.state_dict(), f'models/model_joint_embedding_{self.args.rnd_seed}.pth')
+                torch.save(self.model.state_dict(), f'models/model_joint_embedding_{self.args.seed}.pth')
                 weight_record = wt.detach()
+                best_dict = deepcopy(self.model.state_dict())
 
             if min(vals) != min(vals[-10:]):
+                print('Early stopped.')
                 break
 
         self.wt = weight_record
         self.fitted = True
+        self.model.load_state_dict(best_dict)
 
     def to(self, device):
         """Performs device conversion.
@@ -280,9 +285,9 @@ class ScMoGCNWrapper:
         with torch.no_grad():
             X = propagation_layer_combination(inputs, idx, wt)
 
-        return self.model.encoder(X)
+            return self.model.encoder(X)
 
-    def score(self, idx, cell_type, phase_score=None, metric='loss'):
+    def score(self, idx, cell_type, phase_score=None, adata_sol=None, metric='loss'):
         """Score function to get score of prediction.
 
         Parameters
@@ -324,7 +329,7 @@ class ScMoGCNWrapper:
                 loss4 = mse(output[3], phase_score[idx]).item()
 
                 return loss1, loss2, loss3, loss4
-            else:
+            elif metric == 'clustering':
                 emb = self.predict(idx).cpu().numpy()
                 kmeans = KMeans(n_clusters=10, n_init=5, random_state=200)
 
@@ -336,7 +341,14 @@ class ScMoGCNWrapper:
                 ARI_score = round(adjusted_rand_score(true_labels, pred_labels), 3)
 
                 # print('ARI: ' + str(ARI_score) + ' NMI: ' + str(NMI_score))
-                return NMI_score, ARI_score
+                return {'dance_nmi': NMI_score, 'dance_ari': ARI_score}
+            elif metric == 'openproblems':
+                emb = self.predict(idx).cpu().numpy()
+                assert adata_sol, 'adata_sol is required by `openproblems` evaluation but not provided.'
+                adata_sol.obsm['X_emb'] = emb
+                return integration_openproblems_evaluate(adata_sol)
+            else:
+                raise NotImplementedError
 
 
 class ScMoGCN(nn.Module):

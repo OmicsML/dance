@@ -9,6 +9,7 @@ multiomic profiles at single-cell resolution." Proceedings of the National Acade
 
 """
 import math
+from copy import deepcopy
 from typing import Callable, List, Tuple, Union
 
 import torch
@@ -723,7 +724,7 @@ class BabelWrapper:
             final_activations1=nn.ReLU(),
             final_activations2=nn.ReLU(),
             flat_mode=True,
-            seed=args.rnd_seed,
+            seed=args.seed,
         ).to(args.device)
 
     def to(self, device):
@@ -850,8 +851,9 @@ class BabelWrapper:
             print('validation (prediction loss):', val[-1])
 
             if min(val) == val[-1]:
-                torch.save(self.model.state_dict(), f'{self.args.outdir}/BABEL_best_{self.args.rnd_seed}.pth')
+                torch.save(self.model.state_dict(), f'{self.args.outdir}/BABEL_best_{self.args.seed}.pth')
+                best_dict = deepcopy(self.model.state_dict())
             if i > self.args.earlystop and min(val) != min(val[-self.args.earlystop:]):
                 print('Early stopped.')
-                self.model.load_state_dict(torch.load(f'{self.args.outdir}/BABEL_best_{self.args.rnd_seed}.pth'))
                 break
+        self.model.load_state_dict(best_dict)

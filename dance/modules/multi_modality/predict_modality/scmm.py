@@ -9,6 +9,7 @@ Minoura, Kodai, et al. "A mixture-of-experts deep generative model for integrate
 """
 import math
 import os
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
@@ -538,44 +539,50 @@ class MMVAE(nn.Module):
         vals = []
         tr = []
 
-        for epoch in range(1, self.params.epochs + 1):
-            self.train()
-            b_loss = 0
-            for i, batch_idx in enumerate(train_loader):
-                dataT = (train_mod1[batch_idx], train_mod2[batch_idx])
-                beta = (epoch - 1) / start_early_stop if epoch <= start_early_stop else 1
-                if dataT[0].size()[0] == 1:
-                    continue
-                # data = [d.to(self.paradevice) for d in dataT]  # multimodal
-                data = dataT
-                optimizer.zero_grad()
-                loss = -objective(self, data, beta)
-                loss.backward()
-                optimizer.step()
-                b_loss += loss.item()
-                if self.params.print_freq > 0 and i % self.params.print_freq == 0:
-                    print("iteration {:04d}: loss: {:6.3f}".format(i, loss.item() / self.params.batch_size))
-            tr.append(b_loss / len(train_loader.dataset))
-            print('====> Epoch: {:03d} Train loss: {:.4f}'.format(epoch, tr[-1]))
+        try:
+            for epoch in range(1, self.params.epochs + 1):
+                self.train()
+                b_loss = 0
+                for i, batch_idx in enumerate(train_loader):
+                    dataT = (train_mod1[batch_idx], train_mod2[batch_idx])
+                    beta = (epoch - 1) / start_early_stop if epoch <= start_early_stop else 1
+                    if dataT[0].size()[0] == 1:
+                        continue
+                    # data = [d.to(self.paradevice) for d in dataT]  # multimodal
+                    data = dataT
+                    optimizer.zero_grad()
+                    loss = -objective(self, data, beta)
+                    loss.backward()
+                    optimizer.step()
+                    b_loss += loss.item()
+                    if self.params.print_freq > 0 and i % self.params.print_freq == 0:
+                        print("iteration {:04d}: loss: {:6.3f}".format(i, loss.item() / self.params.batch_size))
+                tr.append(b_loss / len(train_loader.dataset))
+                print('====> Epoch: {:03d} Train loss: {:.4f}'.format(epoch, tr[-1]))
 
-            if torch.isnan(torch.tensor([b_loss])):
-                break
+                if torch.isnan(torch.tensor([b_loss])):
+                    break
 
-            vals.append(self.score(train_mod1[val_idx], train_mod2[val_idx], metric='loss'))
-            print('====>             Valid loss: {:.4f}'.format(vals[-1]))
+                vals.append(self.score(train_mod1[val_idx], train_mod2[val_idx], metric='loss'))
+                print('====>             Valid loss: {:.4f}'.format(vals[-1]))
 
-            if vals[-1] == min(vals):
-                if not os.path.exists('models'):
-                    os.mkdir('models')
-                torch.save(self.state_dict(), f'models/model_{self.params.rnd_seed}.pth')
+                if vals[-1] == min(vals):
+                    if not os.path.exists('models'):
+                        os.mkdir('models')
 
-            if epoch % 10 == 0:
-                print('Valid RMSELoss:', self.score(train_mod1[val_idx], train_mod2[val_idx]))
+    #                 torch.save(self.state_dict(), f'models/model_{self.params.seed}.pth')
+                    best_dict = deepcopy(self.state_dict())
 
-            if epoch > start_early_stop and min(vals) != min(vals[-10:]):
-                print('Early stopped.')
-                self.load_state_dict(torch.load(f'models/model_{self.params.rnd_seed}.pth'))
-                break
+                if epoch % 10 == 0:
+                    print('Valid RMSELoss:', self.score(train_mod1[val_idx], train_mod2[val_idx]))
+
+                if epoch > start_early_stop and min(vals) != min(vals[-10:]):
+                    print('Early stopped.')
+                    #                 self.load_state_dict(torch.load(f'models/model_{self.params.seed}.pth'))
+                    break
+        except:
+            pass
+        self.load_state_dict(best_dict)
 
     def score(self, X, Y, metric='rmse'):
         """Score function to get score of prediction.
