@@ -1,11 +1,8 @@
 from collections import Counter
-from math import isclose
-from statistics import stdev, variance
 from typing import Iterator, Sequence
 
 import numba
 import numpy as np
-import scipy.stats
 import torch
 
 from dance.typing import NormMode
@@ -90,17 +87,31 @@ def pearson_distance(a, b):
     cov_ab = np.sum(np.array([cov_ab1[i] * cov_ab2[i] for i in range(len(cov_ab1))]))
     sq = (np.sum(np.array([(x - a_avg)**2 for x in a])) * np.sum(np.array([(x - b_avg)**2 for x in b])))**0.5
     corr_factor = cov_ab / sq
-    return 1 - corr_factor
+    return 1 - corr_factor  # best correlation: 0, no correlation: 1, best anti correlation: 2
 
 
-def rank_series(values: Sequence[float]) -> Iterator[float]:
-    rank_by_value = {}
-    index = 0
-    for x, n in sorted(Counter(values).items()):
-        rank_by_value[x] = index + (1 + n) / 2
-        index += n
-    for x in values:
-        yield rank_by_value[x]
+@numba.njit("f4[:](f4[:])")
+def mean_rank_data(x):
+    """Rank data and take mean rank for ties.
+
+    See
+    https://github.com/scipy/scipy/blob/5e4a5e3785f79dd4e8930eed883da89958860db2/scipy/stats/_stats_py.py#L10123
+
+    """
+    sorter = np.argsort(x, kind="quicksort")
+    inv = np.empty(sorter.size, dtype=np.intp)
+    for i, j in enumerate(sorter):
+        inv[j] = i
+
+    arr = x[sorter]
+    obs = np.concatenate((np.array([True]), arr[1:] != arr[:-1]))
+    dense = obs.cumsum()[inv]
+
+    count = np.concatenate((np.nonzero(obs)[0].astype(np.float32), np.array([obs.size])))
+    res = np.empty(obs.size, dtype=np.float32)
+    for i in range(res.size):
+        res[i] = (count[dense[i]] + count[dense[i] - 1] + 1) / 2
+    return res
 
 
 @numba.njit("f4(f4[:], f4[:])")
@@ -114,16 +125,12 @@ def spearman_distance(x, y):
     """
     if len(x) != len(y):
         raise ValueError(f'X length {len(x)} does not match Y length {len(y)}')
-    x_ranks = np.argsort(np.argsort(x)) + 1.0
-    y_ranks = np.argsort(np.argsort(y)) + 1.0
-    covxy = np.cov(x_ranks, y_ranks)
-    stdx = np.sqrt(((x_ranks - np.mean(x_ranks))**2).sum() / (x_ranks.size - 1))
-    stdy = np.sqrt(((y_ranks - np.mean(y_ranks))**2).sum() / (y_ranks.size - 1))
-    r = covxy / stdx / stdy
-    return 1 - r[0, 1]
+    x_ranks = mean_rank_data(x)
+    y_ranks = mean_rank_data(y)
+    return pearson_distance(x_ranks, y_ranks)  # best correlation: 0, no correlation: 1, best anti correlation: 2
 
 
-@numba.njit("f4[:,:](f4[:,:], u4)", parallel=True, nogil=True)
+@numba.njit("f4[:,:](f4[:,:], u4)", parallel=False, nogil=True)  # FIX: parallel=True gives segfault on mac
 def pairwise_distance(x, dist_func_id=0):
     if dist_func_id == 0:  # Euclidean distance
         dist = euclidean_distance
