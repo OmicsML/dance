@@ -1,15 +1,12 @@
 import math
 
-import dgl
-import dgl.nn as dglnn
 import numpy as np
 import torch
-from scipy.sparse import coo_matrix
 from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA, TruncatedSVD
-from torch.nn import functional as F
+from sklearn.decomposition import PCA
 
 from dance.transforms.base import BaseTransform
+from dance.typing import Optional
 from dance.utils.matrix import pairwise_distance
 
 
@@ -17,26 +14,41 @@ def normalized_laplacian(adj_matrix):
     R = np.sum(adj_matrix, axis=1)
     R_sqrt = 1 / np.sqrt(R)
     D_sqrt = np.diag(R_sqrt)
-    I = np.eye(adj_matrix.shape[0])
-    return I - np.matmul(np.matmul(D_sqrt, adj_matrix), D_sqrt)
+    identity = np.eye(adj_matrix.shape[0])
+    return identity - np.matmul(np.matmul(D_sqrt, adj_matrix), D_sqrt)
 
 
 class SC3Feature(BaseTransform):
-"""SC3 computes a consensus matrix using the cluster-based similarity partitioningalgorithm (CSPA)33.
-For each individual clustering result,a binary similarity matrix is constructed from the corresponding cell labels: if two cells belong tothe same cluster, their similarity is 1; otherwise, the similarity is 0.
-A consensus matrix is calculated by averaging all similarity matrices of individual clusterings. To reduce computational time, if the length of the d rangeis more than 15, a random subset of 15 values selected uniformly from the d range is used.
-For more details,see the [SC3: consensus clustering of single-cell RNA-seq data](https://www.nature.com/articles/nmeth.4236#Sec2)
+    """SC3 features via a cluster-based similarity partitioning algorithm.
 
-n_cluster:the number of clusters in kmeans
-d:number of cells selected
-"""
-    def __init__(self, n_cluster: int = 3,d=None **kwargs):
+    For each individual clustering result, a binary similarity matrix is constructed from the corresponding cell labels.
+    If two cells belong tothe same cluster, their similarity is 1; otherwise, the similarity is 0. A consensus matrix is
+    calculated by averaging all similarity matrices of individual clusterings. To reduce computational time, if the
+    length of the d rangeis more than 15, a random subset of 15 values selected uniformly from the d range is used.
+
+    Parameters
+    ----------
+    n_cluster
+        Number of clusters for kmeans clustering.
+    d
+        Number of cells selected.
+
+    Reference
+    ---------
+    https://www.nature.com/articles/nmeth.4236
+
+    """
+
+    def __init__(self, n_cluster: int = 3, d: Optional[int] = None, **kwargs):
+
         super().__init__(**kwargs)
         self.n_cluster = n_cluster
         self.choices = None
-        self.d=d
+        self.d = d
+
     def __call__(self, data):
         feat = data.get_feature(return_type="numpy")
+
         num_cells = feat.shape[0]
         if self.d is None:
             self.d = math.ceil(num_cells * 0.07) - math.floor(num_cells * 0.04)
@@ -44,6 +56,7 @@ d:number of cells selected
             self.choices = sorted(np.random.choice(range(self.d), 15, replace=False))
         else:
             self.choices = list(range(self.d))
+
         y_len = feat.shape[0]
         sc3_mats = []
         for i in range(3):
@@ -52,6 +65,7 @@ d:number of cells selected
             mat_pca = PCA(n_components=y_len)
             sc3_mats.append(mat_pca.fit_transform(sc3_mat)[:, self.choices])
             sc3_mats.append(normalized_laplacian(sc3_mat)[:, self.choices])
+
         sim_matrix_all = []
         for sc3_mat in sc3_mats:
             for i in range(len(self.choices)):
@@ -67,5 +81,6 @@ d:number of cells selected
                 sim_matrix_all.append(sim_matrix)
         sim_matrix_all = np.array(sim_matrix_all)
         sim_matrix_mean = np.mean(sim_matrix_all, axis=0)
+
         data.data.uns[self.out] = sim_matrix_mean
         return data

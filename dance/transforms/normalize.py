@@ -1,21 +1,17 @@
 import os
-import random
 from multiprocessing import Manager, Pool
 
 import numpy as np
 import pandas as pd
-import rpy2.robjects as robjects
-import scanpy as sc
 import scipy.sparse as sp
 import statsmodels.discrete.discrete_model
 import statsmodels.nonparametric.kernel_regression
-from anndata2ri import py2rpy, rpy2py
 from KDEpy import FFTKDE
 from scipy import stats
 
 from dance.data.base import Data
 from dance.transforms.base import BaseTransform
-from dance.typing import Dict, List, Literal, LogLevel, NormMode, Optional, Union
+from dance.typing import Dict, List, Literal, NormMode, Optional, Union
 from dance.utils.matrix import normalize
 
 
@@ -99,22 +95,41 @@ class ScaleFeature(BaseTransform):
             self.logger.info(f"Scaling {name} (n={len(idx):,})")
             data.data.X[idx] = normalize(data.data.X[idx], mode=self.mode, axis=self.axis, eps=self.eps)
 
-from rpy2.robjects import numpy2ri, pandas2ri, r
-from rpy2.robjects.conversion import localconverter
 
+class ScTransForm2(BaseTransform):
+    """ScTransform normalization and variance stabiliation.
 
-class scTransForm2(BaseTransform):
-    def __init__(self, min_cells=5, **kwargs):
+    Note
+    ----
+    This is a wrapper for the original R implementation.
+
+    Parameters
+    ----------
+    min_cells
+        Minimum number of cells the gene has to express in, below which that gene will be discarded.
+
+    Reference
+    ---------
+    https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1874-1
+
+    """
+
+    def __init__(self, min_cells: int = 5, **kwargs):
         self.min_cells = min_cells
         super().__init__(**kwargs)
 
     def __call__(self, data: Data) -> Data:
+        import rpy2.robjects as robjects
+        from anndata2ri import py2rpy
+        from rpy2.robjects import numpy2ri, pandas2ri, r
+        from rpy2.robjects.conversion import localconverter
+
         if isinstance(data.data.X, sp.spmatrix):
             self.logger.warning("Native support for sparse matrix is not implemented yet, "
                                 "converting to dense array explicitly.")
             data.data.X = data.data.X.A
         adata = data.X.copy()
-        #min_cells
+
         with localconverter(robjects.default_converter + pandas2ri.converter + numpy2ri.converter):
             sce = py2rpy(adata)
         robjects.r.assign("sce", sce)
@@ -132,30 +147,59 @@ class scTransForm2(BaseTransform):
         with localconverter(robjects.default_converter + pandas2ri.converter + numpy2ri.converter):
             floatmatrix_df = pandas2ri.rpy2py(r_floatmatrix)
 
-        # 创建anndata对象
+        # Convert to anndata
         adata.X = floatmatrix_df.T
         data.data = adata
         return data
 
 
-class scTransForm(BaseTransform):
-    _DISPLAY_ATTRS = ("axis", "mode", "eps", "split_names", "batch_key")
+class ScTransForm(BaseTransform):
+    """ScTransform normalization and variance stabiliation.
+
+    Note
+    ----
+    This is a Python implementation adapted from https://github.com/atarashansky/SCTransformPy
+
+    Parameters
+    ----------
+    split_names
+        Which split(s) to apply the transformation.
+    batch_key
+        Key for batch information.
+    min_cells
+        Minimum number of cells the gene has to express in, below which that gene will be discarded.
+    gmean_eps
+        Pseudocount.
+    n_genes
+        Maximum number of genes to use. Use all if set to ``None``.
+    n_cells
+        maximum number of cells to use. Use all if set to ``None``.
+    bin_size
+        Number of genes a single bin contain.
+    bw_adjust
+        Bandwidth adjusting parameter.
+
+    Reference
+    ---------
+    https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1874-1
+
+    """
+
+    _DISPLAY_ATTRS = ("mode", "eps", "split_names", "batch_key")
 
     def __init__(
         self,
-        axis: int = 0,
         split_names: Optional[Union[Literal["ALL"], List[str]]] = None,
         batch_key: Optional[str] = None,
-        min_cells=5,
-        gmean_eps=1,
-        n_genes=2000,
-        n_cells=None,
-        bin_size=500,
-        bw_adjust=3,
+        min_cells: int = 5,
+        gmean_eps: int = 1,
+        n_genes: Optional[int] = 2000,
+        n_cells: Optional[int] = None,
+        bin_size: int = 500,
+        bw_adjust: float = 3,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.axis = axis
         self.split_names = split_names
         self.batch_key = batch_key
         self.min_cells = min_cells
@@ -166,6 +210,7 @@ class scTransForm(BaseTransform):
         self.bw_adjust = bw_adjust
 
     def _get_idx_dict(self, data) -> List[Dict[str, List[int]]]:
+        # TODO: refactor out this function; reduce ropied code.
         batch_key = self.batch_key
         split_names = self.split_names
 
@@ -232,9 +277,9 @@ class scTransForm(BaseTransform):
         umi_per_gene = umi / gene
         log_umi_per_gene = np.log10(umi_per_gene)
 
-        cell_attrs = pd.DataFrame(index=cn, data=np.vstack(
-            (umi, log_umi, gene, log_gene, umi_per_gene, log_umi_per_gene)).T,
-                                  columns=['umi', 'log_umi', 'gene', 'log_gene', 'umi_per_gene', 'log_umi_per_gene'])
+        cell_attrs = pd.DataFrame(
+            index=cn, data=np.vstack((umi, log_umi, gene, log_gene, umi_per_gene, log_umi_per_gene)).T,
+            columns=['umi', 'log_umi', 'gene', 'log_gene', 'umi_per_gene', 'log_umi_per_gene'])  # yapf: disable
 
         data_step1 = cell_attrs.iloc[cells_step1]
 
