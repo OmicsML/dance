@@ -7,13 +7,14 @@ from dance.transforms.base import BaseTransform
 
 
 class RESEPTGraph(BaseTransform):
-"""
-https://www.biorxiv.org/content/10.1101/2021.07.08.451210v1.full
-Spatial transcriptomics data are converted as an RGB image by mapping a low dimensional embedding to color channels via a spatial retained graph neural network.
-This image represents various spatial contexts together with expression abundance faithfully, and it resists robustly to noises due to limitations of measuring technology.
-fiducial_diameter_fullres：diameter
-tissue_hires_scalef：scale
-"""
+    """RESEPT spatial spot graph.
+
+    Reference
+    ---------
+    https://www.biorxiv.org/content/10.1101/2021.07.08.451210v1.full
+
+    """
+
     def __init__(self, fiducial_diameter_fullres=144.56835055243283, tissue_hires_scalef=0.150015, **kwargs):
         super().__init__(**kwargs)
         self.fiducial_diameter_fullres = fiducial_diameter_fullres
@@ -36,8 +37,8 @@ tissue_hires_scalef：scale
         X_transform[:, 2] = self.scale_to_RGB(X_transform[:, 2], 100)
         radius = int(0.5 * self.fiducial_diameter_fullres + 1)
         max_row = max_col = int(2000 / self.tissue_hires_scalef + 1)
-        high_img = self.transformed_RGB_to_image(xy_pixel[:, 0], xy_pixel[:, 1], max_row, max_col,
-                                                              X_transform, plot_spot_radius=radius)
+        high_img = self.transformed_RGB_to_image(xy_pixel[:, 0], xy_pixel[:, 1], max_row, max_col, X_transform,
+                                                 plot_spot_radius=radius)
         data.data.uns[self.out] = high_img
         return data
 
