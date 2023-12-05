@@ -2,39 +2,66 @@ import dgl
 import dgl.nn as dglnn
 import torch
 from scipy.sparse import coo_matrix
-import numpy as np
+
 from dance.transforms.base import BaseTransform
-from dance.utils.matrix import pairwise_distance
+from dance.typing import Any, Dict, Optional
+from dance.utils.matrix import DIST_FUNC_ID, dist_to_rbf, pairwise_distance
 
 
 class FeatureFeatureGraph(BaseTransform):
-    """Feature-feature correlation graph."""
+    """Feature-feature similarity graph.
 
-    DIST_FUNC_ID = ["euclidean_distance", "pearson_distance", "spearman_distance"]
+    Parameters
+    ----------
+    threshold
+        Edge similarity score threshold.
+    positive_only
+        Only use positive similarity score if set to ``True``.
+    normalize_edges
+        Normalize edge weights following GCN if set to ``True``.
+    score_func
+        Distance function to use, supported options are ``"pearson"``, ``"spearman"``, and ``"rbf"``
+    score_func_kwargs
+        Optional kwargs passed to the score function, e.g. see :meth:`dance.utils.matrix.dist_to_rbf`.
 
-    def __init__(self, threshold: float = 0.3, *, normalize_edges: bool = True, dist_func="euclidean_distance",
-                 **kwargs):
+    """
+
+    _DISPLAY_ATTRS = ("threshold", "positive_only", "normalize_edges", "score_func", "score_func_kwargs")
+
+    def __init__(self, threshold: float = 0.3, *, positive_only: bool = False, normalize_edges: bool = True,
+                 score_func="pearson", score_func_kwargs: Optional[Dict[str, Any]] = None, **kwargs):
         super().__init__(**kwargs)
 
         self.threshold = threshold
+        self.positive_only = positive_only
         self.normalize_edges = normalize_edges
-        self.dist_func_id = self.DIST_FUNC_ID.index(dist_func)
+        self.score_func = score_func
+        self.score_func_kwargs = score_func_kwargs or {}
 
     def __call__(self, data):
-        feat = data.get_feature(return_type="torch")
+        feat = data.get_feature(return_type="numpy")
 
         # Calculate correlation between features
-        # TODO: get more distance options
+        if self.score_func in ("pearson", "spearman"):
+            dist_func_id = DIST_FUNC_ID.index(f"{self.score_func}_distance")
+            adj = 1 - pairwise_distance(feat.T, dist_func_id=dist_func_id)
+        elif self.score_func == "rbf":
+            dist_func_id = DIST_FUNC_ID.index("euclidean_distance")
+            dist_mat = pairwise_distance(feat.T, dist_fun_id=dist_func_id)
+            adj = dist_to_rbf(dist_mat, **self.score_func_kwargs)
+        else:
+            raise ValueError(f"Unknown similarity score function {self.score_func!r}, "
+                             "supported options are: 'pearson', 'spearman', 'rbf'")
 
-        dist_data=pairwise_distance(feat.T.detach().numpy(), dist_func_id=self.dist_func_id)*-1
-        scaled_data = (dist_data - np.min(dist_data)) / (np.max(dist_data) - np.min(dist_data))
-        corr = torch.from_numpy(scaled_data)
-        corr[-self.threshold < corr < self.threshold] = 0  # apply threashold
-        corr_coo = coo_matrix(corr)
+        # Apply threshold
+        adj[-self.threshold < adj < self.threshold] = 0
+        if self.positive_only:
+            adj[adj < 0] = 0
 
         # Initialize graph
-        graph_data = (torch.from_numpy(corr_coo.row).int(), torch.from_numpy(corr_coo.col).int())
-        g = dgl.graph(graph_data, num_nodes=corr.shape[0])
+        adj_coo = coo_matrix(adj)
+        graph_data = (torch.from_numpy(adj_coo.row).int(), torch.from_numpy(adj_coo.col).int())
+        g = dgl.graph(graph_data, num_nodes=adj.shape[0])
         g.ndata["feat"] = feat.T
         g.edata["weight"] = torch.ones(g.num_edges()).float()
 

@@ -1,6 +1,3 @@
-from collections import Counter
-from typing import Iterator, Sequence
-
 import numba
 import numpy as np
 import torch
@@ -70,6 +67,36 @@ def normalize(mat, *, mode: NormMode = "normalize", axis: int = 0, eps: float = 
     return norm_mat
 
 
+def dist_to_rbf(dist_mat: np.ndarray, denom_scale: float = 1.0, scale_mode: str = "med_dist") -> np.ndarray:
+    """Convert distance to Gaussian RBF.
+
+    Parameters
+    ----------
+    dist_mat
+        Distance matrix, where each entry (i,j) represent the distance between entity i and entity j.
+    denom_scale
+        Denominator scaling factor.
+    scale_mode
+        How to sacle the distance matrix. Supported options are (1) ``"med_dist"`` (default) scale by median distance,
+        (2) ``"ind_med_dist"`` scale by median distance for each entity, (3) ``"scale"`` scale only by the scaling
+        factor.
+
+    """
+    if (dist_mat < 0).any():
+        raise ValueError("Distance matrix must only contain non-negative values.")
+
+    if scale_mode == "med_dist":
+        denom = np.median(dist_mat) * denom_scale
+    elif scale_mode == "ind_med_dist":
+        denom = np.median(dist_mat, axis=1, keepdims=True) * denom_scale
+    elif scale_mode == "scale":
+        denom = denom_scale
+    else:
+        raise ValueError(f"Uknwon rbf scaling mode {scale_mode}")
+    rbf = np.exp(-dist_mat / denom)
+    return rbf
+
+
 @numba.njit("f4(f4[:], f4[:])")
 def euclidean_distance(t1, t2):
     sum = 0
@@ -128,6 +155,9 @@ def spearman_distance(x, y):
     x_ranks = mean_rank_data(x)
     y_ranks = mean_rank_data(y)
     return pearson_distance(x_ranks, y_ranks)  # best correlation: 0, no correlation: 1, best anti correlation: 2
+
+
+DIST_FUNC_ID = ["euclidean_distance", "pearson_distance", "spearman_distance"]
 
 
 @numba.njit("f4[:,:](f4[:,:], u4)", parallel=False, nogil=True)  # FIX: parallel=True gives segfault on mac
