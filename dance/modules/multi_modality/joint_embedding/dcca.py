@@ -98,22 +98,16 @@ def log_nb_positive(x, mu, theta, eps=1e-8):
 def build_multi_layers(layers, use_batch_norm=True, dropout_rate=0.1):
     """Build multilayer linear perceptron."""
     if dropout_rate > 0:
-        ts = []
-        for i, (n_in, n_out) in enumerate(zip(layers[:-1], layers[1:])):
-            t = nn.Linear(n_in, n_out)
-            init.xavier_uniform(t.weight)
-            ts.append((
+        fc_layers = nn.Sequential(
+            collections.OrderedDict([(
                 "Layer {}".format(i),
                 nn.Sequential(
-                    t,
+                    nn.Linear(n_in, n_out),
                     nn.BatchNorm1d(n_out, momentum=0.01, eps=0.001),
                     nn.ReLU(),
                     nn.Dropout(p=dropout_rate),
                 ),
-            ))
-
-        fc_layers = nn.Sequential(collections.OrderedDict(ts))
-
+            ) for i, (n_in, n_out) in enumerate(zip(layers[:-1], layers[1:]))]))
     else:
         fc_layers = nn.Sequential(
             collections.OrderedDict([(
