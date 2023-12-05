@@ -2,7 +2,7 @@ import dgl
 import dgl.nn as dglnn
 import torch
 from scipy.sparse import coo_matrix
-
+import numpy as np
 from dance.transforms.base import BaseTransform
 from dance.utils.matrix import pairwise_distance
 
