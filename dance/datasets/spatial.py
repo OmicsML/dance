@@ -50,10 +50,6 @@ class SpatialLIBDDataset(BaseDataset):
         "https://www.dropbox.com/sh/uahka2h5klnrzvj/AABe7K0_ewqOcqKUxHebE6qLa?dl=1",
         "151676":
         "https://www.dropbox.com/sh/jos5jjurezy5zp1/AAB2uaVm3-Us1a4mDkS1Q-iAa?dl=1",
-        "b004":
-        "https://www.dropbox.com/scl/fo/7vecidftrj5ianbiy5pog/h?rlkey=qxfi8fs1g3o4vm24350gn5dz1&dl=1",
-        "be_ton":
-        "https://www.dropbox.com/scl/fo/m58tb3q8ooe10ic4q0zuk/h?rlkey=rstiq8zd07fuz2hgjs1z1qkli&dl=1",
         "mpb":
         "https://www.dropbox.com/scl/fo/psxybrqayr669yeu4ccnc/h?rlkey=9hilmps3wpso1z0xuoceiouq4&dl=1",
         "pancreatic_cancer":
