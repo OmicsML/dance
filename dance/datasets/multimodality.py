@@ -413,20 +413,27 @@ class ModalityMatchingDataset(MultiModalityDataset):
                     preprocessed_features = pickle.load(f)
 
             else:
-                if self.subtask in ("openproblems_2022_cite_gex2adt_subset","pbmc_cite","openproblems_bmmc_cite_phase2_rna", "openproblems_bmmc_cite_phase2_rna_subset","5k_pbmc_subset"):
+                if self.subtask in ("openproblems_2022_cite_gex2adt_subset", "pbmc_cite",
+                                    "openproblems_bmmc_cite_phase2_rna", "openproblems_bmmc_cite_phase2_rna_subset",
+                                    "5k_pbmc_subset"):
                     lsi_transformer_gex = lsiTransformer(n_components=256, drop_first=True)
                     m1_train = lsi_transformer_gex.fit_transform(modalities[0]).values
                     m1_test = lsi_transformer_gex.transform(modalities[2]).values
                     m2_train = modalities[1].X.toarray()
                     m2_test = modalities[3].X.toarray()
-                elif self.subtask in ("GSE117089_mouse_gex2atac","GSE117089_sciCAR_gex2atac","GSE127064_AdBrain_gex2atac","GSE127064_p0Brain_gex2atac","openproblems_bmmc_multiome_phase2_rna","10k_pbmc"):
+                elif self.subtask in ("GSE117089_mouse_gex2atac", "GSE117089_sciCAR_gex2atac",
+                                      "GSE127064_AdBrain_gex2atac", "GSE127064_p0Brain_gex2atac",
+                                      "openproblems_bmmc_multiome_phase2_rna", "10k_pbmc"):
                     lsi_transformer_gex = lsiTransformer(n_components=256, drop_first=True)
                     m1_train = lsi_transformer_gex.fit_transform(modalities[0]).values
                     m1_test = lsi_transformer_gex.transform(modalities[2]).values
                     lsi_transformer_atac = lsiTransformer(n_components=512, drop_first=True)
                     m2_train = lsi_transformer_atac.fit_transform(modalities[1]).values
                     m2_test = lsi_transformer_atac.transform(modalities[3]).values
-                elif self.subtask in ("openproblems_2022_multi_atac2gex_subset","GSE140203_3T3_HG19_atac2gex","GSE140203_3T3_MM10_atac2gex","GSE140203_12878.rep2_atac2gex","GSE140203_12878.rep3_atac2gex","GSE140203_K562_HG19_atac2gex","GSE140203_K562_MM10_atac2gex","GSE140203_LUNG_atac2gex"):
+                elif self.subtask in ("openproblems_2022_multi_atac2gex_subset", "GSE140203_3T3_HG19_atac2gex",
+                                      "GSE140203_3T3_MM10_atac2gex", "GSE140203_12878.rep2_atac2gex",
+                                      "GSE140203_12878.rep3_atac2gex", "GSE140203_K562_HG19_atac2gex",
+                                      "GSE140203_K562_MM10_atac2gex", "GSE140203_LUNG_atac2gex"):
                     lsi_transformer_atac = lsiTransformer(n_components=512, drop_first=True)
                     m1_train = lsi_transformer_atac.fit_transform(modalities[0]).values
                     m1_test = lsi_transformer_atac.transform(modalities[2]).values
