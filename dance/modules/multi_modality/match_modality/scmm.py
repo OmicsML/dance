@@ -195,10 +195,8 @@ class Enc(nn.Module):
         return (read)
 
     def forward(self, x):
-        x = torch.nan_to_num(x)
         read = self.read_count(x)
         x = x / read * self.scale_factor
-        x = torch.nan_to_num(x)
         e = self.enc(x)
         lv = self.fc22(e).clamp(-12, 12)  # restrict to avoid torch.exp() over/underflow
         return self.fc21(e), F.softmax(lv, dim=-1) * lv.size(-1) + Constants.eta
