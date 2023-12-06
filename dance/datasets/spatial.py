@@ -238,7 +238,7 @@ class CellTypeDeconvoDataset(BaseDataset):
                 raw_data_dict[filename] = sc.read_h5ad(filepath).to_df()
             else:
                 warnings.warn(f"Unsupported file type {ext!r}. Only csv or h5ad are supported now.")
-            if ext==".csv" or ext==".h5ad":
+            if ext == ".csv" or ext == ".h5ad":
                 raw_data_dict[filename].index = raw_data_dict[filename].index.astype(str)
         ref_count = raw_data_dict["ref_sc_count"]
         ref_annot = raw_data_dict["ref_sc_annot"]
