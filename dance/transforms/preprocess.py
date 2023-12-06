@@ -126,8 +126,6 @@ class lsiTransformer():
         if not self.fitted:
             raise RuntimeError('Transformer was not fitted on any data')
         X = self.tfidfTransformer.transform(adata.layers['counts'])
-        X = X.toarray()
-        X = np.nan_to_num(X)
         X = sp.csc_matrix(X)
         X_norm = self.normalizer.transform(X)
         X_norm = np.log1p(X_norm * 1e4)
