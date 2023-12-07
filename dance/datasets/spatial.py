@@ -56,6 +56,8 @@ class SpatialLIBDDataset(BaseDataset):
         "https://www.dropbox.com/scl/fo/2vwvyrgou6mxptkqphlq5/h?rlkey=8pkg6mtdnv637bk35idu8bnk7&dl=1",
         "human_breast_cancer":
         "https://www.dropbox.com/scl/fo/hp82ugxvxro4u6e5spl1s/h?rlkey=15uqpgk6hbtrqxy9rz93b34wf&dl=1",
+        "sub_mba":
+        "https://www.dropbox.com/scl/fo/ryh06rm9lwj4s2cizejzi/h?rlkey=nfrcz8m0o7cnjobhtxvkfsd0k&dl=1",
         # "sub_pancreatic_cancer":"",
         # "sub_human_breast_cancer":""
     }
