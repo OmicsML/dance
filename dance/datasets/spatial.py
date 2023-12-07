@@ -81,7 +81,7 @@ class SpatialLIBDDataset(BaseDataset):
     def is_complete(self):
         check = [
             osp.join(self.data_dir, f"{self.data_id}_raw_feature_bc_matrix.h5"),  # expression
-            # osp.join(self.data_dir, f"{self.data_id}_full_image.tif"),  # histology
+            osp.join(self.data_dir, f"{self.data_id}_full_image.tif"),  # histology
             osp.join(self.data_dir, "tissue_positions_list.txt"),  # positions
         ]
 
