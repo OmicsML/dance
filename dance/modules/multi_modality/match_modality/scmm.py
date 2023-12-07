@@ -307,7 +307,6 @@ class Protein(VAE):
 
     def forward(self, x):
         read_count = self.enc.read_count(x)
-        # self._qz_x_params = self.enc(x)
         self._qz_x_params = self.enc(x)
         qz_x = self.qz_x(*self._qz_x_params)
         zs = qz_x.rsample()
@@ -351,7 +350,6 @@ class RNA(VAE):
 
     def forward(self, x):
         read_count = self.enc.read_count(x)
-        # self._qz_x_params = self.enc(x)
         self._qz_x_params = self.enc(x)
         qz_x = self.qz_x(*self._qz_x_params)
         zs = qz_x.rsample()
@@ -550,7 +548,6 @@ class MMVAE(nn.Module):
                 loss.backward()
                 optimizer.step()
                 b_loss += loss.item()
-
                 if self.params.print_freq > 0 and i % self.params.print_freq == 0:
                     print("iteration {:04d}: loss: {:6.3f}".format(i, loss.item() / self.params.batch_size))
             tr.append(b_loss / len(train_loader.dataset))
