@@ -130,7 +130,7 @@ class lsiTransformer():
         if not self.fitted:
             raise RuntimeError('Transformer was not fitted on any data')
         X = self.tfidfTransformer.transform(adata.layers['counts'])
-        X = sp.csc_matrix(X)
+        X = sp.csr_matrix(X)
         X_norm = self.normalizer.transform(X)
         X_norm = np.log1p(X_norm * 1e4)
         X_lsi = self.pcaTransformer.transform(X_norm)
