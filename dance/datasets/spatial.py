@@ -26,38 +26,24 @@ class SpatialLIBDDataset(BaseDataset):
 
     _DISPLAY_ATTRS = ("data_id", )
     URL_DICT = {
-        "151510":
-        "https://www.dropbox.com/sh/41h9brsk6my546x/AADa18mkJge-KQRTndRelTpMa?dl=0",
-        "151507":
-        "https://www.dropbox.com/sh/m3554vfrdzbwv2c/AACGsFNVKx8rjBgvF7Pcm2L7a?dl=1",
-        "151508":
-        "https://www.dropbox.com/sh/tm47u3fre8692zt/AAAJJf8-za_Lpw614ft096qqa?dl=1",
-        "151509":
-        "https://www.dropbox.com/sh/hihr7906vyirjet/AACslV5mKIkF2CF5QqE1LE6ya?dl=1",
-        "151669":
-        "https://www.dropbox.com/sh/ulw2nnnmgtbswvc/AAC0fT549EwtxKZWWoB89gb4a?dl=1",
-        "151670":
-        "https://www.dropbox.com/sh/8fw44zyyjgh0ddc/AAA1asGAmyDiMmvhRmL7pN1Na?dl=1",
-        "151671":
-        "https://www.dropbox.com/sh/9g5qzd5ykx2mpk3/AAD3xjx1i2h0RhYBc-Vft6CEa?dl=1",
-        "151672":
-        "https://www.dropbox.com/sh/l6519tr280krd4p/AAAWefCSp2iKhVmLgytlyxTta?dl=1",
-        "151673":
-        "https://www.dropbox.com/sh/qc64ps6gd64dm0c/AAC_5_mP4AczKj8lORLLKcIba?dl=1",
-        "151674":
-        "https://www.dropbox.com/sh/q7io99psd2xuqgw/AABske8dgX_kc1oaDSxuiqjpa?dl=1",
-        "151675":
-        "https://www.dropbox.com/sh/uahka2h5klnrzvj/AABe7K0_ewqOcqKUxHebE6qLa?dl=1",
-        "151676":
-        "https://www.dropbox.com/sh/jos5jjurezy5zp1/AAB2uaVm3-Us1a4mDkS1Q-iAa?dl=1",
-        "mpb":
-        "https://www.dropbox.com/scl/fo/psxybrqayr669yeu4ccnc/h?rlkey=9hilmps3wpso1z0xuoceiouq4&dl=1",
+        "151510": "https://www.dropbox.com/sh/41h9brsk6my546x/AADa18mkJge-KQRTndRelTpMa?dl=0",
+        "151507": "https://www.dropbox.com/sh/m3554vfrdzbwv2c/AACGsFNVKx8rjBgvF7Pcm2L7a?dl=1",
+        "151508": "https://www.dropbox.com/sh/tm47u3fre8692zt/AAAJJf8-za_Lpw614ft096qqa?dl=1",
+        "151509": "https://www.dropbox.com/sh/hihr7906vyirjet/AACslV5mKIkF2CF5QqE1LE6ya?dl=1",
+        "151669": "https://www.dropbox.com/sh/ulw2nnnmgtbswvc/AAC0fT549EwtxKZWWoB89gb4a?dl=1",
+        "151670": "https://www.dropbox.com/sh/8fw44zyyjgh0ddc/AAA1asGAmyDiMmvhRmL7pN1Na?dl=1",
+        "151671": "https://www.dropbox.com/sh/9g5qzd5ykx2mpk3/AAD3xjx1i2h0RhYBc-Vft6CEa?dl=1",
+        "151672": "https://www.dropbox.com/sh/l6519tr280krd4p/AAAWefCSp2iKhVmLgytlyxTta?dl=1",
+        "151673": "https://www.dropbox.com/sh/qc64ps6gd64dm0c/AAC_5_mP4AczKj8lORLLKcIba?dl=1",
+        "151674": "https://www.dropbox.com/sh/q7io99psd2xuqgw/AABske8dgX_kc1oaDSxuiqjpa?dl=1",
+        "151675": "https://www.dropbox.com/sh/uahka2h5klnrzvj/AABe7K0_ewqOcqKUxHebE6qLa?dl=1",
+        "151676": "https://www.dropbox.com/sh/jos5jjurezy5zp1/AAB2uaVm3-Us1a4mDkS1Q-iAa?dl=1",
+        "mpb": "https://www.dropbox.com/scl/fo/psxybrqayr669yeu4ccnc/h?rlkey=9hilmps3wpso1z0xuoceiouq4&dl=1",
         "pancreatic_cancer":
         "https://www.dropbox.com/scl/fo/2vwvyrgou6mxptkqphlq5/h?rlkey=8pkg6mtdnv637bk35idu8bnk7&dl=1",
         "human_breast_cancer":
         "https://www.dropbox.com/scl/fo/hp82ugxvxro4u6e5spl1s/h?rlkey=15uqpgk6hbtrqxy9rz93b34wf&dl=1",
-        "sub_mba":
-        "https://www.dropbox.com/scl/fo/ryh06rm9lwj4s2cizejzi/h?rlkey=nfrcz8m0o7cnjobhtxvkfsd0k&dl=1",
+        "sub_mba": "https://www.dropbox.com/scl/fo/ryh06rm9lwj4s2cizejzi/h?rlkey=nfrcz8m0o7cnjobhtxvkfsd0k&dl=1",
         # "sub_pancreatic_cancer":"",
         # "sub_human_breast_cancer":""
     }
