@@ -406,13 +406,13 @@ class ModalityMatchingDataset(MultiModalityDataset):
         # TODO: support other two subtasks
         # assert self.subtask in ("openproblems_bmmc_cite_phase2_rna", "openproblems_bmmc_cite_phase2_rna_subset",
         #                         "openproblems_bmmc_multiome_phase2_rna","pbmc_cite","openproblems_2022_multi_atac2gex","openproblems_2022_cite_gex2adt"), "Currently not available."
-        changed_count=0
+        changed_count = 0
         for i in range(4):
-            m_data=modalities[i].X
-            int_data=m_data.astype(int)
-            changed_count+=np.sum(int_data!=m_data)
-            modalities[i].X=int_data
-            modalities[i].layers["counts"]=modalities[i].X
+            m_data = modalities[i].X
+            int_data = m_data.astype(int)
+            changed_count += np.sum(int_data != m_data)
+            modalities[i].X = int_data
+            modalities[i].layers["counts"] = modalities[i].X
         logger.info(f"A total of {changed_count} entries were modified")
 
         if self.preprocess == "pca":
@@ -421,7 +421,7 @@ class ModalityMatchingDataset(MultiModalityDataset):
                     preprocessed_features = pickle.load(f)
 
             else:
-                 for i in range(2):
+                for i in range(2):
                     sc.pp.filter_genes(modalities[i], min_cells=1, inplace=True)
                     sc.pp.filter_genes(modalities[i + 2], min_cells=1, inplace=True)
                     common_genes = list(set(modalities[i].var.index) & set(modalities[i + 2].var.index))
@@ -482,7 +482,7 @@ class ModalityMatchingDataset(MultiModalityDataset):
                 modalities[i + 1] = modalities[i + 1][common_cells, :]
                 if i == 0:
                     train_label = train_label[common_cells, :]
-                    train_label=ad.AnnData(obs=train_label.obs,X=sp.csr_matrix(np.eye(len(train_label.obs))))
+                    train_label = ad.AnnData(obs=train_label.obs, X=sp.csr_matrix(np.eye(len(train_label.obs))))
                 else:
                     test_label = test_label[common_cells, :]
                     test_label = ad.AnnData(obs=test_label.obs, X=sp.csr_matrix(np.eye(len(test_label.obs))))
@@ -501,7 +501,7 @@ class ModalityMatchingDataset(MultiModalityDataset):
                 modalities[i + 1] = modalities[i + 1][common_cells, :]
                 if i == 0:
                     train_label = train_label[common_cells, :]
-                    train_label=ad.AnnData(obs=train_label.obs,X=sp.csr_matrix(np.eye(len(train_label.obs))))
+                    train_label = ad.AnnData(obs=train_label.obs, X=sp.csr_matrix(np.eye(len(train_label.obs))))
                 else:
                     test_label = test_label[common_cells, :]
                     test_label = ad.AnnData(obs=test_label.obs, X=sp.csr_matrix(np.eye(len(test_label.obs))))
@@ -701,7 +701,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
                 pickle.dump([nb_cell_types, nb_batches, nb_phases], f)
 
             self.nb_cell_types, self.nb_batches, self.nb_phases = nb_cell_types, nb_batches, nb_phases
-        elif self.preprocess =="pca":
+        elif self.preprocess == "pca":
             sc.pp.filter_genes(mod1, min_counts=3)
             sc.pp.filter_genes(mod2, min_counts=3)
             meta1 = meta1[:, mod1.var.index]
