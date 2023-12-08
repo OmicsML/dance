@@ -413,6 +413,12 @@ class ModalityMatchingDataset(MultiModalityDataset):
                     preprocessed_features = pickle.load(f)
 
             else:
+                 for i in range(2):
+                    sc.pp.filter_genes(modalities[i], min_cells=1, inplace=True)
+                    sc.pp.filter_genes(modalities[i + 2], min_cells=1, inplace=True)
+                    common_genes = list(set(modalities[i].var.index) & set(modalities[i + 2].var.index))
+                    modalities[i] = modalities[i][:, common_genes]
+                    modalities[i + 2] = modalities[i + 2][:, common_genes]
                 if self.subtask in ("openproblems_2022_cite_gex2adt_subset", "pbmc_cite",
                                     "openproblems_bmmc_cite_phase2_rna", "openproblems_bmmc_cite_phase2_rna_subset",
                                     "5k_pbmc_subset"):
@@ -460,6 +466,18 @@ class ModalityMatchingDataset(MultiModalityDataset):
             modalities[3].obsm["X_pca"] = preprocessed_features["mod2_test"]
 
         elif self.preprocess == "feature_selection":
+            for i in [0, 2]:
+                sc.pp.filter_cells(modalities[i], min_counts=1, inplace=True)
+                sc.pp.filter_cells(modalities[i + 1], min_counts=1, inplace=True)
+                common_cells = list(set(modalities[i].obs.index) & set(modalities[i + 1].obs.index))
+                modalities[i] = modalities[i][common_cells, :]
+                modalities[i + 1] = modalities[i + 1][common_cells, :]
+                if i == 0:
+                    train_label = train_label[common_cells, :]
+                    train_label=ad.AnnData(obs=train_label.obs,X=sp.csr_matrix(np.eye(len(train_label.obs))))
+                else:
+                    test_label = test_label[common_cells, :]
+                    test_label = ad.AnnData(obs=test_label.obs, X=sp.csr_matrix(np.eye(len(test_label.obs))))
             for i in range(2):
                 if modalities[i].shape[1] > selection_threshold:
                     sc.pp.highly_variable_genes(modalities[i], layer="counts", flavor="seurat_v3",
@@ -467,6 +485,18 @@ class ModalityMatchingDataset(MultiModalityDataset):
                     modalities[i + 2].var["highly_variable"] = modalities[i].var["highly_variable"]
                     modalities[i] = modalities[i][:, modalities[i].var["highly_variable"]]
                     modalities[i + 2] = modalities[i + 2][:, modalities[i + 2].var["highly_variable"]]
+            for i in [0, 2]:
+                sc.pp.filter_cells(modalities[i], min_counts=1, inplace=True)
+                sc.pp.filter_cells(modalities[i + 1], min_counts=1, inplace=True)
+                common_cells = list(set(modalities[i].obs.index) & set(modalities[i + 1].obs.index))
+                modalities[i] = modalities[i][common_cells, :]
+                modalities[i + 1] = modalities[i + 1][common_cells, :]
+                if i == 0:
+                    train_label = train_label[common_cells, :]
+                    train_label=ad.AnnData(obs=train_label.obs,X=sp.csr_matrix(np.eye(len(train_label.obs))))
+                else:
+                    test_label = test_label[common_cells, :]
+                    test_label = ad.AnnData(obs=test_label.obs, X=sp.csr_matrix(np.eye(len(test_label.obs))))
 
         else:
             logger.info("Preprocessing method not supported.")
@@ -663,9 +693,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
                 pickle.dump([nb_cell_types, nb_batches, nb_phases], f)
 
             self.nb_cell_types, self.nb_batches, self.nb_phases = nb_cell_types, nb_batches, nb_phases
-
-        elif self.preprocess == "feature_selection":
-
+        elif self.preprocess =="pca":
             sc.pp.filter_genes(mod1, min_counts=3)
             sc.pp.filter_genes(mod2, min_counts=3)
             meta1 = meta1[:, mod1.var.index]
@@ -674,6 +702,15 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
             lsi_transformer_gex = lsiTransformer(n_components=64, drop_first=True)
             mod1.obsm['X_pca'] = lsi_transformer_gex.fit_transform(mod1).values
             mod2.obsm['X_pca'] = lsi_transformer_gex.fit_transform(mod2).values
+            
+        elif self.preprocess == "feature_selection":
+
+            sc.pp.filter_genes(mod1, min_counts=3)
+            sc.pp.filter_genes(mod2, min_counts=3)
+            meta1 = meta1[:, mod1.var.index]
+            meta2 = meta2[:, mod2.var.index]
+            test_sol = test_sol[:, mod1.var.index]
+            
             if mod1.shape[1] > self.selection_threshold:
                 sc.pp.highly_variable_genes(mod1, layer="counts", flavor="seurat_v3",
                                             n_top_genes=self.selection_threshold, span=self.span)
@@ -682,6 +719,18 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
                 sc.pp.highly_variable_genes(mod2, layer="counts", flavor="seurat_v3",
                                             n_top_genes=self.selection_threshold, span=self.span)
                 mod2 = mod2[:, mod2.var["highly_variable"]]
+            sc.pp.filter_cells(mod1, min_genes=1, inplace=True)
+            sc.pp.filter_cells(mod2, min_genes=1, inplace=True)
+            common_cells = list(set(mod1.obs.index) & set(mod2.obs.index))
+            mod1 = mod1[common_cells, :]
+            mod2 = mod2[common_cells, :]
+            test_sol = test_sol[common_cells, :]
+
+            sc.pp.filter_cells(meta1, min_genes=1, inplace=True)
+            sc.pp.filter_cells(meta2, min_genes=1, inplace=True)
+            meta_common_cells = list(set(meta1.obs.index) & set(meta2.obs.index))
+            meta1 = meta1[meta_common_cells, :]
+            meta2 = meta2[meta_common_cells, :]
         else:
             logger.info(f"Preprocessing method {self.preprocess!r} not supported.")
 
