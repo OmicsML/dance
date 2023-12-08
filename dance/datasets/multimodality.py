@@ -406,14 +406,16 @@ class ModalityMatchingDataset(MultiModalityDataset):
         # TODO: support other two subtasks
         # assert self.subtask in ("openproblems_bmmc_cite_phase2_rna", "openproblems_bmmc_cite_phase2_rna_subset",
         #                         "openproblems_bmmc_multiome_phase2_rna","pbmc_cite","openproblems_2022_multi_atac2gex","openproblems_2022_cite_gex2adt"), "Currently not available."
-        changed_count = 0
+        changed_count = 0  # keep track to modified entries due to ensuring count data type
         for i in range(4):
             m_data = modalities[i].X
             int_data = m_data.astype(int)
             changed_count += np.sum(int_data != m_data)
             modalities[i].X = int_data
             modalities[i].layers["counts"] = modalities[i].X
-        logger.info(f"A total of {changed_count} entries were modified")
+        if changed_count > 0:
+            logger.warning("Implicit modification: to ensure count (integer type) data, "
+                           f"a total number of {changed_count} entries were modified.")
 
         if self.preprocess == "pca":
             if self.pkl_path and osp.exists(self.pkl_path):
