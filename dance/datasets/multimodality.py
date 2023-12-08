@@ -245,12 +245,6 @@ class ModalityPredictionDataset(MultiModalityDataset):
         "https://www.dropbox.com/scl/fi/4ybsx6pgiuy6j9m0y92ly/GSE127064_AdBrain_gex2atac.zip?rlkey=6a5u7p7xr2dqsoduflzxjluja&dl=1",
         "GSE127064_p0Brain_gex2atac":
         "https://www.dropbox.com/scl/fi/k4p3nkkqq56ev6ljyo5se/GSE127064_p0Brain_gex2atac.zip?rlkey=y7kayqmk2l72jjogzlvfxtl74&dl=1",
-        "GSE117089_mouse_gex2atac":
-        "https://www.dropbox.com/scl/fi/egktuwiognr06xebeuouk/GSE117089_mouse_gex2atac.zip?rlkey=jadp3hlopc3112lmxe6nz5cd1&dl=1",
-        "GSE117089_A549_gex2atac":
-        "https://www.dropbox.com/scl/fi/b7evc2n5ih5o3xxwcd7uq/GSE117089_A549_gex2atac.zip?rlkey=b5o0ykptfodim59qwnu2m89fh&dl=1",
-        "GSE117089_sciCAR_gex2atac":
-        "https://www.dropbox.com/scl/fi/juibpvmtv2otvfsq1xyr7/GSE117089_sciCAR_gex2atac.zip?rlkey=qcdbfqsuhab56bc553cwm78gc&dl=1",
         "GSE140203_3T3_HG19_atac2gex":
         "https://www.dropbox.com/scl/fi/v1vbypz87t1rz012vojkh/GSE140203_3T3_HG19_atac2gex.zip?rlkey=xmxrwso5e5ty3w53ctbm5bo9z&dl=1",
         "GSE140203_3T3_MM10_atac2gex":
@@ -335,10 +329,6 @@ class ModalityMatchingDataset(MultiModalityDataset):
         "https://www.dropbox.com/scl/fi/rhyzaqtxpkvcu2za8mqaq/5k_pbmc_subset.zip?rlkey=g019vyku5let92z814dor287w&dl=1",
         "10k_pbmc":
         "https://www.dropbox.com/scl/fi/1wi9u5zwzx7td9akk1cri/10k_pbmc.zip?rlkey=u9ir7b6d8s3t29sk2hu7v29au&dl=1",
-        "GSE117089_mouse_gex2atac":
-        "https://www.dropbox.com/scl/fi/cq8cbidn486pvol6obcbq/GSE117089_mouse_gex2atac.zip?rlkey=k2axpyi8tdsvindwpqnzyik8x&dl=1",
-        "GSE117089_sciCAR_gex2atac":
-        "https://www.dropbox.com/scl/fi/riew8e0xkf2gxty296r86/GSE117089_sciCAR_gex2atac.zip?rlkey=0ye3s19adnj2nfbpv5qfu9w62&dl=1",
         "GSE127064_AdBrain_gex2atac":
         "https://www.dropbox.com/scl/fi/mktue5y4bsf9w17t7jyq3/GSE127064_AdBrain_gex2atac.zip?rlkey=3qtazuova6v1rin630keryman&dl=1",
         "GSE127064_p0Brain_gex2atac":
