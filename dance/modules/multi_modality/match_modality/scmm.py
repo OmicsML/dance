@@ -72,7 +72,7 @@ def m_elbo_naive_warmup(model, x, beta):
         kld = kl_divergence(qz_x, model.pz(*model._get_pz_params))
         klds.append(kld.sum(-1))
         for d, px_z in enumerate(px_zs[r]):
-            lpx_z = px_z.log_prob(x[d].to(torch.int)) * model.vaes[d].llik_scaling
+            lpx_z = px_z.log_prob(x[d]) * model.vaes[d].llik_scaling
             lpx_zs.append(lpx_z.sum(-1))
     obj = (1 / len(model.vaes)) * (torch.stack(lpx_zs).sum(0) - beta * torch.stack(klds).sum(0))
     return obj.sum()
