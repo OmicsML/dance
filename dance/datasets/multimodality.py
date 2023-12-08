@@ -702,7 +702,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
             lsi_transformer_gex = lsiTransformer(n_components=64, drop_first=True)
             mod1.obsm['X_pca'] = lsi_transformer_gex.fit_transform(mod1).values
             mod2.obsm['X_pca'] = lsi_transformer_gex.fit_transform(mod2).values
-            
+
         elif self.preprocess == "feature_selection":
 
             sc.pp.filter_genes(mod1, min_counts=3)
@@ -710,7 +710,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
             meta1 = meta1[:, mod1.var.index]
             meta2 = meta2[:, mod2.var.index]
             test_sol = test_sol[:, mod1.var.index]
-            
+
             if mod1.shape[1] > self.selection_threshold:
                 sc.pp.highly_variable_genes(mod1, layer="counts", flavor="seurat_v3",
                                             n_top_genes=self.selection_threshold, span=self.span)
