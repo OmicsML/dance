@@ -124,7 +124,18 @@ def create_pathway_graph(gex_features: scipy.sparse.spmatrix, gene_names: Union[
                         if j != k:
                             uu.append(j)
                             vv.append(k)
-                            ee.append(corr[j][k])
+                            ee.append(1 - corr[j][k])
+        elif pathway_weight == 'spearman':
+            spe = scipy.stats.spearmanr(gex_features.toarray())[0]
+            if gex_features.toarray().shape[0] == 2:
+                spe = np.array([[1, spe], [spe, 1]])
+            for i in new_pw:
+                for j in i:
+                    for k in i:
+                        if j != k:
+                            uu.append(j)
+                            vv.append(k)
+                            ee.append(1 - spe[j][k])
 
         pickle.dump([uu, vv, ee], open(pk_path, 'wb'))
 

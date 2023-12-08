@@ -88,12 +88,18 @@ def log1p(adata):
 
 def calculate_log_library_size(Dataset):
     # Dataset is raw read counts, and should be cells * features
-
     Nsamples = np.shape(Dataset)[0]
-    library_sum = np.log(np.sum(Dataset, axis=1))
+    t = np.sum(Dataset, axis=1).astype(np.float64)
 
-    lib_mean = np.full((Nsamples, 1), np.mean(library_sum))
-    lib_var = np.full((Nsamples, 1), np.var(library_sum))
+    # Check for trivial cells
+    zero_libsize_idx = np.where(t == 0)[0]
+    if zero_libsize_idx.any():
+        raise ValueError(f"Cells with zero reads encountered (index up to first ten): {zero_libsize_idx[:10]}\n"
+                         "Please perform necessary filtering to remove trivial cells to suppress this error.")
+
+    lib_size = np.log(t)
+    lib_mean = np.full((Nsamples, 1), np.mean(lib_size))
+    lib_var = np.full((Nsamples, 1), np.var(lib_size))
 
     return lib_mean, lib_var
 
@@ -124,6 +130,7 @@ class lsiTransformer():
         if not self.fitted:
             raise RuntimeError('Transformer was not fitted on any data')
         X = self.tfidfTransformer.transform(adata.layers['counts'])
+        X = sp.csr_matrix(X)
         X_norm = self.normalizer.transform(X)
         X_norm = np.log1p(X_norm * 1e4)
         X_lsi = self.pcaTransformer.transform(X_norm)

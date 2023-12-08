@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, TruncatedSVD
 
 from dance.transforms.base import BaseTransform
 from dance.typing import Optional
@@ -54,6 +54,14 @@ class WeightedFeaturePCA(BaseTransform):
 
 
 class CellPCA(BaseTransform):
+    """Reduce cell feature matrix with PCA.
+
+    Parameters
+    ----------
+    n_components
+        Number of PCA components to use.
+
+    """
 
     _DISPLAY_ATTRS = ("n_components", )
 
@@ -71,6 +79,40 @@ class CellPCA(BaseTransform):
         self.logger.info(f"Start generating cell PCA features {feat.shape} (k={self.n_components})")
         cell_feat = pca.fit_transform(feat)
         evr = pca.explained_variance_ratio_
+        self.logger.info(f"Top 10 explained variances: {evr[:10]}")
+        self.logger.info(f"Total explained variance: {evr.sum():.2%}")
+
+        data.data.obsm[self.out] = cell_feat
+
+        return data
+
+
+class CellSVD(BaseTransform):
+    """Reduce cell feature matrix with SVD.
+
+    Parameters
+    ----------
+    n_components
+        Number of SVD components to take.
+
+    """
+
+    _DISPLAY_ATTRS = ("n_components", )
+
+    def __init__(self, n_components: int = 400, *, channel: Optional[str] = None, mod: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+
+        self.n_components = n_components
+        self.channel = channel
+        self.mod = mod
+
+    def __call__(self, data):
+        feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
+        svd = TruncatedSVD(n_components=self.n_components)
+
+        self.logger.info(f"Start generating cell SVD features {feat.shape} (k={self.n_components})")
+        cell_feat = svd.fit_transform(feat)
+        evr = svd.explained_variance_ratio_
         self.logger.info(f"Top 10 explained variances: {evr[:10]}")
         self.logger.info(f"Total explained variance: {evr.sum():.2%}")
 

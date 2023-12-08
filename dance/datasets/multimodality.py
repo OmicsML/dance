@@ -57,6 +57,22 @@ class MultiModalityDataset(BaseDataset, ABC):
                 osp.join(self.root, self.subtask, f"{meta}_{mod}_processed_training.h5ad"),
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_solution.h5ad"),
             ]
+            if self.subtask.startswith("GSE140203"):
+                paths = [
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE140203_dataset.output_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE140203_dataset.output_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE140203_dataset.output_train_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE140203_dataset.output_train_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE140203_dataset.output_solution.h5ad"),
+                ]
+            if self.subtask.startswith("openproblems_2022"):
+                paths = [
+                    osp.join(self.root, self.subtask, f"{self.subtask}.open_dataset.output_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.open_dataset.output_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.open_dataset.output_train_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.open_dataset.output_train_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.open_dataset.output_solution.h5ad"),
+                ]
         elif self.TASK == "predict_modality":
             paths = [
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_train_mod1.h5ad"),
@@ -122,6 +138,70 @@ class MultiModalityDataset(BaseDataset, ABC):
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_mod2.h5ad"),
                 osp.join(self.root, self.subtask, f"{self.subtask}.censor_dataset.output_test_sol.h5ad"),
             ]
+            if self.subtask == "pbmc_cite":
+                paths = [
+                    osp.join(self.root, self.subtask, f"{self.subtask}.citeanti_dataset.output_train_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.citeanti_dataset.output_train_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.citeanti_dataset.output_train_sol.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.citeanti_dataset.output_test_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.citeanti_dataset.output_test_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.citeanti_dataset.output_test_sol.h5ad"),
+                ]
+            if self.subtask.startswith("openproblems_2022"):
+                paths = [
+                    osp.join(self.root, self.subtask, f"{self.subtask}.open_dataset.output_train_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.open_dataset.output_train_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.open_dataset.output_train_sol.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.open_dataset.output_test_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.open_dataset.output_test_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.open_dataset.output_test_sol.h5ad"),
+                ]
+            if self.subtask.startswith("GSE127064"):
+                paths = [
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE126074_dataset.output_train_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE126074_dataset.output_train_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE126074_dataset.output_train_sol.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE126074_dataset.output_test_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE126074_dataset.output_test_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE126074_dataset.output_test_sol.h5ad")
+                ]
+            if self.subtask.startswith("GSE117089"):
+                paths = [
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE117089_dataset.output_train_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE117089_dataset.output_train_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE117089_dataset.output_train_sol.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE117089_dataset.output_test_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE117089_dataset.output_test_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE117089_dataset.output_test_sol.h5ad")
+                ]
+            if self.subtask.startswith("GSE140203"):
+                paths = [
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE140203_dataset.output_train_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE140203_dataset.output_train_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE140203_dataset.output_train_sol.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE140203_dataset.output_test_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE140203_dataset.output_test_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.GSE140203_dataset.output_test_sol.h5ad"),
+                ]
+            if self.subtask == "10k_pbmc":
+                paths = [
+                    osp.join(self.root, self.subtask, f"{self.subtask}.10kanti_dataset_subset.output_train_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.10kanti_dataset_subset.output_train_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.10kanti_dataset_subset.output_train_sol.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.10kanti_dataset_subset.output_test_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.10kanti_dataset_subset.output_test_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.10kanti_dataset_subset.output_test_sol.h5ad")
+                ]
+            if self.subtask.startswith("5k_pbmc"):
+                paths = [
+                    osp.join(self.root, self.subtask, f"{self.subtask}.5kanti_dataset.output_train_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.5kanti_dataset.output_train_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.5kanti_dataset.output_train_sol.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.5kanti_dataset.output_test_mod1.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.5kanti_dataset.output_test_mod2.h5ad"),
+                    osp.join(self.root, self.subtask, f"{self.subtask}.5kanti_dataset.output_test_sol.h5ad"),
+                ]
+
         return paths
 
     def is_complete(self) -> bool:
@@ -158,9 +238,9 @@ class ModalityPredictionDataset(MultiModalityDataset):
         "pbmc_cite":
         "https://www.dropbox.com/scl/fi/8yvel9lu2f4pbemjeihzq/pbmc_cite.zip?rlkey=5f5jpjy1fcg14hwzot0hot7xd&dl=1",
         "openproblems_2022_multi_atac2gex":
-        "https://www.dropbox.com/scl/fi/4ynxepu306g3k6vqpi3aw/openproblems_2022_multi_atac2gex.zip?rlkey=2mq5vjnsh26gg5zgq9d85ikcp&dl=1",
+        "https://www.dropbox.com/scl/fi/luzmc1jab7zvvxi2i4od5/openproblems_2022_multi_atac2gex.zip?rlkey=ht1acmhdpq8bbo1guevqgej5y&dl=1",
         "openproblems_2022_cite_gex2adt":
-        "https://www.dropbox.com/scl/fi/dalt3qxwe440107ihjbpy/openproblems_2022_cite_gex2adt.zip?rlkey=ps1fvcr622vhibc1wc1umfdaw&dl=1",
+        "https://www.dropbox.com/scl/fi/ejioe3qqug0h2f7wvw9hq/openproblems_2022_cite_gex2adt.zip?rlkey=2f9kqz61s9ixdllgzic9tamc7&dl=1",
         "GSE127064_AdBrain_gex2atac":
         "https://www.dropbox.com/scl/fi/4ybsx6pgiuy6j9m0y92ly/GSE127064_AdBrain_gex2atac.zip?rlkey=6a5u7p7xr2dqsoduflzxjluja&dl=1",
         "GSE127064_p0Brain_gex2atac":
@@ -245,6 +325,38 @@ class ModalityMatchingDataset(MultiModalityDataset):
         "https://www.dropbox.com/s/h1s067wkefs1jh2/openproblems_bmmc_multiome_phase2_rna.zip?dl=1",
         "openproblems_bmmc_cite_phase2_rna_subset":
         "https://www.dropbox.com/s/3q4xwpzjbe81x58/openproblems_bmmc_cite_phase2_rna_subset.zip?dl=1",
+        "pbmc_cite":
+        "https://www.dropbox.com/scl/fi/eq9eg6hzoqj2plgi2003k/pbmc_cite.zip?rlkey=p7bgttr7v99jxu3qem7sh8qrh&dl=1",
+        "openproblems_2022_multi_atac2gex_subset":
+        "https://www.dropbox.com/scl/fi/2p8izdu5xwvgm705hdf16/openproblems_2022_multi_atac2gex_subset.zip?rlkey=v962rncxmc9jqab2vhk3438sp&dl=1",
+        "openproblems_2022_cite_gex2adt_subset":
+        "https://www.dropbox.com/scl/fi/o9ht00cqgkxwgixtaydxm/openproblems_2022_cite_gex2adt_subset.zip?rlkey=sqnodvi25btk1igowww2pen8h&dl=1",
+        "5k_pbmc_subset":
+        "https://www.dropbox.com/scl/fi/rhyzaqtxpkvcu2za8mqaq/5k_pbmc_subset.zip?rlkey=g019vyku5let92z814dor287w&dl=1",
+        "10k_pbmc":
+        "https://www.dropbox.com/scl/fi/1wi9u5zwzx7td9akk1cri/10k_pbmc.zip?rlkey=u9ir7b6d8s3t29sk2hu7v29au&dl=1",
+        "GSE117089_mouse_gex2atac":
+        "https://www.dropbox.com/scl/fi/cq8cbidn486pvol6obcbq/GSE117089_mouse_gex2atac.zip?rlkey=k2axpyi8tdsvindwpqnzyik8x&dl=1",
+        "GSE117089_sciCAR_gex2atac":
+        "https://www.dropbox.com/scl/fi/riew8e0xkf2gxty296r86/GSE117089_sciCAR_gex2atac.zip?rlkey=0ye3s19adnj2nfbpv5qfu9w62&dl=1",
+        "GSE127064_AdBrain_gex2atac":
+        "https://www.dropbox.com/scl/fi/mktue5y4bsf9w17t7jyq3/GSE127064_AdBrain_gex2atac.zip?rlkey=3qtazuova6v1rin630keryman&dl=1",
+        "GSE127064_p0Brain_gex2atac":
+        "https://www.dropbox.com/scl/fi/anlukciivt5ah4i9v5q8s/GSE127064_p0Brain_gex2atac.zip?rlkey=9q12rwqgbz2z45dkwz372grgk&dl=1",
+        "GSE140203_3T3_HG19_atac2gex":
+        "https://www.dropbox.com/scl/fi/840hsqkcbis0t35i04kdi/GSE140203_3T3_HG19_atac2gex.zip?rlkey=gurncv741zi4q6dqb9q293zsl&dl=1",
+        "GSE140203_3T3_MM10_atac2gex":
+        "https://www.dropbox.com/scl/fi/chtl13dchlteilm2hky7r/GSE140203_3T3_MM10_atac2gex.zip?rlkey=su1itxejsyzkqcxjngb1xbunj&dl=1",
+        "GSE140203_12878.rep2_atac2gex":
+        "https://www.dropbox.com/scl/fi/9axnm23b554tn7uenf98q/GSE140203_12878.rep2_atac2gex.zip?rlkey=dplthpb82qhvnh9fann5o1gvb&dl=1",
+        "GSE140203_12878.rep3_atac2gex":
+        "https://www.dropbox.com/scl/fi/1zgc35dbl1pyrwrqfmtj8/GSE140203_12878.rep3_atac2gex.zip?rlkey=lwkx6iv2z584m1315gqpcomw9&dl=1",
+        "GSE140203_K562_HG19_atac2gex":
+        "https://www.dropbox.com/scl/fi/kro3384oium84fdr46l77/GSE140203_K562_HG19_atac2gex.zip?rlkey=f9kyx8rz4o7tgf8vts64d5rpi&dl=1",
+        "GSE140203_K562_MM10_atac2gex":
+        "https://www.dropbox.com/scl/fi/2dwn8zzhaq86ojkfgh29q/GSE140203_K562_MM10_atac2gex.zip?rlkey=ek94g5d9w0xrafp72z9jx5wty&dl=1",
+        "GSE140203_LUNG_atac2gex":
+        "https://www.dropbox.com/scl/fi/zb7igtgg835pg73ec7f28/GSE140203_LUNG_atac2gex.zip?rlkey=19ohnkxpj1temqnfxje6jae8w&dl=1",
     }
     SUBTASK_NAME_MAP = {
         "adt2gex": "openproblems_bmmc_cite_phase2_mod2",
@@ -292,8 +404,18 @@ class ModalityMatchingDataset(MultiModalityDataset):
         modalities = [train_mod1, train_mod2, test_mod1, test_mod2]
 
         # TODO: support other two subtasks
-        assert self.subtask in ("openproblems_bmmc_cite_phase2_rna", "openproblems_bmmc_cite_phase2_rna_subset",
-                                "openproblems_bmmc_multiome_phase2_rna"), "Currently not available."
+        # assert self.subtask in ("openproblems_bmmc_cite_phase2_rna", "openproblems_bmmc_cite_phase2_rna_subset",
+        #                         "openproblems_bmmc_multiome_phase2_rna","pbmc_cite","openproblems_2022_multi_atac2gex","openproblems_2022_cite_gex2adt"), "Currently not available."
+        changed_count = 0  # keep track to modified entries due to ensuring count data type
+        for i in range(4):
+            m_data = modalities[i].X
+            int_data = m_data.astype(int)
+            changed_count += np.sum(int_data != m_data)
+            modalities[i].X = int_data
+            modalities[i].layers["counts"] = modalities[i].X
+        if changed_count > 0:
+            logger.warning("Implicit modification: to ensure count (integer type) data, "
+                           f"a total number of {changed_count} entries were modified.")
 
         if self.preprocess == "pca":
             if self.pkl_path and osp.exists(self.pkl_path):
@@ -301,21 +423,39 @@ class ModalityMatchingDataset(MultiModalityDataset):
                     preprocessed_features = pickle.load(f)
 
             else:
-                if self.subtask in ("openproblems_bmmc_cite_phase2_rna", "openproblems_bmmc_cite_phase2_rna_subset"):
+                for i in range(2):
+                    sc.pp.filter_genes(modalities[i], min_cells=1, inplace=True)
+                    sc.pp.filter_genes(modalities[i + 2], min_cells=1, inplace=True)
+                    common_genes = list(set(modalities[i].var.index) & set(modalities[i + 2].var.index))
+                    modalities[i] = modalities[i][:, common_genes]
+                    modalities[i + 2] = modalities[i + 2][:, common_genes]
+                if self.subtask in ("openproblems_2022_cite_gex2adt_subset", "pbmc_cite",
+                                    "openproblems_bmmc_cite_phase2_rna", "openproblems_bmmc_cite_phase2_rna_subset",
+                                    "5k_pbmc_subset"):
                     lsi_transformer_gex = lsiTransformer(n_components=256, drop_first=True)
                     m1_train = lsi_transformer_gex.fit_transform(modalities[0]).values
                     m1_test = lsi_transformer_gex.transform(modalities[2]).values
                     m2_train = modalities[1].X.toarray()
                     m2_test = modalities[3].X.toarray()
-
-                elif self.subtask == "openproblems_bmmc_multiome_phase2_rna":
+                elif self.subtask in ("GSE117089_mouse_gex2atac", "GSE117089_sciCAR_gex2atac",
+                                      "GSE127064_AdBrain_gex2atac", "GSE127064_p0Brain_gex2atac",
+                                      "openproblems_bmmc_multiome_phase2_rna", "10k_pbmc"):
                     lsi_transformer_gex = lsiTransformer(n_components=256, drop_first=True)
                     m1_train = lsi_transformer_gex.fit_transform(modalities[0]).values
                     m1_test = lsi_transformer_gex.transform(modalities[2]).values
                     lsi_transformer_atac = lsiTransformer(n_components=512, drop_first=True)
                     m2_train = lsi_transformer_atac.fit_transform(modalities[1]).values
                     m2_test = lsi_transformer_atac.transform(modalities[3]).values
-
+                elif self.subtask in ("openproblems_2022_multi_atac2gex_subset", "GSE140203_3T3_HG19_atac2gex",
+                                      "GSE140203_3T3_MM10_atac2gex", "GSE140203_12878.rep2_atac2gex",
+                                      "GSE140203_12878.rep3_atac2gex", "GSE140203_K562_HG19_atac2gex",
+                                      "GSE140203_K562_MM10_atac2gex", "GSE140203_LUNG_atac2gex"):
+                    lsi_transformer_atac = lsiTransformer(n_components=512, drop_first=True)
+                    m1_train = lsi_transformer_atac.fit_transform(modalities[0]).values
+                    m1_test = lsi_transformer_atac.transform(modalities[2]).values
+                    lsi_transformer_gex = lsiTransformer(n_components=256, drop_first=True)
+                    m2_train = lsi_transformer_gex.fit_transform(modalities[1]).values
+                    m2_test = lsi_transformer_gex.transform(modalities[3]).values
                 else:
                     raise ValueError(f"Unrecognized subtask name: {self.subtask}")
 
@@ -336,6 +476,18 @@ class ModalityMatchingDataset(MultiModalityDataset):
             modalities[3].obsm["X_pca"] = preprocessed_features["mod2_test"]
 
         elif self.preprocess == "feature_selection":
+            for i in [0, 2]:
+                sc.pp.filter_cells(modalities[i], min_counts=1, inplace=True)
+                sc.pp.filter_cells(modalities[i + 1], min_counts=1, inplace=True)
+                common_cells = list(set(modalities[i].obs.index) & set(modalities[i + 1].obs.index))
+                modalities[i] = modalities[i][common_cells, :]
+                modalities[i + 1] = modalities[i + 1][common_cells, :]
+                if i == 0:
+                    train_label = train_label[common_cells, :]
+                    train_label = ad.AnnData(obs=train_label.obs, X=sp.csr_matrix(np.eye(len(train_label.obs))))
+                else:
+                    test_label = test_label[common_cells, :]
+                    test_label = ad.AnnData(obs=test_label.obs, X=sp.csr_matrix(np.eye(len(test_label.obs))))
             for i in range(2):
                 if modalities[i].shape[1] > selection_threshold:
                     sc.pp.highly_variable_genes(modalities[i], layer="counts", flavor="seurat_v3",
@@ -343,6 +495,18 @@ class ModalityMatchingDataset(MultiModalityDataset):
                     modalities[i + 2].var["highly_variable"] = modalities[i].var["highly_variable"]
                     modalities[i] = modalities[i][:, modalities[i].var["highly_variable"]]
                     modalities[i + 2] = modalities[i + 2][:, modalities[i + 2].var["highly_variable"]]
+            for i in [0, 2]:
+                sc.pp.filter_cells(modalities[i], min_counts=1, inplace=True)
+                sc.pp.filter_cells(modalities[i + 1], min_counts=1, inplace=True)
+                common_cells = list(set(modalities[i].obs.index) & set(modalities[i + 1].obs.index))
+                modalities[i] = modalities[i][common_cells, :]
+                modalities[i + 1] = modalities[i + 1][common_cells, :]
+                if i == 0:
+                    train_label = train_label[common_cells, :]
+                    train_label = ad.AnnData(obs=train_label.obs, X=sp.csr_matrix(np.eye(len(train_label.obs))))
+                else:
+                    test_label = test_label[common_cells, :]
+                    test_label = ad.AnnData(obs=test_label.obs, X=sp.csr_matrix(np.eye(len(test_label.obs))))
 
         else:
             logger.info("Preprocessing method not supported.")
@@ -360,7 +524,15 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
         "openproblems_bmmc_cite_phase2":
         "https://www.dropbox.com/s/hjr4dxuw55vin5z/openproblems_bmmc_cite_phase2.zip?dl=1",
         "openproblems_bmmc_multiome_phase2":
-        "https://www.dropbox.com/s/40kjslupxhkg92s/openproblems_bmmc_multiome_phase2.zip?dl=1"
+        "https://www.dropbox.com/s/40kjslupxhkg92s/openproblems_bmmc_multiome_phase2.zip?dl=1",
+        "GSE140203_BRAIN_atac2gex":
+        "https://www.dropbox.com/scl/fi/pa4zpj1fp00cqiavjadtx/GSE140203_BRAIN_atac2gex.zip?rlkey=oy73h59w4p9jsyhoxtaerxfw5&dl=1",
+        "GSE140203_SKIN_atac2gex":
+        "https://www.dropbox.com/scl/fi/2yuatq0icu6g5pc37jxq7/GSE140203_SKIN_atac2gex.zip?rlkey=o9fzlogrk3thcycv6u20jbyc6&dl=1",
+        "openproblems_2022_cite_gex2adt":
+        "https://www.dropbox.com/scl/fi/j3att18aems8ve8qhykeu/openproblems_2022_cite_gex2adt.zip?rlkey=i85wjp8iqkpxhbknywmwz8mz6&dl=1",
+        "openproblems_2022_multi_atac2gex":
+        "https://www.dropbox.com/scl/fi/fcw493eef1kmegwh9dpq9/openproblems_2022_multi_atac2gex.zip?rlkey=sd0dxbb9iadj84f84ai5cm5q5&dl=1"
     }
     SUBTASK_NAME_MAP = {
         "adt": "openproblems_bmmc_cite_phase2",
@@ -368,12 +540,15 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
     }
     AVAILABLE_DATA = sorted(list(URL_DICT) + list(SUBTASK_NAME_MAP))
 
-    def __init__(self, subtask, root="./data", preprocess=None, normalize=False, pretrained_folder="."):
+    def __init__(self, subtask, root="./data", preprocess=None, normalize=False, pretrained_folder=".",
+                 selection_threshold=10000, span=0.3):
         # TODO: factor our preprocess
         self.preprocess = preprocess
         self.normalize = normalize
         self.pretrained_folder = pretrained_folder
         super().__init__(subtask, root)
+        self.selection_threshold = selection_threshold
+        self.span = span
 
     def _raw_to_dance(self, raw_data):
         mod1, mod2, meta1, meta2, test_sol = self._maybe_preprocess(raw_data)
@@ -386,7 +561,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
 
         return data
 
-    def _maybe_preprocess(self, raw_data, selection_threshold=10000):
+    def _maybe_preprocess(self, raw_data):
         if self.preprocess is None:
             return raw_data
 
@@ -528,16 +703,44 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
                 pickle.dump([nb_cell_types, nb_batches, nb_phases], f)
 
             self.nb_cell_types, self.nb_batches, self.nb_phases = nb_cell_types, nb_batches, nb_phases
+        elif self.preprocess == "pca":
+            sc.pp.filter_genes(mod1, min_counts=3)
+            sc.pp.filter_genes(mod2, min_counts=3)
+            meta1 = meta1[:, mod1.var.index]
+            meta2 = meta2[:, mod2.var.index]
+            test_sol = test_sol[:, mod1.var.index]
+            lsi_transformer_gex = lsiTransformer(n_components=64, drop_first=True)
+            mod1.obsm['X_pca'] = lsi_transformer_gex.fit_transform(mod1).values
+            mod2.obsm['X_pca'] = lsi_transformer_gex.fit_transform(mod2).values
 
         elif self.preprocess == "feature_selection":
-            if mod1.shape[1] > selection_threshold:
-                sc.pp.highly_variable_genes(mod1, layer="counts", flavor="seurat_v3", n_top_genes=selection_threshold)
+
+            sc.pp.filter_genes(mod1, min_counts=3)
+            sc.pp.filter_genes(mod2, min_counts=3)
+            meta1 = meta1[:, mod1.var.index]
+            meta2 = meta2[:, mod2.var.index]
+            test_sol = test_sol[:, mod1.var.index]
+
+            if mod1.shape[1] > self.selection_threshold:
+                sc.pp.highly_variable_genes(mod1, layer="counts", flavor="seurat_v3",
+                                            n_top_genes=self.selection_threshold, span=self.span)
                 mod1 = mod1[:, mod1.var["highly_variable"]]
-
-            if mod2.shape[1] > selection_threshold:
-                sc.pp.highly_variable_genes(mod2, layer="counts", flavor="seurat_v3", n_top_genes=selection_threshold)
+            if mod2.shape[1] > self.selection_threshold:
+                sc.pp.highly_variable_genes(mod2, layer="counts", flavor="seurat_v3",
+                                            n_top_genes=self.selection_threshold, span=self.span)
                 mod2 = mod2[:, mod2.var["highly_variable"]]
+            sc.pp.filter_cells(mod1, min_genes=1, inplace=True)
+            sc.pp.filter_cells(mod2, min_genes=1, inplace=True)
+            common_cells = list(set(mod1.obs.index) & set(mod2.obs.index))
+            mod1 = mod1[common_cells, :]
+            mod2 = mod2[common_cells, :]
+            test_sol = test_sol[common_cells, :]
 
+            sc.pp.filter_cells(meta1, min_genes=1, inplace=True)
+            sc.pp.filter_cells(meta2, min_genes=1, inplace=True)
+            meta_common_cells = list(set(meta1.obs.index) & set(meta2.obs.index))
+            meta1 = meta1[meta_common_cells, :]
+            meta2 = meta2[meta_common_cells, :]
         else:
             logger.info(f"Preprocessing method {self.preprocess!r} not supported.")
 

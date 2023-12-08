@@ -1,10 +1,14 @@
+import logging
+
 import cv2
 import numpy as np
+import pandas as pd
+import patsy
 import torch
-import torchvision as tv
 from sklearn.decomposition import PCA
 from tqdm import tqdm, trange
 
+from dance.data.base import Data
 from dance.transforms.base import BaseTransform
 from dance.typing import Optional, Sequence
 from dance.utils.matrix import normalize
@@ -19,6 +23,8 @@ class MorphologyFeature(BaseTransform):
                  crop_size: int = 20, target_size: int = 299, device: str = "cpu",
                  channels: Sequence[str] = ("spatial_pixel", "image"), channel_types: Sequence[str] = ("obsm", "uns"),
                  **kwargs):
+        import torchvision as tv
+
         super().__init__(**kwargs)
 
         self.model_name = model_name
@@ -43,12 +49,11 @@ class MorphologyFeature(BaseTransform):
         cs = self.crop_size
         ts = self.target_size
 
-        img = image[x - cs:x + cs, y - cs:y + cs, :]
+        img = image[int(x - cs):int(x + cs), int(y - cs):int(y + cs), :]
         img = cv2.resize(img, (ts, ts))
         img = (img - self.mean) / self.std
         img = img.transpose((2, 0, 1))
         img = torch.FloatTensor(img).unsqueeze(0)
-
         return img
 
     def __call__(self, data):
@@ -109,3 +114,100 @@ class SMEFeature(BaseTransform):
             sme_feat = pca.fit_transform(sme_feat)
 
         data.data.obsm[self.out] = sme_feat
+
+
+class SpatialIDEFeature(BaseTransform):
+    """Spatial IDE feature.
+
+    The SpatialDE model is based on the assumption of normally distributed residual noise and independent observations
+    across cells. There are two normalization steps:
+
+        1. Variance-stabilizing transformation for negative-binomial-distributed data (Anscombe's transformation).
+        2. Regress log total count values out from the Anscombe-transformed expression values.
+
+    Reference
+    ---------
+    https://www.nature.com/articles/nmeth.4636#Sec2
+
+    """
+
+    def __init__(self, channels: Sequence[Optional[str]] = (None, "spatial"),
+                 channel_types: Sequence[Optional[str]] = (None, "obsm"), **kwargs):
+        super().__init__(**kwargs)
+        self.channels = channels
+        self.channel_types = channel_types
+
+    def regress_out(self, sample_info, expression_matrix, covariate_formula, design_formula='1', rcond=-1):
+        """Implementation of limma's removeBatchEffect function."""
+        # Ensure intercept is not part of covariates
+        covariate_formula += ' - 1'
+
+        covariate_matrix = patsy.dmatrix(covariate_formula, sample_info)
+        design_matrix = patsy.dmatrix(design_formula, sample_info)
+
+        design_batch = np.hstack((design_matrix, covariate_matrix))
+
+        coefficients, res, rank, s = np.linalg.lstsq(design_batch, expression_matrix.T, rcond=rcond)
+        beta = coefficients[design_matrix.shape[1]:]
+        regressed = expression_matrix - covariate_matrix.dot(beta).T
+
+        return regressed
+
+    def stabilize(self, expression_matrix):
+        """Use Anscombes approximation to variance stabilize Negative Binomial data.
+
+        See https://f1000research.com/posters/4-1041 for motivation.
+
+        Assumes columns are samples, and rows are genes
+
+        """
+        from scipy import optimize
+        phi_hat, _ = optimize.curve_fit(lambda mu, phi: mu + phi * mu**2, expression_matrix.mean(1),
+                                        expression_matrix.var(1))
+
+        return np.log(expression_matrix + 1. / (2 * phi_hat[0]))
+
+    def __call__(self, data):
+        counts = data.get_feature(return_type="numpy", channel=self.channels[0], channel_type=self.channel_types[0])
+        xy = data.get_feature(return_type="numpy", channel=self.channels[1], channel_type=self.channel_types[1])
+        norm_expr = self.stabilize(counts.T).T
+        sample_info = pd.DataFrame(xy, columns=['x', 'y'])
+        sample_info['total_counts'] = np.sum(counts, axis=1)
+        resid_expr = self.regress_out(sample_info, norm_expr.T, 'np.log(total_counts)').T
+        data.data.obsm[self.out] = resid_expr
+
+
+class TangramFeature(BaseTransform):
+    """Tangram spatial features.
+
+    First, compute the cell density inside each voxel. Then, the cell density distributions are compared using
+    Kullback-Leibler (KL) divergence, whereas gene expression is assessed via cosine similarity.
+
+    Reference
+    ---------
+    https://www.nature.com/articles/s41592-021-01264-7
+
+    """
+
+    def __init__(self, density_mode: str = "uniform", channel: Optional[str] = None, channel_type: Optional[str] = None,
+                 **kwargs):
+        super().__init__(**kwargs)
+        self.channel = channel
+        self.channel_type = channel_type
+        self.density_mode = density_mode
+
+    def __call__(self, data: Data) -> Data:
+        x = data.get_feature(return_type="default", channel=self.channel, channel_type=self.channel_type)
+        if self.density_mode == "uniform":
+            logging.info("Calculating uniform based density prior.")
+            density = np.ones(x.shape[0]) / x.shape[0]
+        elif self.density_mode == "rna_count":
+            # Calculate rna_count_based density prior as % of rna molecule count
+            logging.info("Calculating rna count based density prior.")
+            rna_count_per_spot = np.array(x.sum(axis=1)).squeeze()
+            density = rna_count_per_spot / np.sum(rna_count_per_spot)
+        else:
+            raise ValueError(f"Unknwon density mode {self.density_mode!r}, "
+                             "supported options are: 'uniform', 'rna_count'")
+        data.data.obs[self.out] = density
+        return data

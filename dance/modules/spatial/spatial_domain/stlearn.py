@@ -68,12 +68,12 @@ class StKmeans(BaseClusteringMethod):
 
     @staticmethod
     def preprocessing_pipeline(morph_feat_dim: int = 50, sme_feat_dim: int = 50, pca_feat_dim: int = 10,
-                               device: str = "cpu", log_level: LogLevel = "INFO"):
+                               device: str = "cpu", log_level: LogLevel = "INFO", crop_size=10, target_size=230):
         return Compose(
             AnnDataTransform(sc.pp.filter_genes, min_cells=1),
             AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
             AnnDataTransform(sc.pp.log1p),
-            MorphologyFeature(n_components=morph_feat_dim, device=device),
+            MorphologyFeature(n_components=morph_feat_dim, device=device, crop_size=crop_size, target_size=target_size),
             CellPCA(n_components=pca_feat_dim),
             SMEGraph(),
             SMEFeature(n_components=sme_feat_dim),
@@ -119,12 +119,12 @@ class StLouvain(BaseClusteringMethod):
     @staticmethod
     def preprocessing_pipeline(morph_feat_dim: int = 50, sme_feat_dim: int = 50, pca_feat_dim: int = 10,
                                nbrs_pcs: int = 10, n_neighbors: int = 10, device: str = "cpu",
-                               log_level: LogLevel = "INFO"):
+                               log_level: LogLevel = "INFO", crop_size=10, target_size=230):
         return Compose(
             AnnDataTransform(sc.pp.filter_genes, min_cells=1),
             AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
             AnnDataTransform(sc.pp.log1p),
-            MorphologyFeature(n_components=morph_feat_dim, device=device),
+            MorphologyFeature(n_components=morph_feat_dim, device=device, crop_size=crop_size, target_size=target_size),
             CellPCA(n_components=pca_feat_dim),
             SMEGraph(),
             SMEFeature(n_components=sme_feat_dim),

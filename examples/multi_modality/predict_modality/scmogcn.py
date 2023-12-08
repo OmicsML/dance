@@ -31,6 +31,15 @@ def pipeline(inductive=False, verbose=2, logger=None, **kwargs):
     mod2 = anndata.concat((modalities[1], modalities[3]))
     mod1.var_names_make_unique()
     mod2.var_names_make_unique()
+
+    mod1_batch = (mod1.obs["batch"].cat.categories
+                  if "unknown" in mod1.obs["batch"].cat.categories else mod1.obs["batch"].cat.add_categories("unknown"))
+    mod2_batch = (mod2.obs["batch"].cat.categories
+                  if "unknown" in mod2.obs["batch"].cat.categories else mod2.obs["batch"].cat.add_categories("unknown"))
+
+    mod1.obs["batch"] = mod1_batch.fillna("unknown")
+    mod2.obs["batch"] = mod2_batch.fillna("unknown")
+
     mdata = mudata.MuData({"mod1": mod1, "mod2": mod2})
     train_size = modalities[0].shape[0]
     data = Data(mdata, train_size=train_size)

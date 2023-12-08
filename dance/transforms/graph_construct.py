@@ -9,17 +9,13 @@ import dgl
 import networkx as nx
 import numpy as np
 import pandas as pd
-import sklearn
+import scipy.stats
 import torch
 from dgl import nn as dglnn
-from scipy import sparse as sp
 from scipy.sparse import csc_matrix
 from scipy.spatial import distance, distance_matrix, minkowski_distance
-from sklearn.decomposition import PCA, TruncatedSVD
-from sklearn.metrics import pairwise_distances as pair
+from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.neighbors import kneighbors_graph
-from sklearn.preprocessing import normalize
 from torch.nn import functional as F
 
 from dance import logger
@@ -202,9 +198,8 @@ def construct_pathway_graph(gex_data, **kwargs):
     pk_path = f'pw_{subtask}_{pww}.pkl'
     #     pk_path = f'pw_{subtask}_{pww}.pkl'
     if os.path.exists(pk_path):
-        print(
-            'WARNING: Pathway file exist. Load pickle file by default. Auguments "--pathway_weight" and "--pathway_path" will not take effect.'
-        )
+        print("WARNING: Pathway file exist. Load pickle file by default. "
+              "Auguments --pathway_weight and --pathway_path will not take effect.")
         uu, vv, ee = pickle.load(open(pk_path, 'rb'))
     else:
         # Load Original Pathway File
@@ -237,8 +232,8 @@ def construct_pathway_graph(gex_data, **kwargs):
         pw = [i[1] for i in gene_sets_symbols.items()]
 
         # Generate New Pathway Data
-        counter = 0
-        total = 0
+        # counter = 0
+        # total = 0
         feature_index = gex_data.var['feature_types'].index.tolist()
         gex_features = gex_data.X
         new_pw = []
@@ -276,7 +271,18 @@ def construct_pathway_graph(gex_data, **kwargs):
                         if j != k:
                             uu.append(j)
                             vv.append(k)
-                            ee.append(corr[j][k])
+                            ee.append(1 - corr[j][k])
+        elif pww == 'spearman':
+            spe = scipy.stats.spearmanr(gex_features.toarray())[0]
+            if gex_features.toarray().shape[0] == 2:
+                spe = np.array([[1, spe], [spe, 1]])
+            for i in new_pw:
+                for j in i:
+                    for k in i:
+                        if j != k:
+                            uu.append(j)
+                            vv.append(k)
+                            ee.append(1 - spe[j][k])
 
         pickle.dump([uu, vv, ee], open(pk_path, 'wb'))
 
@@ -322,11 +328,14 @@ def construct_basic_feature_graph(feature_mod1, feature_mod1_test=None, bf_input
         input_test_mod1 = csc_matrix(feature_mod1_test)
         assert (input_test_mod1.shape[1] == input_train_mod1.shape[1])
 
-        u = torch.from_numpy(np.concatenate([np.array(t.nonzero()[0] + i) for i, t in enumerate(input_train_mod1)] + \
-                                            [np.array(t.nonzero()[0] + i + input_train_mod1.shape[0]) for i, t in
-                                             enumerate(input_test_mod1)], axis=0))
-        v = torch.from_numpy(np.concatenate([np.array(t.nonzero()[1]) for t in input_train_mod1] + \
-                                            [np.array(t.nonzero()[1]) for t in input_test_mod1], axis=0))
+        u = torch.from_numpy(
+            np.concatenate(
+                [np.array(t.nonzero()[0] + i) for i, t in enumerate(input_train_mod1)] +
+                [np.array(t.nonzero()[0] + i + input_train_mod1.shape[0])
+                 for i, t in enumerate(input_test_mod1)], axis=0))
+        v = torch.from_numpy(
+            np.concatenate([np.array(t.nonzero()[1])
+                            for t in input_train_mod1] + [np.array(t.nonzero()[1]) for t in input_test_mod1], axis=0))
         sample_size = input_train_mod1.shape[0] + input_test_mod1.shape[0]
         weights = torch.from_numpy(np.concatenate(
             [input_train_mod1.tocsr().data, input_test_mod1.tocsr().data], axis=0)).float()
@@ -349,7 +358,7 @@ def construct_basic_feature_graph(feature_mod1, feature_mod1_test=None, bf_input
     else:
         g.nodes['cell'].data['bf'] = torch.zeros(sample_size).float()
 
-    g.nodes['cell'].data['id'] = torch.zeros(sample_size).long()  #torch.arange(sample_size).long()
+    g.nodes['cell'].data['id'] = torch.zeros(sample_size).long()  # torch.arange(sample_size).long()
     #     g.nodes['cell'].data['source'] =
     g.nodes['feature'].data['id'] = torch.arange(input_train_mod1.shape[1]).long()
     g.edges['cell2feature'].data['weight'] = g.edges['feature2cell'].data['weight'] = weights
@@ -545,22 +554,24 @@ def construct_modality_prediction_graph(dataset, **kwargs):
         e = torch.from_numpy(input_train_mod1.tocsr().data).float()
         g = construct_enhanced_feature_graph(u, v, e, cell_node_features, enhance_graph, **kwargs)
 
-        u = torch.from_numpy(np.concatenate([np.array(t.nonzero()[0] + i) for i, t in enumerate(input_train_mod1)] + \
-                                            [np.array(t.nonzero()[0] + i + TRAIN_SIZE) for i, t in
-                                             enumerate(input_test_mod1)], axis=0))
-        v = torch.from_numpy(np.concatenate([np.array(t.nonzero()[1]) for t in input_train_mod1] + \
-                                            [np.array(t.nonzero()[1]) for t in input_test_mod1], axis=0))
+        u = torch.from_numpy(
+            np.concatenate([np.array(t.nonzero()[0] + i) for i, t in enumerate(input_train_mod1)] +
+                           [np.array(t.nonzero()[0] + i + TRAIN_SIZE) for i, t in enumerate(input_test_mod1)], axis=0))
+        v = torch.from_numpy(
+            np.concatenate([np.array(t.nonzero()[1])
+                            for t in input_train_mod1] + [np.array(t.nonzero()[1]) for t in input_test_mod1], axis=0))
         e = torch.from_numpy(np.concatenate(
             [input_train_mod1.tocsr().data, input_test_mod1.tocsr().data], axis=0)).float()
         gtest = construct_enhanced_feature_graph(u, v, e, cell_node_features, enhance_graph, test=True, **kwargs)
         return g, gtest
 
     else:
-        u = torch.from_numpy(np.concatenate([np.array(t.nonzero()[0] + i) for i, t in enumerate(input_train_mod1)] + \
-                                            [np.array(t.nonzero()[0] + i + TRAIN_SIZE) for i, t in
-                                             enumerate(input_test_mod1)], axis=0))
-        v = torch.from_numpy(np.concatenate([np.array(t.nonzero()[1]) for t in input_train_mod1] + \
-                                            [np.array(t.nonzero()[1]) for t in input_test_mod1], axis=0))
+        u = torch.from_numpy(
+            np.concatenate([np.array(t.nonzero()[0] + i) for i, t in enumerate(input_train_mod1)] +
+                           [np.array(t.nonzero()[0] + i + TRAIN_SIZE) for i, t in enumerate(input_test_mod1)], axis=0))
+        v = torch.from_numpy(
+            np.concatenate([np.array(t.nonzero()[1])
+                            for t in input_train_mod1] + [np.array(t.nonzero()[1]) for t in input_test_mod1], axis=0))
         e = torch.from_numpy(np.concatenate(
             [input_train_mod1.tocsr().data, input_test_mod1.tocsr().data], axis=0)).float()
         g = construct_enhanced_feature_graph(u, v, e, cell_node_features, enhance_graph, **kwargs)
@@ -617,8 +628,10 @@ def basic_feature_graph_propagation(g, layers=3, alpha=0.5, beta=0.5, cell_init=
                     'edge_weight': g.edges['feature2cell'].data['weight']
                 }
             })
-        if verbose: print(i, 'cell', h['cell'].abs().mean(), h1['cell'].abs().mean())
-        if verbose: print(i, 'feature', h['feature'].abs().mean(), h1['feature'].abs().mean())
+        if verbose:
+            print(i, 'cell', h['cell'].abs().mean(), h1['cell'].abs().mean())
+        if verbose:
+            print(i, 'feature', h['feature'].abs().mean(), h1['feature'].abs().mean())
 
         h1['feature'] = (h1['feature'] -
                          h1['feature'].mean()) / (h1['feature'].std() if h1['feature'].mean() != 0 else 1)
@@ -634,12 +647,13 @@ def basic_feature_graph_propagation(g, layers=3, alpha=0.5, beta=0.5, cell_init=
 
         hcell.append(h['cell'])
 
-    if verbose: print(hcell[-1].abs().mean())
+    if verbose:
+        print(hcell[-1].abs().mean())
 
     return hcell[1:]
 
 
-##### scGNN create adjacency, likely much overlap with above functions, nested function defs to avoid possible namespace conflicts
+# scGNN create adjacency, likely much overlap with above functions, nested function defs to avoid possible namespace conflicts
 
 
 def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLimit=0, adjTag=True):
@@ -649,7 +663,7 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
         r"""KNNgraphPairwise:  measuareName:k Pairwise:5 Minkowski-Pairwise:5:1."""
         measureName = ''
         k = 5
-        if para != None:
+        if para is not None:
             parawords = para.split(':')
             measureName = parawords[0]
 
@@ -677,7 +691,8 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
         KNNgraph:
         https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.distance.cdist.html#scipy.spatial.distance.cdist
         distanceType incude:
-        Distance functions between two numeric vectors u and v. Computing distances over a large collection of vectors is inefficient for these functions. Use pdist for this purpose.
+        Distance functions between two numeric vectors u and v. Computing distances over a large collection of
+        vectors is inefficient for these functions. Use pdist for this purpose.
         braycurtis(u, v[, w])	Compute the Bray-Curtis distance between two 1-D arrays.
         canberra(u, v[, w])	Compute the Canberra distance between two 1-D arrays.
         chebyshev(u, v[, w])	Compute the Chebyshev distance.
@@ -691,7 +706,8 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
         seuclidean(u, v, V)	Return the standardized Euclidean distance between two 1-D arrays.
         sqeuclidean(u, v[, w])	Compute the squared Euclidean distance between two 1-D arrays.
         wminkowski(u, v, p, w)	Compute the weighted Minkowski distance between two 1-D arrays.
-        Distance functions between two boolean vectors (representing sets) u and v. As in the case of numerical vectors, pdist is more efficient for computing the distances between all pairs.
+        Distance functions between two boolean vectors (representing sets) u and v. As in the case of numerical
+        vectors, pdist is more efficient for computing the distances between all pairs.
         dice(u, v[, w])	Compute the Dice dissimilarity between two boolean 1-D arrays.
         hamming(u, v[, w])	Compute the Hamming distance between two 1-D arrays.
         jaccard(u, v[, w])	Compute the Jaccard-Needham dissimilarity between two boolean 1-D arrays.
@@ -780,8 +796,8 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
         edgeList = []
         # Version 1: cost memory, precalculate all dist
 
-        ## distMat = distance.cdist(featureMatrix,featureMatrix, distanceType)
-        ## parallel
+        # distMat = distance.cdist(featureMatrix,featureMatrix, distanceType)
+        # parallel
         # distMat = pairwise_distances(featureMatrix,featureMatrix, distanceType, n_jobs=-1)
 
         # for i in np.arange(distMat.shape[0]):
@@ -796,7 +812,7 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
         #             weight = 0.0
         #         edgeList.append((i,res[j],weight))
 
-        ## Version 2: for each of the cell, calculate dist, save memory
+        # Version 2: for each of the cell, calculate dist, save memory
         p_time = time.time()
         for i in np.arange(featureMatrix.shape[0]):
             if i % 10000 == 0:
@@ -843,7 +859,10 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
 
         t1 = time.time()
         print('Pruning succeed in ' + str(t1 - t) + ' seconds')
-        flatten = lambda l: [item for sublist in l for item in sublist]
+
+        def flatten(l):
+            return [item for sublist in l for item in sublist]
+
         t2 = time.time()
         edgeList = flatten(edgeListT)
         print('Prune out ready in ' + str(t2 - t1) + ' seconds')
@@ -909,19 +928,19 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
     if graphType == 'KNNgraphPairwise':
         edgeList = calculateKNNgraphDistanceMatrixPairwise(featureMatrix, para)
     elif graphType == 'KNNgraph':
-        if para != None:
+        if para is not None:
             parawords = para.split(':')
             distanceType = parawords[0]
             k = int(parawords[1])
         edgeList = calculateKNNgraphDistanceMatrix(featureMatrix, distanceType=distanceType, k=k)
     elif graphType == 'Thresholdgraph':
-        if para != None:
+        if para is not None:
             parawords = para.split(':')
             distanceType = parawords[0]
             threshold = float(parawords[1])
         edgeList = calculateThresholdgraphDistanceMatrix(featureMatrix, distanceType=distanceType, threshold=threshold)
     elif graphType == 'KNNgraphThreshold':
-        if para != None:
+        if para is not None:
             parawords = para.split(':')
             distanceType = parawords[0]
             k = int(parawords[1])
@@ -932,7 +951,7 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
         # with weights!
         # https://towardsdatascience.com/5-ways-to-detect-outliers-that-every-data-scientist-should-know-python-code-70a54335a623
         # https://scikit-learn.org/stable/modules/outlier_detection.html
-        if para != None:
+        if para is not None:
             parawords = para.split(':')
             distanceType = parawords[0]
             k = int(parawords[1])
@@ -940,7 +959,7 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
     elif graphType == 'KNNgraphStats':
         # with weights!
         # with stats, one std is contained
-        if para != None:
+        if para is not None:
             parawords = para.split(':')
             distanceType = parawords[0]
             k = int(parawords[1])
@@ -949,7 +968,7 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
     elif graphType == 'KNNgraphStatsSingleThread':
         # with weights!
         # with stats, one std is contained, but only use single thread
-        if para != None:
+        if para is not None:
             parawords = para.split(':')
             distanceType = parawords[0]
             k = int(parawords[1])

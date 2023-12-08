@@ -192,6 +192,7 @@ class Enc(nn.Module):
     def read_count(self, x):
         read = torch.sum(x, axis=1)
         read = read.repeat(self.data_dim, 1).t()
+        read[read == 0] += Constants.eta
         return (read)
 
     def forward(self, x):

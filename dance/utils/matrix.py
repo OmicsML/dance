@@ -67,6 +67,36 @@ def normalize(mat, *, mode: NormMode = "normalize", axis: int = 0, eps: float = 
     return norm_mat
 
 
+def dist_to_rbf(dist_mat: np.ndarray, denom_scale: float = 1.0, scale_mode: str = "med_dist") -> np.ndarray:
+    """Convert distance to Gaussian RBF.
+
+    Parameters
+    ----------
+    dist_mat
+        Distance matrix, where each entry (i,j) represent the distance between entity i and entity j.
+    denom_scale
+        Denominator scaling factor.
+    scale_mode
+        How to sacle the distance matrix. Supported options are (1) ``"med_dist"`` (default) scale by median distance,
+        (2) ``"ind_med_dist"`` scale by median distance for each entity, (3) ``"scale"`` scale only by the scaling
+        factor.
+
+    """
+    if (dist_mat < 0).any():
+        raise ValueError("Distance matrix must only contain non-negative values.")
+
+    if scale_mode == "med_dist":
+        denom = np.median(dist_mat) * denom_scale
+    elif scale_mode == "ind_med_dist":
+        denom = np.median(dist_mat, axis=1, keepdims=True) * denom_scale
+    elif scale_mode == "scale":
+        denom = denom_scale
+    else:
+        raise ValueError(f"Uknwon rbf scaling mode {scale_mode}")
+    rbf = np.exp(-dist_mat / denom)
+    return rbf
+
+
 @numba.njit("f4(f4[:], f4[:])")
 def euclidean_distance(t1, t2):
     sum = 0
@@ -75,10 +105,69 @@ def euclidean_distance(t1, t2):
     return np.sqrt(sum)
 
 
-@numba.njit("f4[:,:](f4[:,:], u4)", parallel=True, nogil=True)
+@numba.njit("f4(f4[:], f4[:])")
+def pearson_distance(a, b):
+    a_avg = np.sum(a) / len(a)
+    b_avg = np.sum(b) / len(b)
+    cov_ab1 = [x - a_avg for x in a]
+    cov_ab2 = [y - b_avg for y in b]
+    cov_ab = np.sum(np.array([cov_ab1[i] * cov_ab2[i] for i in range(len(cov_ab1))]))
+    sq = (np.sum(np.array([(x - a_avg)**2 for x in a])) * np.sum(np.array([(x - b_avg)**2 for x in b])))**0.5
+    corr_factor = cov_ab / sq
+    return 1 - corr_factor  # best correlation: 0, no correlation: 1, best anti correlation: 2
+
+
+@numba.njit("f4[:](f4[:])")
+def mean_rank_data(x):
+    """Rank data and take mean rank for ties.
+
+    See
+    https://github.com/scipy/scipy/blob/5e4a5e3785f79dd4e8930eed883da89958860db2/scipy/stats/_stats_py.py#L10123
+
+    """
+    sorter = np.argsort(x, kind="quicksort")
+    inv = np.empty(sorter.size, dtype=np.intp)
+    for i, j in enumerate(sorter):
+        inv[j] = i
+
+    arr = x[sorter]
+    obs = np.concatenate((np.array([True]), arr[1:] != arr[:-1]))
+    dense = obs.cumsum()[inv]
+
+    count = np.concatenate((np.nonzero(obs)[0].astype(np.float32), np.array([obs.size])))
+    res = np.empty(obs.size, dtype=np.float32)
+    for i in range(res.size):
+        res[i] = (count[dense[i]] + count[dense[i] - 1] + 1) / 2
+    return res
+
+
+@numba.njit("f4(f4[:], f4[:])")
+def spearman_distance(x, y):
+    """The Spearman rank correlation is used to evaluate if the relationship between two
+    variables, X and Y is monotonic.
+
+    The rank correlation measures how closely related the ordering of one variable to
+    the other variable, with no regard to the actual values of the variables.
+
+    """
+    if len(x) != len(y):
+        raise ValueError(f'X length {len(x)} does not match Y length {len(y)}')
+    x_ranks = mean_rank_data(x)
+    y_ranks = mean_rank_data(y)
+    return pearson_distance(x_ranks, y_ranks)  # best correlation: 0, no correlation: 1, best anti correlation: 2
+
+
+DIST_FUNC_ID = ["euclidean_distance", "pearson_distance", "spearman_distance"]
+
+
+@numba.njit("f4[:,:](f4[:,:], u4)", parallel=False, nogil=True)  # FIX: parallel=True gives segfault on mac
 def pairwise_distance(x, dist_func_id=0):
     if dist_func_id == 0:  # Euclidean distance
         dist = euclidean_distance
+    elif dist_func_id == 1:
+        dist = pearson_distance
+    elif dist_func_id == 2:
+        dist = spearman_distance
     else:
         raise ValueError("Unknown distance function ID")
 

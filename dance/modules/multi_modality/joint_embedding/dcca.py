@@ -19,6 +19,8 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.init as init
+import torch.nn.utils as utils
 import torch.utils.data as data_utils
 from sklearn import metrics
 from sklearn.cluster import KMeans
@@ -96,7 +98,6 @@ def log_nb_positive(x, mu, theta, eps=1e-8):
 
 def build_multi_layers(layers, use_batch_norm=True, dropout_rate=0.1):
     """Build multilayer linear perceptron."""
-
     if dropout_rate > 0:
         fc_layers = nn.Sequential(
             collections.OrderedDict([(
@@ -108,7 +109,6 @@ def build_multi_layers(layers, use_batch_norm=True, dropout_rate=0.1):
                     nn.Dropout(p=dropout_rate),
                 ),
             ) for i, (n_in, n_out) in enumerate(zip(layers[:-1], layers[1:]))]))
-
     else:
         fc_layers = nn.Sequential(
             collections.OrderedDict([(
@@ -159,7 +159,6 @@ class Encoder(nn.Module):
             h = self.fc1(x)
         else:
             h = x
-
         mean_x = self.fc_means(h)
         logvar_x = self.fc_logvar(h)
         latent = self.reparametrize(mean_x, logvar_x)
@@ -407,7 +406,6 @@ class VAE(nn.Module):
                 epoch_lr = adjust_learning_rate(args.lr1, optimizer, epoch, args.flr1, 10)
             else:
                 epoch_lr = adjust_learning_rate(args.lr2, optimizer, epoch, args.flr2, 10)
-
             for batch_idx, (X1, X1_raw, size_factor1, X2, X2_raw, size_factor2) in enumerate(train_loader):
 
                 X1, X1_raw, size_factor1 = X1.to(args.device), X1_raw.to(args.device), size_factor1.to(args.device)
