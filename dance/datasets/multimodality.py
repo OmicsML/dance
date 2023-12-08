@@ -488,7 +488,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
         "GSE140203_BRAIN_atac2gex":
         "https://www.dropbox.com/scl/fi/pa4zpj1fp00cqiavjadtx/GSE140203_BRAIN_atac2gex.zip?rlkey=oy73h59w4p9jsyhoxtaerxfw5&dl=1",
         "GSE140203_SKIN_atac2gex":
-        "https://www.dropbox.com/scl/fi/xsmtygbyhh1otog7qg2i6/GSE140203_SKIN_atac2gex.zip?rlkey=4d3n1mtflrysryqxxnjad8uob&dl=1",
+        "https://www.dropbox.com/scl/fi/2yuatq0icu6g5pc37jxq7/GSE140203_SKIN_atac2gex.zip?rlkey=o9fzlogrk3thcycv6u20jbyc6&dl=1",
         "openproblems_2022_cite_gex2adt":
         "https://www.dropbox.com/scl/fi/j3att18aems8ve8qhykeu/openproblems_2022_cite_gex2adt.zip?rlkey=i85wjp8iqkpxhbknywmwz8mz6&dl=1",
         "openproblems_2022_multi_atac2gex":
