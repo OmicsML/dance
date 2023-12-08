@@ -414,7 +414,7 @@ class ModalityMatchingDataset(MultiModalityDataset):
             modalities[i].X=int_data
             modalities[i].layers["counts"]=modalities[i].X
         logger.info(f"A total of {changed_count} entries were modified")
-        
+
         if self.preprocess == "pca":
             if self.pkl_path and osp.exists(self.pkl_path):
                 with open(self.pkl_path, "rb") as f:
