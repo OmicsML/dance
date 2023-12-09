@@ -1,11 +1,13 @@
 import dgl
 import dgl.nn as dglnn
+import numpy as np
 import torch
 from scipy.sparse import coo_matrix
+from scipy.stats import spearmanr
 
 from dance.transforms.base import BaseTransform
 from dance.typing import Any, Dict, Optional
-from dance.utils.matrix import DIST_FUNC_ID, dist_to_rbf, pairwise_distance
+from dance.utils.matrix import dist_to_rbf
 
 
 class FeatureFeatureGraph(BaseTransform):
@@ -42,19 +44,26 @@ class FeatureFeatureGraph(BaseTransform):
         feat = data.get_feature(return_type="numpy")
 
         # Calculate correlation between features
-        if self.score_func in ("pearson", "spearman"):
-            dist_func_id = DIST_FUNC_ID.index(f"{self.score_func}_distance")
-            adj = 1 - pairwise_distance(feat.T, dist_func_id=dist_func_id)
+        if self.score_func == "pearson":
+            adj = np.corrcoef(feat.T)
+        elif self.score_func == "spearman":
+            adj = spearmanr(feat, axis=0)[0]
         elif self.score_func == "rbf":
-            dist_func_id = DIST_FUNC_ID.index("euclidean_distance")
-            dist_mat = pairwise_distance(feat.T, dist_fun_id=dist_func_id)
+            norm_vec = np.power(feat, 2).sum(0, keepdims=True)
+            # NOTE: need to clip zero due to numerical errors caused by single
+            # precision computationa leading to negative values.
+            dist_mat = np.sqrt((norm_vec + norm_vec.T - 2 * feat.T @ feat).clip(0))
             adj = dist_to_rbf(dist_mat, **self.score_func_kwargs)
         else:
             raise ValueError(f"Unknown similarity score function {self.score_func!r}, "
                              "supported options are: 'pearson', 'spearman', 'rbf'")
 
+        # Cast type
+        feat = feat.astype(np.float32)
+        adj = adj.astype(np.float32)
+
         # Apply threshold
-        adj[-self.threshold < adj < self.threshold] = 0
+        adj[np.logical_and(adj > -self.threshold, adj < self.threshold)] = 0
         if self.positive_only:
             adj[adj < 0] = 0
 
@@ -62,8 +71,8 @@ class FeatureFeatureGraph(BaseTransform):
         adj_coo = coo_matrix(adj)
         graph_data = (torch.from_numpy(adj_coo.row).int(), torch.from_numpy(adj_coo.col).int())
         g = dgl.graph(graph_data, num_nodes=adj.shape[0])
-        g.ndata["feat"] = feat.T
-        g.edata["weight"] = torch.ones(g.num_edges()).float()
+        g.ndata["feat"] = torch.from_numpy(feat.T)
+        g.edata["weight"] = torch.ones(g.num_edges(), dtype=torch.float32)
 
         # Normalize edges
         if self.normalize_edges:
