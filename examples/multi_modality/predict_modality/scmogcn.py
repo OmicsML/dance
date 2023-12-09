@@ -32,10 +32,9 @@ def pipeline(inductive=False, verbose=2, logger=None, **kwargs):
     mod1.var_names_make_unique()
     mod2.var_names_make_unique()
 
-    mod1_batch = (mod1.obs["batch"].cat.categories
-                  if "unknown" in mod1.obs["batch"].cat.categories else mod1.obs["batch"].cat.add_categories("unknown"))
-    mod2_batch = (mod2.obs["batch"].cat.categories
-                  if "unknown" in mod2.obs["batch"].cat.categories else mod2.obs["batch"].cat.add_categories("unknown"))
+    mod1_batch_cat, mod2_batch_cat = map(lambda x: x.obs["batch"].astype("category"), (mod1, mod2))
+    mod1_batch, mod2_batch = map(lambda x: x if "unknown" in x.cat.categories else x.cat.add_categories("unknown"),
+                                 (mod1_batch_cat, mod2_batch_cat))
 
     mod1.obs["batch"] = mod1_batch.fillna("unknown")
     mod2.obs["batch"] = mod2_batch.fillna("unknown")
