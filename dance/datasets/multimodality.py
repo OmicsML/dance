@@ -7,6 +7,7 @@ import anndata as ad
 import mudata as md
 import numpy as np
 import scanpy as sc
+import scipy.sparse as sp
 
 from dance import logger
 from dance.data import Data
