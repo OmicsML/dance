@@ -1,3 +1,5 @@
+import sys
+
 import numba
 import numpy as np
 import torch
@@ -160,7 +162,8 @@ def spearman_distance(x, y):
 DIST_FUNC_ID = ["euclidean_distance", "pearson_distance", "spearman_distance"]
 
 
-@numba.njit("f4[:,:](f4[:,:], u4)", parallel=False, nogil=True)  # FIX: parallel=True gives segfault on mac
+# XXX: parallel produce segfalt on M-chip Mac
+@numba.njit("f4[:,:](f4[:,:], u4)", parallel=True, nogil=True)
 def pairwise_distance(x, dist_func_id=0):
     if dist_func_id == 0:  # Euclidean distance
         dist = euclidean_distance
