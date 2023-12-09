@@ -27,5 +27,6 @@ statsmodels==0.14.0
 tables==3.8.0; python_version < "3.9"
 tables==3.9.1; python_version >= "3.9"
 threadpoolctl==3.2.0
+tifffile==2023.7.10
 torchnmf==0.3.5
 tqdm==4.66.1

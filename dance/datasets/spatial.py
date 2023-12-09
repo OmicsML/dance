@@ -8,10 +8,8 @@ import h5py
 import numpy as np
 import pandas as pd
 import scanpy as sc
-import scipy
 import tifffile
 from anndata import AnnData
-from matplotlib import pyplot as plt
 
 from dance import logger
 from dance.data import Data
