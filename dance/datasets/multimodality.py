@@ -403,6 +403,10 @@ class ModalityMatchingDataset(MultiModalityDataset):
 
         train_mod1, train_mod2, train_label, test_mod1, test_mod2, test_label = raw_data
         modalities = [train_mod1, train_mod2, test_mod1, test_mod2]
+        if is_numeric(train_mod2.obs_names[0]):
+            train_mod2.obs_names=train_mod1.obs_names
+        if is_numeric(test_mod2.obs_names[0]):
+            test_mod2.obs_names=test_mod1.obs_names
 
         # TODO: support other two subtasks
         # assert self.subtask in ("openproblems_bmmc_cite_phase2_rna", "openproblems_bmmc_cite_phase2_rna_subset",
