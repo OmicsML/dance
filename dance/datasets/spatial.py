@@ -14,7 +14,7 @@ from anndata import AnnData
 from dance import logger
 from dance.data import Data
 from dance.datasets.base import BaseDataset
-from dance.registers import register_dataset
+from dance.registry import register_dataset
 from dance.typing import Tuple
 from dance.utils.download import download_file, download_unzip, unzip_file
 

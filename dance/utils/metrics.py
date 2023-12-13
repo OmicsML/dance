@@ -8,7 +8,7 @@ from sklearn.metrics import adjusted_rand_score, mean_squared_error
 from sklearn.metrics.cluster import normalized_mutual_info_score
 
 from dance import logger
-from dance.registers import METRIC_FUNCS, register_metric_func
+from dance.registry import METRIC_FUNCS, register_metric_func
 from dance.typing import Any, Mapping, Optional, Union
 from dance.utils.wrappers import torch_to_numpy
 

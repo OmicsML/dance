@@ -2,7 +2,7 @@ from pprint import pformat
 
 import pandas as pd
 
-from dance.registers import GENESTATS_FUNCS, register_genestats_func
+from dance.registry import GENESTATS_FUNCS, register_genestats_func
 from dance.transforms.base import BaseTransform
 from dance.typing import List, Optional, Union
 from dance.utils.wrappers import as_1d_array
