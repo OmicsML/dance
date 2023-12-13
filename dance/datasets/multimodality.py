@@ -305,6 +305,18 @@ class ModalityPredictionDataset(MultiModalityDataset):
         return data
 
     def _maybe_preprocess(self, raw_data, selection_threshold=10000):
+        
+        changed_count = 0  # keep track to modified entries due to ensuring count data type
+        for i in range(4):
+            m_data = raw_data[i].X
+            int_data = m_data.astype(int)
+            changed_count += np.sum(int_data != m_data)
+            raw_data[i].X = int_data
+            raw_data[i].layers["counts"] = raw_data[i].X
+        if changed_count > 0:
+            logger.warning("Implicit modification: to ensure count (integer type) data, "
+                           f"a total number of {changed_count} entries were modified.")
+            
         if self.preprocess == "feature_selection":
             if raw_data[0].shape[1] > selection_threshold:
                 sc.pp.highly_variable_genes(raw_data[0], layer="counts", flavor="seurat_v3",
