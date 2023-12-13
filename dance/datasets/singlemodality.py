@@ -14,11 +14,11 @@ import scanpy as sc
 from scipy.sparse import csr_matrix
 
 from dance import logger
-from dance.config import METADIR
 from dance.data import Data
 from dance.datasets.base import BaseDataset
 from dance.metadata.imputation import IMPUTATION_DATASET_TO_FILE
 from dance.registers import register_dataset
+from dance.settings import METADIR
 from dance.typing import Dict, List, Optional, Set, Tuple
 from dance.utils.download import download_file, download_unzip
 from dance.utils.io import load_data_url_dict_from_csv
