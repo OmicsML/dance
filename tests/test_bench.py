@@ -55,7 +55,7 @@ light_options_dict: Dict[str, Tuple[str, str]] = {
     "spatial_domain-louvain-151507": "--sample_number 151507 --seed 10",
     "spatial_domain-spagcn-151507": "--sample_number 151507 --lr 0.009",
     "spatial_domain-stagate-151507": "--sample_number 151507 --seed 2021",
-    "spatial_domain-stlearn-151507": "--n_clusters 20 --sample_number 151507 --seed 0",
+    "spatial_domain-stlearn-151507": "--n_clusters 20 --sample_number 151507 --seed 1",
 }  # yapf: disable
 
 full_options_dict: Dict[str, Tuple[str, str]] = {
