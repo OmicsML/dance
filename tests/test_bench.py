@@ -42,7 +42,7 @@ light_options_dict: Dict[str, Tuple[str, str]] = {
     "joint_embedding-scmvae-gex_adt": "--subtask openproblems_bmmc_cite_phase2 --device cuda --max_epoch 2 --anneal_epoch 2 --epoch_per_test 2 --max_iteration 3",
     "match_modality-cmae-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --max_epochs 2",
     "match_modality-scmm-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --epochs 2",
-    "match_modality-scmogcn-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --threshold_quantile 0.85 --device cuda --epochs 100",
+    "match_modality-scmogcn-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --threshold_quantile 0.85 --device cuda --epochs 2",
     "predict_modality-babel-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --max_epochs 2 --earlystop 2",
     "predict_modality-cmae-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --max_epochs 2",
     "predict_modality-scmm-gex2adt_subset": "--subtask openproblems_bmmc_cite_phase2_rna_subset --device cuda --epochs 2",
