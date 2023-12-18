@@ -56,7 +56,7 @@ if __name__ == "__main__":
     # Obtain training and testing data
     x_train, y_train = data.get_train_data(return_type="torch")
     x_test, y_test = data.get_test_data(return_type="torch")
-
+    x_train, y_train, x_test, y_test = x_train.float(), y_train.float(), x_test.float(), y_test.float()
     # Train and evaluate the model
     res = pd.DataFrame({'rmse': [], 'seed': [], 'subtask': [], 'method': []})
     for k in range(args.runs):
