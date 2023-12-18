@@ -14,6 +14,7 @@ from dance.data import Data
 from dance.datasets.base import BaseDataset
 from dance.transforms.preprocess import lsiTransformer
 from dance.typing import List
+from dance.utils import is_numeric
 from dance.utils.download import download_file, unzip_file
 
 
@@ -247,11 +248,9 @@ class ModalityPredictionDataset(MultiModalityDataset):
         "GSE127064_p0Brain_gex2atac":
         "https://www.dropbox.com/scl/fi/k4p3nkkqq56ev6ljyo5se/GSE127064_p0Brain_gex2atac.zip?rlkey=y7kayqmk2l72jjogzlvfxtl74&dl=1",
         "GSE117089_mouse_gex2atac":
-        "https://www.dropbox.com/scl/fi/egktuwiognr06xebeuouk/GSE117089_mouse_gex2atac.zip?rlkey=jadp3hlopc3112lmxe6nz5cd1&dl=1",
-        "GSE117089_A549_gex2atac":
-        "https://www.dropbox.com/scl/fi/b7evc2n5ih5o3xxwcd7uq/GSE117089_A549_gex2atac.zip?rlkey=b5o0ykptfodim59qwnu2m89fh&dl=1",
+        "https://www.dropbox.com/scl/fi/hbo5eel8vtkctwhgelu5u/GSE117089_mouse_gex2atac.zip?rlkey=84t4kj1ls7ut09dpcbj86mtlc&dl=1",
         "GSE117089_sciCAR_gex2atac":
-        "https://www.dropbox.com/scl/fi/juibpvmtv2otvfsq1xyr7/GSE117089_sciCAR_gex2atac.zip?rlkey=qcdbfqsuhab56bc553cwm78gc&dl=1",
+        "https://www.dropbox.com/scl/fi/hc0c48so824uohx0szs3h/GSE117089_sciCAR_gex2atac.zip?rlkey=4xjayirgijodd1fqcf7a42apo&dl=1",
         "GSE140203_3T3_HG19_atac2gex":
         "https://www.dropbox.com/scl/fi/v1vbypz87t1rz012vojkh/GSE140203_3T3_HG19_atac2gex.zip?rlkey=xmxrwso5e5ty3w53ctbm5bo9z&dl=1",
         "GSE140203_3T3_MM10_atac2gex":
@@ -299,6 +298,18 @@ class ModalityPredictionDataset(MultiModalityDataset):
         return data
 
     def _maybe_preprocess(self, raw_data, selection_threshold=10000):
+
+        changed_count = 0  # keep track to modified entries due to ensuring count data type
+        for i in range(4):
+            m_data = raw_data[i].X
+            int_data = m_data.astype(int)
+            changed_count += np.sum(int_data != m_data)
+            raw_data[i].X = int_data
+            raw_data[i].layers["counts"] = raw_data[i].X
+        if changed_count > 0:
+            logger.warning("Implicit modification: to ensure count (integer type) data, "
+                           f"a total number of {changed_count} entries were modified.")
+
         if self.preprocess == "feature_selection":
             if raw_data[0].shape[1] > selection_threshold:
                 sc.pp.highly_variable_genes(raw_data[0], layer="counts", flavor="seurat_v3",
@@ -337,9 +348,9 @@ class ModalityMatchingDataset(MultiModalityDataset):
         "10k_pbmc":
         "https://www.dropbox.com/scl/fi/1wi9u5zwzx7td9akk1cri/10k_pbmc.zip?rlkey=u9ir7b6d8s3t29sk2hu7v29au&dl=1",
         "GSE117089_mouse_gex2atac":
-        "https://www.dropbox.com/scl/fi/cq8cbidn486pvol6obcbq/GSE117089_mouse_gex2atac.zip?rlkey=k2axpyi8tdsvindwpqnzyik8x&dl=1",
+        "https://www.dropbox.com/scl/fi/dbxgretuwq1zekxibb2p0/GSE117089_mouse_gex2atac.zip?rlkey=wzqi309on9v1wllkiatnkpnhv&dl=1",
         "GSE117089_sciCAR_gex2atac":
-        "https://www.dropbox.com/scl/fi/riew8e0xkf2gxty296r86/GSE117089_sciCAR_gex2atac.zip?rlkey=0ye3s19adnj2nfbpv5qfu9w62&dl=1",
+        "https://www.dropbox.com/scl/fi/4sohkymkqyry5xkx34oiw/GSE117089_sciCAR_gex2atac.zip?rlkey=6exg6ybf5ufhagycj5g7hq5vi&dl=1",
         "GSE127064_AdBrain_gex2atac":
         "https://www.dropbox.com/scl/fi/mktue5y4bsf9w17t7jyq3/GSE127064_AdBrain_gex2atac.zip?rlkey=3qtazuova6v1rin630keryman&dl=1",
         "GSE127064_p0Brain_gex2atac":
@@ -403,6 +414,10 @@ class ModalityMatchingDataset(MultiModalityDataset):
 
         train_mod1, train_mod2, train_label, test_mod1, test_mod2, test_label = raw_data
         modalities = [train_mod1, train_mod2, test_mod1, test_mod2]
+        if is_numeric(train_mod2.obs_names[0]):
+            train_mod2.obs_names = train_mod1.obs_names
+        if is_numeric(test_mod2.obs_names[0]):
+            test_mod2.obs_names = test_mod1.obs_names
 
         # TODO: support other two subtasks
         # assert self.subtask in ("openproblems_bmmc_cite_phase2_rna", "openproblems_bmmc_cite_phase2_rna_subset",
