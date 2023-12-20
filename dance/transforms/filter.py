@@ -631,6 +631,7 @@ class FilterGenesRegression(BaseTransform):
         self.channel = channel
         self.mod = mod
         self.method = method
+        self.skip_count_check = skip_count_check
 
     def __call__(self, data):
         feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod).T
