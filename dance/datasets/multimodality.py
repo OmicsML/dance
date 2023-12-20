@@ -18,14 +18,6 @@ from dance.utils import is_numeric
 from dance.utils.download import download_file, unzip_file
 
 
-def is_numeric(s):
-    try:
-        float(s)
-        return True
-    except ValueError:
-        return False
-
-
 class MultiModalityDataset(BaseDataset, ABC):
 
     TASK = "N/A"
