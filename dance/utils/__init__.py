@@ -20,6 +20,14 @@ def hexdigest(x: str, /) -> str:
     return hashlib.md5(x.encode()).hexdigest()
 
 
+def is_numeric(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+
 class SimpleIndexDataset(Dataset):
 
     def __init__(self, dataset):

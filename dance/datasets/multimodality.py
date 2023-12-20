@@ -14,6 +14,7 @@ from dance.data import Data
 from dance.datasets.base import BaseDataset
 from dance.transforms.preprocess import lsiTransformer
 from dance.typing import List
+from dance.utils import is_numeric
 from dance.utils.download import download_file, unzip_file
 
 
