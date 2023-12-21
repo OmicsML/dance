@@ -1,6 +1,7 @@
 import os
 from multiprocessing import Manager, Pool
 
+import anndata as ad
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
@@ -114,43 +115,54 @@ class ScTransformR(BaseTransform):
 
     """
 
-    def __init__(self, min_cells: int = 5, **kwargs):
+    def __init__(self, min_cells: int = 5, mirror_index=-1, **kwargs):
         self.min_cells = min_cells
+        self.mirror_index = mirror_index
         super().__init__(**kwargs)
 
     def __call__(self, data: Data) -> Data:
         import rpy2.robjects as robjects
+        import rpy2.robjects.packages as rpackages
         from anndata2ri import py2rpy
         from rpy2.robjects import numpy2ri, pandas2ri, r
         from rpy2.robjects.conversion import localconverter
-
-        if isinstance(data.data.X, sp.spmatrix):
-            self.logger.warning("Native support for sparse matrix is not implemented yet, "
-                                "converting to dense array explicitly.")
-            data.data.X = data.data.X.A
-        adata = data.X.copy()
+        with localconverter(robjects.default_converter):
+            utils = rpackages.importr('utils')
+            if self.mirror_index != -1:
+                utils.chooseCRANmirror(ind=self.mirror_index)
+            if not rpackages.isinstalled('BiocManager'):
+                utils.install_packages('BiocManager')
+            BiocManager = rpackages.importr('BiocManager')
+            bio_package_names = ('Seurat', 'SingleCellExperiment')
+            [BiocManager.install(x) for x in bio_package_names if not rpackages.isinstalled(x)]
+            [robjects.r(f'library({x})') for x in bio_package_names]
+            if isinstance(data.data.X, sp.spmatrix):
+                self.logger.warning("Native support for sparse matrix is not implemented yet, "
+                                    "converting to dense array explicitly.")
+                data.data.X = data.data.X.A
+            adata = ad.AnnData(X=data.data.X)
 
         with localconverter(robjects.default_converter + pandas2ri.converter + numpy2ri.converter):
             sce = py2rpy(adata)
-        robjects.r.assign("sce", sce)
-        r_code = f'''
-        counts <- assay(sce, "X")
-        libsizes <- colSums(counts)
-        size.factors <- libsizes/mean(libsizes)
-        logcounts(sce) <- log2(t(t(counts)/size.factors) + 1)
-        seurat <- as.Seurat(sce,counts="X")
-        seurat@assays$RNA<-seurat@assays$originalexp
-        seurat_p=SCTransform(seurat, vst.flavor = "v2", verbose = FALSE,min_cells={self.min_cells})
-        '''
-        r(r_code)
-        r_floatmatrix = r('seurat@assays$RNA@data')
-        with localconverter(robjects.default_converter + pandas2ri.converter + numpy2ri.converter):
-            floatmatrix_df = pandas2ri.rpy2py(r_floatmatrix)
+            robjects.r.assign("sce", sce)
+            r_code = f'''
+            counts <- assay(sce, "X")
+            libsizes <- colSums(counts)
+            size.factors <- libsizes/mean(libsizes)
+            logcounts(sce) <- log2(t(t(counts)/size.factors) + 1)
+            seurat <- as.Seurat(sce,counts="X")
+            seurat@assays$RNA<-seurat@assays$originalexp
+            seurat_p=SCTransform(seurat, vst.flavor = "v2", verbose = FALSE,min_cells={self.min_cells})
+            '''
+            r(r_code)
+            r_floatmatrix = r('seurat@assays$RNA@data')
+            # with localconverter(robjects.default_converter + pandas2ri.converter + numpy2ri.converter):
+            #     floatmatrix_df = pandas2ri.rpy2py(r_floatmatrix)
 
-        # Convert to anndata
-        adata.X = floatmatrix_df.T
-        data.data = adata
-        return data
+            # Convert to anndata
+            adata.X = r_floatmatrix.T
+            data.data.X = adata.X
+            return data
 
 
 class ScTransform(BaseTransform):

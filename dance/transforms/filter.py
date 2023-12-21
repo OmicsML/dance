@@ -643,30 +643,30 @@ class FilterGenesRegression(BaseTransform):
         func_dict = {"enclasc": self._filter_enclasc, "seurat3": self._filter_seurat3, "scmap": self._filter_scmap}
         if (filter_func := func_dict.get(self.method)) is None:
             raise ValueError(f"Unknown method {self.method}, supported options are: {list(func_dict)}.")
-
         data.data.obsm[self.out] = filter_func(feat)
         return data
 
-    def _filter_enclasc(feat: np.ndarray, num_genes: int, logger: Logger, no_check: bool = False) -> np.ndarray:
+    def _filter_enclasc(self, feat: np.ndarray, num_genes: int = 2000, logger: Logger = default_logger,
+                        no_check: bool = False) -> np.ndarray:
         logger.info("Start generating cell features using EnClaSC")
-
         num_feat = feat.shape[1]
         scores = np.zeros(num_feat) - 100
 
         feat_mean = feat.mean(0)
         drop_feat = (feat == 0).mean(0)
-        select_index = 0 < drop_feat < 1
+        select_index = (0 < drop_feat) & (drop_feat < 1)
 
         x1 = feat_mean[select_index].reshape(-1, 1)
-        x2 = feat_mean[select_index].reshape(-1, 1)
+        x2 = drop_feat[select_index].reshape(-1, 1)
         y = np.log(feat_mean + 1)[select_index].reshape(-1, 1)
 
-        y_pred = LinearRegression(x2, y).predict(x2)
+        y_pred = LinearRegression().fit(x2, y).predict(x2)
         scores[select_index] = (2 * y - y_pred - x1).ravel()
         feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
-        return feat[:, feat_index]
+        return feat[feat_index, :].T
 
-    def _filter_seurat3(feat: np.ndarray, num_genes: int, logger: Logger, no_check: bool = False) -> np.ndarray:
+    def _filter_seurat3(self, feat: np.ndarray, num_genes: int = 2000, logger: Logger = default_logger,
+                        no_check: bool = False) -> np.ndarray:
         logger.info("Start generating cell features using Seurat v3.0")
 
         feat_mean_log = np.log(feat.mean(0) + 1)
@@ -676,17 +676,18 @@ class FilterGenesRegression(BaseTransform):
         y_pred = LinearRegression().fit(x, feat_var_log).predict(x)
         scores = (feat_var_log - y_pred).ravel()
         feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
-        return feat[:, feat_index]
+        return feat[feat_index, :].T
 
-    def _filter_scmap(feat: np.ndarray, num_genes: int, logger: Logger, no_check: bool = False) -> np.ndarray:
+    def _filter_scmap(self, feat: np.ndarray, num_genes: int = 2000, logger: Logger = default_logger,
+                      no_check: bool = False) -> np.ndarray:
         logger.info("Start generating cell features using scmap")
 
         num_feat = feat.shape[1]
         scores = np.zeros(num_feat) - 100
 
         feat_mean = feat.mean(0)
-        drop_feat = (feat == 0).mean(0).tolist()
-        select_index = 0 < drop_feat < 1
+        drop_feat = (feat == 0).mean(0)
+        select_index = (0 < drop_feat) & (drop_feat < 1)
 
         x = np.log(feat_mean[select_index] + 1).reshape(-1, 1) * np.log(2.7) / np.log(2)
         y = np.log(drop_feat[select_index] * 100).reshape(-1, 1) * np.log(2.7) / np.log(2)
@@ -694,7 +695,7 @@ class FilterGenesRegression(BaseTransform):
         y_pred = LinearRegression().fit(x, y).y_pred(x)
         scores[select_index] = (y - y_pred).ravel()
         feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
-        return feat[:, feat_index]
+        return feat[feat_index, :].T
 
 
 class FilterGenesMarkerGini(BaseTransform):
