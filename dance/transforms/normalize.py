@@ -156,8 +156,6 @@ class ScTransformR(BaseTransform):
             '''
             r(r_code)
             r_floatmatrix = r('seurat@assays$RNA@data')
-            # with localconverter(robjects.default_converter + pandas2ri.converter + numpy2ri.converter):
-            #     floatmatrix_df = pandas2ri.rpy2py(r_floatmatrix)
 
             # Convert to anndata
             adata.X = r_floatmatrix.T
