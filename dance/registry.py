@@ -5,12 +5,6 @@ from dance.typing import Any, Dict, Iterator, Optional, Tuple
 
 REGISTRY_PREFIX = "_registry_"
 
-TYPE_KEY = "type"
-DESC_KEY = "desc"
-TARGET_KEY = "target"
-SCOPE_KEY = "scope"
-PARAMS_KEY = "params"
-
 
 class DotDict(dict):
     """Special dictionary equiped with dot compositional key handling.
@@ -164,11 +158,28 @@ class Registry(DotDict):
                 yield from self.children(key_, _level=_level + 1, **kwargs)
 
 
-def resolve_from_registry(name: str, scope: str):
-    scope = scope.replace(REGISTRY_PREFIX, "", 1).lstrip(".")
-
-
 REGISTRY = Registry()
+
+
+def resolve_from_registry(name: str, scope: str, registry: Registry = REGISTRY_PREFIX):
+    """Resolve query scope from registry.
+
+    Example
+    -------
+    Suppose we have a registry ``r`` with the following content: ``{"a": {"b": 1}}``.
+
+    .. code-block:: python
+
+        assert resolve_from_registry(name="b", scope="_registry_.a") == 1
+
+        # Default registry prefix can be skipped as well
+        assert resolve_from_registry(name="b", scope="a") == 1
+
+    """
+    scope = scope.replace(REGISTRY_PREFIX, "", 1).lstrip(".")
+    key = ".".join((scope, name))
+    logger.debug(f"Resolving from registry: {key}")
+    return registry.get(key, missed_ok=False)
 
 
 def register(*scope: Tuple[str], name: Optional[str] = None, registry: Registry = REGISTRY):
