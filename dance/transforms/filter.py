@@ -634,7 +634,7 @@ class FilterGenesRegression(BaseTransform):
         self.skip_count_check = skip_count_check
 
     def __call__(self, data):
-        feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod).T
+        feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
 
         if not self.skip_count_check and np.mod(feat, 1).sum():
             warnings.warn("Expecting count data as input, but the input feature matrix does not appear to be count."
@@ -663,7 +663,7 @@ class FilterGenesRegression(BaseTransform):
         y_pred = LinearRegression().fit(x2, y).predict(x2)
         scores[select_index] = (2 * y - y_pred - x1).ravel()
         feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
-        return feat[feat_index, :].T
+        return feat[:, feat_index]
 
     def _filter_seurat3(self, feat: np.ndarray, num_genes: int = 2000, logger: Logger = default_logger,
                         no_check: bool = False) -> np.ndarray:
@@ -676,7 +676,7 @@ class FilterGenesRegression(BaseTransform):
         y_pred = LinearRegression().fit(x, feat_var_log).predict(x)
         scores = (feat_var_log - y_pred).ravel()
         feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
-        return feat[feat_index, :].T
+        return feat[:, feat_index]
 
     def _filter_scmap(self, feat: np.ndarray, num_genes: int = 2000, logger: Logger = default_logger,
                       no_check: bool = False) -> np.ndarray:
@@ -695,7 +695,7 @@ class FilterGenesRegression(BaseTransform):
         y_pred = LinearRegression().fit(x, y).y_pred(x)
         scores[select_index] = (y - y_pred).ravel()
         feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
-        return feat[feat_index, :].T
+        return feat[:, feat_index]
 
 
 class FilterGenesMarkerGini(BaseTransform):
