@@ -28,6 +28,14 @@ def default(value: Any, default_value: Any):
     return default_value if value is None else value
 
 
+def is_numeric(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+
 class SimpleIndexDataset(Dataset):
 
     def __init__(self, dataset):
