@@ -14,11 +14,11 @@ import scanpy as sc
 from scipy.sparse import csr_matrix
 
 from dance import logger
-from dance.config import METADIR
 from dance.data import Data
 from dance.datasets.base import BaseDataset
 from dance.metadata.imputation import IMPUTATION_DATASET_TO_FILE
-from dance.registers import register_dataset
+from dance.registry import register_dataset
+from dance.settings import METADIR
 from dance.typing import Dict, List, Optional, Set, Tuple
 from dance.utils.download import download_file, download_unzip
 from dance.utils.io import load_data_url_dict_from_csv
@@ -39,7 +39,7 @@ def _load_scdeepsort_metadata():
     return bench_url_dict, available_data
 
 
-@register_dataset("CellTypeAnnotation")
+@register_dataset(name="CellTypeAnnotation")
 class CellTypeAnnotationDataset(BaseDataset):
     _DISPLAY_ATTRS = ("species", "tissue", "train_dataset", "test_dataset")
     ALL_URL_DICT: Dict[str, str] = {
@@ -239,7 +239,7 @@ class CellTypeAnnotationDataset(BaseDataset):
         return dict(map_dict)
 
 
-@register_dataset("clustering")
+@register_dataset(name="clustering")
 class ClusteringDataset(BaseDataset):
     """Data downloading and loading for clustering.
 
@@ -284,7 +284,7 @@ class ClusteringDataset(BaseDataset):
         return data
 
 
-@register_dataset("imputation")
+@register_dataset(name="imputation")
 class ImputationDataset(BaseDataset):
     URL = load_data_url_dict_from_csv(METADIR / "imputation.csv")
     DATASET_TO_FILE =IMPUTATION_DATASET_TO_FILE   # yapf: disable

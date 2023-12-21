@@ -1,49 +1,47 @@
-import logging
-import logging.config
-from pathlib import Path
-from typing import Union
+import json
+import os.path as osp
+from typing import get_args
 
-_logger_config = {
-    "version": 1,
-    "formatters": {
-        "default_formatter": {
-            "format": "[%(levelname)s][%(asctime)s][%(name)s][%(funcName)s] %(message)s",
-        },
-    },
-    "handlers": {
-        "stream_handler": {
-            "class": "logging.StreamHandler",
-            "formatter": "default_formatter",
-            "level": "DEBUG",
-        },
-    },
-    "loggers": {
-        "dance": {
-            "handlers": ["stream_handler"],
-            "level": "INFO",
-            "propagate": False,
-        },
-    },
-}
-logging.config.dictConfig(_logger_config)
+from omegaconf import DictConfig, OmegaConf
+
+from dance.typing import Any, ConfigLike, Dict, FileExistHandle, Literal, Optional, PathLike
+from dance.utils import file_check
+
+CONFIG_FTYPE = Literal["json", "yaml"]
 
 
-def change_log_level(name: str = "dance", /, *, level: Union[str, int]):
-    """Change logger level.
+class Config(DictConfig):
 
-    Parameters
-    ----------
-    name: str
-        Name of the logger whose log level is to be updated. Default set to global logger.
-    level: Union[str, int]
-        Log level to be updated. Can be either the log level name (str type) or its corresponding code (int type).
+    def __init__(self, content: Optional[ConfigLike] = None, **kwargs):
+        super().__init__(content, **kwargs)
 
-    """
-    logging.getLogger(name).setLevel(level)
+    def to_dict(self) -> Dict[str, Any]:
+        return OmegaConf.to_container(self, resolve=True)
 
+    def to_yaml(self) -> str:
+        return OmegaConf.to_yaml(self, resolve=True)
 
-METADIR = Path(__file__).resolve().parent / "metadata"
+    def _dump_file(self, ftype: CONFIG_FTYPE, path: PathLike, exist_handle: FileExistHandle):
+        file_check(path, exist_handle=exist_handle)
+        with open(path, "w") as f:
+            if ftype == "json":
+                json.dump(self.to_dict(), f, indent=4)
+            elif ftype == "yaml":
+                f.write(self.to_yaml())
+            else:
+                raise ValueError(f"Unknwon dumping file type: {ftype}, supported options: {get_args(CONFIG_FTYPE)}")
 
-__all__ = [
-    "change_log_level",
-]
+    def dump_json(self, path: PathLike, exist_handle: FileExistHandle = "warn"):
+        """Dump config file as JSON."""
+        self._dump_file("json", path, exist_handle)
+
+    def dump_yaml(self, path: PathLike, exist_handle: FileExistHandle = "warn"):
+        """Dump config file as YAML."""
+        self._dump_file("yaml", path, exist_handle)
+
+    @classmethod
+    def from_file(cls, path: PathLike, **kwargs):
+        if not osp.isfile(path):
+            raise FileNotFoundError(f"Config file not found: {path}")
+        cfg = OmegaConf.load(path)
+        return cls(cfg, **kwargs)

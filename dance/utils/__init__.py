@@ -1,6 +1,9 @@
+# TODO: move these to utils.misc, __init__ should only be used for importing
 import hashlib
 import os
 import random
+import warnings
+from typing import get_args
 
 import dgl
 import numpy as np
@@ -8,6 +11,7 @@ import torch
 from torch.utils.data import Dataset
 
 from dance import logger
+from dance.typing import Any, FileExistHandle, PathLike
 
 
 def get_device(device: str) -> str:
@@ -18,6 +22,10 @@ def get_device(device: str) -> str:
 
 def hexdigest(x: str, /) -> str:
     return hashlib.md5(x.encode()).hexdigest()
+
+
+def default(value: Any, default_value: Any):
+    return default_value if value is None else value
 
 
 def is_numeric(s):
@@ -55,3 +63,17 @@ def set_seed(rndseed, cuda: bool = True, extreme_mode: bool = False):
     dgl.seed(rndseed)
     dgl.random.seed(rndseed)
     logger.info(f"Setting global random seed to {rndseed}")
+
+
+def file_check(path: PathLike, exist_handle: FileExistHandle = "none"):
+    """Check if file exists and handle accordingly."""
+    if not os.path.isfile(path):
+        return
+
+    if exist_handle == "warn":
+        warnings.warn(f"File exists! {path}", UserWarning, stacklevel=3)
+    elif exist_handle == "error":
+        raise FileExistsError(path)
+    elif exist_handle != "none":
+        raise ValueError(f"Unknwon file exist handling: {exist_handle!r}, "
+                         f"supported options are: {get_args(FileExistHandle)}")

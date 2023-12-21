@@ -1,0 +1,20 @@
+type: preprocessor
+desc: Preprocess scRNAseq counts for SVM by taking the weighted gene PCA components.
+pipeline:
+  - type: cell_feature
+    target: WeightedFeaturePCA
+    # TODO: set to _registry_, which would be effectively the same as
+    # _registry_.preprocessor.cell_feature, which is resolved automatically
+    scope: dance.transforms.cell_feature
+    params:
+      n_components: 400
+      split_name: train
+  - type: misc
+    target: SetConfig
+    # TODO: set to _registry_, which would be effectively the same as
+    # _registry_.preprocessor.misc, which is resolved automatically
+    scope: dance.transforms.misc
+    params:
+      config_dict:
+        feature_channel: WeightedFeaturePCA
+        label_channel: cell_type

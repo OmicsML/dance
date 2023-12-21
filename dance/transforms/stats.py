@@ -2,7 +2,7 @@ from pprint import pformat
 
 import pandas as pd
 
-from dance.registers import GENESTATS_FUNCS, register_genestats_func
+from dance.registry import REGISTERED_GENESTATS_FUNCS, register_genestats_func
 from dance.transforms.base import BaseTransform
 from dance.typing import List, Optional, Union
 from dance.utils.wrappers import as_1d_array
@@ -37,12 +37,13 @@ class GeneStats(BaseTransform):
 
         # Check genestats options
         if isinstance(genestats_select, str) and (genestats_select == "all"):
-            self.genestats_select = list(GENESTATS_FUNCS)
+            self.genestats_select = list(REGISTERED_GENESTATS_FUNCS)
         elif isinstance(genestats_select, list):
-            invalid_options = [i for i in genestats_select if i not in GENESTATS_FUNCS]
+            invalid_options = [i for i in genestats_select if i not in REGISTERED_GENESTATS_FUNCS]
             if invalid_options:
-                raise ValueError(f"The following genestats selections are unavailable:\n{pformat(invalid_options)}\n"
-                                 f"Currently supported genestats options are {pformat(list(GENESTATS_FUNCS))}")
+                raise ValueError("The following genestats selections are unavailable:\n"
+                                 f"{pformat(invalid_options)}\nCurrently supported genestats "
+                                 f"options are {pformat(list(REGISTERED_GENESTATS_FUNCS))}")
             self.genestats_select = genestats_select
 
         # Set kwargs to be used by genestats functions
@@ -68,7 +69,7 @@ class GeneStats(BaseTransform):
 
         stats_dict = {}
         for name in self.genestats_select:
-            func = GENESTATS_FUNCS[name]
+            func = REGISTERED_GENESTATS_FUNCS[name]
             stats_dict[name] = func(exp, **self.func_kwargs)
         stats_df = pd.DataFrame(stats_dict, index=data.data.var_names)
 
@@ -78,7 +79,7 @@ class GeneStats(BaseTransform):
         data.data.varm[self.out] = stats_df
 
 
-@register_genestats_func("mu")
+@register_genestats_func(name="mu")
 @as_1d_array
 def genestats_mu(exp, threshold: float = 0, **kwargs):
     mask = (exp > threshold).astype(float)
@@ -86,7 +87,7 @@ def genestats_mu(exp, threshold: float = 0, **kwargs):
     return mu
 
 
-@register_genestats_func("alpha")
+@register_genestats_func(name="alpha")
 @as_1d_array
 def genestats_alpha(exp, threshold: float = 0, pseudo: bool = False, **kwargs):
     mask = (exp > threshold).astype(float)
@@ -101,31 +102,31 @@ def genestats_alpha(exp, threshold: float = 0, pseudo: bool = False, **kwargs):
     return alpha
 
 
-@register_genestats_func("mean_all")
+@register_genestats_func(name="mean_all")
 @as_1d_array
 def genestats_mean_all(exp, **kwargs):
     return exp.mean(0)
 
 
-@register_genestats_func("cov_all")
+@register_genestats_func(name="cov_all")
 @as_1d_array
 def genestats_cov_all(exp, **kwargs):
     return exp.std(0) / exp.mean(0)
 
 
-@register_genestats_func("fano_all")
+@register_genestats_func(name="fano_all")
 @as_1d_array
 def genestats_fano_all(exp, **kwargs):
     return exp.var(0) / exp.mean(0)
 
 
-@register_genestats_func("max_all")
+@register_genestats_func(name="max_all")
 @as_1d_array
 def genestats_max_all(exp, **kwargs):
     return exp.max(0)
 
 
-@register_genestats_func("std_all")
+@register_genestats_func(name="std_all")
 @as_1d_array
 def genestats_std_all(exp, **kwargs):
     return exp.std(0)

@@ -4,8 +4,10 @@ from typing import Any, Callable, Dict, Iterator, List, Literal, Mapping, Option
 
 import numpy as np
 from anndata import AnnData
+from omegaconf import DictConfig, DictKeyType, Node
 from torch import Tensor
 
+ConfigLike = Union[Dict[DictKeyType, Node], DictConfig]
 PathLike = Union[str, bytes, os.PathLike]
 
 CellIdxType = Union[int, str]
@@ -15,12 +17,16 @@ GeneSummaryMode = Literal["sum", "cv", "rv", "var"]
 LogLevel = Literal["NOTSET", "DEBUG", "INFO", "WARNING", "ERROR"]
 ReturnedFeat = Union[np.ndarray, Tensor, AnnData]
 
+FileExistHandle = Literal["none", "warn", "error"]
+
 __all__ = [
     "Any",
     "Callable",
     "CellIdxType",
+    "ConfigLike",
     "Dict",
     "FeatType",
+    "FileExistHandle",
     "GeneSummaryMode",
     "Iterator",
     "List",
