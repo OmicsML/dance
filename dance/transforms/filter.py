@@ -13,6 +13,7 @@ from sklearn.preprocessing import MinMaxScaler, PolynomialFeatures
 
 from dance import logger as default_logger
 from dance.exceptions import DevError
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Dict, GeneSummaryMode, List, Literal, Logger, Optional, Tuple, Union
 
@@ -42,6 +43,7 @@ def get_count(count_or_ratio: Optional[Union[float, int]], total: int) -> Option
         raise TypeError(f"count_or_ratio must be either float or int, got {type(count_or_ratio)}")
 
 
+@register_preprocessor("filter")
 class FilterScanpy(BaseTransform):
     """Scanpy filtering transformation with additional options."""
 
@@ -109,6 +111,7 @@ class FilterScanpy(BaseTransform):
             subset_func(subset_ind)
 
 
+@register_preprocessor("filter", "cell")
 class FilterCellsScanpy(FilterScanpy):
     """Scanpy filtering cell transformation with additional options.
 
@@ -159,6 +162,7 @@ class FilterCellsScanpy(FilterScanpy):
         )
 
 
+@register_preprocessor("filter", "gene")
 class FilterGenesScanpy(FilterScanpy):
     """Scanpy filtering gene transformation with additional options.
 
@@ -207,6 +211,7 @@ class FilterGenesScanpy(FilterScanpy):
         )
 
 
+@register_preprocessor("filter", "gene")
 class FilterGenesCommon(BaseTransform):
     """Filter genes by taking the common genes across batches or splits.
 
@@ -272,6 +277,7 @@ class FilterGenesCommon(BaseTransform):
         data.data._inplace_subset_var(common_genes)
 
 
+@register_preprocessor("filter", "gene")
 class FilterGenesMatch(BaseTransform):
     """Filter genes based on prefixes and suffixes.
 
@@ -394,6 +400,7 @@ class FilterGenes(BaseTransform, ABC):
         data.data._inplace_subset_var(selected_genes)
 
 
+@register_preprocessor("filter", "gene")
 class FilterGenesPercentile(FilterGenes):
     """Filter genes based on percentiles of the summarized gene expressions.
 
@@ -449,6 +456,7 @@ class FilterGenesPercentile(FilterGenes):
         return np.logical_and(gene_summary >= percentile_lo, gene_summary <= percentile_hi)
 
 
+@register_preprocessor("filter", "gene")
 class FilterGenesTopK(FilterGenes):
     """Select top/bottom genes based on the  summarized gene expressions.
 
@@ -509,6 +517,7 @@ class FilterGenesTopK(FilterGenes):
         return mask
 
 
+@register_preprocessor("filter", "gene")
 class FilterGenesMarker(BaseTransform):
     """Select marker genes based on log fold-change.
 
@@ -601,6 +610,7 @@ class FilterGenesMarker(BaseTransform):
             data.data._inplace_subset_var(marker_genes)
 
 
+@register_preprocessor("filter", "gene")
 class FilterGenesRegression(BaseTransform):
     """Select genes based on regression.
 
@@ -698,6 +708,7 @@ class FilterGenesRegression(BaseTransform):
         return feat[:, feat_index]
 
 
+@register_preprocessor("filter", "gene")
 class FilterGenesMarkerGini(BaseTransform):
     """Select marker genes based on Gini coefficient.
 
