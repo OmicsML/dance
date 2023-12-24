@@ -4,7 +4,7 @@ import numpy as np
 
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.stlearn import StKmeans, StLouvain
-from dance.transforms.preprocess import set_seed
+from dance.utils import set_seed
 
 MODES = ["louvain", "kmeans"]
 

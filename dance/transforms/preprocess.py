@@ -20,11 +20,11 @@ import sklearn.utils.extmath
 import torch
 from dgl.sampling import pack_traces, random_walk
 from scipy.stats import expon
-from sklearn.model_selection import train_test_split
 
-from dance.utils.deprecate import deprecated
+from dance.utils.status import deprecated
 
 
+@deprecated
 def set_seed(seed=1029):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
