@@ -208,12 +208,11 @@ def register(*scope: Tuple[str], name: Optional[str] = None, registry: Registry 
 
 register_dataset = partial(register, "dataset")
 register_preprocessor = partial(register, "preprocessor")
-
 register_genestats_func = partial(register, "function", "genestats")
 register_metric_func = partial(register, "function", "metric")
 
 REGISTERED_DATASETS = REGISTRY.get("dataset", create_on_miss=True)
-REGISTERED_PREPROCESSORS = REGISTRY.get("preprocesor", create_on_miss=True)
+REGISTERED_PREPROCESSORS = REGISTRY.get("preprocessor", create_on_miss=True)
 REGISTERED_GENESTATS_FUNCS = REGISTRY.get("function.genestats", create_on_miss=True)
 REGISTERED_METRIC_FUNCS = REGISTRY.get("function.metric", create_on_miss=True)
 
