@@ -182,7 +182,22 @@ def resolve_from_registry(name: str, scope: str, registry: Registry = REGISTRY_P
     return registry.get(key, missed_ok=False)
 
 
-def register(*scope: Tuple[str], name: Optional[str] = None, registry: Registry = REGISTRY):
+def register(*scope: Tuple[str], name: Optional[str] = None, overwrite: bool = False, _registry: Registry = REGISTRY):
+    """
+
+    Parameters
+    ----------
+    scope
+        Tuple of strings indicating the registry scope (or a single string with ``"."`` as the scope separator). For
+        example, ``scope=("a", "b", "c")`` and ``scope=("a.b.c",)`` will have the same effect that register the new
+        object under ``registry["a"]["b"]["c"][name]``.
+    name
+        Name of the object. If not set, then will be automatically inferred by ``obj.__name__``.
+    overwrite
+        If set to ``True``, then overwrite existing registry entries. Default is ``False``, which will raise a
+        ``KeyError`` if the entry to be updated already exists and the is different from the object to be updated.
+
+    """
 
     def wrapped_obj(obj):
         logger.debug(f"Registering {obj!r}")
@@ -197,9 +212,12 @@ def register(*scope: Tuple[str], name: Optional[str] = None, registry: Registry 
         # Register
         try:
             key = ".".join((*scope, obj_name))
-            registry.set(key, obj, exist_ok=False)
+            _registry.set(key, obj, exist_ok=overwrite)
         except KeyError as e:
-            raise KeyError(f"{obj_name!r} already registered under {scope}") from e
+            registered_obj = _registry.get(key)
+            if registered_obj != obj:
+                raise KeyError(f"{obj_name!r} already registered under {scope}"
+                               f"\n   Registered: {registered_obj}\n   New: {obj}") from e
 
         return obj
 
