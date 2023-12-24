@@ -1,9 +1,11 @@
 import importlib
 
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Callable, Union
 
 
+@register_preprocessor("interface")
 class AnnDataTransform(BaseTransform):
     """AnnData transformation interface object.
 
