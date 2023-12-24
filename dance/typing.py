@@ -1,6 +1,6 @@
 import os
 from logging import Logger
-from typing import Any, Callable, Dict, Iterator, List, Literal, Mapping, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, List, Literal, Mapping, Optional, Sequence, Set, Tuple, Type, Union
 
 import numpy as np
 from anndata import AnnData
@@ -40,5 +40,6 @@ __all__ = [
     "Set",
     "Tensor",
     "Tuple",
+    "Type",
     "Union",
 ]

@@ -9,6 +9,7 @@ from dance.data import Data
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Callable, Dict, List, Literal, Logger, Optional, Tuple, Union
+from dance.utils.status import experimental
 
 
 @register_preprocessor("pseudobulk")
@@ -259,8 +260,12 @@ def get_cell_types(ct_select: Union[Literal["auto"], List[str]], annot: np.ndarr
     return ct_select
 
 
+@experimental(reason="Seems more appropriate to be categorized under ``transforms.stats``. "
+              "Also the counting could be easily done by ``df.value_counts()``.")
 class CellTypeNums(BaseTransform):
     """Number of cell types."""
+
+    _DISPLAY_ATTRS = ("ct_select", "ct_key", "split_name")
 
     def __init__(
         self,
