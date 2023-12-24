@@ -6,10 +6,12 @@ import pandas as pd
 
 from dance import logger as native_logger
 from dance.data import Data
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Callable, Dict, List, Literal, Logger, Optional, Tuple, Union
 
 
+@register_preprocessor("pseudobulk")
 class PseudoMixture(BaseTransform):
     """Pseudo mixture generation."""
 
@@ -96,6 +98,7 @@ class PseudoMixture(BaseTransform):
         return data
 
 
+@register_preprocessor("pseudobulk")
 class CellTopicProfile(BaseTransform):
     """Cell topic profile."""
 
@@ -204,6 +207,7 @@ def get_ct_profile(
     return ct_profile
 
 
+@register_preprocessor("pseudobulk")
 class CellGiottoTopicProfile(BaseTransform):
     """Giotto cell topic profile.
 
