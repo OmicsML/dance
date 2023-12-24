@@ -9,11 +9,14 @@ from sklearn.decomposition import PCA
 from tqdm import tqdm, trange
 
 from dance.data.base import Data
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Optional, Sequence
 from dance.utils.matrix import normalize
+from dance.utils.status import experimental
 
 
+@register_preprocessor("feature", "spatial")
 class MorphologyFeatureCNN(BaseTransform):
     """Cell morphological features extracted from CNN.
 
@@ -93,6 +96,7 @@ class MorphologyFeatureCNN(BaseTransform):
         data.data.obsm[self.out] = morth_feat
 
 
+@register_preprocessor("feature", "spatial")
 class SMEFeature(BaseTransform):
     """Spatial Morphological gene Expression normalization feature from stLearn.
 
@@ -148,6 +152,7 @@ class SMEFeature(BaseTransform):
         data.data.obsm[self.out] = sme_feat
 
 
+@register_preprocessor("feature", "spatial")
 class SpatialIDEFeature(BaseTransform):
     """Spatial IDE feature.
 
@@ -209,6 +214,8 @@ class SpatialIDEFeature(BaseTransform):
         data.data.obsm[self.out] = resid_expr
 
 
+# @register_preprocessor("feature", "???")  # update out channel type accordingly
+@experimental(reason="Need to check whether this is cell or gene feature and update out channel type accordingly. ")
 class TangramFeature(BaseTransform):
     """Tangram spatial features.
 

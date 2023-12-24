@@ -11,11 +11,13 @@ from KDEpy import FFTKDE
 from scipy import stats
 
 from dance.data.base import Data
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Dict, List, Literal, NormMode, Optional, Union
 from dance.utils.matrix import normalize
 
 
+@register_preprocessor("normalize")
 class ScaleFeature(BaseTransform):
     """Scale the feature matrix in the AnnData object.
 
@@ -163,6 +165,7 @@ class ScTransformR(BaseTransform):
             return data
 
 
+@register_preprocessor("normalize")
 class ScTransform(BaseTransform):
     """ScTransform normalization and variance stabiliation.
 
