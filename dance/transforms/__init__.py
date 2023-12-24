@@ -11,7 +11,7 @@ from dance.transforms.normalize import ScaleFeature, ScTransform
 from dance.transforms.pseudo_gen import CellGiottoTopicProfile, CellTopicProfile, CellTypeNums, PseudoMixture
 from dance.transforms.sc3_feature import SC3Feature
 from dance.transforms.scn_feature import SCNFeature
-from dance.transforms.spatial_feature import MorphologyFeature, SMEFeature, SpatialIDEFeature, TangramFeature
+from dance.transforms.spatial_feature import MorphologyFeatureCNN, SMEFeature, SpatialIDEFeature, TangramFeature
 from dance.transforms.stats import GeneStats
 
 __all__ = [
@@ -37,7 +37,7 @@ __all__ = [
     "GeneHoldout",
     "GeneStats",
     "MaskData",
-    "MorphologyFeature",
+    "MorphologyFeatureCNN",
     "PseudoMixture",
     "RemoveSplit",
     "SC3Feature",

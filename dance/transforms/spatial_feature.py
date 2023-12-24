@@ -14,7 +14,7 @@ from dance.typing import Optional, Sequence
 from dance.utils.matrix import normalize
 
 
-class MorphologyFeature(BaseTransform):
+class MorphologyFeatureCNN(BaseTransform):
 
     _DISPLAY_ATTRS = ("model_name", "n_components", "crop_size", "target_size")
     _MODELS = ("resnet50", "inception_v3", "xception", "vgg16")

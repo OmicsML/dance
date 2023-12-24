@@ -77,7 +77,7 @@ class SMEGraph(BaseTransform):
     """Spatial Morphological gene Expression graph."""
 
     def __init__(self, radius: float = 3, *,
-                 channels: Sequence[str] = ("spatial", "spatial_pixel", "MorphologyFeature", "CellPCA"),
+                 channels: Sequence[str] = ("spatial", "spatial_pixel", "MorphologyFeatureCNN", "CellPCA"),
                  channel_types: Sequence[str] = ("obsm", "obsm", "obsm", "obsm"), **kwargs):
         super().__init__(**kwargs)
 
