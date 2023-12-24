@@ -18,7 +18,7 @@ from torchnmf.nmf import NMF
 from dance import logger
 from dance.modules.base import BaseRegressionMethod
 from dance.transforms import SetConfig
-from dance.transforms.pseudo_gen import get_ct_profile
+from dance.transforms.pseudobulk import get_ct_profile
 from dance.typing import Any, List, LogLevel, Optional
 from dance.utils import get_device
 from dance.utils.wrappers import CastOutputType

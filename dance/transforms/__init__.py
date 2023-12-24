@@ -8,7 +8,7 @@ from dance.transforms.interface import AnnDataTransform
 from dance.transforms.mask import CellwiseMaskData, MaskData
 from dance.transforms.misc import Compose, RemoveSplit, SaveRaw, SetConfig
 from dance.transforms.normalize import ScaleFeature, ScTransform
-from dance.transforms.pseudo_gen import CellGiottoTopicProfile, CellTopicProfile, CellTypeNums, PseudoMixture
+from dance.transforms.pseudobulk import CellGiottoTopicProfile, CellTopicProfile, CellTypeNums, PseudoMixture
 from dance.transforms.sc3_feature import SC3Feature
 from dance.transforms.scn_feature import SCNFeature
 from dance.transforms.spatial_feature import MorphologyFeatureCNN, SMEFeature, SpatialIDEFeature, TangramFeature
