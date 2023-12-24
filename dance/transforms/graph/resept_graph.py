@@ -4,8 +4,12 @@ import scanpy as sc
 
 from dance.data.base import Data
 from dance.transforms.base import BaseTransform
+from dance.utils.status import experimental
 
 
+# @register_preprocessor("graph", "spatial")  # update out channel type accordingly
+@experimental(reason="Do not set adj to ``uns``. Follow other spatial graph transform and use ``obsp`` instead."
+              "Also, this seems more appropriate to be implemented under ``spatial_graph.py``.")
 class RESEPTGraph(BaseTransform):
     """RESEPT spatial spot graph.
 

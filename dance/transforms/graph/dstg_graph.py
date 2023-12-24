@@ -5,9 +5,11 @@ import scipy.sparse as sp
 from sklearn.neighbors import KDTree
 
 import dance.transforms.preprocess
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 
 
+@register_preprocessor("graph", "reference")
 class DSTGraph(BaseTransform):
     """DSTG link graph construction.
 
