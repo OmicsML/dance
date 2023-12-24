@@ -1,10 +1,12 @@
 import numpy as np
 from scipy.stats import expon
 
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Literal, Optional
 
 
+@register_preprocessor("split", "entry")
 class CellwiseMaskData(BaseTransform):
     """Randomly mask data in a cell-wise approach.
 
@@ -71,6 +73,7 @@ class CellwiseMaskData(BaseTransform):
         return data
 
 
+@register_preprocessor("split", "entry")
 class MaskData(BaseTransform):
     """Randomly mask data.
 

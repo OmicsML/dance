@@ -1,9 +1,11 @@
 import numpy as np
 
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Optional
 
 
+@register_preprocessor("split", "gene")
 class GeneHoldout(BaseTransform):
     """Progressively hold out genes for DeepImpute.
 
