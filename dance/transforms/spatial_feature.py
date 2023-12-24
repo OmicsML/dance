@@ -15,6 +15,24 @@ from dance.utils.matrix import normalize
 
 
 class MorphologyFeatureCNN(BaseTransform):
+    """Cell morphological features extracted from CNN.
+
+    Parameters
+    ----------
+    model_name
+        Pretrained CNN name: ``"resnet50"``, ``"inceptron_v3"``, ``"xception"``, ``"vgg16"``.
+    n_components
+        Number of feature dimension.
+    crop_size
+        Cell image cropping size (cropped as square centered around the target cell).
+    target_size
+        Target patch size.
+
+    Reference
+    ---------
+    https://doi.org/10.1101/2020.05.31.125658
+
+    """
 
     _DISPLAY_ATTRS = ("model_name", "n_components", "crop_size", "target_size")
     _MODELS = ("resnet50", "inception_v3", "xception", "vgg16")
@@ -76,6 +94,20 @@ class MorphologyFeatureCNN(BaseTransform):
 
 
 class SMEFeature(BaseTransform):
+    """Spatial Morphological gene Expression normalization feature from stLearn.
+
+    Parameters
+    ----------
+    n_neighbors
+        Number of spatial spots neighbors to consider.
+    n_components
+        Number of feature dimension.
+
+    Reference
+    ---------
+    https://doi.org/10.1101/2020.05.31.125658
+
+    """
 
     def __init__(self, n_neighbors: int = 3, n_components: int = 50, random_state: int = 0, *,
                  channels: Sequence[Optional[str]] = (None, "SMEGraph"),
