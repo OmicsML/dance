@@ -8,6 +8,7 @@ from sklearn.decomposition import PCA
 from dance.transforms.base import BaseTransform
 from dance.typing import Optional
 from dance.utils.matrix import pairwise_distance
+from dance.utils.status import experimental
 
 
 def normalized_laplacian(adj_matrix):
@@ -18,6 +19,9 @@ def normalized_laplacian(adj_matrix):
     return identity - np.matmul(np.matmul(D_sqrt, adj_matrix), D_sqrt)
 
 
+# @register_preprocessor("feature", "???")  # update out channel type accordingly
+@experimental(reason="Need to check whether this is cell or gene feature and update out channel type accordingly. "
+              "The computateion needs to be improved: use vectorized computation instead of nested loops.")
 class SC3Feature(BaseTransform):
     """SC3 features via a cluster-based similarity partitioning algorithm.
 

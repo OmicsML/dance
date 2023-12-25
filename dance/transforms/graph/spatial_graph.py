@@ -3,11 +3,13 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import pairwise_distances
 from sklearn.neighbors import NearestNeighbors
 
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Sequence
 from dance.utils.matrix import pairwise_distance
 
 
+@register_preprocessor("graph", "spatial")
 class SpaGCNGraph(BaseTransform):
 
     _DISPLAY_ATTRS = ("alpha", "beta")
@@ -60,6 +62,7 @@ class SpaGCNGraph(BaseTransform):
         return data
 
 
+@register_preprocessor("graph", "spatial")
 class SpaGCNGraph2D(BaseTransform):
 
     def __init__(self, *, channel: str = "spatial_pixel", **kwargs):
@@ -73,11 +76,12 @@ class SpaGCNGraph2D(BaseTransform):
         return data
 
 
+@register_preprocessor("graph", "spatial")
 class SMEGraph(BaseTransform):
     """Spatial Morphological gene Expression graph."""
 
     def __init__(self, radius: float = 3, *,
-                 channels: Sequence[str] = ("spatial", "spatial_pixel", "MorphologyFeature", "CellPCA"),
+                 channels: Sequence[str] = ("spatial", "spatial_pixel", "MorphologyFeatureCNN", "CellPCA"),
                  channel_types: Sequence[str] = ("obsm", "obsm", "obsm", "obsm"), **kwargs):
         super().__init__(**kwargs)
 
@@ -105,6 +109,7 @@ class SMEGraph(BaseTransform):
         data.data.obsp[self.out] = adj
 
 
+@register_preprocessor("graph", "spatial")
 class StagateGraph(BaseTransform):
     """STAGATE spatial graph.
 

@@ -7,7 +7,7 @@ from sklearn.svm import SVC
 from dance.modules.base import BaseClassificationMethod
 from dance.transforms import Compose, SetConfig, WeightedFeaturePCA
 from dance.typing import LogLevel, Optional
-from dance.utils.deprecate import deprecated
+from dance.utils.status import deprecated
 
 
 class SVM(BaseClassificationMethod):

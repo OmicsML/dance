@@ -1,11 +1,13 @@
 from pprint import pformat
 
 from dance import logger
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Any, Dict, Tuple
 from dance.utils import hexdigest
 
 
+@register_preprocessor("misc")
 class Compose(BaseTransform):
     """Compose transformation by combining several transfomration objects.
 
@@ -64,6 +66,7 @@ class Compose(BaseTransform):
             transform(data)
 
 
+@register_preprocessor("misc")
 class SetConfig(BaseTransform):
     """Set configuration options of a dance data object.
 
@@ -85,6 +88,7 @@ class SetConfig(BaseTransform):
         data.set_config_from_dict(self.config_dict)
 
 
+@register_preprocessor("misc")
 class SaveRaw(BaseTransform):
     """Save raw data.
 
@@ -113,6 +117,7 @@ class SaveRaw(BaseTransform):
         data.data.raw = data.data.copy()
 
 
+@register_preprocessor("misc")
 class RemoveSplit(BaseTransform):
     """Remove a particular split from the data."""
 

@@ -1,9 +1,11 @@
 import scanpy as sc
 
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Optional
 
 
+@register_preprocessor("graph", "cell")
 class NeighborGraph(BaseTransform):
     """Construct neighborhood graph of observations.
 

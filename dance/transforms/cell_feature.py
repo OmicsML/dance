@@ -2,11 +2,13 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA, TruncatedSVD
 
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Optional
 from dance.utils.matrix import normalize
 
 
+@register_preprocessor("feature", "cell")
 class WeightedFeaturePCA(BaseTransform):
     """Compute the weighted gene PCA as cell features.
 
@@ -53,6 +55,7 @@ class WeightedFeaturePCA(BaseTransform):
         return data
 
 
+@register_preprocessor("feature", "cell")
 class CellPCA(BaseTransform):
     """Reduce cell feature matrix with PCA.
 
@@ -87,6 +90,7 @@ class CellPCA(BaseTransform):
         return data
 
 
+@register_preprocessor("feature", "cell")
 class CellSVD(BaseTransform):
     """Reduce cell feature matrix with SVD.
 
@@ -121,6 +125,7 @@ class CellSVD(BaseTransform):
         return data
 
 
+@register_preprocessor("feature", "cell")
 class BatchFeature(BaseTransform):
     """Assign statistical batch features for each cell."""
 

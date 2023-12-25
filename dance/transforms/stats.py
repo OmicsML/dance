@@ -2,12 +2,13 @@ from pprint import pformat
 
 import pandas as pd
 
-from dance.registry import REGISTERED_GENESTATS_FUNCS, register_genestats_func
+from dance.registry import REGISTERED_GENESTATS_FUNCS, register_genestats_func, register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import List, Optional, Union
 from dance.utils.wrappers import as_1d_array
 
 
+@register_preprocessor("feature", "gene")
 class GeneStats(BaseTransform):
     """Gene statistics computation.
 

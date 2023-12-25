@@ -9,12 +9,33 @@ from sklearn.decomposition import PCA
 from tqdm import tqdm, trange
 
 from dance.data.base import Data
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Optional, Sequence
 from dance.utils.matrix import normalize
+from dance.utils.status import experimental
 
 
-class MorphologyFeature(BaseTransform):
+@register_preprocessor("feature", "spatial")
+class MorphologyFeatureCNN(BaseTransform):
+    """Cell morphological features extracted from CNN.
+
+    Parameters
+    ----------
+    model_name
+        Pretrained CNN name: ``"resnet50"``, ``"inceptron_v3"``, ``"xception"``, ``"vgg16"``.
+    n_components
+        Number of feature dimension.
+    crop_size
+        Cell image cropping size (cropped as square centered around the target cell).
+    target_size
+        Target patch size.
+
+    Reference
+    ---------
+    https://doi.org/10.1101/2020.05.31.125658
+
+    """
 
     _DISPLAY_ATTRS = ("model_name", "n_components", "crop_size", "target_size")
     _MODELS = ("resnet50", "inception_v3", "xception", "vgg16")
@@ -75,7 +96,22 @@ class MorphologyFeature(BaseTransform):
         data.data.obsm[self.out] = morth_feat
 
 
+@register_preprocessor("feature", "spatial")
 class SMEFeature(BaseTransform):
+    """Spatial Morphological gene Expression normalization feature from stLearn.
+
+    Parameters
+    ----------
+    n_neighbors
+        Number of spatial spots neighbors to consider.
+    n_components
+        Number of feature dimension.
+
+    Reference
+    ---------
+    https://doi.org/10.1101/2020.05.31.125658
+
+    """
 
     def __init__(self, n_neighbors: int = 3, n_components: int = 50, random_state: int = 0, *,
                  channels: Sequence[Optional[str]] = (None, "SMEGraph"),
@@ -116,6 +152,7 @@ class SMEFeature(BaseTransform):
         data.data.obsm[self.out] = sme_feat
 
 
+@register_preprocessor("feature", "spatial")
 class SpatialIDEFeature(BaseTransform):
     """Spatial IDE feature.
 
@@ -177,6 +214,8 @@ class SpatialIDEFeature(BaseTransform):
         data.data.obsm[self.out] = resid_expr
 
 
+# @register_preprocessor("feature", "???")  # update out channel type accordingly
+@experimental(reason="Need to check whether this is cell or gene feature and update out channel type accordingly. ")
 class TangramFeature(BaseTransform):
     """Tangram spatial features.
 

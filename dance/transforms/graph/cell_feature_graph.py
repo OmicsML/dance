@@ -2,11 +2,13 @@ import dgl
 import numpy as np
 import torch
 
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.transforms.cell_feature import WeightedFeaturePCA
 from dance.typing import LogLevel, Optional
 
 
+@register_preprocessor("graph", "cell")
 class CellFeatureGraph(BaseTransform):
 
     def __init__(self, cell_feature_channel: str, gene_feature_channel: Optional[str] = None, *,
@@ -77,6 +79,7 @@ class CellFeatureGraph(BaseTransform):
         return data
 
 
+@register_preprocessor("graph", "cell")
 class PCACellFeatureGraph(BaseTransform):
 
     _DISPLAY_ATTRS = ("n_components", "split_name")
@@ -109,6 +112,7 @@ class PCACellFeatureGraph(BaseTransform):
         return data
 
 
+@register_preprocessor("graph", "cell")
 class CellFeatureBipartiteGraph(BaseTransform):
 
     def __init__(self, cell_feature_channel: str, *, mod: Optional[str] = None, **kwargs):

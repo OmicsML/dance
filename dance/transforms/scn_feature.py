@@ -7,11 +7,13 @@ import scanpy as sc
 from sklearn.metrics import r2_score
 
 from dance import logger
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.transforms.stats import genestats_alpha, genestats_mu
 from dance.typing import Dict, List, Optional, Tuple
 
 
+@register_preprocessor("feature", "cell")
 class SCNFeature(BaseTransform):
     """Differential gene-pair feature used in SingleCellNet."""
 

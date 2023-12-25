@@ -1,7 +1,11 @@
+import importlib
+
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
-from dance.typing import Any
+from dance.typing import Callable, Union
 
 
+@register_preprocessor("interface")
 class AnnDataTransform(BaseTransform):
     """AnnData transformation interface object.
 
@@ -23,7 +27,7 @@ class AnnDataTransform(BaseTransform):
 
     _DISPLAY_ATTRS = ("func", "func_kwargs")
 
-    def __init__(self, func: Any, **kwargs):
+    def __init__(self, func: Union[Callable, str], **kwargs):
         """Initialize the AnnDataTransform object.
 
         Parameters
@@ -38,6 +42,23 @@ class AnnDataTransform(BaseTransform):
 
         self.func = func
         self.func_kwargs = kwargs
+
+    @property
+    def func(self) -> Callable:
+        return self._func
+
+    @func.setter
+    def func(self, func: Union[Callable, str]):
+        if isinstance(func, str):
+            self.logger.debug(f"Resolving {func}")
+            func_scope, func_name = func.rsplit(".", 1)
+            mod = importlib.import_module(func_scope)
+            func = getattr(mod, func_name)
+
+        if not callable(func):
+            raise TypeError(f"Interfaced function must be callable, got {type(func)}: {func!r}")
+
+        self._func = func
 
     def __repr__(self):
         func_name = f"{self.func.__module__}.{self.func.__name__}"

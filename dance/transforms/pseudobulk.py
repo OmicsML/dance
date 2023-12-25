@@ -6,10 +6,13 @@ import pandas as pd
 
 from dance import logger as native_logger
 from dance.data import Data
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Callable, Dict, List, Literal, Logger, Optional, Tuple, Union
+from dance.utils.status import experimental
 
 
+@register_preprocessor("pseudobulk")
 class PseudoMixture(BaseTransform):
     """Pseudo mixture generation."""
 
@@ -96,6 +99,7 @@ class PseudoMixture(BaseTransform):
         return data
 
 
+@register_preprocessor("pseudobulk")
 class CellTopicProfile(BaseTransform):
     """Cell topic profile."""
 
@@ -204,6 +208,7 @@ def get_ct_profile(
     return ct_profile
 
 
+@register_preprocessor("pseudobulk")
 class CellGiottoTopicProfile(BaseTransform):
     """Giotto cell topic profile.
 
@@ -255,8 +260,12 @@ def get_cell_types(ct_select: Union[Literal["auto"], List[str]], annot: np.ndarr
     return ct_select
 
 
+@experimental(reason="Seems more appropriate to be categorized under ``transforms.stats``. "
+              "Also the counting could be easily done by ``df.value_counts()``.")
 class CellTypeNums(BaseTransform):
     """Number of cell types."""
+
+    _DISPLAY_ATTRS = ("ct_select", "ct_key", "split_name")
 
     def __init__(
         self,

@@ -13,7 +13,7 @@ from sklearn.cluster import KMeans
 
 from dance.modules.base import BaseClusteringMethod
 from dance.modules.spatial.spatial_domain.louvain import Louvain
-from dance.transforms import AnnDataTransform, CellPCA, Compose, MorphologyFeature, SetConfig, SMEFeature
+from dance.transforms import AnnDataTransform, CellPCA, Compose, MorphologyFeatureCNN, SetConfig, SMEFeature
 from dance.transforms.graph import NeighborGraph, SMEGraph
 from dance.typing import LogLevel, Optional
 
@@ -73,7 +73,8 @@ class StKmeans(BaseClusteringMethod):
             AnnDataTransform(sc.pp.filter_genes, min_cells=1),
             AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
             AnnDataTransform(sc.pp.log1p),
-            MorphologyFeature(n_components=morph_feat_dim, device=device, crop_size=crop_size, target_size=target_size),
+            MorphologyFeatureCNN(n_components=morph_feat_dim, device=device, crop_size=crop_size,
+                                 target_size=target_size),
             CellPCA(n_components=pca_feat_dim),
             SMEGraph(),
             SMEFeature(n_components=sme_feat_dim),
@@ -124,7 +125,8 @@ class StLouvain(BaseClusteringMethod):
             AnnDataTransform(sc.pp.filter_genes, min_cells=1),
             AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
             AnnDataTransform(sc.pp.log1p),
-            MorphologyFeature(n_components=morph_feat_dim, device=device, crop_size=crop_size, target_size=target_size),
+            MorphologyFeatureCNN(n_components=morph_feat_dim, device=device, crop_size=crop_size,
+                                 target_size=target_size),
             CellPCA(n_components=pca_feat_dim),
             SMEGraph(),
             SMEFeature(n_components=sme_feat_dim),

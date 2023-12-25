@@ -85,19 +85,19 @@ def test_register(subtests):
     r1 = Registry()
     r2 = Registry()
 
-    register("a", name="test", registry=r1)(1)
+    register("a", name="test", _registry=r1)(1)
     assert dict(r1) == {"a": {"test": 1}}
     assert dict(r2) == {}
 
-    register("a.b", name="test", registry=r1)(2)
+    register("a.b", name="test", _registry=r1)(2)
     assert dict(r1) == {"a": {"test": 1, "b": {"test": 2}}}
     assert dict(r2) == {}
 
-    register("a", "c", "d", name="test", registry=r1)(3)
+    register("a", "c", "d", name="test", _registry=r1)(3)
     assert dict(r1) == {"a": {"test": 1, "b": {"test": 2}, "c": {"d": {"test": 3}}}}
     assert dict(r2) == {}
 
     register_b = partial(register, "b")
-    register_b("c", "d", name="test", registry=r2)(4)
+    register_b("c", "d", name="test", _registry=r2)(4)
     assert dict(r1) == {"a": {"test": 1, "b": {"test": 2}, "c": {"d": {"test": 3}}}}
     assert dict(r2) == {"b": {"c": {"d": {"test": 4}}}}

@@ -5,11 +5,13 @@ import torch
 from scipy.sparse import coo_matrix
 from scipy.stats import spearmanr
 
+from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Any, Dict, Optional
 from dance.utils.matrix import dist_to_rbf
 
 
+@register_preprocessor("graph", "feature")
 class FeatureFeatureGraph(BaseTransform):
     """Feature-feature similarity graph.
 

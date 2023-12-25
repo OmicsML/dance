@@ -10,9 +10,9 @@ from sklearn.decomposition import TruncatedSVD
 
 from dance import logger
 from dance.data.base import Data
+from dance.registry import register_preprocessor
+from dance.transforms.base import BaseTransform
 from dance.typing import Union
-
-from ..base import BaseTransform
 
 
 def read_gmt(entrez_string, symbol_string):
@@ -227,6 +227,7 @@ def construct_enhanced_feature_graph(u, v, e, train_size, feature_size, cell_nod
     return graph
 
 
+@register_preprocessor("graph", "cell")
 class ScMoGNNGraph(BaseTransform):
     """Construct the cell-feature graph object for scmognn.
 
