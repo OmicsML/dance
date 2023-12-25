@@ -39,7 +39,7 @@ def _load_scdeepsort_metadata():
     return bench_url_dict, available_data
 
 
-@register_dataset(name="CellTypeAnnotation")
+@register_dataset("singlemodality")
 class CellTypeAnnotationDataset(BaseDataset):
     _DISPLAY_ATTRS = ("species", "tissue", "train_dataset", "test_dataset")
     ALL_URL_DICT: Dict[str, str] = {
@@ -239,7 +239,7 @@ class CellTypeAnnotationDataset(BaseDataset):
         return dict(map_dict)
 
 
-@register_dataset(name="clustering")
+@register_dataset("singlemodality")
 class ClusteringDataset(BaseDataset):
     """Data downloading and loading for clustering.
 
@@ -284,7 +284,7 @@ class ClusteringDataset(BaseDataset):
         return data
 
 
-@register_dataset(name="imputation")
+@register_dataset("singlemodality")
 class ImputationDataset(BaseDataset):
     URL = load_data_url_dict_from_csv(METADIR / "imputation.csv")
     DATASET_TO_FILE =IMPUTATION_DATASET_TO_FILE   # yapf: disable

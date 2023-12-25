@@ -12,6 +12,7 @@ import scipy.sparse as sp
 from dance import logger
 from dance.data import Data
 from dance.datasets.base import BaseDataset
+from dance.registry import register_dataset
 from dance.transforms.preprocess import lsiTransformer
 from dance.typing import List
 from dance.utils import is_numeric
@@ -217,6 +218,7 @@ class MultiModalityDataset(BaseDataset, ABC):
         return modalities
 
 
+@register_dataset("multimodality")
 class ModalityPredictionDataset(MultiModalityDataset):
 
     TASK = "predict_modality"
@@ -323,6 +325,7 @@ class ModalityPredictionDataset(MultiModalityDataset):
         return raw_data
 
 
+@register_dataset("multimodality")
 class ModalityMatchingDataset(MultiModalityDataset):
 
     TASK = "match_modality"
@@ -533,6 +536,7 @@ class ModalityMatchingDataset(MultiModalityDataset):
         return train_mod1, train_mod2, train_label, test_mod1, test_mod2, test_label
 
 
+@register_dataset("multimodality")
 class JointEmbeddingNIPSDataset(MultiModalityDataset):
 
     TASK = "joint_embedding"
