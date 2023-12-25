@@ -19,7 +19,7 @@ from dance.typing import Tuple
 from dance.utils.download import download_file, download_unzip, unzip_file
 
 
-@register_dataset(name="spatiallibd")
+@register_dataset("spatial")
 class SpatialLIBDDataset(BaseDataset):
 
     _DISPLAY_ATTRS = ("data_id", )
@@ -152,7 +152,7 @@ class SpatialLIBDDataset(BaseDataset):
         return data
 
 
-@register_dataset(name="celltypedeconvo")
+@register_dataset("spatial")
 class CellTypeDeconvoDataset(BaseDataset):
     """Load raw data.
 
