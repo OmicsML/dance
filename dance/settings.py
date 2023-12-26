@@ -1,5 +1,6 @@
 import logging
 import logging.config
+import os
 from pathlib import Path
 from typing import Union
 
@@ -20,7 +21,7 @@ _logger_config = {
     "loggers": {
         "dance": {
             "handlers": ["stream_handler"],
-            "level": "INFO",
+            "level": os.environ.get("DANCE_LOG_LEVEL", "INFO"),
             "propagate": False,
         },
     },

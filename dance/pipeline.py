@@ -24,32 +24,52 @@ class Action:
         type_: Optional[str] = None,
         desc: Optional[str] = None,
         target: Optional[str] = None,
-        scope: str = REGISTRY_PREFIX,
+        scope: Optional[str] = None,
         params: Optional[Dict[str, Any]] = None,
+        _parent_type: Optional[str] = None,
         _registry: Registry = REGISTRY,
     ):
         self._type = type_
+        self._parent_type = _parent_type
         self._desc = desc  # TODO: extract default description from docstring?
         self._target = target
-        self._scope = scope
+        self.scope = scope
         self._params = default(params, {})
         self._registry = _registry  # for testing purposes
 
     @property
-    def type(self) -> str:
+    def type(self) -> Optional[str]:
         return self._type
+
+    @property
+    def parent_type(self) -> Optional[str]:
+        return self._parent_type
+
+    @property
+    def full_type(self) -> Optional[str]:
+        if self.type is None and self.parent_type is None:
+            return None
+        else:
+            return ".".join(filter(None, (self.parent_type, self.type)))
 
     @property
     def desc(self) -> Optional[str]:
         return self._desc
 
     @property
-    def target(self) -> str:
+    def target(self) -> Optional[str]:
         return self._target
 
     @property
     def scope(self) -> str:
         return self._scope
+
+    @scope.setter
+    def scope(self, val: Optional[str]):
+        val = default(val, REGISTRY_PREFIX)
+        if val == REGISTRY_PREFIX:
+            val = ".".join(filter(None, (val, self.parent_type, self.type)))
+        self._scope = val
 
     @property
     def params(self) -> Dict[str, Any]:
@@ -87,13 +107,14 @@ class Action:
         return deepcopy(self)
 
     @classmethod
-    def from_config(cls, cfg: ConfigLike):
+    def from_config(cls, cfg: ConfigLike, **kwargs):
         return cls(
             type_=cfg.get(cls.TYPE_KEY),
             desc=cfg.get(cls.DESC_KEY),
             target=cfg.get(cls.TARGET_KEY),
             scope=cfg.get(cls.SCOPE_KEY),
             params=cfg.get(cls.PARAMS_KEY),
+            **kwargs,
         )
 
     def to_config(self) -> Config:
@@ -121,7 +142,13 @@ class Action:
 class Pipeline(Action):
 
     # TODO: shared configs that are parsed under sub config dicts
-    def __init__(self, cfg: ConfigLike):
+    def __init__(self, cfg: ConfigLike, *, _parent_type: Optional[str] = None, _registry: Registry = REGISTRY):
+        super().__init__(
+            type_=cfg.get(self.TYPE_KEY),
+            desc=cfg.get(self.DESC_KEY),
+            _parent_type=_parent_type,
+            _registry=_registry,
+        )
         self._config = Config(cfg)
 
         self._pipeline: List[Action] = []
@@ -133,21 +160,19 @@ class Pipeline(Action):
                 raise KeyError(f"Cannot specify both {self.PARAMS_KEY!r} and {self.PIPELINE_KEY!r} at the same time.")
 
             cls = Pipeline if self.PIPELINE_KEY in sub_cfg else Action
-            self._pipeline.append(cls.from_config(sub_cfg))
-
-        super().__init__(type_=cfg.get(self.TYPE_KEY), desc=cfg.get(self.DESC_KEY))
+            self._pipeline.append(cls.from_config(sub_cfg, _parent_type=self.full_type, _registry=_registry))
 
     @property
     def config(self) -> Config:
-        self._config
+        return self._config
 
     @property
     def config_dict(self) -> Dict[str, Any]:
-        self.config.to_dict()
+        return self.config.to_dict()
 
     @property
     def config_yaml(self) -> str:
-        self.config.to_yaml()
+        return self.config.to_yaml()
 
     def __iter__(self):
         yield from self._pipeline
@@ -169,6 +194,14 @@ class Pipeline(Action):
     @property
     def functional(self) -> Callable:
 
+        # Try to resolve all functionals first before returning the composed funcitonal
+        try:
+            for a in self._pipeline:
+                a.functional
+        except KeyError as e:
+            raise KeyError(f"Failed to resolve for {a}:\n   scope={a.scope}\n   type={a.type}"
+                           f"\n   parent_type={a.parent_type}\n   full_type={a.full_type}") from e
+
         # TODO: maybe come up with some mechanism to automatically figure out
         # what the input (and output) should be?
         def bounded_functional(*args, **kwargs):
@@ -178,8 +211,8 @@ class Pipeline(Action):
         return bounded_functional
 
     @classmethod
-    def from_config(cls, cfg: ConfigLike):
-        return cls(cfg)
+    def from_config(cls, cfg: ConfigLike, **kwargs):
+        return cls(cfg, **kwargs)
 
     @classmethod
     def from_config_file(cls, path: PathLike, **kwargs):
