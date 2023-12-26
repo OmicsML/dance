@@ -56,10 +56,11 @@ def test_pipeline(subtests):
 def test_pipeline_scope_resolve(subtests):
     r = Registry()
     r.set("a.b.integer", int)
+    r.set("a.b.c.integer2", int)
 
     def pass_subtest(pipeline):
         assert repr(pipeline) == "Pipeline(\n    Action(integer)\n)"
-        pipeline.functional  # test resolability
+        pipeline.functional  # test resolvability
 
     with subtests.test("_registry_.xxx.xxx"):
         p = Pipeline({"pipeline": [{"target": "integer", "scope": "_registry_.a.b"}]}, _registry=r)
@@ -115,8 +116,8 @@ def test_pipeline_scope_resolve(subtests):
         }
         pass_subtest(Pipeline(cfg, _registry=r))
 
+        # Invalid scope a.c
         with pytest.raises(KeyError):
-            # Invalid scope a.c
             cfg = {
                 "type": "a",
                 "pipeline": [
@@ -127,3 +128,21 @@ def test_pipeline_scope_resolve(subtests):
                 ],
             }
             pass_subtest(Pipeline(cfg, _registry=r))
+
+        # Nested pipeline scope
+        cfg = {
+            "type": "a",
+            "pipeline": [
+                {
+                    "type": "b",
+                    "pipeline": [{
+                        "type": "c",
+                        "target": "integer2",
+                        "scope": "_registry_",
+                    }],
+                },
+            ],
+        }
+        p = Pipeline(cfg, _registry=r)
+        assert repr(p) == "Pipeline(\n    Pipeline(\n        Action(integer2)\n    )\n)"
+        p.functional  # test resolvability
