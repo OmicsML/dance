@@ -139,15 +139,15 @@ class Pipeline(Action):
 
     @property
     def config(self) -> Config:
-        self._config
+        return self._config
 
     @property
     def config_dict(self) -> Dict[str, Any]:
-        self.config.to_dict()
+        return self.config.to_dict()
 
     @property
     def config_yaml(self) -> str:
-        self.config.to_yaml()
+        return self.config.to_yaml()
 
     def __iter__(self):
         yield from self._pipeline
