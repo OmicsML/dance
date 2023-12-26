@@ -1,3 +1,5 @@
+import pytest
+
 from dance.pipeline import Action, Pipeline
 from dance.registry import Registry
 
@@ -49,3 +51,79 @@ def test_pipeline(subtests):
         })
         assert repr(p) == ("Pipeline(\n    Action(BaseTransform)\n"
                            "    Pipeline(\n        Action(BaseTransform)\n    )\n)")
+
+
+def test_pipeline_scope_resolve(subtests):
+    r = Registry()
+    r.set("a.b.integer", int)
+
+    def pass_subtest(pipeline):
+        assert repr(pipeline) == "Pipeline(\n    Action(integer)\n)"
+        pipeline.functional  # test resolability
+
+    with subtests.test("_registry_.xxx.xxx"):
+        p = Pipeline({"pipeline": [{"target": "integer", "scope": "_registry_.a.b"}]}, _registry=r)
+        assert repr(p) == "Pipeline(\n    Action(integer)\n)"
+
+    with subtests.test("_registry_"):
+        # Full scope in parent pipeline
+        cfg = {
+            "type": "a.b",
+            "pipeline": [
+                {
+                    "target": "integer",
+                    "scope": "_registry_",
+                },
+            ],
+        }
+        pass_subtest(Pipeline(cfg, _registry=r))
+
+        # Full scope in the child pipeline
+        cfg = {
+            "pipeline": [
+                {
+                    "type": "a.b",
+                    "target": "integer",
+                    "scope": "_registry_",
+                },
+            ],
+        }
+        pass_subtest(Pipeline(cfg, _registry=r))
+
+        # Full scope constructed from parent and the child
+        cfg = {
+            "type": "a",
+            "pipeline": [
+                {
+                    "type": "b",
+                    "target": "integer",
+                    "scope": "_registry_",
+                },
+            ],
+        }
+        pass_subtest(Pipeline(cfg, _registry=r))
+
+        # Default scope is _registry_
+        cfg = {
+            "type": "a",
+            "pipeline": [
+                {
+                    "type": "b",
+                    "target": "integer",
+                },
+            ],
+        }
+        pass_subtest(Pipeline(cfg, _registry=r))
+
+        with pytest.raises(KeyError):
+            # Invalid scope a.c
+            cfg = {
+                "type": "a",
+                "pipeline": [
+                    {
+                        "type": "c",
+                        "target": "integer",
+                    },
+                ],
+            }
+            pass_subtest(Pipeline(cfg, _registry=r))
