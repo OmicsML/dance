@@ -194,6 +194,14 @@ class Pipeline(Action):
     @property
     def functional(self) -> Callable:
 
+        # Try to resolve all functionals first before returning the composed funcitonal
+        try:
+            for a in self._pipeline:
+                a.functional
+        except KeyError as e:
+            raise KeyError(f"Failed to resolve for {a}:\n   scope={a.scope}\n   type={a.type}"
+                           f"\n   parent_type={a.parent_type}\n   full_type={a.full_type}") from e
+
         # TODO: maybe come up with some mechanism to automatically figure out
         # what the input (and output) should be?
         def bounded_functional(*args, **kwargs):
