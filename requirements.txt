@@ -17,7 +17,7 @@ pandas==1.5.3  # scib 1.1.4 requires pandas<2
 # pandas==2.1.1; python_version >= "3.9"
 pyro-ppl==1.8.6
 requests==2.31.0
-scanpy==1.9.5
+scanpy==1.9.6
 scib==1.1.4
 scikit-learn==1.3.2
 scikit-misc==0.2.0; python_version < "3.9"
