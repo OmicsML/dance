@@ -1,19 +1,33 @@
 type: preprocessor
-desc: Preprocess scRNAseq counts for SVM by taking the weighted gene PCA components.
+desc: >-
+  Preprocess scRNA-seq counts into dense features for SVM by taking the
+  weighted sum of the gene PCA components.
 pipeline:
-  - type: cell_feature
+  - type: feature.cell
     target: WeightedFeaturePCA
-    # TODO: set to _registry_, which would be effectively the same as
-    # _registry_.preprocessor.cell_feature, which is resolved automatically
-    scope: dance.transforms.cell_feature
+    # Scope will be set to _registry_ by default, so you can leave out the
+    # specification of scope as well.
+    # Setting scope to "_registry_" will trigger auto-scope-resolve and
+    # iteratively combines the type. In this case, it will be resolved to
+    # "_registry_.preprocessor.feature.cell".
+    # You can also specify the absolute scope of the target object, rather than
+    # the scope of the registry. For example, the absolute scope for
+    # "WeightedFeaturePCA" is "dance.transforms.feature.cell".
+    scope: _registry_
     params:
       n_components: 400
       split_name: train
   - type: misc
     target: SetConfig
-    # TODO: set to _registry_, which would be effectively the same as
-    # _registry_.preprocessor.misc, which is resolved automatically
-    scope: dance.transforms.misc
+    # Scope will be set to _registry_ by default, so you can leave out the
+    # specification of scope as well.
+    # Setting scope to "_registry_" will trigger auto-scope-resolve and
+    # iteratively combines the type. In this case, it will be resolved to
+    # "_registry_.preprocessor.misc".
+    # You can also specify the absolute scope of the target object, rather than
+    # the scope of the registry. For example, the absolute scope for
+    # "SetConfig" is "dance.transforms.misc".
+    scope: _registry_
     params:
       config_dict:
         feature_channel: WeightedFeaturePCA
