@@ -16,7 +16,6 @@ class Action:
     TARGET_KEY = "target"
     SCOPE_KEY = "scope"
     PARAMS_KEY = "params"
-    PIPELINE_KEY = "pipeline"
 
     def __init__(
         self,
@@ -33,7 +32,7 @@ class Action:
         self._parent_type = _parent_type
         self._desc = desc  # TODO: extract default description from docstring?
         self._target = target
-        self.scope = scope
+        self.scope = scope  # defaults to REGISTRY_PREFIX
         self._params = default(params, {})
         self._registry = _registry  # for testing purposes
 
@@ -140,6 +139,7 @@ class Action:
 
 
 class Pipeline(Action):
+    PIPELINE_KEY = "pipeline"
 
     # TODO: shared configs that are parsed under sub config dicts
     def __init__(self, cfg: ConfigLike, *, _parent_type: Optional[str] = None, _registry: Registry = REGISTRY):
@@ -149,7 +149,6 @@ class Pipeline(Action):
             _parent_type=_parent_type,
             _registry=_registry,
         )
-        self._config = Config(cfg)
 
         self._pipeline: List[Action] = []
         if (sub_cfgs := cfg.get(self.PIPELINE_KEY)) is None:
@@ -162,9 +161,16 @@ class Pipeline(Action):
             cls = Pipeline if self.PIPELINE_KEY in sub_cfg else Action
             self._pipeline.append(cls.from_config(sub_cfg, _parent_type=self.full_type, _registry=_registry))
 
+        # NOTE: need to set config at last as config setter might use _pipeline
+        self.config = cfg
+
     @property
     def config(self) -> Config:
         return self._config
+
+    @config.setter
+    def config(self, cfg: ConfigLike):
+        self._config = Config(cfg)
 
     @property
     def config_dict(self) -> Dict[str, Any]:
@@ -176,6 +182,9 @@ class Pipeline(Action):
 
     def __iter__(self):
         yield from self._pipeline
+
+    def __getitem__(self, idx: int) -> Action:
+        return self._pipeline[idx]
 
     def __len__(self):
         return len(self._pipeline)
