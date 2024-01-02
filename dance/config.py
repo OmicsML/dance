@@ -5,7 +5,7 @@ from typing import get_args
 from omegaconf import DictConfig, OmegaConf
 
 from dance.typing import Any, ConfigLike, Dict, FileExistHandle, Literal, Optional, PathLike
-from dance.utils import file_check
+from dance.utils import default, file_check
 
 CONFIG_FTYPE = Literal["json", "yaml"]
 
@@ -13,7 +13,7 @@ CONFIG_FTYPE = Literal["json", "yaml"]
 class Config(DictConfig):
 
     def __init__(self, content: Optional[ConfigLike] = None, **kwargs):
-        super().__init__(content, **kwargs)
+        super().__init__(default(content, {}), **kwargs)
 
     def to_dict(self) -> Dict[str, Any]:
         return OmegaConf.to_container(self, resolve=True)
