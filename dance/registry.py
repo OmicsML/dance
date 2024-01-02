@@ -137,6 +137,11 @@ class Registry(DotDict):
         if not non_leaf_node and not leaf_node:
             raise ValueError("Either one, or both, of leaf_node and non_leaf_node must be True")
 
+        try:
+            self.get(key, missed_ok=False)
+        except KeyError:
+            raise KeyError(f"{key!r} node does not exist yet.")
+
         if _level == 0 and self.is_leaf_node(key):
             raise KeyError(f"{key} is a leaf node. children only take non-leaf nodes.")
 
