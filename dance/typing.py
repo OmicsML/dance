@@ -1,13 +1,19 @@
+from __future__ import annotations
+
 import os
 from logging import Logger
-from typing import Any, Callable, Dict, Iterator, List, Literal, Mapping, Optional, Sequence, Set, Tuple, Type, Union
+from typing import (TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Literal, Mapping, Optional, Sequence, Set,
+                    Tuple, Type, Union)
 
 import numpy as np
 from anndata import AnnData
 from omegaconf import DictConfig, DictKeyType, Node
 from torch import Tensor
 
-ConfigLike = Union[Dict[DictKeyType, Node], DictConfig]
+if TYPE_CHECKING:  # https://peps.python.org/pep-0563/#forward-references
+    from dance.config import Config
+
+ConfigLike = Union[Dict[DictKeyType, Node], DictConfig, "Config"]
 PathLike = Union[str, bytes, os.PathLike]
 
 CellIdxType = Union[int, str]
