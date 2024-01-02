@@ -371,7 +371,7 @@ class PipelinePlaner(Pipeline):
             if len(missed_target_idx) > 0:
                 raise ValueError(
                     "Target must be specified for all pipeline elements when tuning mode is set to 'params'. "
-                    f"Missing targets for {missed_target_idx}\nFull config:{OmegaConf.to_yaml(self.config)}", )
+                    f"Missing targets for {missed_target_idx}\nFull config:{OmegaConf.to_yaml(self.config)}")
 
         else:
             raise ValueError(f"Unknown tune mode {self.tune_mode!r}, supported options are {self.VALID_TUNE_MODES}")
@@ -449,7 +449,7 @@ class PipelinePlaner(Pipeline):
             obj = self._registry.get(full_scope, missed_ok=False)
         except KeyError as e:
             raise DevError(
-                f"Failed to obtain {full_scope} from the registry. This should have been caught earlier.", ) from e
+                f"Failed to obtain {full_scope} from the registry. This should have been caught earlier.") from e
 
         known_keys = set(inspect.signature(obj).parameters)
         if unknown_keys := set(ith_params).difference(known_keys):
