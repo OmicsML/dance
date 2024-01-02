@@ -331,9 +331,10 @@ class PipelinePlaner(Pipeline):
             raise ValueError("Empty pipeline.")
 
         # Set up base config
-        base_keys = pelem_keys = (self.TYPE_KEY, self.DESC_KEY)
-        if self.tune_mode == "params":
-            pelem_keys = pelem_keys + (self.TARGET_KEY, )
+        base_keys = pelem_keys = (self.TYPE_KEY, self.DESC_KEY, self.TARGET_KEY)
+        if self.tune_mode == "pipeline":
+            # NOTE: params reserved for planing when tuning mode is ``params``
+            pelem_keys = pelem_keys + (self.PARAMS_KEY, )
 
         base_config = {}
         for key in base_keys:
@@ -496,7 +497,7 @@ class PipelinePlaner(Pipeline):
         # TODO: nested pipeline support?
         for i in range(pipeline_length):
             # Parse pipeline plan
-            if pipeline is not None:
+            if pipeline is not None and pipeline[i] is not None:
                 self._validate_pipeline(validate, pipeline, i)
                 get_ith_pelem(i)[self.TARGET_KEY] = pipeline[i]
 
@@ -614,7 +615,7 @@ class PipelinePlaner(Pipeline):
                 }
             )
 
-            dict(planer.search_space()) == {
+            planer.search_space() == {
                 "pipeline.0.target": {
                     "values": [
                         "FilterGenesScanpy",
@@ -662,7 +663,7 @@ class PipelinePlaner(Pipeline):
                 }
             )
 
-            dict(planer.search_space()) == {
+            planer.search_space() == {
                 "params.1.n_components": {
                     "values": [128, 256, 512, 1024],
                 },
