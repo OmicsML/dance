@@ -29,9 +29,6 @@ if __name__ == "__main__":
     logger.info(f"\n{pprint.pformat(vars(args))}")
 
     pipeline_planer = PipelinePlaner.from_config_file("tuning_config.yaml")
-    # XXX: manually obtaining wandb agent info from config. need to improve.
-    wandb_entity = pipeline_planer.config.wandb.entity
-    wandb_project = pipeline_planer.config.wandb.project
 
     def evaluate_pipeline():
         wandb.init()
@@ -56,17 +53,11 @@ if __name__ == "__main__":
         # Train and evaluate the model
         model.fit(x_train, y_train_converted)
         score = model.score(x_test, y_test)
-
         wandb.log({"acc": score})
-        print(f"{score=:.4f}")
 
-    if (sweep_id := args.sweep_id) is None:
-        sweep_config = pipeline_planer.wandb_sweep_config()
-        print(f"Sweep config:\n{pprint.pformat(sweep_config)}")
-        sweep_id = wandb.sweep(sweep=sweep_config, entity=wandb_entity, project=wandb_project)
-        print(f"[*] Sweep ID: {sweep_id}")
+        wandb.finish()
 
-    wandb.agent(sweep_id, function=evaluate_pipeline, count=10, entity=wandb_entity, project=wandb_project)
+    pipeline_planer.wandb_sweep_agent(evaluate_pipeline, count=3)
 """To reproduce SVM benchmarks, please refer to command lines below:
 
 Mouse Brain

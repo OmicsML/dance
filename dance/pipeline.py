@@ -1,6 +1,7 @@
 import importlib
 import inspect
 from copy import deepcopy
+from pprint import pformat
 
 from omegaconf import DictConfig, OmegaConf
 
@@ -8,8 +9,8 @@ from dance import logger
 from dance.config import Config
 from dance.exceptions import DevError
 from dance.registry import REGISTRY, REGISTRY_PREFIX, Registry, resolve_from_registry
-from dance.typing import Any, Callable, ConfigLike, Dict, FileExistHandle, List, Optional, PathLike, Union
-from dance.utils import default
+from dance.typing import Any, Callable, ConfigLike, Dict, FileExistHandle, List, Optional, PathLike, Tuple, Union
+from dance.utils import Color, default
 
 
 class Action:
@@ -408,10 +409,15 @@ class PipelinePlaner(Pipeline):
                 logger.debug(f"Setting pipeline element {idx} to {j}")
                 pipeline[idx] = j
 
+        if pipeline is None:
+            return
+
         # Make sure pipeline length matches
-        if pipeline is not None and len(pipeline) != pipeline_length:
+        if len(pipeline) != pipeline_length:
             raise ValueError(f"Expecting {pipeline_length} targets specifications, "
                              f"but only got {len(pipeline)}: {pipeline}")
+
+        logger.info(f"Pipeline plane:\n{Color('green')(pformat(pipeline))}")
 
         return pipeline
 
@@ -436,9 +442,15 @@ class PipelinePlaner(Pipeline):
                     params[idx] = {}
                 params[idx][key] = j
 
-        if params is not None and len(params) != pipeline_length:
+        if params is None:
+            return
+
+        # Make sure pipeline length matches
+        if len(params) != pipeline_length:
             raise ValueError(f"Expecting {pipeline_length} targets specifications, "
                              f"but only got {len(params)}: {params}")
+
+        logger.info(f"Params plane:\n{Color('green')(pformat(params))}")
 
         return params
 
@@ -719,7 +731,52 @@ class PipelinePlaner(Pipeline):
                     search_space[f"{self.PARAMS_KEY}.{i}.{key}"] = val
         return search_space
 
-    def wandb_sweep_config(self, as_yaml: bool = False) -> Dict[str, Any]:
+    def wandb_sweep_config(self) -> Dict[str, Any]:
         if self.wandb_config is None:
             raise ValueError("wandb config not specified in the raw config.")
         return {**self.wandb_config, "parameters": self.search_space()}
+
+    def wandb_sweep(self) -> Tuple[str, str, str]:
+        try:
+            import wandb
+        except ModuleNotFoundError as e:
+            raise ImportError("wandb not installed. Please install wandb first: $ pip install wandb") from e
+
+        if "wandb" not in self.config:
+            raise ValueError(f"{self.config_yaml}\nMissing wandb config.")
+        wandb_entity = self.config.wandb.get("entity")
+        wandb_project = self.config.wandb.get("project")
+        if wandb_entity is None or wandb_project is None:
+            raise ValueError(f"{self.config_yaml}\nMissing either one (or both) of wandb configs "
+                             f"'entity' and 'project': {wandb_entity=!r}, {wandb_project=!r}")
+
+        sweep_config = self.wandb_sweep_config()
+        logger.info(f"Sweep config:\n{pformat(sweep_config)}")
+        wandb_sweep_id = wandb.sweep(sweep=sweep_config, entity=wandb_entity, project=wandb_project)
+        logger.info(Color("blue")(f"\n\n\t[*] Sweep ID: {wandb_sweep_id}\n"))
+
+        return wandb_entity, wandb_project, wandb_sweep_id
+
+    def wandb_sweep_agent(
+        self,
+        function: Callable,
+        *,
+        sweep_id: Optional[str] = None,
+        entity: Optional[str] = None,
+        project: Optional[str] = None,
+        count: Optional[int] = None,
+    ) -> Tuple[str, str, str]:
+        try:
+            import wandb
+        except ModuleNotFoundError as e:
+            raise ImportError("wandb not installed. Please install wandb first: $ pip install wandb") from e
+
+        if sweep_id is None:
+            if entity is not None or project is not None:
+                raise ValueError("Cannot specify entity or project when sweep_id is not specified "
+                                 "(will be inferred from config)")
+            entity, project, sweep_id = self.wandb_sweep()
+
+        wandb.agent(sweep_id, function=function, entity=entity, project=project, count=count)
+
+        return entity, project, sweep_id
