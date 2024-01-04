@@ -776,7 +776,11 @@ class PipelinePlaner(Pipeline):
                 raise ValueError("Cannot specify entity or project when sweep_id is not specified "
                                  "(will be inferred from config)")
             entity, project, sweep_id = self.wandb_sweep()
+        else:
+            entity = self.config.wandb.get("entity")
+            project = self.config.wandb.get("project")
 
+        logger.info(f"Spawning agent: {sweep_id=}, {entity=}, {project=}, {count=}")
         wandb.agent(sweep_id, function=function, entity=entity, project=project, count=count)
 
         return entity, project, sweep_id
