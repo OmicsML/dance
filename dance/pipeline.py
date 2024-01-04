@@ -272,12 +272,16 @@ class PipelinePlaner(Pipeline):
     def candidate_params(self) -> Optional[List[Dict[str, Any]]]:
         return getattr(self, "_candidate_params", None)
 
-    def _resolve_pelem_plan(self, idx: int) -> List[str]:
+    def _resolve_pelem_plan(self, idx: int) -> Optional[List[str]]:
         # NOTE: we need to use the raw config here instaed of the pipeline
         # element action object, as obtained by self[idx], since that does not
         # contain the extra information about tuning settings we need, e.g.,
         # the inclusion and exlusion settings.
         pelem_config = self.config[self.PIPELINE_KEY][idx]
+
+        # Use fixed target if available
+        if pelem_config.get(self.TARGET_KEY) is not None:
+            return None
 
         # Disallow setting includes and excludes at the same time
         if all(pelem_config.get(i) is not None for i in (self.PELEM_INCLUDE_KEY, self.PELEM_EXCLUDE_KEY)):
@@ -429,7 +433,13 @@ class PipelinePlaner(Pipeline):
         return params
 
     def _validate_pipeline(self, validate: bool, pipeline: List[str], i: int):
-        if validate and pipeline[i] not in self.candidate_pipelines[i]:
+        if not validate:
+            return
+
+        if self.candidate_pipelines[i] is None:  # use fixed target
+            return
+
+        if pipeline[i] not in self.candidate_pipelines[i]:  # invalid specified target
             raise ValueError(f"Specified target {pipeline[i]} ({i=}) not supported. "
                              f"Available options are: {self.candidate_pipelines[i]}")
 
@@ -458,8 +468,9 @@ class PipelinePlaner(Pipeline):
                    f"params specification for {full_scope!r} ({i=}): {unknown_keys}")
             if strict_params_check:
                 raise ValueError(msg)
-            else:
-                logger.warning(msg)
+            # FIX: need to figure out a way to get inherited kwargs as well, e.g., ``out``...
+            # else:
+            #     logger.warning(msg)
 
     def generate_config(
         self,
@@ -682,7 +693,12 @@ class PipelinePlaner(Pipeline):
         return search_space
 
     def _pipeline_search_space(self) -> Dict[str, str]:
-        search_space = {f"{self.PIPELINE_KEY}.{i}": {"values": j} for i, j in enumerate(self.candidate_pipelines)}
+        search_space = {
+            f"{self.PIPELINE_KEY}.{i}": {
+                "values": j
+            }
+            for i, j in enumerate(self.candidate_pipelines) if j is not None
+        }
         return search_space
 
     def _params_search_space(self) -> Dict[str, Dict[str, Optional[Union[str, float]]]]:

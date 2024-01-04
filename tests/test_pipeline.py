@@ -895,6 +895,11 @@ def test_pipeline_planer_generation(subtests, planer_toy_registry):
             },
             None,
         ]
+        assert p.search_space() == {
+            "pipeline.0": {
+                "values": ["func_b0", "func_b1", "func_b2"]
+            },
+        }
 
         for i in (1, 2):
             assert dict(p.generate_config(pipeline=[f"func_b{i}", None])) == {
