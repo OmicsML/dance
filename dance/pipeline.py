@@ -245,6 +245,7 @@ class PipelinePlaner(Pipeline):
     DEFAULT_PARAMS_KEY = "default_params"
     PELEM_INCLUDE_KEY = "include"
     PELEM_EXCLUDE_KEY = "exclude"
+    WANDB_KEY = "wandb"
     VALID_TUNE_MODES = ("pipeline", "params")
 
     def __init__(self, cfg: ConfigLike, **kwargs):
@@ -271,6 +272,10 @@ class PipelinePlaner(Pipeline):
     @property
     def candidate_params(self) -> Optional[List[Dict[str, Any]]]:
         return getattr(self, "_candidate_params", None)
+
+    @property
+    def wandb_config(self) -> Optional[Dict[str, Any]]:
+        return self._wandb_config
 
     def _resolve_pelem_plan(self, idx: int) -> Optional[List[str]]:
         # NOTE: we need to use the raw config here instaed of the pipeline
@@ -380,6 +385,11 @@ class PipelinePlaner(Pipeline):
 
         else:
             raise ValueError(f"Unknown tune mode {self.tune_mode!r}, supported options are {self.VALID_TUNE_MODES}")
+
+        # Other configs
+        self._wandb_config = self.config.get(self.WANDB_KEY)
+        if self._wandb_config is not None:
+            self._wandb_config = OmegaConf.to_container(self._wandb_config)
 
     @staticmethod
     def _sanitize_pipeline(
@@ -708,3 +718,8 @@ class PipelinePlaner(Pipeline):
                 for key, val in param_dict.items():
                     search_space[f"{self.PARAMS_KEY}.{i}.{key}"] = val
         return search_space
+
+    def wandb_sweep_config(self, as_yaml: bool = False) -> Dict[str, Any]:
+        if self.wandb_config is None:
+            raise ValueError("wandb config not specified in the raw config.")
+        return {**self.wandb_config, "parameters": self.search_space()}
