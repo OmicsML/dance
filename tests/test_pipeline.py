@@ -824,3 +824,202 @@ def test_pipeline_planer_generation(subtests, planer_toy_registry):
                 },
             ]
         }
+
+    with subtests.test("Pipeline with defaults and default pipeline settings"):
+        cfg = {
+            "type":
+            "a",
+            "tune_mode":
+            "pipeline",
+            "pipeline": [
+                {
+                    "type": "b",
+                    "params": {
+                        "shared_i": "i",
+                        "shared_j": "j",
+                        "shared_k": "k",
+                    },
+                    "default_params": {
+                        "func_b1": {
+                            "x": "b1",
+                            "shared_j": "j_new_1",
+                        },
+                        "func_b2": {
+                            "x": "b2",
+                            "shared_j": "j_new_2",
+                        },
+                    },
+                },
+                {
+                    "type": "c",
+                    "target": "func_c1",  # <- fixed target (and params below)
+                    "params": {
+                        "y": "c1",
+                    },
+                },
+            ],
+        }
+        p = PipelinePlaner(cfg, _registry=r)
+
+        assert p.base_config == {
+            "type":
+            "a",
+            "pipeline": [
+                {
+                    "type": "b",
+                    "params": {
+                        "shared_i": "i",
+                        "shared_j": "j",
+                        "shared_k": "k",
+                    },
+                },
+                {
+                    "type": "c",
+                    "target": "func_c1",
+                    "params": {
+                        "y": "c1",
+                    },
+                },
+            ],
+        }
+        assert p.default_params == [
+            {
+                "func_b1": {
+                    "x": "b1",
+                    "shared_j": "j_new_1",
+                },
+                "func_b2": {
+                    "x": "b2",
+                    "shared_j": "j_new_2",
+                },
+            },
+            None,
+        ]
+        assert p.search_space() == {
+            "pipeline.0": {
+                "values": ["func_b0", "func_b1", "func_b2"]
+            },
+        }
+
+        for i in (1, 2):
+            assert dict(p.generate_config(pipeline=[f"func_b{i}", None])) == {
+                "type":
+                "a",
+                "pipeline": [
+                    {
+                        "type": "b",
+                        "target": f"func_b{i}",
+                        "params": {
+                            "x": f"b{i}",
+                            "shared_i": "i",
+                            "shared_j": f"j_new_{i}",
+                            "shared_k": "k",
+                        },
+                    },
+                    {
+                        "type": "c",
+                        "target": "func_c1",
+                        "params": {
+                            "y": "c1",
+                        }
+                    },
+                ],
+            }
+
+        # HACK: overwrite fixed elements.
+        assert dict(p.generate_config(pipeline=["func_b1", "func_c2"])) == {
+            "type":
+            "a",
+            "pipeline": [
+                {
+                    "type": "b",
+                    "target": "func_b1",
+                    "params": {
+                        "x": "b1",
+                        "shared_i": "i",
+                        "shared_j": "j_new_1",
+                        "shared_k": "k",
+                    },
+                },
+                {
+                    "type": "c",
+                    "target": "func_c2",
+                    "params": {
+                        "y": "c1",
+                    }
+                },
+            ],
+        }
+
+
+def test_pipeline_planer_wandb_integration(planer_toy_registry):
+    r = planer_toy_registry
+
+    cfg = {
+        "type": "a",
+        "tune_mode": "pipeline",
+        "pipeline": [
+            {
+                "type": "b",
+            },
+        ],
+        "wandb": {
+            "entity": "dance",
+            "project": "dance-dev",
+            "method": "bayes",
+            "metric": {
+                "name": "val/acc",
+                "goal": "maximize",
+            },
+        },
+    }
+    p = PipelinePlaner(cfg, _registry=r)
+
+    assert p.base_config == {
+        "type": "a",
+        "pipeline": [
+            {
+                "type": "b",
+            },
+        ],
+    }
+    assert p.wandb_config == {
+        "entity": "dance",
+        "project": "dance-dev",
+        "method": "bayes",
+        "metric": {
+            "name": "val/acc",
+            "goal": "maximize",
+        },
+    }
+
+    assert dict(p.generate_config(pipeline=["func_b1"])) == {
+        "type": "a",
+        "pipeline": [
+            {
+                "type": "b",
+                "target": "func_b1",
+            },
+        ],
+    }
+
+    assert p.search_space() == {
+        "pipeline.0": {
+            "values": ["func_b0", "func_b1", "func_b2"],
+        },
+    }
+
+    assert p.wandb_sweep_config() == {
+        "entity": "dance",
+        "project": "dance-dev",
+        "method": "bayes",
+        "metric": {
+            "name": "val/acc",
+            "goal": "maximize",
+        },
+        "parameters": {
+            "pipeline.0": {
+                "values": ["func_b0", "func_b1", "func_b2"],
+            },
+        },
+    }

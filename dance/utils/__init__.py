@@ -49,6 +49,33 @@ class SimpleIndexDataset(Dataset):
         return x
 
 
+class Color:
+    COLOR_DICT = {
+        "blue": "\033[94m",
+        "cyan": "\033[96m",
+        "green": "\033[92m",
+        "yellow": "\033[93m",
+        "red": "\033[91m",
+    }
+    ENDC = "\033[0m"
+
+    def __init__(self, color: str):
+        if (code := self.COLOR_DICT.get(color)) is None:
+            raise ValueError(f"Unknown color {color}, supported options: {sorted(self.COLOR_DICT)}")
+        self._start = code
+
+    @property
+    def start(self) -> str:
+        return self._start
+
+    @property
+    def end(self) -> str:
+        return self.ENDC
+
+    def __call__(self, txt: str) -> str:
+        return "".join((self.start, txt, self.end))
+
+
 def set_seed(rndseed, cuda: bool = True, extreme_mode: bool = False):
     os.environ["PYTHONHASHSEED"] = str(rndseed)
     random.seed(rndseed)

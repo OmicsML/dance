@@ -1,6 +1,7 @@
 import importlib
 import inspect
 from copy import deepcopy
+from pprint import pformat
 
 from omegaconf import DictConfig, OmegaConf
 
@@ -8,8 +9,8 @@ from dance import logger
 from dance.config import Config
 from dance.exceptions import DevError
 from dance.registry import REGISTRY, REGISTRY_PREFIX, Registry, resolve_from_registry
-from dance.typing import Any, Callable, ConfigLike, Dict, FileExistHandle, List, Optional, PathLike, Union
-from dance.utils import default
+from dance.typing import Any, Callable, ConfigLike, Dict, FileExistHandle, List, Optional, PathLike, Tuple, Union
+from dance.utils import Color, default
 
 
 class Action:
@@ -245,6 +246,7 @@ class PipelinePlaner(Pipeline):
     DEFAULT_PARAMS_KEY = "default_params"
     PELEM_INCLUDE_KEY = "include"
     PELEM_EXCLUDE_KEY = "exclude"
+    WANDB_KEY = "wandb"
     VALID_TUNE_MODES = ("pipeline", "params")
 
     def __init__(self, cfg: ConfigLike, **kwargs):
@@ -272,12 +274,20 @@ class PipelinePlaner(Pipeline):
     def candidate_params(self) -> Optional[List[Dict[str, Any]]]:
         return getattr(self, "_candidate_params", None)
 
-    def _resolve_pelem_plan(self, idx: int) -> List[str]:
+    @property
+    def wandb_config(self) -> Optional[Dict[str, Any]]:
+        return self._wandb_config
+
+    def _resolve_pelem_plan(self, idx: int) -> Optional[List[str]]:
         # NOTE: we need to use the raw config here instaed of the pipeline
         # element action object, as obtained by self[idx], since that does not
         # contain the extra information about tuning settings we need, e.g.,
         # the inclusion and exlusion settings.
         pelem_config = self.config[self.PIPELINE_KEY][idx]
+
+        # Use fixed target if available
+        if pelem_config.get(self.TARGET_KEY) is not None:
+            return None
 
         # Disallow setting includes and excludes at the same time
         if all(pelem_config.get(i) is not None for i in (self.PELEM_INCLUDE_KEY, self.PELEM_EXCLUDE_KEY)):
@@ -331,9 +341,10 @@ class PipelinePlaner(Pipeline):
             raise ValueError("Empty pipeline.")
 
         # Set up base config
-        base_keys = pelem_keys = (self.TYPE_KEY, self.DESC_KEY)
-        if self.tune_mode == "params":
-            pelem_keys = pelem_keys + (self.TARGET_KEY, )
+        base_keys = pelem_keys = (self.TYPE_KEY, self.DESC_KEY, self.TARGET_KEY)
+        if self.tune_mode == "pipeline":
+            # NOTE: params reserved for planing when tuning mode is ``params``
+            pelem_keys = pelem_keys + (self.PARAMS_KEY, )
 
         base_config = {}
         for key in base_keys:
@@ -376,6 +387,11 @@ class PipelinePlaner(Pipeline):
         else:
             raise ValueError(f"Unknown tune mode {self.tune_mode!r}, supported options are {self.VALID_TUNE_MODES}")
 
+        # Other configs
+        self._wandb_config = self.config.get(self.WANDB_KEY)
+        if self._wandb_config is not None:
+            self._wandb_config = OmegaConf.to_container(self._wandb_config)
+
     @staticmethod
     def _sanitize_pipeline(
         pipeline: Optional[Union[Dict[str, Any], List[str]]],
@@ -393,10 +409,15 @@ class PipelinePlaner(Pipeline):
                 logger.debug(f"Setting pipeline element {idx} to {j}")
                 pipeline[idx] = j
 
+        if pipeline is None:
+            return
+
         # Make sure pipeline length matches
-        if pipeline is not None and len(pipeline) != pipeline_length:
+        if len(pipeline) != pipeline_length:
             raise ValueError(f"Expecting {pipeline_length} targets specifications, "
                              f"but only got {len(pipeline)}: {pipeline}")
+
+        logger.info(f"Pipeline plane:\n{Color('green')(pformat(pipeline))}")
 
         return pipeline
 
@@ -421,14 +442,26 @@ class PipelinePlaner(Pipeline):
                     params[idx] = {}
                 params[idx][key] = j
 
-        if params is not None and len(params) != pipeline_length:
+        if params is None:
+            return
+
+        # Make sure pipeline length matches
+        if len(params) != pipeline_length:
             raise ValueError(f"Expecting {pipeline_length} targets specifications, "
                              f"but only got {len(params)}: {params}")
+
+        logger.info(f"Params plane:\n{Color('green')(pformat(params))}")
 
         return params
 
     def _validate_pipeline(self, validate: bool, pipeline: List[str], i: int):
-        if validate and pipeline[i] not in self.candidate_pipelines[i]:
+        if not validate:
+            return
+
+        if self.candidate_pipelines[i] is None:  # use fixed target
+            return
+
+        if pipeline[i] not in self.candidate_pipelines[i]:  # invalid specified target
             raise ValueError(f"Specified target {pipeline[i]} ({i=}) not supported. "
                              f"Available options are: {self.candidate_pipelines[i]}")
 
@@ -457,8 +490,9 @@ class PipelinePlaner(Pipeline):
                    f"params specification for {full_scope!r} ({i=}): {unknown_keys}")
             if strict_params_check:
                 raise ValueError(msg)
-            else:
-                logger.warning(msg)
+            # FIX: need to figure out a way to get inherited kwargs as well, e.g., ``out``...
+            # else:
+            #     logger.warning(msg)
 
     def generate_config(
         self,
@@ -496,7 +530,7 @@ class PipelinePlaner(Pipeline):
         # TODO: nested pipeline support?
         for i in range(pipeline_length):
             # Parse pipeline plan
-            if pipeline is not None:
+            if pipeline is not None and pipeline[i] is not None:
                 self._validate_pipeline(validate, pipeline, i)
                 get_ith_pelem(i)[self.TARGET_KEY] = pipeline[i]
 
@@ -614,7 +648,7 @@ class PipelinePlaner(Pipeline):
                 }
             )
 
-            dict(planer.search_space()) == {
+            planer.search_space() == {
                 "pipeline.0.target": {
                     "values": [
                         "FilterGenesScanpy",
@@ -662,7 +696,7 @@ class PipelinePlaner(Pipeline):
                 }
             )
 
-            dict(planer.search_space()) == {
+            planer.search_space() == {
                 "params.1.n_components": {
                     "values": [128, 256, 512, 1024],
                 },
@@ -681,7 +715,12 @@ class PipelinePlaner(Pipeline):
         return search_space
 
     def _pipeline_search_space(self) -> Dict[str, str]:
-        search_space = {f"{self.PIPELINE_KEY}.{i}": {"values": j} for i, j in enumerate(self.candidate_pipelines)}
+        search_space = {
+            f"{self.PIPELINE_KEY}.{i}": {
+                "values": j
+            }
+            for i, j in enumerate(self.candidate_pipelines) if j is not None
+        }
         return search_space
 
     def _params_search_space(self) -> Dict[str, Dict[str, Optional[Union[str, float]]]]:
@@ -691,3 +730,57 @@ class PipelinePlaner(Pipeline):
                 for key, val in param_dict.items():
                     search_space[f"{self.PARAMS_KEY}.{i}.{key}"] = val
         return search_space
+
+    def wandb_sweep_config(self) -> Dict[str, Any]:
+        if self.wandb_config is None:
+            raise ValueError("wandb config not specified in the raw config.")
+        return {**self.wandb_config, "parameters": self.search_space()}
+
+    def wandb_sweep(self) -> Tuple[str, str, str]:
+        try:
+            import wandb
+        except ModuleNotFoundError as e:
+            raise ImportError("wandb not installed. Please install wandb first: $ pip install wandb") from e
+
+        if "wandb" not in self.config:
+            raise ValueError(f"{self.config_yaml}\nMissing wandb config.")
+        wandb_entity = self.config.wandb.get("entity")
+        wandb_project = self.config.wandb.get("project")
+        if wandb_entity is None or wandb_project is None:
+            raise ValueError(f"{self.config_yaml}\nMissing either one (or both) of wandb configs "
+                             f"'entity' and 'project': {wandb_entity=!r}, {wandb_project=!r}")
+
+        sweep_config = self.wandb_sweep_config()
+        logger.info(f"Sweep config:\n{pformat(sweep_config)}")
+        wandb_sweep_id = wandb.sweep(sweep=sweep_config, entity=wandb_entity, project=wandb_project)
+        logger.info(Color("blue")(f"\n\n\t[*] Sweep ID: {wandb_sweep_id}\n"))
+
+        return wandb_entity, wandb_project, wandb_sweep_id
+
+    def wandb_sweep_agent(
+        self,
+        function: Callable,
+        *,
+        sweep_id: Optional[str] = None,
+        entity: Optional[str] = None,
+        project: Optional[str] = None,
+        count: Optional[int] = None,
+    ) -> Tuple[str, str, str]:
+        try:
+            import wandb
+        except ModuleNotFoundError as e:
+            raise ImportError("wandb not installed. Please install wandb first: $ pip install wandb") from e
+
+        if sweep_id is None:
+            if entity is not None or project is not None:
+                raise ValueError("Cannot specify entity or project when sweep_id is not specified "
+                                 "(will be inferred from config)")
+            entity, project, sweep_id = self.wandb_sweep()
+        else:
+            entity = self.config.wandb.get("entity")
+            project = self.config.wandb.get("project")
+
+        logger.info(f"Spawning agent: {sweep_id=}, {entity=}, {project=}, {count=}")
+        wandb.agent(sweep_id, function=function, entity=entity, project=project, count=count)
+
+        return entity, project, sweep_id
