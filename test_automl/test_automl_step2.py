@@ -1,0 +1,145 @@
+from functools import partial
+from itertools import combinations
+
+import scanpy as sc
+import wandb
+
+from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
+from dance.transforms.filter import FilterGenesPercentile, FilterGenesRegression
+from dance.transforms.interface import AnnDataTransform
+from dance.transforms.normalize import ScaleFeature, ScTransformR
+
+fun2code_dict = {
+    "normalize_total": AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
+    "log1p": AnnDataTransform(sc.pp.log1p, base=2),
+    "scaleFeature": ScaleFeature(split_names="ALL", mode="standardize"),
+    "scTransform": ScTransformR(mirror_index=1),
+    "filter_gene_by_count": AnnDataTransform(sc.pp.filter_genes, min_cells=1),
+    "filter_gene_by_percentile": FilterGenesPercentile(min_val=1, max_val=99, mode="sum"),
+    "highly_variable_genes": AnnDataTransform(sc.pp.highly_variable_genes),
+    "regress_out": AnnDataTransform(sc.pp.regress_out),
+    "Filter_gene_by_regress_score": FilterGenesRegression("enclasc"),
+    "cell_svd": CellSVD(),
+    "cell_weighted_pca": WeightedFeaturePCA(split_name="train"),
+    "cell_pca": CellPCA()
+}
+
+
+def getSweepId(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"]):
+    pipline2fun_dict = {
+        "normalize": {
+            "values": ["normalize_total", "log1p", "scaleFeature", "scTransform"]
+        },
+        "gene_filter": {
+            "values": [
+                "filter_gene_by_count", "filter_gene_by_percentile", "highly_variable_genes",
+                "Filter_gene_by_regress_score"
+            ]
+        },
+        "gene_dim_reduction": {
+            "values": ["cell_svd", "cell_weighted_pca", "cell_pca"]
+        }
+    }
+    pipline2fun_dict = {key: pipline2fun_dict[key] for key in selected_keys}
+    count = 1
+    for pipline_key, pipline_values in pipline2fun_dict.items():
+        count *= len(pipline_values['values'])
+    parameters_dict = pipline2fun_dict
+    parameters_dict.update({
+        'batch_size': {
+            'value': 128
+        },
+        "hidden_dims": {
+            'value': [2000]
+        },
+        'lambd': {
+            'value': 0.005
+        },
+        'num_epochs': {
+            'value': 50
+        },
+        'seed': {
+            'value': 0
+        },
+        'num_runs': {
+            'value': 1
+        },
+        'learning_rate': {
+            'value': 0.0001
+        }
+    })
+    sweep_config = {'method': 'grid'}
+    sweep_config['parameters'] = parameters_dict
+    metric = {'name': 'scores', 'goal': 'maximize'}
+
+    sweep_config['metric'] = metric
+    sweep_id = wandb.sweep(sweep_config, project="pytorch-cell_type_annotation_ACTINN")
+    return sweep_id, count
+
+
+import numpy as np
+import torch
+
+from dance.datasets.singlemodality import CellTypeAnnotationDataset
+from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
+from dance.transforms.misc import Compose, SetConfig
+from dance.utils import set_seed
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def train(config=None):
+    with wandb.init(config=config):
+        config = wandb.config
+        if ("normalize" not in config.keys() or config.normalize
+                != "log1p") and ("gene_filter" in config.keys() and config.gene_filter == "highly_variable_genes"):
+            wandb.log({"scores": 0})
+            return
+        model = ACTINN(hidden_dims=config.hidden_dims, lambd=config.lambd, device=device)
+        transforms = []
+        transforms.append(fun2code_dict[config.normalize]) if "normalize" in config.keys() else None
+        transforms.append(fun2code_dict[config.gene_filter]) if "gene_filter" in config.keys() else None
+        transforms.append(fun2code_dict[config.gene_dim_reduction]) if "gene_dim_reduction" in config.keys() else None
+        data_config = {"label_channel": "cell_type"}
+        if "gene_dim_reduction" in config.keys():
+            data_config.update({"feature_channel": fun2code_dict[config.gene_dim_reduction].name})
+        transforms.append(SetConfig(data_config))
+        preprocessing_pipeline = Compose(*transforms, log_level="INFO")
+
+        # preprocessing_pipeline = model.preprocessing_pipeline(normalize=args.normalize, filter_genes=not args.nofilter)
+        # Load data and perform necessary preprocessing
+        train_dataset = [753, 3285]
+        test_dataset = [2695]
+        tissue = "Brain"
+        species = "mouse"
+        dataloader = CellTypeAnnotationDataset(train_dataset=train_dataset, test_dataset=test_dataset, tissue=tissue,
+                                               species=species)
+        data = dataloader.load_data(transform=preprocessing_pipeline, cache=False)
+
+        # Obtain training and testing data
+        x_train, y_train = data.get_train_data(return_type="torch")
+        x_test, y_test = data.get_test_data(return_type="torch")
+        x_train, y_train, x_test, y_test = x_train.float(), y_train.float(), x_test.float(), y_test.float()
+        # Train and evaluate models for several rounds
+        scores = []
+        for seed in range(config.seed, config.seed + config.num_runs):
+            set_seed(seed)
+
+            model.fit(x_train, y_train, seed=seed, lr=config.learning_rate, num_epochs=config.num_epochs,
+                      batch_size=config.batch_size, print_cost=False)
+            scores.append(score := model.score(x_test, y_test))
+        #     print(f"{score=:.4f}")
+        # print(f"ACTINN {species} {tissue} {test_dataset}:")
+        # print(f"{scores}\n{np.mean(scores):.5f} +/- {np.std(scores):.5f}")
+        wandb.log({"scores": np.mean(scores)})
+
+
+if __name__ == "__main__":
+    original_list = ["normalize", "gene_filter", "gene_dim_reduction"]
+    all_combinations = [combo for i in range(1, len(original_list) + 1) for combo in combinations(original_list, i)]
+    all_combinations.append([])
+    for s_key in all_combinations:
+        s_list = list(s_key)
+        sweep_id, count = getSweepId(s_list)
+        print(s_list, count)
+        wandb.agent(sweep_id, train, count=count)
