@@ -86,5 +86,5 @@ class SC3Feature(BaseTransform):
         sim_matrix_all = np.array(sim_matrix_all)
         sim_matrix_mean = np.mean(sim_matrix_all, axis=0)
 
-        data.data.uns[self.out] = sim_matrix_mean
+        data.data.obsm[self.out] = sim_matrix_mean
         return data
