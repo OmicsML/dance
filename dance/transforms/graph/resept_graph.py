@@ -19,11 +19,13 @@ class RESEPTGraph(BaseTransform):
 
     """
 
-    def __init__(self, fiducial_diameter_fullres=144.56835055243283, tissue_hires_scalef=0.150015,n_neighbors: int = 15,**kwargs):
+    def __init__(self, fiducial_diameter_fullres=144.56835055243283, tissue_hires_scalef=0.150015,
+                 n_neighbors: int = 15, **kwargs):
         super().__init__(**kwargs)
         self.fiducial_diameter_fullres = fiducial_diameter_fullres
         self.tissue_hires_scalef = tissue_hires_scalef
-        self.n_neighbors=n_neighbors
+        self.n_neighbors = n_neighbors
+
     def scale_to_RGB(self, channel, truncated_percent):
         truncated_down = np.percentile(channel, truncated_percent)
         truncated_up = np.percentile(channel, 100 - truncated_percent)
@@ -34,7 +36,7 @@ class RESEPTGraph(BaseTransform):
 
     def __call__(self, data: Data) -> Data:
         xy_pixel = data.get_feature(return_type="numpy", channel="spatial_pixel", channel_type="obsm")
-        sc.pp.neighbors(data.data,n_neighbors=self.n_neighbors)
+        sc.pp.neighbors(data.data, n_neighbors=self.n_neighbors)
         sc.tl.umap(data.data, n_components=3)
         X_transform = data.get_feature(return_type="numpy", channel="X_umap", channel_type="obsm")
         X_transform[:, 0] = self.scale_to_RGB(X_transform[:, 0], 100)
