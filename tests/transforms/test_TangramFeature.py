@@ -1,8 +1,9 @@
-from dance.transforms import TangramFeature
 import numpy as np
-from anndata import AnnData
-from dance.data import Data
 import pytest
+from anndata import AnnData
+
+from dance.data import Data
+from dance.transforms import TangramFeature
 
 SEED = 123
 
@@ -14,9 +15,10 @@ def toy_data():
     data = Data(adata.copy())
     return adata, data
 
+
 def test_tangram_feature(toy_data):
     adata, data = toy_data
-    tangramFeature=TangramFeature()
-    data=tangramFeature(data)
-    tangram_feature=data.get_feature(return_type="numpy", channel="TangramFeature", channel_type="obs")
-    assert np.sum(tangram_feature)==1
+    tangramFeature = TangramFeature()
+    data = tangramFeature(data)
+    tangram_feature = data.get_feature(return_type="numpy", channel="TangramFeature", channel_type="obs")
+    assert np.sum(tangram_feature) == 1
