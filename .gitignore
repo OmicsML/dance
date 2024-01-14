@@ -7,3 +7,5 @@ __pycache__
 *.egg*
 
 .DS_Store
+
+wandb
