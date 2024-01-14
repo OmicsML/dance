@@ -7,7 +7,7 @@ import scanpy as sc
 import torch
 import wandb
 from optuna_wandb import fun_list
-from test_automl_preprocess import fun2code_dict
+from test_automl_step2 import fun2code_dict
 
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
