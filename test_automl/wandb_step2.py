@@ -2,8 +2,8 @@ from functools import partial
 from itertools import combinations
 
 import scanpy as sc
-import wandb
 
+import wandb
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
 from dance.transforms.filter import FilterGenesPercentile, FilterGenesRegression
 from dance.transforms.interface import AnnDataTransform

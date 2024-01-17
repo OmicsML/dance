@@ -5,10 +5,9 @@ import sys
 import numpy as np
 import scanpy as sc
 import torch
-import wandb
 from optuna_wandb import fun_list
-from test_automl_step2 import fun2code_dict
 
+import wandb
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
@@ -17,6 +16,7 @@ from dance.transforms.interface import AnnDataTransform
 from dance.transforms.misc import Compose, SetConfig
 from dance.transforms.normalize import ScaleFeature, ScTransformR
 from dance.utils import set_seed
+from test_automl.wandb_step2 import fun2code_dict
 
 device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
