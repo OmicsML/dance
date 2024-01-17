@@ -6,7 +6,7 @@ run_cap: 20
 scheduler:
   job: xzy11632/pytorch-cell_type_annotation_ACTINN_function_new/job-OptunaScheduler:latest
   num_workers: 2
-  docker_image: r:fcf2b32f
+  docker_image: rdance_fcf2b32f.sif
   resource_args:
     local-container:
       env-file: "/home/zyxing/dance/web-variables.env"

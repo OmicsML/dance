@@ -9,3 +9,6 @@ __pycache__
 .DS_Store
 
 wandb
+
+
+test_automl/data
