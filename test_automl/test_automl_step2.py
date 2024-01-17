@@ -2,8 +2,8 @@ from functools import partial
 from itertools import combinations
 
 import scanpy as sc
-import wandb
 
+import wandb
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
 from dance.transforms.filter import FilterGenesPercentile, FilterGenesRegression
 from dance.transforms.interface import AnnDataTransform
@@ -105,9 +105,6 @@ def train(config=None):
             data_config.update({"feature_channel": fun2code_dict[config.gene_dim_reduction].name})
         transforms.append(SetConfig(data_config))
         preprocessing_pipeline = Compose(*transforms, log_level="INFO")
-
-        # preprocessing_pipeline = model.preprocessing_pipeline(normalize=args.normalize, filter_genes=not args.nofilter)
-        # Load data and perform necessary preprocessing
         train_dataset = [753, 3285]
         test_dataset = [2695]
         tissue = "Brain"
@@ -128,9 +125,6 @@ def train(config=None):
             model.fit(x_train, y_train, seed=seed, lr=config.learning_rate, num_epochs=config.num_epochs,
                       batch_size=config.batch_size, print_cost=False)
             scores.append(score := model.score(x_test, y_test))
-        #     print(f"{score=:.4f}")
-        # print(f"ACTINN {species} {tissue} {test_dataset}:")
-        # print(f"{scores}\n{np.mean(scores):.5f} +/- {np.std(scores):.5f}")
         wandb.log({"scores": np.mean(scores)})
 
 
