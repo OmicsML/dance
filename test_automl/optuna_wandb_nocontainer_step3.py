@@ -4,9 +4,9 @@ import numpy as np
 import optuna
 import scanpy as sc
 import torch
+import wandb
 from optuna.integration.wandb import WeightsAndBiasesCallback
 
-import wandb
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
