@@ -18,4 +18,4 @@ def test_cell_type_nums():
     data = Data(adata.copy())
     data = CellTypeNums()(data)
     cell_type_nums = data.get_feature(return_type="numpy", channel="CellTypeNums", channel_type="uns")
-    return cell_type_nums.shape[0] == len(np.unique(cell_types))
+    assert cell_type_nums.shape[0] == len(np.unique(cell_types))

@@ -10,7 +10,7 @@ SEED = 123
 
 @pytest.fixture
 def toy_data():
-    x = np.random.default_rng(SEED).random((5, 3))
+    x = np.random.default_rng(SEED).random((50, 30))
     adata = AnnData(X=x, dtype=np.float32)
     data = Data(adata.copy())
     return adata, data
