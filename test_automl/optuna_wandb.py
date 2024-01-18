@@ -1,9 +1,6 @@
-import json
-import os
 import sys
 
 import optuna
-import scanpy as sc
 
 fun_list = ["log1p", "filter_gene_by_count"]
 
