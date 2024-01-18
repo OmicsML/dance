@@ -106,11 +106,7 @@ def normalize_total(trial: optuna.Trial):
         }
 
 
-parameter_config = None
-
-
 def objective(trial):
-    global parameter_config
     parameter_config = {}
     for f_str in fun_list:
         fun_i = eval(f_str)
