@@ -5,9 +5,9 @@ import sys
 import numpy as np
 import scanpy as sc
 import torch
-import wandb
 from optuna_wandb import fun_list
 
+import wandb
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
@@ -21,12 +21,6 @@ from test_automl.wandb_step2 import fun2code_dict
 device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
 
-# import inspect
-# path= os.path.dirname(inspect.getfile(lambda: None))
-# path = os.path.join(path,"fun_list.json") # 拼接文件的路径
-# with open(path,"r") as file:
-#     loaded_data = json.load(file)
-# fun_list = loaded_data["fun_list"]
 def cell_pca(parameter_config):
     method_name = str(sys._getframe().f_code.co_name) + "_"
     return CellPCA(n_components=parameter_config.get(method_name + "n_components"))
@@ -138,8 +132,6 @@ def run_training_run():
         transforms.append(SetConfig(data_config))
         preprocessing_pipeline = Compose(*transforms, log_level="INFO")
 
-        # preprocessing_pipeline = model.preprocessing_pipeline(normalize=args.normalize, filter_genes=not args.nofilter)
-        # Load data and perform necessary preprocessing
         train_dataset = [753, 3285]
         test_dataset = [2695]
         tissue = "Brain"
@@ -164,9 +156,7 @@ def run_training_run():
                       num_epochs=parameter_config.get('num_epochs'), batch_size=parameter_config.get('batch_size'),
                       print_cost=False)
             scores.append(score := model.score(x_test, y_test))
-        #     print(f"{score=:.4f}")
-        # print(f"ACTINN {species} {tissue} {test_dataset}:")
-        # print(f"{scores}\n{np.mean(scores):.5f} +/- {np.std(scores):.5f}")
+
         wandb.log({"scores": np.mean(scores)})
     run.log_code()
     run.finish()
