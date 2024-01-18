@@ -1,13 +1,11 @@
-import os
-import random
 import sys
 
 import numpy as np
 import scanpy as sc
 import torch
-import wandb
 from optuna_wandb import fun_list
 
+import wandb
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
