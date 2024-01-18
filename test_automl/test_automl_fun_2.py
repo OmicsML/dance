@@ -1,6 +1,5 @@
-import yaml
-
 import wandb
+import yaml
 
 ARTIFACT_FILENAME = "/home/zyxing/dance/"
 ARTIFACT_NAME = "optuna-config"
