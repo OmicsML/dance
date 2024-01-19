@@ -1,4 +1,4 @@
-from itertools import combinations
+from typing import Any, Callable, Dict, Tuple
 
 import numpy as np
 import torch
@@ -41,7 +41,7 @@ def train(config):
     return {"scores": np.mean(scores)}
 
 
-def startSweep(parameters_dict):
+def startSweep(parameters_dict) -> Tuple[Dict[str, Any], Callable[..., Any]]:
     parameters_dict.update({
         'batch_size': {
             'value': 128
@@ -70,7 +70,7 @@ def startSweep(parameters_dict):
     metric = {'name': 'scores', 'goal': 'maximize'}
 
     sweep_config['metric'] = metric
-    return sweep_config, train
+    return sweep_config, train  #Return function configuration and training function
 
 
 if __name__ == "__main__":
