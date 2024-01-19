@@ -2,7 +2,7 @@ from typing import Any, Callable, Dict, Tuple
 
 import numpy as np
 import torch
-from step2_config import get_preprocessing_pipeline, setStep2, track_in_wandb
+from step2_config import get_preprocessing_pipeline, log_in_wandb, setStep2
 
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
@@ -11,7 +11,7 @@ from dance.utils import set_seed
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-@track_in_wandb(config=None)
+@log_in_wandb(config=None)
 def train(config):
 
     model = ACTINN(hidden_dims=config.hidden_dims, lambd=config.lambd, device=device)
