@@ -4,9 +4,9 @@ import numpy as np
 import optuna
 import scanpy as sc
 import torch
-import wandb
 from optuna.integration.wandb import WeightsAndBiasesCallback
 
+import wandb
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
@@ -15,7 +15,7 @@ from dance.transforms.interface import AnnDataTransform
 from dance.transforms.misc import Compose, SetConfig
 from dance.transforms.normalize import ScaleFeature, ScTransformR
 from dance.utils import set_seed
-from test_automl.wandb_step2 import fun2code_dict
+from test_automl.config import fun2code_dict
 
 fun_list = ["log1p", "filter_gene_by_count"]
 wandb_kwargs = {"project": "my-project"}
