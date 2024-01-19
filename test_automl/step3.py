@@ -1,10 +1,10 @@
 import numpy as np
 import optuna
 import torch
+import wandb
 from optuna.integration.wandb import WeightsAndBiasesCallback
 from step3_config import get_preprocessing_pipeline
 
-import wandb
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.utils import set_seed
