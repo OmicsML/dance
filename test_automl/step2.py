@@ -2,30 +2,14 @@ from itertools import combinations
 
 import numpy as np
 import torch
-import wandb
-from step2_config import get_preprocessing_pipeline, getFunConfig
+from step2_config import get_preprocessing_pipeline, getFunConfig, track_in_wandb
 
+import wandb
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.utils import set_seed
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-def track_in_wandb(config):
-
-    def decorator(func):
-
-        def wrapper(*args, **kwargs):
-            with wandb.init(config=config):
-                config = wandb.config
-                print(config)
-                result = func(config, *args, **kwargs)
-                return result
-
-        return wrapper
-
-    return decorator
 
 
 @track_in_wandb(config=None)

@@ -1,5 +1,6 @@
 from fun2code import fun2code_dict
 
+import wandb
 from dance.transforms.misc import Compose, SetConfig
 
 pipline2fun_dict = {
@@ -40,3 +41,19 @@ def get_preprocessing_pipeline(config=None):
     transforms.append(SetConfig(data_config))
     preprocessing_pipeline = Compose(*transforms, log_level="INFO")
     return preprocessing_pipeline
+
+
+def track_in_wandb(config):
+
+    def decorator(func):
+
+        def wrapper(*args, **kwargs):
+            with wandb.init(config=config):
+                config = wandb.config
+                print(config)
+                result = func(config, *args, **kwargs)
+                return result
+
+        return wrapper
+
+    return decorator
