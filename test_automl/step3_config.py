@@ -3,7 +3,9 @@ import sys
 import optuna
 import scanpy as sc
 from fun2code import fun2code_dict
+from optuna.integration.wandb import WeightsAndBiasesCallback
 
+import wandb
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
 from dance.transforms.filter import FilterGenesPercentile, FilterGenesRegression
 from dance.transforms.interface import AnnDataTransform
@@ -12,6 +14,7 @@ from dance.transforms.normalize import ScaleFeature, ScTransformR
 
 
 def set_method_name(func):
+    """get_method_name."""
 
     def wrapper(*args, **kwargs):
         method_name = func.__name__ + "_"
@@ -119,6 +122,8 @@ def normalize_total(method_name: str, trial: optuna.Trial):
 
 
 def get_preprocessing_pipeline(trial, fun_list):
+    """Obtain the Compose of the preprocessing function according to the preprocessing
+    function."""
     transforms = []
     for f_str in fun_list:
         fun_i = eval(f_str)
@@ -130,3 +135,38 @@ def get_preprocessing_pipeline(trial, fun_list):
     transforms.append(SetConfig(data_config))
     preprocessing_pipeline = Compose(*transforms, log_level="INFO")
     return preprocessing_pipeline
+
+
+def log_in_wandb(wandbc=None):
+    """Decorate optimization functions."""
+
+    def decorator(func):
+
+        def wrapper(*args, **kwargs):
+            wandb_decorator = wandbc.track_in_wandb()
+            decorator_function = wandb_decorator(func)
+            result = decorator_function(*args, **kwargs)
+            wandb.log(result)
+            values = list(result.values())
+            if len(values) == 1:
+                return values[0]
+            else:
+                return tuple(values)
+
+        return wrapper
+
+    return decorator
+
+
+def get_optimizer(project, objective, n_trials=2):
+    """Get optimizer."""
+    wandb_kwargs = {"project": project}
+    wandbc = WeightsAndBiasesCallback(wandb_kwargs=wandb_kwargs, as_multirun=True)
+    decorator = log_in_wandb(wandbc)
+    decorator_function = decorator(objective)
+    study = optuna.create_study()
+
+    def wrapper():
+        study.optimize(decorator_function, n_trials=n_trials, callbacks=[wandbc])
+
+    return wrapper
