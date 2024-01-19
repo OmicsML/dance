@@ -9,7 +9,7 @@ def getSweepId(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"])
     global pipline2fun_dict
     pipline2fun_dict = {key: pipline2fun_dict[key] for key in selected_keys}
     count = 1
-    for pipline_key, pipline_values in pipline2fun_dict.items():
+    for _, pipline_values in pipline2fun_dict.items():
         count *= len(pipline_values['values'])
     parameters_dict = pipline2fun_dict
     parameters_dict.update({
