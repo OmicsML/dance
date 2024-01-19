@@ -1,9 +1,9 @@
 import functools
 from itertools import combinations
 
-import wandb
 from fun2code import fun2code_dict
 
+import wandb
 from dance.transforms.misc import Compose, SetConfig
 
 pipline2fun_dict = {
@@ -20,14 +20,14 @@ pipline2fun_dict = {
 }  #Functions registered in the preprocessing process
 
 
-def getFunConfig(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"]):
+def getFunConfig(selected_keys=None):
     """Get the config that needs to be optimized and the number of rounds."""
     global pipline2fun_dict
-    pipline2fun_dict = {key: pipline2fun_dict[key] for key in selected_keys}
+    pipline2fun_dict_subset = {key: pipline2fun_dict[key] for key in selected_keys}
     count = 1
-    for _, pipline_values in pipline2fun_dict.items():
+    for _, pipline_values in pipline2fun_dict_subset.items():
         count *= len(pipline_values['values'])
-    return pipline2fun_dict, count
+    return pipline2fun_dict_subset, count
 
 
 def get_preprocessing_pipeline(config=None):
@@ -49,8 +49,7 @@ def get_preprocessing_pipeline(config=None):
     return preprocessing_pipeline
 
 
-def sweepDecorator(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"],
-                   project="pytorch-cell_type_annotation_ACTINN"):
+def sweepDecorator(selected_keys=None, project="pytorch-cell_type_annotation_ACTINN"):
     """Decorator for preprocessing configuration functions."""
 
     def decorator(func):
@@ -72,7 +71,7 @@ def sweepDecorator(selected_keys=["normalize", "gene_filter", "gene_dim_reductio
     return decorator
 
 
-def setStep2(func=None, original_list=["normalize", "gene_filter", "gene_dim_reduction"]):
+def setStep2(func=None, original_list=None):
     """Generate corresponding decorators for different preprocessing."""
     all_combinations = [combo for i in range(1,
                                              len(original_list) + 1) for combo in combinations(original_list, i)] + [[]]

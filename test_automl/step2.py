@@ -74,6 +74,6 @@ def startSweep(parameters_dict) -> Tuple[Dict[str, Any], Callable[..., Any]]:
 
 
 if __name__ == "__main__":
-    function_list = setStep2(startSweep)
+    function_list = setStep2(startSweep, original_list=["gene_filter", "gene_dim_reduction"])
     for func in function_list:
         func()
