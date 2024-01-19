@@ -12,4 +12,4 @@ wandb
 
 
 test_automl/data
-test_automl/test.ipynb
+test_automl/test.py
