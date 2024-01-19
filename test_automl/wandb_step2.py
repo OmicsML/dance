@@ -1,10 +1,11 @@
 from itertools import combinations
 
 import wandb
-from config import fun2code_dict, pipline2fun_dict
+from test_automl.pipline_config import fun2code_dict, pipline2fun_dict
 
 
 def getSweepId(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"]):
+    global pipline2fun_dict
     pipline2fun_dict = {key: pipline2fun_dict[key] for key in selected_keys}
     count = 1
     for pipline_key, pipline_values in pipline2fun_dict.items():
