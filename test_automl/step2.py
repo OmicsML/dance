@@ -2,9 +2,9 @@ from itertools import combinations
 
 import numpy as np
 import torch
+import wandb
 from step2_config import get_preprocessing_pipeline, getFunConfig, track_in_wandb
 
-import wandb
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.utils import set_seed
