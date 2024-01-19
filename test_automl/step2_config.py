@@ -1,9 +1,9 @@
 import functools
 from itertools import combinations
 
-import wandb
 from fun2code import fun2code_dict
 
+import wandb
 from dance.transforms.misc import Compose, SetConfig
 
 #TODO register more functions
@@ -63,7 +63,7 @@ def sweepDecorator(selected_keys=None, project="pytorch-cell_type_annotation_ACT
                 sweep_config, train = func(parameters_dict)
                 sweep_id = wandb.sweep(sweep_config, project=project)
                 wandb.agent(sweep_id, train, count=count)
-            except Exception as e:
+            except Exception as e:  #Except, etc. are not necessarily needed in the code.
                 print(f"{func.__name__}{args}\n==> {e}")
                 raise e
 
