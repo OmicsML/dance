@@ -1,8 +1,7 @@
 from itertools import combinations
 
-from step2_config import getFunConfig
-
 import wandb
+from step2_config import getFunConfig
 
 
 def getSweepId(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"]):
