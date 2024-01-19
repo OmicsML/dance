@@ -1,11 +1,12 @@
+import functools
 import sys
 
 import optuna
 import scanpy as sc
-import wandb
 from fun2code import fun2code_dict
 from optuna.integration.wandb import WeightsAndBiasesCallback
 
+import wandb
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
 from dance.transforms.filter import FilterGenesPercentile, FilterGenesRegression
 from dance.transforms.interface import AnnDataTransform
@@ -16,10 +17,15 @@ from dance.transforms.normalize import ScaleFeature, ScTransformR
 def set_method_name(func):
     """Get method name to name the optimization option."""
 
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        method_name = func.__name__ + "_"
-        result = func(method_name, *args, **kwargs)
-        return result
+        try:
+            method_name = func.__name__ + "_"
+            result = func(method_name, *args, **kwargs)
+            return result
+        except Exception as e:
+            print(f"{func.__name__}{args}\n==> {e}")
+            raise e
 
     return wrapper
 
