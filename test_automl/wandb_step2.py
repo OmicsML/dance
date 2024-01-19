@@ -1,7 +1,8 @@
 from itertools import combinations
 
-import wandb
 from config import fun2code_dict, pipline2fun_dict
+
+import wandb
 
 
 def getSweepId(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"]):
