@@ -1,5 +1,7 @@
 from fun2code import fun2code_dict
 
+from dance.transforms.misc import Compose, SetConfig
+
 pipline2fun_dict = {
     "normalize": {
         "values": ["normalize_total", "log1p", "scaleFeature", "scTransform"]
