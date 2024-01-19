@@ -2,9 +2,9 @@ from itertools import combinations
 
 import numpy as np
 import torch
-import wandb
 from step2_config import get_preprocessing_pipeline, getFunConfig
 
+import wandb
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.utils import set_seed
@@ -12,35 +12,50 @@ from dance.utils import set_seed
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def train(config=None):
-    with wandb.init(config=config):
-        config = wandb.config
-        model = ACTINN(hidden_dims=config.hidden_dims, lambd=config.lambd, device=device)
-        preprocessing_pipeline = get_preprocessing_pipeline(config=config)
-        if preprocessing_pipeline is None:
-            wandb.log({"scores": 0})
-            return
-        train_dataset = [753, 3285]
-        test_dataset = [2695]
-        tissue = "Brain"
-        species = "mouse"
-        dataloader = CellTypeAnnotationDataset(train_dataset=train_dataset, test_dataset=test_dataset, tissue=tissue,
-                                               species=species)
-        data = dataloader.load_data(transform=preprocessing_pipeline, cache=False)
+def track_in_wandb(config):
 
-        # Obtain training and testing data
-        x_train, y_train = data.get_train_data(return_type="torch")
-        x_test, y_test = data.get_test_data(return_type="torch")
-        x_train, y_train, x_test, y_test = x_train.float(), y_train.float(), x_test.float(), y_test.float()
-        # Train and evaluate models for several rounds
-        scores = []
-        for seed in range(config.seed, config.seed + config.num_runs):
-            set_seed(seed)
+    def decorator(func):
 
-            model.fit(x_train, y_train, seed=seed, lr=config.learning_rate, num_epochs=config.num_epochs,
-                      batch_size=config.batch_size, print_cost=False)
-            scores.append(score := model.score(x_test, y_test))
-        wandb.log({"scores": np.mean(scores)})
+        def wrapper(*args, **kwargs):
+            with wandb.init(config=config):
+                config = wandb.config
+                print(config)
+                result = func(config, *args, **kwargs)
+                return result
+
+        return wrapper
+
+    return decorator
+
+
+@track_in_wandb(config=None)
+def train(config):
+    model = ACTINN(hidden_dims=config.hidden_dims, lambd=config.lambd, device=device)
+    preprocessing_pipeline = get_preprocessing_pipeline(config=config)
+    if preprocessing_pipeline is None:
+        wandb.log({"scores": 0})
+        return
+    train_dataset = [753, 3285]
+    test_dataset = [2695]
+    tissue = "Brain"
+    species = "mouse"
+    dataloader = CellTypeAnnotationDataset(train_dataset=train_dataset, test_dataset=test_dataset, tissue=tissue,
+                                           species=species, data_dir="./test_automl/data")
+    data = dataloader.load_data(transform=preprocessing_pipeline, cache=False)
+
+    # Obtain training and testing data
+    x_train, y_train = data.get_train_data(return_type="torch")
+    x_test, y_test = data.get_test_data(return_type="torch")
+    x_train, y_train, x_test, y_test = x_train.float(), y_train.float(), x_test.float(), y_test.float()
+    # Train and evaluate models for several rounds
+    scores = []
+    for seed in range(config.seed, config.seed + config.num_runs):
+        set_seed(seed)
+
+        model.fit(x_train, y_train, seed=seed, lr=config.learning_rate, num_epochs=config.num_epochs,
+                  batch_size=config.batch_size, print_cost=False)
+        scores.append(score := model.score(x_test, y_test))
+    wandb.log({"scores": np.mean(scores)})
 
 
 def startSweep(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"]):
@@ -84,3 +99,7 @@ def setStep2(original_list=["normalize", "gene_filter", "gene_dim_reduction"]):
     for s_key in all_combinations:
         s_list = list(s_key)
         startSweep(s_list)
+
+
+if __name__ == "__main__":
+    setStep2()
