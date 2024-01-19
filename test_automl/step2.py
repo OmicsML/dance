@@ -1,6 +1,5 @@
 from itertools import combinations
 
-from fun2code import fun2code_dict
 from step2_config import getFunConfig
 
 import wandb
@@ -46,7 +45,6 @@ import torch
 
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
-from dance.transforms.misc import Compose, SetConfig
 from dance.utils import set_seed
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -55,20 +53,11 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def train(config=None):
     with wandb.init(config=config):
         config = wandb.config
-        if ("normalize" not in config.keys() or config.normalize
-                != "log1p") and ("gene_filter" in config.keys() and config.gene_filter == "highly_variable_genes"):
+        model = ACTINN(hidden_dims=config.hidden_dims, lambd=config.lambd, device=device)
+        preprocessing_pipeline = get_preprocessing_pipeline(config=config)
+        if preprocessing_pipeline is None:
             wandb.log({"scores": 0})
             return
-        model = ACTINN(hidden_dims=config.hidden_dims, lambd=config.lambd, device=device)
-        transforms = []
-        transforms.append(fun2code_dict[config.normalize]) if "normalize" in config.keys() else None
-        transforms.append(fun2code_dict[config.gene_filter]) if "gene_filter" in config.keys() else None
-        transforms.append(fun2code_dict[config.gene_dim_reduction]) if "gene_dim_reduction" in config.keys() else None
-        data_config = {"label_channel": "cell_type"}
-        if "gene_dim_reduction" in config.keys():
-            data_config.update({"feature_channel": fun2code_dict[config.gene_dim_reduction].name})
-        transforms.append(SetConfig(data_config))
-        preprocessing_pipeline = Compose(*transforms, log_level="INFO")
         train_dataset = [753, 3285]
         test_dataset = [2695]
         tissue = "Brain"
