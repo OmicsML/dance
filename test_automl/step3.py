@@ -1,15 +1,15 @@
 import numpy as np
 import optuna
+import step3_config as register_function
 import torch
-import wandb
 from optuna.integration.wandb import WeightsAndBiasesCallback
+from step2_config import fun2code_dict
 
-import test_automl.register_function as register_function
+import wandb
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.transforms.misc import Compose, SetConfig
 from dance.utils import set_seed
-from test_automl.pipline_config import fun2code_dict
 
 fun_list = ["log1p", "filter_gene_by_count"]
 
