@@ -2,10 +2,10 @@ import numpy as np
 import optuna
 import step3_config as register_function
 import torch
-import wandb
+from fun2code import fun2code_dict
 from optuna.integration.wandb import WeightsAndBiasesCallback
-from step2_config import fun2code_dict
 
+import wandb
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.transforms.misc import Compose, SetConfig
