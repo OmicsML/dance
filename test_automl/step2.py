@@ -1,16 +1,22 @@
 from itertools import combinations
 
-import wandb
 from fun2code import fun2code_dict
 from step2_config import pipline2fun_dict
 
+import wandb
 
-def getSweepId(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"]):
+
+def getFunConfig(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"]):
     global pipline2fun_dict
     pipline2fun_dict = {key: pipline2fun_dict[key] for key in selected_keys}
     count = 1
     for _, pipline_values in pipline2fun_dict.items():
         count *= len(pipline_values['values'])
+    return pipline2fun_dict, count
+
+
+def getSweepId(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"]):
+    pipline2fun_dict, count = getFunConfig(selected_keys)
     parameters_dict = pipline2fun_dict
     parameters_dict.update({
         'batch_size': {
