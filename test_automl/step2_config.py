@@ -1,6 +1,6 @@
+import wandb
 from fun2code import fun2code_dict
 
-import wandb
 from dance.transforms.misc import Compose, SetConfig
 
 pipline2fun_dict = {
