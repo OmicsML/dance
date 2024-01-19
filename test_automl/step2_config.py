@@ -10,3 +10,12 @@ pipline2fun_dict = {
         "values": ["cell_svd", "cell_weighted_pca", "cell_pca"]
     }
 }
+
+
+def getFunConfig(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"]):
+    global pipline2fun_dict
+    pipline2fun_dict = {key: pipline2fun_dict[key] for key in selected_keys}
+    count = 1
+    for _, pipline_values in pipline2fun_dict.items():
+        count *= len(pipline_values['values'])
+    return pipline2fun_dict, count
