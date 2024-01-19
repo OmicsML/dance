@@ -78,8 +78,8 @@ def startSweep(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"])
 
 
 def setStep2(original_list=["normalize", "gene_filter", "gene_dim_reduction"]):
-    all_combinations = [combo for i in range(1, len(original_list) + 1) for combo in combinations(original_list, i)]
-    all_combinations.append([])
+    all_combinations = [combo for i in range(1,
+                                             len(original_list) + 1) for combo in combinations(original_list, i)] + [[]]
     for s_key in all_combinations:
         s_list = list(s_key)
         startSweep(s_list)
