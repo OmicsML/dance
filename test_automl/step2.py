@@ -1,47 +1,10 @@
 from itertools import combinations
 
-import wandb
-from step2_config import get_preprocessing_pipeline, getFunConfig
-
-
-def getSweepId(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"]):
-    pipline2fun_dict, count = getFunConfig(selected_keys)
-    parameters_dict = pipline2fun_dict
-    parameters_dict.update({
-        'batch_size': {
-            'value': 128
-        },
-        "hidden_dims": {
-            'value': [2000]
-        },
-        'lambd': {
-            'value': 0.005
-        },
-        'num_epochs': {
-            'value': 50
-        },
-        'seed': {
-            'value': 0
-        },
-        'num_runs': {
-            'value': 1
-        },
-        'learning_rate': {
-            'value': 0.0001
-        }
-    })
-    sweep_config = {'method': 'grid'}
-    sweep_config['parameters'] = parameters_dict
-    metric = {'name': 'scores', 'goal': 'maximize'}
-
-    sweep_config['metric'] = metric
-    sweep_id = wandb.sweep(sweep_config, project="pytorch-cell_type_annotation_ACTINN")
-    return sweep_id, count
-
-
 import numpy as np
 import torch
+from step2_config import get_preprocessing_pipeline, getFunConfig
 
+import wandb
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.utils import set_seed
@@ -80,12 +43,44 @@ def train(config=None):
         wandb.log({"scores": np.mean(scores)})
 
 
-if __name__ == "__main__":
-    original_list = ["normalize", "gene_filter", "gene_dim_reduction"]
+def startSweep(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"]):
+    pipline2fun_dict, count = getFunConfig(selected_keys)
+    parameters_dict = pipline2fun_dict
+    parameters_dict.update({
+        'batch_size': {
+            'value': 128
+        },
+        "hidden_dims": {
+            'value': [2000]
+        },
+        'lambd': {
+            'value': 0.005
+        },
+        'num_epochs': {
+            'value': 50
+        },
+        'seed': {
+            'value': 0
+        },
+        'num_runs': {
+            'value': 1
+        },
+        'learning_rate': {
+            'value': 0.0001
+        }
+    })
+    sweep_config = {'method': 'grid'}
+    sweep_config['parameters'] = parameters_dict
+    metric = {'name': 'scores', 'goal': 'maximize'}
+
+    sweep_config['metric'] = metric
+    sweep_id = wandb.sweep(sweep_config, project="pytorch-cell_type_annotation_ACTINN")
+    wandb.agent(sweep_id, train, count=count)
+
+
+def setStep2(original_list=["normalize", "gene_filter", "gene_dim_reduction"]):
     all_combinations = [combo for i in range(1, len(original_list) + 1) for combo in combinations(original_list, i)]
     all_combinations.append([])
     for s_key in all_combinations:
         s_list = list(s_key)
-        sweep_id, count = getSweepId(s_list)
-        print(s_list, count)
-        wandb.agent(sweep_id, train, count=count)
+        startSweep(s_list)
