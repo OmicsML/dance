@@ -1,14 +1,12 @@
 import numpy as np
 import optuna
-import step3_config as register_function
 import torch
-import wandb
-from fun2code import fun2code_dict
 from optuna.integration.wandb import WeightsAndBiasesCallback
+from step3_config import get_preprocessing_pipeline
 
+import wandb
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
-from dance.transforms.misc import Compose, SetConfig
 from dance.utils import set_seed
 
 fun_list = ["log1p", "filter_gene_by_count"]
@@ -22,10 +20,6 @@ device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 @wandbc.track_in_wandb()
 def objective(trial):
 
-    transforms = []
-    for f_str in fun_list:
-        fun_i = getattr(register_function, f_str)
-        transforms.append(fun_i(trial))
     parameters_dict = {
         'batch_size': 128,
         "hidden_dims": [2000],
@@ -35,18 +29,14 @@ def objective(trial):
         'num_runs': 1,
         'learning_rate': 0.0001
     }
-    data_config = {"label_channel": "cell_type"}
-    feature_name = {"cell_svd", "cell_weighted_pca", "cell_pca"} & set(fun_list)
-    if feature_name:
-        data_config.update({"feature_channel": fun2code_dict[feature_name].name})
-    transforms.append(SetConfig(data_config))
-    preprocessing_pipeline = Compose(*transforms, log_level="INFO")
+
     train_dataset = [753, 3285]
     test_dataset = [2695]
     tissue = "Brain"
     species = "mouse"
     dataloader = CellTypeAnnotationDataset(train_dataset=train_dataset, test_dataset=test_dataset, tissue=tissue,
                                            species=species, data_dir="./test_automl/data")
+    preprocessing_pipeline = get_preprocessing_pipeline(trial=trial, fun_list=fun_list)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=True)
 
     # Obtain training and testing data

@@ -1,12 +1,13 @@
-import inspect
 import sys
 
 import optuna
 import scanpy as sc
+from fun2code import fun2code_dict
 
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
 from dance.transforms.filter import FilterGenesPercentile, FilterGenesRegression
 from dance.transforms.interface import AnnDataTransform
+from dance.transforms.misc import Compose, SetConfig
 from dance.transforms.normalize import ScaleFeature, ScTransformR
 
 
@@ -115,3 +116,17 @@ def normalize_total(method_name: str, trial: optuna.Trial):
 #     if name != "set_method_name":  # 排除装饰器函数本身
 #         print(function)
 #         setattr(__name__, name, set_method_name(function))
+
+
+def get_preprocessing_pipeline(trial, fun_list):
+    transforms = []
+    for f_str in fun_list:
+        fun_i = eval(f_str)
+        transforms.append(fun_i(trial))
+    data_config = {"label_channel": "cell_type"}
+    feature_name = {"cell_svd", "cell_weighted_pca", "cell_pca"} & set(fun_list)
+    if feature_name:
+        data_config.update({"feature_channel": fun2code_dict[feature_name].name})
+    transforms.append(SetConfig(data_config))
+    preprocessing_pipeline = Compose(*transforms, log_level="INFO")
+    return preprocessing_pipeline
