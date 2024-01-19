@@ -2,8 +2,7 @@ from itertools import combinations
 
 import numpy as np
 import torch
-import wandb
-from step2_config import get_preprocessing_pipeline, getFunConfig, track_in_wandb
+from step2_config import get_preprocessing_pipeline, setStep2, track_in_wandb
 
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
@@ -14,11 +13,11 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 @track_in_wandb(config=None)
 def train(config):
+
     model = ACTINN(hidden_dims=config.hidden_dims, lambd=config.lambd, device=device)
     preprocessing_pipeline = get_preprocessing_pipeline(config=config)
     if preprocessing_pipeline is None:
-        wandb.log({"scores": 0})
-        return
+        return {"scores": 0}
     train_dataset = [753, 3285]
     test_dataset = [2695]
     tissue = "Brain"
@@ -39,12 +38,10 @@ def train(config):
         model.fit(x_train, y_train, seed=seed, lr=config.learning_rate, num_epochs=config.num_epochs,
                   batch_size=config.batch_size, print_cost=False)
         scores.append(score := model.score(x_test, y_test))
-    wandb.log({"scores": np.mean(scores)})
+    return {"scores": np.mean(scores)}
 
 
-def startSweep(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"]):
-    pipline2fun_dict, count = getFunConfig(selected_keys)
-    parameters_dict = pipline2fun_dict
+def startSweep(parameters_dict):
     parameters_dict.update({
         'batch_size': {
             'value': 128
@@ -73,17 +70,10 @@ def startSweep(selected_keys=["normalize", "gene_filter", "gene_dim_reduction"])
     metric = {'name': 'scores', 'goal': 'maximize'}
 
     sweep_config['metric'] = metric
-    sweep_id = wandb.sweep(sweep_config, project="pytorch-cell_type_annotation_ACTINN")
-    wandb.agent(sweep_id, train, count=count)
-
-
-def setStep2(original_list=["normalize", "gene_filter", "gene_dim_reduction"]):
-    all_combinations = [combo for i in range(1,
-                                             len(original_list) + 1) for combo in combinations(original_list, i)] + [[]]
-    for s_key in all_combinations:
-        s_list = list(s_key)
-        startSweep(s_list)
+    return sweep_config, train
 
 
 if __name__ == "__main__":
-    setStep2()
+    function_list = setStep2(startSweep)
+    for func in function_list:
+        func()
