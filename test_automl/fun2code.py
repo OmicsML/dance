@@ -5,6 +5,7 @@ from dance.transforms.filter import FilterGenesPercentile, FilterGenesRegression
 from dance.transforms.interface import AnnDataTransform
 from dance.transforms.normalize import ScaleFeature, ScTransformR
 
+#TODO register more functions
 fun2code_dict = {
     "normalize_total": AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
     "log1p": AnnDataTransform(sc.pp.log1p, base=2),
@@ -18,4 +19,4 @@ fun2code_dict = {
     "cell_svd": CellSVD(),
     "cell_weighted_pca": WeightedFeaturePCA(split_name="train"),
     "cell_pca": CellPCA()
-}
+}  #funcion 2 code
