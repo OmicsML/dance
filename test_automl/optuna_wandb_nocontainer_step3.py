@@ -1,17 +1,19 @@
 import numpy as np
 import optuna
+import step3_fun
 import torch
-import wandb
+from config import fun2code_dict
 from optuna.integration.wandb import WeightsAndBiasesCallback
 
+import wandb
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.transforms.misc import Compose, SetConfig
 from dance.utils import set_seed
-from test_automl.config import fun2code_dict
 
 fun_list = ["log1p", "filter_gene_by_count"]
-wandb_kwargs = {"project": "my-project"}
+
+wandb_kwargs = {"project": "step3-project"}
 wandbc = WeightsAndBiasesCallback(wandb_kwargs=wandb_kwargs, as_multirun=True)
 
 device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
@@ -22,13 +24,13 @@ def objective(trial):
 
     transforms = []
     for f_str in fun_list:
-        fun_i = eval(f_str)
+        fun_i = getattr(step3_fun, f_str)
         transforms.append(fun_i(trial))
     parameters_dict = {
         'batch_size': 128,
         "hidden_dims": [2000],
         'lambd': 0.005,
-        'num_epochs': 50,
+        'num_epochs': 2,
         'seed': 0,
         'num_runs': 1,
         'learning_rate': 0.0001
@@ -67,5 +69,6 @@ def objective(trial):
     return np.mean(scores)
 
 
+print(dir(step3_fun))
 study = optuna.create_study()
-study.optimize(objective, n_trials=10, callbacks=[wandbc])
+study.optimize(objective, n_trials=2, callbacks=[wandbc])
