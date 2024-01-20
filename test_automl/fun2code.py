@@ -8,7 +8,7 @@ from dance.transforms.normalize import ScaleFeature, ScTransformR
 
 #TODO register more functions
 fun2code_dict = {
-    "normalize_total": AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
+    "normalize_total": AnnDataTransform(sc.pp.normalize_total, target_sum=1e4, key_added="n_counts"),
     "log1p": AnnDataTransform(sc.pp.log1p, base=2),
     "scaleFeature": ScaleFeature(split_names="ALL", mode="standardize"),
     "scTransform": ScTransformR(mirror_index=1),

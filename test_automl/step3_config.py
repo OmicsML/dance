@@ -3,10 +3,10 @@ import sys
 
 import optuna
 import scanpy as sc
-import wandb
 from fun2code import fun2code_dict
 from optuna.integration.wandb import WeightsAndBiasesCallback
 
+import wandb
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
 from dance.transforms.filter import FilterGenesPercentile, FilterGenesRegression
 from dance.transforms.interface import AnnDataTransform
@@ -108,11 +108,13 @@ def normalize_total(method_name: str, trial: optuna.Trial):
         max_fraction = trial.suggest_float(method_name + "max_fraction", 0.04, 0.1)
         return AnnDataTransform(sc.pp.normalize_total,
                                 target_sum=trial.suggest_categorical(method_name + "target_sum", [1e4, 1e5, 1e6]),
-                                exclude_highly_expressed=exclude_highly_expressed, max_fraction=max_fraction)
+                                exclude_highly_expressed=exclude_highly_expressed, max_fraction=max_fraction,
+                                key_added="n_counts")
     else:
         return AnnDataTransform(sc.pp.normalize_total,
                                 target_sum=trial.suggest_categorical(method_name + "target_sum", [1e4, 1e5, 1e6]),
-                                exclude_highly_expressed=exclude_highly_expressed, max_fraction=max_fraction)
+                                exclude_highly_expressed=exclude_highly_expressed, max_fraction=max_fraction,
+                                key_added="n_counts")
 
 
 @set_method_name

@@ -13,3 +13,4 @@ wandb
 
 test_automl/data
 test_automl/test.py
+*.pkl

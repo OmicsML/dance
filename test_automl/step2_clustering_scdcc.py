@@ -7,8 +7,7 @@ import torch
 from step2_config import get_transforms, log_in_wandb, setStep2
 
 from dance import logger
-from dance.datasets.singlemodality import CellTypeAnnotationDataset, ClusteringDataset
-from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
+from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdcc import ScDCC
 from dance.transforms.misc import Compose, SetConfig
 from dance.transforms.preprocess import generate_random_pair
@@ -22,9 +21,9 @@ def train(config):
     aris = []
     for seed in range(config.seed, config.seed + config.num_runs):
         set_seed(seed)
-
+        dataset = "10X_PBMC"
         # Load data and perform necessary preprocessing
-        dataloader = ClusteringDataset("./test_automl/data", "10X_PBMC")
+        dataloader = ClusteringDataset("./test_automl/data", dataset=dataset)
 
         transforms = get_transforms(config=config, set_data_config=False, save_raw=True)
         if ("normalize" not in config.keys() or config.normalize != "normalize_total") or transforms is None:
@@ -64,8 +63,8 @@ def train(config):
         # Build and train moodel
         model = ScDCC(input_dim=in_dim, z_dim=config.z_dim, n_clusters=n_clusters, encodeLayer=config.encodeLayer,
                       decodeLayer=config.encodeLayer[::-1], sigma=config.sigma, gamma=config.gamma,
-                      ml_weight=config.ml_weight, cl_weight=config.ml_weight, device=config.device,
-                      pretrain_path=f"scdcc_{config.dataset}_pre.pkl")
+                      ml_weight=config.ml_weight, cl_weight=config.ml_weight, device=device,
+                      pretrain_path=f"scdcc_{dataset}_pre.pkl")
         model.fit(inputs, y, lr=config.lr, batch_size=config.batch_size, epochs=config.epochs, ml_ind1=ml_ind1,
                   ml_ind2=ml_ind2, cl_ind1=cl_ind1, cl_ind2=cl_ind2, update_interval=config.update_interval,
                   tol=config.tol, pt_batch_size=config.batch_size, pt_lr=config.pretrain_lr,
@@ -77,7 +76,6 @@ def train(config):
         aris.append(score)
 
     print('scdcc')
-    print(config.dataset)
     print(f'aris: {aris}')
     print(f'aris: {np.mean(aris)} +/- {np.std(aris)}')
     return ({"scores": np.mean(aris)})
@@ -118,6 +116,12 @@ def startSweep(parameters_dict) -> Tuple[Dict[str, Any], Callable[..., Any]]:
         'gamma': {
             'value': 1.0
         },
+        'lr': {
+            'value': 0.01
+        },
+        'pretrain_lr': {
+            'value': 0.001
+        },
         'ml_weight': {
             'value': 1.0
         },
@@ -135,6 +139,15 @@ def startSweep(parameters_dict) -> Tuple[Dict[str, Any], Callable[..., Any]]:
         },
         'ae_weight_file': {
             'value': "AE_weights.pth.tar"
+        },
+        'pretrain_epochs': {
+            'value': 50
+        },
+        'epochs': {
+            'value': 500
+        },
+        'batch_size': {
+            'value': 256
         }
     })
 
