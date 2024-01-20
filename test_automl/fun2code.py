@@ -18,5 +18,6 @@ fun2code_dict = {
     "Filter_gene_by_regress_score": FilterGenesRegression("enclasc"),
     "cell_svd": CellSVD(),
     "cell_weighted_pca": WeightedFeaturePCA(split_name="train"),
-    "cell_pca": CellPCA()
+    "cell_pca": CellPCA(),
+    # "filter_cell_by_count":AnnDataTransform(sc.pp.filter_cells,min_genes=1)
 }  #funcion 2 code
