@@ -3,10 +3,10 @@ import sys
 
 import optuna
 import scanpy as sc
-import wandb
 from fun2code import fun2code_dict
 from optuna.integration.wandb import WeightsAndBiasesCallback
 
+import wandb
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
 from dance.transforms.filter import FilterGenesPercentile, FilterGenesRegression
 from dance.transforms.interface import AnnDataTransform
@@ -115,6 +115,20 @@ def normalize_total(method_name: str, trial: optuna.Trial):
                                 exclude_highly_expressed=exclude_highly_expressed, max_fraction=max_fraction)
 
 
+@set_method_name
+def filter_cell_by_count(method_name: str, trial: optuna.Trial):
+    method = trial.suggest_categorical(method_name + "method", ['min_counts', 'min_genes', 'max_counts', 'max_genes'])
+    if method == "min_counts":
+        num = trial.suggest_int(method_name + "num", 2, 10)
+    if method == "min_genes":
+        num = trial.suggest_int(method_name + "num", 2, 10)
+    if method == "max_counts":
+        num = trial.suggest_int(method_name + "num", 500, 1000)
+    if method == "max_genes":
+        num = trial.suggest_int(method_name + "num", 500, 1000)
+    return AnnDataTransform(sc.pp.filter_cells, **{method: num})
+
+
 # # 获取当前文件中的所有函数
 # functions = [(name,obj) for name, obj in inspect.getmembers(
 #     sys.modules[__name__]) if inspect.isfunction(obj)]
@@ -127,20 +141,22 @@ def normalize_total(method_name: str, trial: optuna.Trial):
 #         setattr(__name__, name, set_method_name(function))
 
 
-def get_preprocessing_pipeline(trial, fun_list):
+def get_transforms(trial, fun_list, set_data_config=True):
     """Obtain the Compose of the preprocessing function according to the preprocessing
     function."""
     transforms = []
     for f_str in fun_list:
         fun_i = eval(f_str)
         transforms.append(fun_i(trial))
-    data_config = {"label_channel": "cell_type"}
-    feature_name = {"cell_svd", "cell_weighted_pca", "cell_pca"} & set(fun_list)
-    if feature_name:
-        data_config.update({"feature_channel": fun2code_dict[feature_name].name})
-    transforms.append(SetConfig(data_config))
-    preprocessing_pipeline = Compose(*transforms, log_level="INFO")
-    return preprocessing_pipeline
+    if "highly_variable_genes" in fun_list and "log1p" not in fun_list[:fun_list.index('"highly_variable_genes"')]:
+        return None
+    if set_data_config:
+        data_config = {"label_channel": "cell_type"}
+        feature_name = {"cell_svd", "cell_weighted_pca", "cell_pca"} & set(fun_list)
+        if feature_name:
+            data_config.update({"feature_channel": fun2code_dict[feature_name].name})
+        transforms.append(SetConfig(data_config))
+    return transforms
 
 
 def log_in_wandb(wandbc=None):

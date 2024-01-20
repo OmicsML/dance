@@ -2,10 +2,12 @@ from typing import Any, Callable, Dict, Tuple
 
 import numpy as np
 import torch
-from step2_config import get_preprocessing_pipeline, log_in_wandb, setStep2
+from step2_config import get_transforms, log_in_wandb, setStep2
 
+from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
+from dance.transforms.misc import Compose
 from dance.utils import set_seed
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -15,9 +17,11 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def train(config):
 
     model = ACTINN(hidden_dims=config.hidden_dims, lambd=config.lambd, device=device)
-    preprocessing_pipeline = get_preprocessing_pipeline(config=config)
-    if preprocessing_pipeline is None:
+    transforms = get_transforms(config=config)
+    if transforms is None:
+        logger.warning("skip transforms")
         return {"scores": 0}
+    preprocessing_pipeline = Compose(*transforms, log_level="INFO")
     train_dataset = [753, 3285]
     test_dataset = [2695]
     tissue = "Brain"
@@ -75,6 +79,6 @@ def startSweep(parameters_dict) -> Tuple[Dict[str, Any], Callable[..., Any]]:
 
 if __name__ == "__main__":
     """get_function_combinations."""
-    function_list = setStep2(startSweep, original_list=["normalize_total", "gene_filter", "gene_dim_reduction"])
+    function_list = setStep2(startSweep, original_list=["normalize", "gene_filter", "gene_dim_reduction"])
     for func in function_list:
         func()

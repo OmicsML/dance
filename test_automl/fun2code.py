@@ -3,6 +3,7 @@ import scanpy as sc
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
 from dance.transforms.filter import FilterGenesPercentile, FilterGenesRegression
 from dance.transforms.interface import AnnDataTransform
+from dance.transforms.misc import SaveRaw
 from dance.transforms.normalize import ScaleFeature, ScTransformR
 
 #TODO register more functions
@@ -19,5 +20,6 @@ fun2code_dict = {
     "cell_svd": CellSVD(),
     "cell_weighted_pca": WeightedFeaturePCA(split_name="train"),
     "cell_pca": CellPCA(),
-    # "filter_cell_by_count":AnnDataTransform(sc.pp.filter_cells,min_genes=1)
+    "filter_cell_by_count": AnnDataTransform(sc.pp.filter_cells, min_genes=1),
+    "save_raw": SaveRaw()
 }  #funcion 2 code

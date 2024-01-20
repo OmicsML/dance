@@ -1,9 +1,9 @@
 import functools
 from itertools import combinations
 
-import wandb
 from fun2code import fun2code_dict
 
+import wandb
 from dance.transforms.misc import Compose, SetConfig
 
 #TODO register more functions and add more examples
@@ -17,6 +17,9 @@ pipline2fun_dict = {
     },
     "gene_dim_reduction": {
         "values": ["cell_svd", "cell_weighted_pca", "cell_pca"]
+    },
+    "cell_filter": {
+        "values": ["filter_cell_by_count"]
     }
 }  #Functions registered in the preprocessing process
 
@@ -25,13 +28,14 @@ def getFunConfig(selected_keys=None):
     """Get the config that needs to be optimized and the number of rounds."""
     global pipline2fun_dict
     pipline2fun_dict_subset = {key: pipline2fun_dict[key] for key in selected_keys}
+    print(pipline2fun_dict)
     count = 1
     for _, pipline_values in pipline2fun_dict_subset.items():
         count *= len(pipline_values['values'])
     return pipline2fun_dict_subset, count
 
 
-def get_preprocessing_pipeline(config=None):
+def get_transforms(config=None, set_data_config=True, save_raw=False):
     """Obtain the Compose of the preprocessing function according to the preprocessing
     process."""
     if ("normalize" not in config.keys() or config.normalize
@@ -39,15 +43,19 @@ def get_preprocessing_pipeline(config=None):
 
         return None
     transforms = []
-    transforms.append(fun2code_dict[config.normalize]) if "normalize" in config.keys() else None
     transforms.append(fun2code_dict[config.gene_filter]) if "gene_filter" in config.keys() else None
+    transforms.append(fun2code_dict[config.cell_filter]) if "cell_filter" in config.keys() else None
+    if save_raw:
+        transforms.append(fun2code_dict["save_raw"])
+    transforms.append(fun2code_dict[config.normalize]) if "normalize" in config.keys() else None
     transforms.append(fun2code_dict[config.gene_dim_reduction]) if "gene_dim_reduction" in config.keys() else None
-    data_config = {"label_channel": "cell_type"}
-    if "gene_dim_reduction" in config.keys():
-        data_config.update({"feature_channel": fun2code_dict[config.gene_dim_reduction].name})
-    transforms.append(SetConfig(data_config))
-    preprocessing_pipeline = Compose(*transforms, log_level="INFO")
-    return preprocessing_pipeline
+
+    if set_data_config:
+        data_config = {"label_channel": "cell_type"}
+        if "gene_dim_reduction" in config.keys():
+            data_config.update({"feature_channel": fun2code_dict[config.gene_dim_reduction].name})
+        transforms.append(SetConfig(data_config))
+    return transforms
 
 
 def sweepDecorator(selected_keys=None, project="pytorch-cell_type_annotation_ACTINN"):

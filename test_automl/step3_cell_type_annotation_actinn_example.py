@@ -1,10 +1,12 @@
 import numpy as np
 import optuna
 import torch
-from step3_config import get_optimizer, get_preprocessing_pipeline
+from step3_config import get_optimizer, get_transforms
 
+from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
+from dance.transforms.misc import Compose
 from dance.utils import set_seed
 
 fun_list = ["log1p", "filter_gene_by_count"]
@@ -30,7 +32,11 @@ def objective(trial):
     species = "mouse"
     dataloader = CellTypeAnnotationDataset(train_dataset=train_dataset, test_dataset=test_dataset, tissue=tissue,
                                            species=species, data_dir="./test_automl/data")
-    preprocessing_pipeline = get_preprocessing_pipeline(trial=trial, fun_list=fun_list)
+    transforms = get_transforms(trial=trial, fun_list=fun_list)
+    if transforms is None:
+        logger.warning("skip transforms")
+        return {"scores": 0}
+    preprocessing_pipeline = Compose(*transforms, log_level="INFO")
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=True)
 
     # Obtain training and testing data
