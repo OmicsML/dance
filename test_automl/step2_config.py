@@ -23,8 +23,38 @@ pipline2fun_dict = {
     },
     "mask": {
         "values": ["cell_wise_mask_data", "mask_data"]
+    },
+    "gene_hold_out_name": {
+        "values": ["gene_hold_out"]
     }
 }  #Functions registered in the preprocessing process
+
+
+def generate_combinations_with_required_elements(elements, r, required_elements=[]):
+    """生成元素的所有组合，其中多个元素为必选.
+
+    参数:
+    - elements: 元素的集合
+    - r: 每个组合的元素个数
+    - required_elements: 必选的元素集合
+
+    返回:
+    一个包含所有组合的列表
+
+    """
+
+    def combinations_helper(current_combo, remaining_elements, r, required_elements):
+        if r == 0 and all(elem in current_combo for elem in required_elements):
+            all_combinations.append(tuple(current_combo))
+            return
+
+        for i, element in enumerate(remaining_elements):
+            print(remaining_elements)
+            combinations_helper(current_combo + [element], remaining_elements[i + 1:], r - 1, required_elements)
+
+    all_combinations = []
+    combinations_helper([], elements, r, required_elements)
+    return all_combinations
 
 
 def getFunConfig(selected_keys=None):
@@ -83,10 +113,12 @@ def sweepDecorator(selected_keys=None, project="pytorch-cell_type_annotation_ACT
     return decorator
 
 
-def setStep2(func=None, original_list=None):
+def setStep2(func=None, original_list=None, required_elements=[]):
     """Generate corresponding decorators for different preprocessing."""
-    all_combinations = [combo for i in range(1,
-                                             len(original_list) + 1) for combo in combinations(original_list, i)] + [[]]
+    all_combinations = [
+        combo for i in range(len(original_list) + 1)
+        for combo in generate_combinations_with_required_elements(original_list, i, required_elements=required_elements)
+    ]
     generated_functions = []
     for s_key in all_combinations:
         s_list = list(s_key)
