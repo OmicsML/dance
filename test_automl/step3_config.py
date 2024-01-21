@@ -3,10 +3,11 @@ import sys
 
 import optuna
 import scanpy as sc
-import wandb
 from fun2code import fun2code_dict
 from optuna.integration.wandb import WeightsAndBiasesCallback
+from step2_config import pipline2fun_dict
 
+import wandb
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
 from dance.transforms.filter import FilterGenesPercentile, FilterGenesRegression
 from dance.transforms.interface import AnnDataTransform
@@ -113,8 +114,7 @@ def normalize_total(method_name: str, trial: optuna.Trial):
     else:
         return AnnDataTransform(sc.pp.normalize_total,
                                 target_sum=trial.suggest_categorical(method_name + "target_sum", [1e4, 1e5, 1e6]),
-                                exclude_highly_expressed=exclude_highly_expressed, max_fraction=max_fraction,
-                                key_added="n_counts")
+                                exclude_highly_expressed=exclude_highly_expressed, key_added="n_counts")
 
 
 @set_method_name
@@ -143,11 +143,13 @@ def filter_cell_by_count(method_name: str, trial: optuna.Trial):
 #         setattr(__name__, name, set_method_name(function))
 
 
-def get_transforms(trial, fun_list, set_data_config=True):
+def get_transforms(trial, fun_list, set_data_config=True, save_raw=False):
     """Obtain the Compose of the preprocessing function according to the preprocessing
     function."""
     transforms = []
     for f_str in fun_list:
+        if f_str in pipline2fun_dict['normalize']['values'] and save_raw:
+            transforms.append(fun2code_dict["save_raw"])
         fun_i = eval(f_str)
         transforms.append(fun_i(trial))
     if "highly_variable_genes" in fun_list and "log1p" not in fun_list[:fun_list.index('"highly_variable_genes"')]:

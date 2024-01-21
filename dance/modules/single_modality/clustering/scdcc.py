@@ -521,7 +521,7 @@ class ScDCC(nn.Module, TorchNNPretrain, BaseClusteringMethod):
                                 float(ml_loss.cpu()) + float(cl_loss.cpu()), ml_loss.cpu(), cl_loss.cpu())
 
         index = update_interval * np.argmax(aris)
-        self.q = Q[f"epoch{index}"]
+        self.q = Q[f"epoch{int(index)}"]
 
     def predict_proba(self, x: Optional[Any] = None) -> np.ndarray:
         """Get the predicted propabilities for each cell.
