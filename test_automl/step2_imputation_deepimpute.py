@@ -22,7 +22,59 @@ def train(config):
 
 
 def startSweep(parameters_dict) -> Tuple[Dict[str, Any], Callable[..., Any]]:
-    pass
+    parameters_dict.update({
+        'dropout': {
+            'value': 0.1
+        },
+        'lr': {
+            'value': 1e-5
+        },
+        'n_epochs': {
+            'value': 500
+        },
+        'batch_size': {
+            'value': 64
+        },
+        'sub_outputdim': {
+            'value': 512
+        },
+        'hidden_dim': {
+            'value': 256
+        },
+        'patience': {
+            'value': 20
+        },
+        'min_cells': {
+            'value': 0.05
+        },
+        "n_top": {
+            'value': 5
+        },
+        "train_size": {
+            "value": 0.9
+        },
+        "mask_rate": {
+            "value": 0.1
+        },
+        "cache": {
+            "value": False
+        },
+        "mask": {
+            "value": True
+        },
+        "seed": {
+            "value": 0
+        },
+        "num_runs": {
+            "value": 1
+        }
+    })
+    sweep_config = {'method': 'grid'}
+    sweep_config['parameters'] = parameters_dict
+    metric = {'name': 'scores', 'goal': 'maximize'}
+
+    sweep_config['metric'] = metric
+    return sweep_config, train  #Return function configuration and training function
 
 
 if __name__ == "__main__":
