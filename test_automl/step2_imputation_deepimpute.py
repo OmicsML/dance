@@ -28,6 +28,7 @@ def startSweep(parameters_dict) -> Tuple[Dict[str, Any], Callable[..., Any]]:
 if __name__ == "__main__":
     """get_function_combinations."""
     function_list = setStep2(startSweep,
-                             original_list=["gene_filter", "cell_filter", "normalize", "gene_hold_out_name", "mask"])
+                             original_list=["gene_filter", "cell_filter", "normalize", "gene_hold_out_name",
+                                            "mask"], required_elements=["gene_hold_out_name"])
     for func in function_list:
         func()
