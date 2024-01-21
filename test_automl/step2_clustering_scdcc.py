@@ -1,4 +1,4 @@
-#normalize_per_cell是一定要选的，因为需要n_counts
+#normalize_total是一定要选的，因为需要n_counts
 import os
 from typing import Any, Callable, Dict, Tuple
 
