@@ -91,12 +91,19 @@ def objective(trial):
                       sigma=parameters_config.sigma, gamma=parameters_config.gamma,
                       ml_weight=parameters_config.ml_weight, cl_weight=parameters_config.ml_weight, device=device,
                       pretrain_path=f"scdcc_{dataset}_pre.pkl")
-        model.fit(inputs, y, lr=parameters_config.lr, batch_size=parameters_config.batch_size,
-                  epochs=parameters_config.epochs, ml_ind1=ml_ind1, ml_ind2=ml_ind2, cl_ind1=cl_ind1, cl_ind2=cl_ind2,
-                  update_interval=parameters_config.update_interval, tol=parameters_config.tol,
-                  pt_batch_size=parameters_config.batch_size, pt_lr=parameters_config.pretrain_lr,
-                  pt_epochs=parameters_config.pretrain_epochs)
-
+        try:
+            model.fit(inputs, y, lr=parameters_config.lr, batch_size=parameters_config.batch_size,
+                      epochs=parameters_config.epochs, ml_ind1=ml_ind1, ml_ind2=ml_ind2, cl_ind1=cl_ind1,
+                      cl_ind2=cl_ind2, update_interval=parameters_config.update_interval, tol=parameters_config.tol,
+                      pt_batch_size=parameters_config.batch_size, pt_lr=parameters_config.pretrain_lr,
+                      pt_epochs=parameters_config.pretrain_epochs)
+        except Exception as e:
+            """If don't skip the error, then all hyperparameter combinations will
+            inevitably have problems when facing all datasets and models, and need to
+            ensure the effectiveness of automatic machine learning and ignore some
+            hyperparameters."""
+            print(e)
+            return ({"scores": 0})
         # Evaluate model predictions
         score = model.score(None, y)
         print(f"{score=:.4f}")
@@ -109,5 +116,5 @@ def objective(trial):
 
 
 if __name__ == "__main__":
-    start_optimizer = get_optimizer(project="step3-cluster-scdcc-project", objective=objective)
+    start_optimizer = get_optimizer(project="step3-cluster-scdcc-project", objective=objective, n_trials=10)
     start_optimizer()

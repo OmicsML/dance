@@ -3,11 +3,11 @@ import sys
 
 import optuna
 import scanpy as sc
-import wandb
 from fun2code import fun2code_dict
 from optuna.integration.wandb import WeightsAndBiasesCallback
 from step2_config import pipline2fun_dict
 
+import wandb
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
 from dance.transforms.filter import FilterGenesPercentile, FilterGenesRegression
 from dance.transforms.interface import AnnDataTransform
@@ -106,7 +106,7 @@ def scaleFeature(method_name: str, trial: optuna.Trial):  #eps未优化
 def normalize_total(method_name: str, trial: optuna.Trial):
     exclude_highly_expressed = trial.suggest_categorical(method_name + "exclude_highly_expressed", [False, True])
     if exclude_highly_expressed:
-        max_fraction = trial.suggest_float(method_name + "max_fraction", 0.04, 0.1)
+        max_fraction = trial.suggest_float(method_name + "max_fraction", 0.08, 0.1)
         return AnnDataTransform(sc.pp.normalize_total,
                                 target_sum=trial.suggest_categorical(method_name + "target_sum", [1e4, 1e5, 1e6]),
                                 exclude_highly_expressed=exclude_highly_expressed, max_fraction=max_fraction,
@@ -121,9 +121,9 @@ def normalize_total(method_name: str, trial: optuna.Trial):
 def filter_cell_by_count(method_name: str, trial: optuna.Trial):
     method = trial.suggest_categorical(method_name + "method", ['min_counts', 'min_genes', 'max_counts', 'max_genes'])
     if method == "min_counts":
-        num = trial.suggest_int(method_name + "num", 2, 10)
+        num = trial.suggest_int(method_name + "num", 1, 10)
     if method == "min_genes":
-        num = trial.suggest_int(method_name + "num", 2, 10)
+        num = trial.suggest_int(method_name + "num", 1, 10)
     if method == "max_counts":
         num = trial.suggest_int(method_name + "num", 500, 1000)
     if method == "max_genes":
