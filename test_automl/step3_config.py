@@ -3,14 +3,15 @@ import sys
 
 import optuna
 import scanpy as sc
-import wandb
 from fun2code import fun2code_dict
 from optuna.integration.wandb import WeightsAndBiasesCallback
 from step2_config import pipline2fun_dict
 
+import wandb
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
 from dance.transforms.filter import FilterGenesPercentile, FilterGenesRegression
 from dance.transforms.interface import AnnDataTransform
+from dance.transforms.mask import CellwiseMaskData, MaskData
 from dance.transforms.misc import Compose, SetConfig
 from dance.transforms.normalize import ScaleFeature, ScTransformR
 
@@ -129,6 +130,18 @@ def filter_cell_by_count(method_name: str, trial: optuna.Trial):
     if method == "max_genes":
         num = trial.suggest_int(method_name + "num", 500, 1000)
     return AnnDataTransform(sc.pp.filter_cells, **{method: num})
+
+
+@set_method_name
+def cell_wise_mask_data(method_name: str, trial: optuna.Trial):
+    return CellwiseMaskData(distr=trial.suggest_categorical(method_name + "distr", ['exp', 'uniform']),
+                            mask_rate=trial.suggest_float(method_name + "mask_rate", 0.01, 0.5),
+                            min_gene_counts=trial.suggest_int(method_name + "min_gene_counts", 1, 10))
+
+
+@set_method_name
+def mask_data(method_name: str, trial: optuna.Trial):
+    return MaskData(mask_rate=trial.suggest_float(method_name + "mask_rate", 0.01, 0.5))
 
 
 # # 获取当前文件中的所有函数

@@ -1,9 +1,9 @@
 import functools
 from itertools import combinations
 
-import wandb
 from fun2code import fun2code_dict
 
+import wandb
 from dance.transforms.misc import Compose, SetConfig
 
 #TODO register more functions and add more examples
@@ -20,6 +20,9 @@ pipline2fun_dict = {
     },
     "cell_filter": {
         "values": ["filter_cell_by_count"]
+    },
+    "mask": {
+        "values": ["cell_wise_mask_data", "mask_data"]
     }
 }  #Functions registered in the preprocessing process
 
