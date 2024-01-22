@@ -47,7 +47,7 @@ def train(config):
         X_raw = torch.tensor(X_raw.toarray()).float()
         X_train = X * mask
         model = DeepImpute(predictors, targets, dataset, config.sub_outputdim, config.hidden_dim, config.dropout, seed,
-                           config.gpu)
+                           2)
 
         model.fit(X_train, X_train, mask, config.batch_size, config.lr, config.n_epochs, config.patience)
         imputed_data = model.predict(X_train, mask)
@@ -70,7 +70,7 @@ def startSweep(parameters_dict) -> Tuple[Dict[str, Any], Callable[..., Any]]:
             'value': 1e-5
         },
         'n_epochs': {
-            'value': 500
+            'value': 5
         },
         'batch_size': {
             'value': 64
