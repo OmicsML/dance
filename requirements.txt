@@ -1,7 +1,7 @@
 KDEpy==1.1.8
 h5py==3.10.0
 igraph==0.11.3
-leidenalg==0.10.1
+leidenalg==0.10.2
 louvain==0.8.1
 mudata==0.2.3
 networkx==3.1; python_version < "3.9"
