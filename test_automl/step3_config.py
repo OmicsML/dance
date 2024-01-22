@@ -3,11 +3,11 @@ import sys
 
 import optuna
 import scanpy as sc
+import wandb
 from fun2code import fun2code_dict
 from optuna.integration.wandb import WeightsAndBiasesCallback
 from step2_config import pipline2fun_dict
 
-import wandb
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
 from dance.transforms.filter import FilterGenesPercentile, FilterGenesRegression
 from dance.transforms.gene_holdout import GeneHoldout
