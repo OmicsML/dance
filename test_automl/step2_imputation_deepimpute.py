@@ -58,7 +58,7 @@ def train(config):
     print('deepimpute')
     print(f'rmses: {rmses}')
     print(f'rmses: {np.mean(rmses)} +/- {np.std(rmses)}')
-    return ({"scores": np.mean(rmses)})
+    return ({"rmses": np.mean(rmses)})
 
 
 def startSweep(parameters_dict) -> Tuple[Dict[str, Any], Callable[..., Any]]:
@@ -111,7 +111,7 @@ def startSweep(parameters_dict) -> Tuple[Dict[str, Any], Callable[..., Any]]:
     })
     sweep_config = {'method': 'grid'}
     sweep_config['parameters'] = parameters_dict
-    metric = {'name': 'scores', 'goal': 'maximize'}
+    metric = {'name': 'rmses', 'goal': 'minimize'}
 
     sweep_config['metric'] = metric
     return sweep_config, train  #Return function configuration and training function
