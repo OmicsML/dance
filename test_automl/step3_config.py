@@ -3,13 +3,14 @@ import sys
 
 import optuna
 import scanpy as sc
-import wandb
 from fun2code import fun2code_dict
 from optuna.integration.wandb import WeightsAndBiasesCallback
 from step2_config import pipline2fun_dict
 
+import wandb
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
 from dance.transforms.filter import FilterGenesPercentile, FilterGenesRegression
+from dance.transforms.gene_holdout import GeneHoldout
 from dance.transforms.interface import AnnDataTransform
 from dance.transforms.mask import CellwiseMaskData, MaskData
 from dance.transforms.misc import Compose, SetConfig
@@ -144,6 +145,12 @@ def mask_data(method_name: str, trial: optuna.Trial):
     return MaskData(mask_rate=trial.suggest_float(method_name + "mask_rate", 0.01, 0.5))
 
 
+@set_method_name
+def gene_hold_out(method_name: str, trial: optuna.Trial):
+    return GeneHoldout(n_top=trial.suggest_int(method_name + "n_top", 1, 10),
+                       batch_size=trial.suggest_categorical(method_name + "batch_size", [256, 512, 1024]))
+
+
 # # 获取当前文件中的所有函数
 # functions = [(name,obj) for name, obj in inspect.getmembers(
 #     sys.modules[__name__]) if inspect.isfunction(obj)]
@@ -197,13 +204,13 @@ def log_in_wandb(wandbc=None):
     return decorator
 
 
-def get_optimizer(project, objective, n_trials=2):
+def get_optimizer(project, objective, n_trials=2, direction="maximize"):
     """Get optimizer."""
     wandb_kwargs = {"project": project}
     wandbc = WeightsAndBiasesCallback(wandb_kwargs=wandb_kwargs, as_multirun=True)
     decorator = log_in_wandb(wandbc)
     decorator_function = decorator(objective)
-    study = optuna.create_study()
+    study = optuna.create_study(direction=direction)
 
     def wrapper():
         study.optimize(decorator_function, n_trials=n_trials, callbacks=[wandbc])
