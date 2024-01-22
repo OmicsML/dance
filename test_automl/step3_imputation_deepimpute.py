@@ -29,7 +29,8 @@ def objective(trial):
         "cache": False,
         "mask": True,  #避免出现与超参数流程重复的情况，一般没有
         "seed": 0,
-        "num_runs": 1
+        "num_runs": 1,
+        "gpu": 3
     }
     parameters_config = {}
     parameters_config.update(parameters_dict)
@@ -66,7 +67,7 @@ def objective(trial):
         X_raw = torch.tensor(X_raw.toarray()).float()
         X_train = X * mask
         model = DeepImpute(predictors, targets, dataset, parameters_config.sub_outputdim, parameters_config.hidden_dim,
-                           parameters_config.dropout, seed, 1)
+                           parameters_config.dropout, seed, parameters_config.gpu)
 
         model.fit(X_train, X_train, mask, parameters_config.batch_size, parameters_config.lr,
                   parameters_config.n_epochs, parameters_config.patience)
