@@ -1,9 +1,10 @@
 import functools
+import itertools
 from itertools import combinations
 
-import wandb
 from fun2code import fun2code_dict
 
+import wandb
 from dance.transforms.misc import Compose, SetConfig
 
 #TODO register more functions and add more examples
@@ -21,7 +22,7 @@ pipline2fun_dict = {
     "cell_filter": {
         "values": ["filter_cell_by_count"]
     },
-    "mask": {
+    "mask_name": {
         "values": ["cell_wise_mask_data", "mask_data"]
     },
     "gene_hold_out_name": {
@@ -29,31 +30,47 @@ pipline2fun_dict = {
     }
 }  #Functions registered in the preprocessing process
 
+# def generate_combinations_with_required_elements(elements, r, required_elements=[]):
+#     """生成元素的所有组合，其中多个元素为必选.
 
-def generate_combinations_with_required_elements(elements, r, required_elements=[]):
-    """生成元素的所有组合，其中多个元素为必选.
+#     参数:
+#     - elements: 元素的集合
+#     - r: 每个组合的元素个数
+#     - required_elements: 必选的元素集合
 
-    参数:
-    - elements: 元素的集合
-    - r: 每个组合的元素个数
-    - required_elements: 必选的元素集合
+#     返回:
+#     一个包含所有组合的列表
 
-    返回:
-    一个包含所有组合的列表
+#     """
 
-    """
+#     def combinations_helper(current_combo, remaining_elements, r, required_elements):
+#         if r == 0 and all(elem in current_combo for elem in required_elements):
+#             all_combinations.append(tuple(current_combo))
+#             return
 
-    def combinations_helper(current_combo, remaining_elements, r, required_elements):
-        if r == 0 and all(elem in current_combo for elem in required_elements):
-            all_combinations.append(tuple(current_combo))
-            return
+#         for i, element in enumerate(remaining_elements):
+#             print(remaining_elements)
+#             combinations_helper(current_combo + [element], remaining_elements[i + 1:], r - 1, required_elements)
 
-        for i, element in enumerate(remaining_elements):
-            print(remaining_elements)
-            combinations_helper(current_combo + [element], remaining_elements[i + 1:], r - 1, required_elements)
 
+#     all_combinations = []
+#     combinations_helper([], elements, r, required_elements)
+#     return all_combinations
+def generate_combinations_with_required_elements(elements, required_elements=[]):
+    optional_elements = [x for x in elements if x not in required_elements]
+
+    # Sort optional elements in the same order as in the `elements` list
+    optional_elements.sort(key=lambda x: elements.index(x))
+
+    # Generate all possible combinations of optional elements
+    optional_combinations = []
+    for i in range(len(optional_elements) + 1):
+        optional_combinations += list(itertools.combinations(optional_elements, i))
+
+    # Combine required elements with optional combinations to get all possible combinations
     all_combinations = []
-    combinations_helper([], elements, r, required_elements)
+    for optional_combination in optional_combinations:
+        all_combinations.append([x for x in elements if x in required_elements or x in optional_combination])
     return all_combinations
 
 
@@ -75,14 +92,15 @@ def get_transforms(config=None, set_data_config=True, save_raw=False):
             != "log1p") and ("gene_filter" in config.keys() and config.gene_filter == "highly_variable_genes"):
 
         return None
-    transforms = []
-    transforms.append(fun2code_dict[config.gene_filter]) if "gene_filter" in config.keys() else None
-    transforms.append(fun2code_dict[config.cell_filter]) if "cell_filter" in config.keys() else None
-    if save_raw:
-        transforms.append(fun2code_dict["save_raw"])
-    transforms.append(fun2code_dict[config.normalize]) if "normalize" in config.keys() else None
-    transforms.append(fun2code_dict[config.gene_dim_reduction]) if "gene_dim_reduction" in config.keys() else None
 
+    transforms = []
+    for key in config.keys():
+        if save_raw and key == "normalize":
+            transforms.append(fun2code_dict["save_raw"])
+        print(key, config[key])
+        transforms.append(fun2code_dict[config[key]]) if key in pipline2fun_dict.keys() else None
+    if save_raw and "normalize" not in config.keys():
+        transforms.append(fun2code_dict["save_raw"])
     if set_data_config:
         data_config = {"label_channel": "cell_type"}
         if "gene_dim_reduction" in config.keys():
@@ -115,13 +133,16 @@ def sweepDecorator(selected_keys=None, project="pytorch-cell_type_annotation_ACT
 
 def setStep2(func=None, original_list=None, required_elements=[]):
     """Generate corresponding decorators for different preprocessing."""
-    all_combinations = [
-        combo for i in range(len(original_list) + 1)
-        for combo in generate_combinations_with_required_elements(original_list, i, required_elements=required_elements)
-    ]
+    # all_combinations = [
+    #     combo for i in range(len(original_list) + 1)
+    #     for combo in generate_combinations_with_required_elements(original_list, i, required_elements=required_elements)
+    # ]
+    all_combinations = generate_combinations_with_required_elements(elements=original_list,
+                                                                    required_elements=required_elements)
     generated_functions = []
     for s_key in all_combinations:
         s_list = list(s_key)
+        print(s_list)
         decorator = sweepDecorator(selected_keys=s_list)
         generated_functions.append(decorator(func))
     return generated_functions
