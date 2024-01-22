@@ -1,6 +1,6 @@
 KDEpy==1.1.8
 h5py==3.10.0
-igraph==0.10.8
+igraph==0.11.3
 leidenalg==0.10.1
 louvain==0.8.1
 mudata==0.2.3
