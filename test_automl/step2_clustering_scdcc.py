@@ -18,6 +18,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 @log_in_wandb(config=None)
 def train(config):
+    """clustering."""
     aris = []
     for seed in range(config.seed, config.seed + config.num_runs):
         set_seed(seed)
