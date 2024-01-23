@@ -27,4 +27,4 @@ fun2code_dict = {
     "cell_wise_mask_data": CellwiseMaskData(),
     "mask_data": MaskData(),
     "gene_hold_out": GeneHoldout()
-}  #funcion 2 code
+}  #funcion 2 code，map functions as variables
