@@ -3,9 +3,10 @@ import sys
 
 import optuna
 import scanpy as sc
-import wandb
 from optuna.integration.wandb import WeightsAndBiasesCallback
 
+import wandb
+from dance import logger
 from dance.automl_config.fun2code import fun2code_dict
 from dance.automl_config.step2_config import pipline2fun_dict
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
@@ -173,6 +174,12 @@ def get_transforms(trial, fun_list, set_data_config=True, save_raw=False):
         fun_i = eval(f_str)
         transforms.append(fun_i(trial))
     if "highly_variable_genes" in fun_list and "log1p" not in fun_list[:fun_list.index('"highly_variable_genes"')]:
+        logger.warning(
+            "highly_variable_genes expects logarithmized data, except when flavor='seurat_v3', in which count data is expected."
+        )
+
+        #The relationship between highly_variable_genes and log1p needs to be further discussed based on the flavor parameter
+        #A little change is needed
         return None
     if set_data_config:
         data_config = {"label_channel": "cell_type"}
