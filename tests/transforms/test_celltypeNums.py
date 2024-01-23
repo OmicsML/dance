@@ -9,7 +9,7 @@ SEED = 123
 
 
 def test_cell_type_nums():
-    np.random.seed()
+    np.random.seed(SEED)
     num_cells = 100
     num_genes = 500
     gene_expression = np.random.default_rng(seed=SEED).random((num_cells, num_genes))
