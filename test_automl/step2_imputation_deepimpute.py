@@ -15,15 +15,13 @@ device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 
 @log_in_wandb(config=None)
 def train(config):
+    """imputation."""
     rmses = []
     for seed in range(config.seed, config.seed + config.num_runs):
         set_seed(seed)
         dataset = "mouse_brain_data"
         data_dir = "./test_automl/data"
         dataloader = ImputationDataset(data_dir=data_dir, dataset=dataset, train_size=config.train_size)
-        # preprocessing_pipeline = DeepImpute.preprocessing_pipeline(min_cells=config.min_cells, n_top=config.n_top,
-        #                                                            sub_outputdim=config.sub_outputdim, mask=config.mask,
-        #                                                            seed=seed, mask_rate=config.mask_rate)
         transforms = get_transforms(config=config, set_data_config=False, save_raw=True)
         if transforms is None:
             logger.warning("skip transforms")
