@@ -2,9 +2,9 @@ import functools
 import itertools
 from itertools import combinations
 
-import wandb
 from fun2code import fun2code_dict
 
+import wandb
 from dance.transforms.misc import Compose, SetConfig
 
 #TODO register more functions and add more examples
@@ -30,32 +30,7 @@ pipline2fun_dict = {
     }
 }  #Functions registered in the preprocessing process
 
-# def generate_combinations_with_required_elements(elements, r, required_elements=[]):
-#     """生成元素的所有组合，其中多个元素为必选.
 
-#     参数:
-#     - elements: 元素的集合
-#     - r: 每个组合的元素个数
-#     - required_elements: 必选的元素集合
-
-#     返回:
-#     一个包含所有组合的列表
-
-#     """
-
-#     def combinations_helper(current_combo, remaining_elements, r, required_elements):
-#         if r == 0 and all(elem in current_combo for elem in required_elements):
-#             all_combinations.append(tuple(current_combo))
-#             return
-
-#         for i, element in enumerate(remaining_elements):
-#             print(remaining_elements)
-#             combinations_helper(current_combo + [element], remaining_elements[i + 1:], r - 1, required_elements)
-
-
-#     all_combinations = []
-#     combinations_helper([], elements, r, required_elements)
-#     return all_combinations
 def generate_combinations_with_required_elements(elements, required_elements=[]):
     optional_elements = [x for x in elements if x not in required_elements]
 
