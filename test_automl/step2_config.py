@@ -1,9 +1,9 @@
 import functools
 import itertools
 
-import wandb
 from fun2code import fun2code_dict
 
+import wandb
 from dance.transforms.misc import SetConfig
 
 #TODO register more functions and add more examples
@@ -123,7 +123,7 @@ def setStep2(func=None, original_list=None, required_elements=[]):
 
 
 def log_in_wandb(config):
-    """Decorator wrapped using wandb."""
+    """Decorator wrapped using wandb.It is used in train function."""
 
     def decorator(func):
 
