@@ -1,11 +1,10 @@
 import functools
 import itertools
-from itertools import combinations
 
-import wandb
 from fun2code import fun2code_dict
 
-from dance.transforms.misc import Compose, SetConfig
+import wandb
+from dance.transforms.misc import SetConfig
 
 #TODO register more functions and add more examples
 pipline2fun_dict = {
