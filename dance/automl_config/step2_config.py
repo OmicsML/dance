@@ -2,7 +2,7 @@ import functools
 import itertools
 
 import wandb
-
+from dance import logger
 from dance.automl_config.fun2code import fun2code_dict
 from dance.transforms.misc import SetConfig
 
@@ -64,7 +64,7 @@ def get_transforms(config=None, set_data_config=True, save_raw=False):
     process."""
     if ("normalize" not in config.keys() or config.normalize
             != "log1p") and ("gene_filter" in config.keys() and config.gene_filter == "highly_variable_genes"):
-
+        logger.warning("Expects logarithmized data, except when flavor='seurat_v3', in which count data is expected.")
         return None
 
     transforms = []
