@@ -1,5 +1,4 @@
 import numpy as np
-import optuna
 import torch
 from step3_config import get_optimizer, get_transforms
 

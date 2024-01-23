@@ -27,7 +27,7 @@ def objective(trial):
         "train_size": 0.9,
         "mask_rate": 0.1,
         "cache": False,
-        "mask": True,  #避免出现与超参数流程重复的情况，一般没有
+        "mask": True,  #Avoid duplication with hyperparameter processes
         "seed": 0,
         "num_runs": 1,
         "gpu": 3

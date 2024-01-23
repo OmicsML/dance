@@ -4,10 +4,9 @@ import numpy as np
 import torch
 from step3_config import get_optimizer, get_transforms
 
-from dance import logger
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdcc import ScDCC
-from dance.registry import DotDict  # 可以用可以不用
+from dance.registry import DotDict  # Optional
 from dance.transforms.misc import Compose, SetConfig
 from dance.transforms.preprocess import generate_random_pair
 from dance.utils import set_seed
