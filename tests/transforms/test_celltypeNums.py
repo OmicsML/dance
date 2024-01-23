@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 from anndata import AnnData
 
 from dance.data import Data
