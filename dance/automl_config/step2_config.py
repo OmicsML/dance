@@ -2,8 +2,7 @@ import functools
 import itertools
 
 import wandb
-from fun2code import fun2code_dict
-
+from dance.automl_config.fun2code import fun2code_dict
 from dance.transforms.misc import SetConfig
 
 #TODO register more functions and add more examples

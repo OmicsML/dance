@@ -2,8 +2,8 @@ import os
 
 import numpy as np
 import torch
-from step3_config import get_optimizer, get_transforms
 
+from dance.automl_config.step3_config import get_optimizer, get_transforms
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdcc import ScDCC
 from dance.registry import DotDict  # Optional

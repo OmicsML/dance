@@ -1,7 +1,7 @@
 import torch
-from step3_config import get_optimizer, get_transforms
 
 from dance import logger
+from dance.automl_config.step3_config import get_optimizer, get_transforms
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.deepimpute import DeepImpute
 from dance.registry import DotDict
