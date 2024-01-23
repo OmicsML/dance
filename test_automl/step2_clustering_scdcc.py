@@ -1,4 +1,4 @@
-#normalize_total是一定要选的，因为需要n_counts
+"""normalize_total is a must at SCDCC because it requires n_counts."""
 import os
 from typing import Any, Callable, Dict, Tuple
 
