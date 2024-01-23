@@ -3,9 +3,9 @@ import sys
 
 import optuna
 import scanpy as sc
+import wandb
 from optuna.integration.wandb import WeightsAndBiasesCallback
 
-import wandb
 from dance.automl_config.fun2code import fun2code_dict
 from dance.automl_config.step2_config import pipline2fun_dict
 from dance.transforms.cell_feature import CellPCA, CellSVD, WeightedFeaturePCA
