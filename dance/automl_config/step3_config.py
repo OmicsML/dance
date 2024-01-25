@@ -3,9 +3,9 @@ import sys
 
 import optuna
 import scanpy as sc
-import wandb
 from optuna.integration.wandb import WeightsAndBiasesCallback
 
+import wandb
 from dance import logger
 from dance.automl_config.fun2code import fun2code_dict
 from dance.automl_config.step2_config import pipline2fun_dict
@@ -14,7 +14,7 @@ from dance.transforms.filter import FilterGenesPercentile, FilterGenesRegression
 from dance.transforms.gene_holdout import GeneHoldout
 from dance.transforms.interface import AnnDataTransform
 from dance.transforms.mask import CellwiseMaskData, MaskData
-from dance.transforms.misc import Compose, SetConfig
+from dance.transforms.misc import SetConfig
 from dance.transforms.normalize import ScaleFeature, ScTransformR
 
 
