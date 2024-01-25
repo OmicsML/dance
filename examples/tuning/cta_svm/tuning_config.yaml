@@ -1,6 +1,13 @@
 type: preprocessor
 tune_mode: pipeline
 pipeline:
+  - type: filter.gene
+    include:
+      - FilterGenesTopK
+      - FilterGenesPercentile
+    default_params:
+      FilterGenesTopK:
+        num_genes: 2000
   - type: feature.cell
     include:
       - WeightedFeaturePCA
@@ -17,11 +24,6 @@ pipeline:
       WeightedFeaturePCA:
         n_components: 400
         split_name: train
-  # -type: filter.gene
-  #   include:
-  #     - FilterGenesTopK
-  #     - FilterGenesPercentile
-  #   params
   - type: misc
     target: SetConfig
     params:
@@ -31,7 +33,7 @@ pipeline:
 wandb:
   entity: danceteam
   project: dance-dev
-  method: bayes
+  method: bayes #maybe grid
   metric:
     name: acc  # val/acc
     goal: maximize
