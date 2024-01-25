@@ -18,3 +18,4 @@ legacy/test_automl/test.py
 openfe-singlecell
 examples/tuning/cta_svm/test
 examples/tuning/cta_svm/train
+examples/tuning/cta_svm/map
