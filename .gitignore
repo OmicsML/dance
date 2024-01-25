@@ -19,3 +19,6 @@ openfe-singlecell
 examples/tuning/cta_svm/test
 examples/tuning/cta_svm/train
 examples/tuning/cta_svm/map
+test
+train
+map
