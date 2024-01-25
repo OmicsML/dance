@@ -7,11 +7,21 @@ pipeline:
       - CellPCA
       - CellSVD
     params:
-      n_components: 400 #set same params?
+    #It is suggested to change to common_params
       out: feature.cell
     default_params:
+      CellSVD:
+        n_components: 400
+      CellPCA:
+        n_components: 400
       WeightedFeaturePCA:
+        n_components: 400
         split_name: train
+  # -type: filter.gene
+  #   include:
+  #     - FilterGenesTopK
+  #     - FilterGenesPercentile
+  #   params
   - type: misc
     target: SetConfig
     params:
