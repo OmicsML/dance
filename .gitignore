@@ -11,8 +11,10 @@ __pycache__
 wandb
 
 
-test_automl/data
-test_automl/test.py
+legacy/test_automl/data
+legacy/test_automl/test.py
 *.pkl
 *.pt
 openfe-singlecell
+examples/tuning/cta_svm/test
+examples/tuning/cta_svm/train
