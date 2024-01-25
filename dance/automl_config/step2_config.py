@@ -2,7 +2,6 @@ import functools
 import itertools
 
 import wandb
-
 from dance import logger
 from dance.automl_config.fun2code import fun2code_dict
 from dance.transforms.misc import SetConfig
@@ -32,6 +31,14 @@ pipline2fun_dict = {
 
 
 def generate_combinations_with_required_elements(elements, required_elements=[]):
+    """
+    Parameters
+    ----------
+    elements
+    Optional process in Step 2
+    required_elements
+    The required process in Step 2
+    """
     optional_elements = [x for x in elements if x not in required_elements]
 
     # Sort optional elements in the same order as in the `elements` list
