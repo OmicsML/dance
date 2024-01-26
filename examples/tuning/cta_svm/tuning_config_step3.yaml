@@ -1,0 +1,31 @@
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: filter.gene
+    target: FilterGenesTopK
+    params:
+      num_genes:
+        min: 2000
+        max: 4000
+  - type: feature.cell
+    target: WeightedFeaturePCA
+    params:
+      n_components:
+        min: 200
+        max: 400
+    default_params:
+      out: feature.cell
+      split_name: train
+  - type: misc
+    target: SetConfig
+    default_params:
+      config_dict:
+        feature_channel: feature.cell
+        label_channel: cell_type
+wandb:
+  entity: danceteam
+  project: dance-dev
+  method: bayes #maybe grid
+  metric:
+    name: acc  # val/acc
+    goal: maximize
