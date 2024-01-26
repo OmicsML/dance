@@ -40,7 +40,18 @@ if __name__ == "__main__":
                                          species=args.species, tissue=args.tissue).load_data()
 
         # Prepare preprocessing pipeline and apply it to data
-        preprocessing_pipeline = pipeline_planer.generate(pipeline=dict(wandb.config))
+        preprocessing_pipeline = pipeline_planer.generate(
+            pipeline=dict(wandb.config), params=[{
+                "n_components": {
+                    "min": 200,
+                    "max": 400
+                }
+            }, {
+                "num_genes:": {
+                    "min": 2000,
+                    "max": 4000
+                }
+            }, None])
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
 
