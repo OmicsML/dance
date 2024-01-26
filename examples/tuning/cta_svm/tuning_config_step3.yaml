@@ -13,15 +13,17 @@ pipeline:
       n_components:
         min: 200
         max: 400
-    default_params:
-      out: feature.cell
-      split_name: train
+      out:
+        value: feature.cell
+      split_name:
+        value: train
   - type: misc
     target: SetConfig
-    default_params:
+    params:
       config_dict:
-        feature_channel: feature.cell
-        label_channel: cell_type
+        value:
+          feature_channel: feature.cell
+          label_channel: cell_type
 wandb:
   entity: danceteam
   project: dance-dev

@@ -564,8 +564,7 @@ def test_pipeline_planer_generation(subtests, planer_toy_registry):
                     "target": "func_b1",
                     "params": {
                         "x": {
-                            "min": 2000,
-                            "max": 4000,
+                            "values": ["x1", "x2", "x3"]
                         },
                         "y": {
                             "values": ["y1", "y2", "y3"]

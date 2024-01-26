@@ -3,7 +3,6 @@ import pprint
 from typing import get_args
 
 import wandb
-
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
@@ -39,20 +38,25 @@ if __name__ == "__main__":
         # Load raw data
         data = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
                                          species=args.species, tissue=args.tissue).load_data()
-
+        print("???")
+        print(dict(wandb.config))
         # Prepare preprocessing pipeline and apply it to data
         preprocessing_pipeline = pipeline_planer.generate(
-            pipeline=dict(wandb.config), params=[{
-                "n_components": {
-                    "min": 200,
-                    "max": 400
-                }
-            }, {
-                "num_genes:": {
-                    "min": 2000,
-                    "max": 4000
-                }
-            }, None])
+            pipeline=None,
+            #     params=[{
+            #         "num_genes": 2000,
+            #     }, {
+            #         "n_components":200,
+            #         "out":"feature.cell",
+            #         "split_name":"train",
+
+            #     },
+            #     {"config_dict":{
+            #         "feature_channel": "feature.cell",
+            #         "label_channel": "cell_type"
+            #     }
+            # }]
+            params=list(dict(wandb.config)))
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
 
