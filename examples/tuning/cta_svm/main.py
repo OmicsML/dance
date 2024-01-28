@@ -28,7 +28,7 @@ if __name__ == "__main__":
     logger.setLevel(args.log_level)
     logger.info(f"\n{pprint.pformat(vars(args))}")
 
-    pipeline_planer = PipelinePlaner.from_config_file("tuning_config.yaml")
+    pipeline_planer = PipelinePlaner.from_config_file("pipeline_tuning_config.yaml")
 
     def evaluate_pipeline():
         wandb.init()
