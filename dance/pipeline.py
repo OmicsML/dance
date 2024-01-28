@@ -243,6 +243,7 @@ class Pipeline(Action):
 
 class PipelinePlaner(Pipeline):
     TUNE_MODE_KEY = "tune_mode"
+    TUNING_PARAMS_KEY = "params_to_tune"
     DEFAULT_PARAMS_KEY = "default_params"
     PELEM_INCLUDE_KEY = "include"
     PELEM_EXCLUDE_KEY = "exclude"
@@ -371,9 +372,17 @@ class PipelinePlaner(Pipeline):
         elif self.tune_mode == "params":
             self._candidate_params = [None] * pipeline_length
             for i in range(pipeline_length):
-                self._default_params[i] = pipeline_config[i].get(self.DEFAULT_PARAMS_KEY)
-                if val := self[i].params:
-                    self._candidate_params[i] = val
+                if self.DEFAULT_PARAMS_KEY in pipeline_config[i]:
+                    logger.warning(f"params tuning mode ignores {self.DEFAULT_PARAMS_KEY!r}, which is "
+                                   f"currently specified pipeline element #{i}:\n\t{pipeline_config[i]}")
+
+                # Set default params (auto set key to the current target)
+                if val := pipeline_config[i].get(self.PARAMS_KEY):
+                    self._default_params[i] = {self[i].target: val}
+
+                # Set tuning params
+                if val := pipeline_config[i].get(self.TUNING_PARAMS_KEY):
+                    self._candidate_params[i] = OmegaConf.to_container(val)
 
             # Make sure targets are set
             missed_target_idx = [
@@ -684,6 +693,9 @@ class PipelinePlaner(Pipeline):
                             "type": "feature.cell",
                             "target": "WeightedFeaturePCA",
                             "params": {
+                                "out": "feature.cell",
+                            }
+                            "params_to_tune": {
                                 "n_components": {
                                     "values": [128, 256, 512, 1024],
                                 },

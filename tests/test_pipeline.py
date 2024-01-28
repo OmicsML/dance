@@ -352,7 +352,7 @@ def test_pipeline_planer_construction(subtests, planer_toy_registry):
                 {
                     "type": "b",
                     "target": "func_b1",
-                    "params": {
+                    "params_to_tune": {
                         "x": {
                             "values": ["x1", "x2", "x3"]
                         },
@@ -402,7 +402,7 @@ def test_pipeline_planer_construction(subtests, planer_toy_registry):
                 {
                     "type": "b",
                     "target": "func_b1",
-                    "params": {
+                    "params_to_tune": {
                         "x": {
                             "values": ["x1", "x2", "x3"]
                         },
@@ -414,7 +414,7 @@ def test_pipeline_planer_construction(subtests, planer_toy_registry):
                 {
                     "type": "c",
                     "target": "func_c1",
-                    "params": {
+                    "params_to_tune": {
                         "z": {
                             "min": 0,
                             "max": 1
@@ -424,7 +424,7 @@ def test_pipeline_planer_construction(subtests, planer_toy_registry):
                 {
                     "type": "c",
                     "target": "func_c1",
-                    "params": {
+                    "params_to_tune": {
                         "z": {
                             "min": -10.,
                             "max": 10.
@@ -562,7 +562,7 @@ def test_pipeline_planer_generation(subtests, planer_toy_registry):
                 {
                     "type": "b",
                     "target": "func_b1",
-                    "params": {
+                    "params_to_tune": {
                         "x": {
                             "values": ["x1", "x2", "x3"]
                         },
@@ -639,7 +639,7 @@ def test_pipeline_planer_generation(subtests, planer_toy_registry):
                     "pipeline": [{
                         "type": "b",
                         # "target": "func_b1",  # this must be set
-                        "params": {
+                        "params_to_tune": {
                             "x": {
                                 "values": ["x1", "x2", "x3"]
                             },
@@ -725,10 +725,8 @@ def test_pipeline_planer_generation(subtests, planer_toy_registry):
                 {
                     "type": "b",
                     "target": "func_b1",
-                    "default_params": {
-                        "func_b1": {
-                            "x": "b1"
-                        },
+                    "params": {
+                        "x": "b1"
                     },
                 },
                 {
