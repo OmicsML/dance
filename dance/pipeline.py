@@ -426,7 +426,7 @@ class PipelinePlaner(Pipeline):
             raise ValueError(f"Expecting {pipeline_length} targets specifications, "
                              f"but only got {len(pipeline)}: {pipeline}")
 
-        logger.info(f"Pipeline plane:\n{Color('green')(pformat(pipeline))}")
+        logger.info(f"Pipeline plan:\n{Color('green')(pformat(pipeline))}")
 
         return pipeline
 
@@ -443,7 +443,7 @@ class PipelinePlaner(Pipeline):
             params_dict = params
             params = [None] * pipeline_length
             for i, j in params_dict.items():
-                idx, key = i.split(f"{Pipeline.PIPELINE_KEY}.", 1)[1].split(".", 1)
+                idx, key = i.split(f"{Pipeline.PARAMS_KEY}.", 1)[1].split(".", 1)
                 idx = int(idx)
                 logger.debug(f"Setting {key!r} for pipeline element {idx} to {j}")
 
@@ -459,7 +459,7 @@ class PipelinePlaner(Pipeline):
             raise ValueError(f"Expecting {pipeline_length} targets specifications, "
                              f"but only got {len(params)}: {params}")
 
-        logger.info(f"Params plane:\n{Color('green')(pformat(params))}")
+        logger.info(f"Params plan:\n{Color('green')(pformat(params))}")
 
         return params
 

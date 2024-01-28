@@ -605,9 +605,7 @@ def test_pipeline_planer_generation(subtests, planer_toy_registry):
             ]
         }
 
-        assert dict(p.generate_config(params=[{
-            "x": "x1"
-        }, None])) == {
+        ans = {
             "type": "a",
             "pipeline": [
                 {
@@ -623,6 +621,10 @@ def test_pipeline_planer_generation(subtests, planer_toy_registry):
                 },
             ],
         }
+        # Option 1: list of param dict
+        assert dict(p.generate_config(params=[{"x": "x1"}, None])) == ans
+        # Option 2: wandb type config
+        assert dict(p.generate_config(params={"params.0.x": "x1"})) == ans
 
         with pytest.raises(ValueError):
             # Unknown param key 'y'
