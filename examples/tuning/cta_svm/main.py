@@ -3,7 +3,6 @@ import pprint
 from typing import get_args
 
 import wandb
-
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
@@ -57,7 +56,8 @@ if __name__ == "__main__":
             #         "label_channel": "cell_type"
             #     }
             # }]
-            params=list(dict(wandb.config)))
+            params=dict(wandb.config))
+
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
 

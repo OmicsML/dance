@@ -434,7 +434,7 @@ class PipelinePlaner(Pipeline):
             params_dict = params
             params = [None] * pipeline_length
             for i, j in params_dict.items():
-                idx, key = i.split(f"{Pipeline.PIPELINE_KEY}.", i)[1].split(".", 1)
+                idx, key = i.split(f"{Pipeline.PARAMS_KEY}.", 1)[1].split(".", 1)
                 idx = int(idx)
                 logger.debug(f"Setting {key!r} for pipeline element {idx} to {j}")
 
