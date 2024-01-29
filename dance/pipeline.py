@@ -740,12 +740,7 @@ class PipelinePlaner(Pipeline):
         for i, param_dict in enumerate(self.candidate_params):
             if param_dict is not None:
                 for key, val in param_dict.items():
-                    if type(val) == DictConfig:
-                        search_space[f"{self.PARAMS_KEY}.{i}.{key}"] = OmegaConf.to_container(val, resolve=True)
-                    else:
-                        search_space[f"{self.PARAMS_KEY}.{i}.{key}"] = val
-                    # type of DotConfig
-                    # search_space[f"{self.PARAMS_KEY}.{i}.{key}"] = val
+                    search_space[f"{self.PARAMS_KEY}.{i}.{key}"] = val
         return search_space
 
     def wandb_sweep_config(self) -> Dict[str, Any]:

@@ -3,7 +3,6 @@ import pprint
 from typing import get_args
 
 import wandb
-
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
@@ -28,7 +27,7 @@ if __name__ == "__main__":
     logger.setLevel(args.log_level)
     logger.info(f"\n{pprint.pformat(vars(args))}")
 
-    pipeline_planer = PipelinePlaner.from_config_file("pipeline_tuning_config.yaml")
+    pipeline_planer = PipelinePlaner.from_config_file("examples/tuning/cta_svm/tuning_config_step3.yaml")
 
     def evaluate_pipeline():
         wandb.init()

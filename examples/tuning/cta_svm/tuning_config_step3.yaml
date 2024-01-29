@@ -3,27 +3,27 @@ tune_mode: params
 pipeline:
   - type: filter.gene
     target: FilterGenesTopK
-    params:
+    params_to_tune:
       num_genes:
         min: 2000
         max: 4000
   - type: feature.cell
     target: WeightedFeaturePCA
-    params:
+    params_to_tune:
       n_components:
         min: 200
         max: 400
+    params:
       out:
-        value: feature.cell
+        feature.cell
       split_name:
-        value: train
+        train
   - type: misc
     target: SetConfig
     params:
       config_dict:
-        value:
-          feature_channel: feature.cell
-          label_channel: cell_type
+        feature_channel: feature.cell
+        label_channel: cell_type
 wandb:
   entity: danceteam
   project: dance-dev
