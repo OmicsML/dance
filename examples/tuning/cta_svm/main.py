@@ -21,7 +21,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_dataset", nargs="+", default=[2695], type=int, help="list of dataset id")
     parser.add_argument("--tissue", default="Brain")  # TODO: Add option for different tissue name for train/test
     parser.add_argument("--train_dataset", nargs="+", default=[753, 3285], type=int, help="list of dataset id")
-    parser.add_argument("--tuning_mode", default="pipeline", choices=["pipeline", "params"], help="Tuning mode")
+    parser.add_argument("--tune_mode", default="pipeline", choices=["pipeline", "params"])
     parser.add_argument("--seed", type=int, default=10)
     parser.add_argument("--sweep_id", type=str, default=None)
 
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     logger.setLevel(args.log_level)
     logger.info(f"\n{pprint.pformat(vars(args))}")
 
-    pipeline_planer = PipelinePlaner.from_config_file(f"{args.tuning_mode}_tuning_config.yaml")
+    pipeline_planer = PipelinePlaner.from_config_file(f"{args.tune_mode}_tuning_config.yaml")
 
     def evaluate_pipeline():
         wandb.init()
@@ -42,7 +42,7 @@ if __name__ == "__main__":
                                          species=args.species, tissue=args.tissue).load_data()
 
         # Prepare preprocessing pipeline and apply it to data
-        kwargs = {args.tuning_mode: dict(wandb.config)}
+        kwargs = {args.tune_mode: dict(wandb.config)}
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
