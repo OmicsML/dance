@@ -942,6 +942,8 @@ class FilterGenesScanpyOrder(BaseTransform):
                  min_cells: Optional[Union[float, int]] = None, max_counts: Optional[int] = None,
                  max_cells: Optional[Union[float, int]] = None, split_name: Optional[str] = None,
                  channel: Optional[str] = None, channel_type: Optional[str] = "X", **kwargs):
+        if order_index < 0 or order_index >= len(filter_genes_orders):
+            raise KeyError(f"An integer between 0 and {len(filter_genes_orders)-1} should be chosen")
         self.filter_genes_order = filter_genes_orders[order_index]
         self.geneScanpyOrderDict = {
             "min_counts":
