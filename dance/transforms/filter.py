@@ -953,7 +953,7 @@ class FilterGenesScanpyOrder(BaseTransform):
             "max_counts":
             FilterGenesScanpy(max_counts=max_counts, split_name=split_name, channel=channel, channel_type=channel_type,
                               **kwargs),
-            "min_cells":
+            "max_cells":
             FilterGenesScanpy(max_cells=max_cells, split_name=split_name, channel=channel, channel_type=channel_type,
                               **kwargs)
         }

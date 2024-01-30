@@ -2,7 +2,7 @@ from dance.transforms import graph
 from dance.transforms.cell_feature import BatchFeature, CellPCA, CellSVD, WeightedFeaturePCA
 from dance.transforms.filter import (FilterCellsScanpy, FilterGenesCommon, FilterGenesMarker, FilterGenesMarkerGini,
                                      FilterGenesMatch, FilterGenesPercentile, FilterGenesRegression, FilterGenesScanpy,
-                                     FilterGenesTopK, FilterScanpy)
+                                     FilterGenesScanpyOrder, FilterGenesTopK, FilterScanpy)
 from dance.transforms.gene_holdout import GeneHoldout
 from dance.transforms.interface import AnnDataTransform
 from dance.transforms.mask import CellwiseMaskData, MaskData
@@ -32,6 +32,7 @@ __all__ = [
     "FilterGenesPercentile",
     "FilterGenesRegression",
     "FilterGenesScanpy",
+    "FilterGenesScanpyOrder",
     "FilterGenesTopK",
     "FilterScanpy",
     "GeneHoldout",
