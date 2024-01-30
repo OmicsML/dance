@@ -4,6 +4,7 @@ from multiprocessing import Manager, Pool
 import anndata as ad
 import numpy as np
 import pandas as pd
+import scanpy as sc
 import scipy.sparse as sp
 import statsmodels.discrete.discrete_model
 import statsmodels.nonparametric.kernel_regression
@@ -13,6 +14,7 @@ from scipy import stats
 from dance.data.base import Data
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
+from dance.transforms.interface import AnnDataTransform
 from dance.typing import Dict, List, Literal, NormMode, Optional, Union
 from dance.utils.matrix import normalize
 
@@ -483,3 +485,17 @@ def theta_ml(y, mu):
     t0 = max(t0, 0)
 
     return t0
+
+
+@register_preprocessor("normalize")
+class Log1P(AnnDataTransform):
+
+    def __init__(self, **kwargs):
+        super().__init__(sc.pp.log1p, **kwargs)
+
+
+@register_preprocessor("normalize")
+class NormalizeTotal(AnnDataTransform):
+
+    def __init__(self, **kwargs):
+        super().__init__(sc.pp.normalize_total, **kwargs)

@@ -4,8 +4,8 @@ import numpy as np
 import torch
 
 from dance import logger
-from dance.automl_config.step2_config import get_transforms, log_in_wandb, setStep2
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
+from dance.legacy.automl_config.step2_config import get_transforms, log_in_wandb, setStep2
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.transforms.misc import Compose
 from dance.utils import set_seed
