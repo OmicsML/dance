@@ -21,6 +21,9 @@ class WeightedFeaturePCA(BaseTransform):
         Number of PCs to use.
     split_name
         Which split to use to compute the gene PCA. If not set, use all data.
+    feat_norm_mode
+        Feature normalization mode, see :func:`dance.utils.matrix.normalize`. If set to `None`, then do not perform
+        feature normalization before reduction.
 
     """
 

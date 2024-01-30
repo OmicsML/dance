@@ -3,13 +3,38 @@ import pprint
 from typing import get_args
 
 import wandb
+from sklearn.random_projection import GaussianRandomProjection
 
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
 from dance.pipeline import PipelinePlaner
+from dance.registry import register_preprocessor
+from dance.transforms.base import BaseTransform
 from dance.typing import LogLevel
 from dance.utils import set_seed
+
+
+@register_preprocessor("feature", "cell")  # NOTE: register any custom preprocessing function to be used for tuning
+class GaussRandProjFeature(BaseTransform):
+    """Custom preprocessing to extract cell feature via Gaussian random projection."""
+
+    _DISPLAY_ATTRS = ("n_components", "eps")
+
+    def __init__(self, n_components: int = 400, eps: float = 0.1, **kwargs):
+        super().__init__(**kwargs)
+        self.n_components = n_components
+        self.eps = eps
+
+    def __call__(self, data):
+        feat = data.get_feature(return_type="numpy")
+        grp = GaussianRandomProjection(n_components=self.n_components, eps=self.eps)
+
+        self.logger.info(f"Start generateing cell feature via Gaussian random projection (d={self.n_components}).")
+        data.data.obsm[self.out] = grp.fit_transform(feat)
+
+        return data
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -21,6 +46,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_dataset", nargs="+", default=[2695], type=int, help="list of dataset id")
     parser.add_argument("--tissue", default="Brain")  # TODO: Add option for different tissue name for train/test
     parser.add_argument("--train_dataset", nargs="+", default=[753, 3285], type=int, help="list of dataset id")
+    parser.add_argument("--tune_mode", default="pipeline", choices=["pipeline", "params"])
     parser.add_argument("--seed", type=int, default=10)
     parser.add_argument("--sweep_id", type=str, default=None)
 
@@ -28,7 +54,7 @@ if __name__ == "__main__":
     logger.setLevel(args.log_level)
     logger.info(f"\n{pprint.pformat(vars(args))}")
 
-    pipeline_planer = PipelinePlaner.from_config_file("tuning_config.yaml")
+    pipeline_planer = PipelinePlaner.from_config_file(f"{args.tune_mode}_tuning_config.yaml")
 
     def evaluate_pipeline():
         wandb.init()
@@ -41,7 +67,8 @@ if __name__ == "__main__":
                                          species=args.species, tissue=args.tissue).load_data()
 
         # Prepare preprocessing pipeline and apply it to data
-        preprocessing_pipeline = pipeline_planer.generate(pipeline=dict(wandb.config))
+        kwargs = {args.tune_mode: dict(wandb.config)}
+        preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
 
@@ -61,12 +88,12 @@ if __name__ == "__main__":
 """To reproduce SVM benchmarks, please refer to command lines below:
 
 Mouse Brain
-$ python main.py --species mouse --tissue Brain --train_dataset 753 3285 --test_dataset 2695
+$ python main.py --tune_mode (pipeline/params) --species mouse --tissue Brain --train_dataset 753 3285 --test_dataset 2695
 
 Mouse Spleen
-$ python main.py --species mouse --tissue Spleen --train_dataset 1970 --test_dataset 1759
+$ python main.py --tune_mode (pipeline/params) --species mouse --tissue Spleen --train_dataset 1970 --test_dataset 1759
 
 Mouse Kidney
-$ python main.py --species mouse --tissue Kidney --train_dataset 4682 --test_dataset 203
+$ python main.py --tune_mode (pipeline/params) --species mouse --tissue Kidney --train_dataset 4682 --test_dataset 203
 
 """
