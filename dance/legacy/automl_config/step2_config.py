@@ -2,6 +2,7 @@ import functools
 import itertools
 
 import wandb
+
 from dance import logger
 from dance.legacy.automl_config import fun2code_dict
 from dance.transforms.misc import SetConfig
