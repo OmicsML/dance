@@ -16,9 +16,9 @@ def toy_data():
     return adata, data
 
 
-def test_sc3_feature(toy_data):
+def test_filter_genes_scanpy_order(toy_data):
     adata, data = toy_data
     filterGenesScanpy = FilterGenesScanpyOrder(order_index=0, min_counts=1, min_cells=1, max_counts=3000, max_cells=20)
     filterGenesScanpy(data)
-    sc3_feature = data.get_feature(return_type="numpy")
-    assert sc3_feature.shape[0] == data.shape[0]
+    X = data.get_feature(return_type="numpy")
+    assert X.shape[0] == data.shape[0]
