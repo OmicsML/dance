@@ -3,13 +3,38 @@ import pprint
 from typing import get_args
 
 import wandb
+from sklearn.random_projection import GaussianRandomProjection
 
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
 from dance.pipeline import PipelinePlaner
+from dance.registry import register_preprocessor
+from dance.transforms.base import BaseTransform
 from dance.typing import LogLevel
 from dance.utils import set_seed
+
+
+@register_preprocessor("feature", "cell")  # NOTE: register any custom preprocessing function to be used for tuning
+class GaussRandProjFeature(BaseTransform):
+    """Custom preprocessing to extract cell feature via Gaussian random projection."""
+
+    _DISPLAY_ATTRS = ("n_components", "eps")
+
+    def __init__(self, n_components: int = 400, eps: float = 0.1, **kwargs):
+        super().__init__(**kwargs)
+        self.n_components = n_components
+        self.eps = eps
+
+    def __call__(self, data):
+        feat = data.get_feature(return_type="numpy")
+        grp = GaussianRandomProjection(n_components=self.n_components, eps=self.eps)
+
+        self.logger.info(f"Start generateing cell feature via Gaussian random projection (d={self.n_components}).")
+        data.data.obsm[self.out] = grp.fit_transform(feat)
+
+        return data
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)

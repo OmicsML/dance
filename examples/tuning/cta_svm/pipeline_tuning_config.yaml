@@ -6,9 +6,11 @@ pipeline:
       - WeightedFeaturePCA
       - CellPCA
       - CellSVD
+      - GaussRandProjFeature  # Registered custom preprocessing func
     params:
       n_components: 400
       out: feature.cell
+      log_level: INFO
     default_params:
       WeightedFeaturePCA:
         split_name: train
