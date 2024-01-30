@@ -28,7 +28,7 @@ if __name__ == "__main__":
     logger.setLevel(args.log_level)
     logger.info(f"\n{pprint.pformat(vars(args))}")
 
-    pipeline_planer = PipelinePlaner.from_config_file("tuning_config.yaml")
+    pipeline_planer = PipelinePlaner.from_config_file("examples/tuning/cta_svm/tuning_config_step3.yaml")
 
     def evaluate_pipeline():
         wandb.init()
@@ -39,9 +39,9 @@ if __name__ == "__main__":
         # Load raw data
         data = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
                                          species=args.species, tissue=args.tissue).load_data()
-
         # Prepare preprocessing pipeline and apply it to data
-        preprocessing_pipeline = pipeline_planer.generate(pipeline=dict(wandb.config))
+        preprocessing_pipeline = pipeline_planer.generate(pipeline=None, params=dict(wandb.config))
+
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
 

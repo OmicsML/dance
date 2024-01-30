@@ -1,0 +1,18 @@
+type: preprocessor
+tune_mode: pipeline
+pipeline:
+  - type: normalize
+    include:
+      - ScaleFeature
+      - ScTransform
+      - Log1P
+      - NormalizeTotal
+  - type: filter.gene
+    include:
+      - FilterGenesTopK
+      - FilterGenesPercentile
+      - FilterGenesMarker
+      - FilterGenesRegression
+      - FilterGenesMarkerGini
+      - FilterGenesCommon
+      - FilterGenesMatch

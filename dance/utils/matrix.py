@@ -1,5 +1,3 @@
-import sys
-
 import numba
 import numpy as np
 import torch
