@@ -12,6 +12,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import MinMaxScaler, PolynomialFeatures
 
 from dance import logger as default_logger
+from dance.data.base import Data
 from dance.exceptions import DevError
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
@@ -884,3 +885,80 @@ def gini_func(x, weights=None):
     G_RSV = G_num / mean_RSV
 
     return G_RSV
+
+
+filter_genes_orders = [['min_counts', 'min_cells', 'max_counts', 'max_cells'],
+                       ['min_counts', 'min_cells', 'max_cells', 'max_counts'],
+                       ['min_counts', 'max_counts', 'min_cells', 'max_cells'],
+                       ['min_counts', 'max_counts', 'max_cells', 'min_cells'],
+                       ['min_counts', 'max_cells', 'min_cells', 'max_counts'],
+                       ['min_counts', 'max_cells', 'max_counts', 'min_cells'],
+                       ['min_cells', 'min_counts', 'max_counts', 'max_cells'],
+                       ['min_cells', 'min_counts', 'max_cells', 'max_counts'],
+                       ['min_cells', 'max_counts', 'min_counts', 'max_cells'],
+                       ['min_cells', 'max_counts', 'max_cells', 'min_counts'],
+                       ['min_cells', 'max_cells', 'min_counts', 'max_counts'],
+                       ['min_cells', 'max_cells', 'max_counts', 'min_counts'],
+                       ['max_counts', 'min_counts', 'min_cells', 'max_cells'],
+                       ['max_counts', 'min_counts', 'max_cells', 'min_cells'],
+                       ['max_counts', 'min_cells', 'min_counts', 'max_cells'],
+                       ['max_counts', 'min_cells', 'max_cells', 'min_counts'],
+                       ['max_counts', 'max_cells', 'min_counts', 'min_cells'],
+                       ['max_counts', 'max_cells', 'min_cells', 'min_counts'],
+                       ['max_cells', 'min_counts', 'min_cells', 'max_counts'],
+                       ['max_cells', 'min_counts', 'max_counts', 'min_cells'],
+                       ['max_cells', 'min_cells', 'min_counts', 'max_counts'],
+                       ['max_cells', 'min_cells', 'max_counts', 'min_counts'],
+                       ['max_cells', 'max_counts', 'min_counts', 'min_cells'],
+                       ['max_cells', 'max_counts', 'min_cells', 'min_counts']]
+
+
+@register_preprocessor("filter", "gene")
+class FilterGenesScanpyOrder(BaseTransform):
+    """Scanpy filtering gene transformation with additional options.
+
+    Parameters
+    ----------
+    order_index
+        Index of (min_counts,min_cells,max_counts,max_cells) order
+    min_counts
+        Minimum number of counts required for a gene to be kept.
+    min_cells
+        Minimum number (or ratio) of cells required for a gene to be kept.
+    max_counts
+        Maximum number of counts required for a gene to be kept.
+    max_cells
+        Maximum number (or ratio) of cells required for a gene to be kept.
+    split_name
+        Which split to be used for filtering.
+    channel
+        Channel to be used for filtering.
+    channel_type
+        Channel type to be used for filtering.
+
+    """
+
+    def __init__(self, order_index: int, min_counts: Optional[int] = None,
+                 min_cells: Optional[Union[float, int]] = None, max_counts: Optional[int] = None,
+                 max_cells: Optional[Union[float, int]] = None, split_name: Optional[str] = None,
+                 channel: Optional[str] = None, channel_type: Optional[str] = "X", **kwargs):
+        self.filter_genes_order = filter_genes_orders[order_index]
+        self.geneScanpyOrderDict = {
+            "min_counts":
+            FilterGenesScanpy(min_counts=min_counts, split_name=split_name, channel=channel, channel_type=channel_type,
+                              **kwargs),
+            "min_cells":
+            FilterGenesScanpy(min_cells=min_cells, split_name=split_name, channel=channel, channel_type=channel_type,
+                              **kwargs),
+            "max_counts":
+            FilterGenesScanpy(max_counts=max_counts, split_name=split_name, channel=channel, channel_type=channel_type,
+                              **kwargs),
+            "min_cells":
+            FilterGenesScanpy(max_cells=max_cells, split_name=split_name, channel=channel, channel_type=channel_type,
+                              **kwargs)
+        }
+
+    def __call__(self, data: Data):
+        for parameter in self.filter_genes_order:
+            geneScanpyOrder = self.geneScanpyOrderDict[parameter]
+            geneScanpyOrder(data)
