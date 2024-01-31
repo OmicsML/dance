@@ -16,11 +16,12 @@ def toy_data():
     return adata, data
 
 
-@pytest.mark.parametrize('order_index', [0, 24, 25, 26, 27])
-def test_filter_genes_scanpy_order(toy_data, order_index):
+@pytest.mark.parametrize('order',
+                         [['min_counts', 'min_cells', 'max_counts', 'max_cells'],
+                          ['max_counts', 'min_cells', 'min_counts'], ['min_cells', 'min_counts'], ['min_counts'], []])
+def test_filter_genes_scanpy_order(toy_data, order):
     adata, data = toy_data
-    filterGenesScanpy = FilterGenesScanpyOrder(order_index=order_index, min_counts=1, min_cells=1, max_counts=3000,
-                                               max_cells=20)
+    filterGenesScanpy = FilterGenesScanpyOrder(order=order, min_counts=1, min_cells=1, max_counts=3000, max_cells=20)
     filterGenesScanpy(data)
     X = data.get_feature(return_type="numpy")
     assert X.shape[0] == data.shape[0]

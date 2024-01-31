@@ -898,8 +898,8 @@ class FilterGenesScanpyOrder(BaseTransform):
 
     Parameters
     ----------
-    order_index
-        Index of (min_counts,min_cells,max_counts,max_cells) order
+    order
+        Order of (min_counts,min_cells,max_counts,max_cells)
     min_counts
         Minimum number of counts required for a gene to be kept.
     min_cells
@@ -917,14 +917,14 @@ class FilterGenesScanpyOrder(BaseTransform):
 
     """
 
-    def __init__(self, order_index: int, min_counts: Optional[int] = None,
-                 min_cells: Optional[Union[float, int]] = None, max_counts: Optional[int] = None,
-                 max_cells: Optional[Union[float, int]] = None, split_name: Optional[str] = None,
-                 channel: Optional[str] = None, channel_type: Optional[str] = "X", **kwargs):
+    def __init__(self, order: list, min_counts: Optional[int] = None, min_cells: Optional[Union[float, int]] = None,
+                 max_counts: Optional[int] = None, max_cells: Optional[Union[float, int]] = None,
+                 split_name: Optional[str] = None, channel: Optional[str] = None, channel_type: Optional[str] = "X",
+                 **kwargs):
         super().__init__(**kwargs)
-        if order_index < 0 or order_index >= len(filter_genes_orders):
-            raise KeyError(f"An integer between 0 and {len(filter_genes_orders)-1} should be chosen")
-        self.filter_genes_order = filter_genes_orders[order_index]
+        if order not in list(filter_genes_orders.values()):
+            raise KeyError(f"An order in filter_genes_orders in dance/conditional_parameter.yml should be chosen")
+        self.filter_genes_order = order
         self.logger.info(f"choose filter_genes_order f{self.filter_genes_order}")
         geneParameterDict = {
             "min_counts": min_counts,
