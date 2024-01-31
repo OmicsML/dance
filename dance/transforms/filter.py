@@ -17,6 +17,7 @@ from dance.exceptions import DevError
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Dict, GeneSummaryMode, List, Literal, Logger, Optional, Tuple, Union
+from dance.utils.io import read_conditional_parameter
 
 
 def get_count(count_or_ratio: Optional[Union[float, int]], total: int) -> Optional[int]:
@@ -887,30 +888,8 @@ def gini_func(x, weights=None):
     return G_RSV
 
 
-filter_genes_orders = [['min_counts', 'min_cells', 'max_counts', 'max_cells'],
-                       ['min_counts', 'min_cells', 'max_cells', 'max_counts'],
-                       ['min_counts', 'max_counts', 'min_cells', 'max_cells'],
-                       ['min_counts', 'max_counts', 'max_cells', 'min_cells'],
-                       ['min_counts', 'max_cells', 'min_cells', 'max_counts'],
-                       ['min_counts', 'max_cells', 'max_counts', 'min_cells'],
-                       ['min_cells', 'min_counts', 'max_counts', 'max_cells'],
-                       ['min_cells', 'min_counts', 'max_cells', 'max_counts'],
-                       ['min_cells', 'max_counts', 'min_counts', 'max_cells'],
-                       ['min_cells', 'max_counts', 'max_cells', 'min_counts'],
-                       ['min_cells', 'max_cells', 'min_counts', 'max_counts'],
-                       ['min_cells', 'max_cells', 'max_counts', 'min_counts'],
-                       ['max_counts', 'min_counts', 'min_cells', 'max_cells'],
-                       ['max_counts', 'min_counts', 'max_cells', 'min_cells'],
-                       ['max_counts', 'min_cells', 'min_counts', 'max_cells'],
-                       ['max_counts', 'min_cells', 'max_cells', 'min_counts'],
-                       ['max_counts', 'max_cells', 'min_counts', 'min_cells'],
-                       ['max_counts', 'max_cells', 'min_cells', 'min_counts'],
-                       ['max_cells', 'min_counts', 'min_cells', 'max_counts'],
-                       ['max_cells', 'min_counts', 'max_counts', 'min_cells'],
-                       ['max_cells', 'min_cells', 'min_counts', 'max_counts'],
-                       ['max_cells', 'min_cells', 'max_counts', 'min_counts'],
-                       ['max_cells', 'max_counts', 'min_counts', 'min_cells'],
-                       ['max_cells', 'max_counts', 'min_cells', 'min_counts']]
+filter_genes_orders = read_conditional_parameter(path='dance/conditional_parameter.yml',
+                                                 conditional_parameter="filter_genes_orders")
 
 
 @register_preprocessor("filter", "gene")
