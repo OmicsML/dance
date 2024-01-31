@@ -13,6 +13,7 @@ wandb
 
 legacy/test_automl/data
 legacy/test_automl/test.py
+legacy/test_automl/test.ipynb
 *.pkl
 *.pt
 openfe-singlecell

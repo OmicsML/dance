@@ -3,6 +3,7 @@ import inspect
 from copy import deepcopy
 from pprint import pformat
 
+import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
 from dance import logger
@@ -777,6 +778,7 @@ class PipelinePlaner(Pipeline):
         entity: Optional[str] = None,
         project: Optional[str] = None,
         count: Optional[int] = None,
+        summmary_file_path: Optional[str] = None,
     ) -> Tuple[str, str, str]:
         try:
             import wandb
@@ -795,4 +797,36 @@ class PipelinePlaner(Pipeline):
         logger.info(f"Spawning agent: {sweep_id=}, {entity=}, {project=}, {count=}")
         wandb.agent(sweep_id, function=function, entity=entity, project=project, count=count)
 
+        if summmary_file_path is not None:
+            sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
+            summary_data = []
+            for run in sweep.runs:
+                result = dict(run.summary._json_dict).copy()
+                result.update(run.config)
+                result.update({"id": run.id})
+                summary_data.append(flatten_dict(result))  #get result and config
+            pd.DataFrame(summary_data).set_index(["id"]).to_csv(summmary_file_path)  #save file
         return entity, project, sweep_id
+
+
+def flatten_dict(d, parent_key='', sep='_'):
+    """Flatten the nested dictionary, and the parent key is the prefix of the child.
+
+    parameter:
+      d:The dictionary to flatten.
+      parent_key:parent key。
+      sep:delimiter
+
+    return:
+      flattened dictionary
+
+    """
+
+    items = []
+    for k, v in d.items():
+        new_key = parent_key + sep + k if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
