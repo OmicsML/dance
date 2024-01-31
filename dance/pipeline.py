@@ -778,7 +778,6 @@ class PipelinePlaner(Pipeline):
         entity: Optional[str] = None,
         project: Optional[str] = None,
         count: Optional[int] = None,
-        summary_file_path: Optional[str] = None,
     ) -> Tuple[str, str, str]:
         try:
             import wandb
@@ -797,16 +796,25 @@ class PipelinePlaner(Pipeline):
         logger.info(f"Spawning agent: {sweep_id=}, {entity=}, {project=}, {count=}")
         wandb.agent(sweep_id, function=function, entity=entity, project=project, count=count)
 
-        if summary_file_path is not None:
-            sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
-            summary_data = []
-            for run in sweep.runs:
-                result = dict(run.summary._json_dict).copy()
-                result.update(run.config)
-                result.update({"id": run.id})
-                summary_data.append(flatten_dict(result))  #get result and config
-            pd.DataFrame(summary_data).set_index(["id"]).to_csv(summary_file_path)  #save file
         return entity, project, sweep_id
+
+
+def save_summary_data(entity, project, sweep_id, summary_file_path):
+    try:
+        import wandb
+    except ModuleNotFoundError as e:
+        raise ImportError("wandb not installed. Please install wandb first: $ pip install wandb") from e
+    sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
+    summary_data = []
+    for run in sweep.runs:
+        result = dict(run.summary._json_dict).copy()
+        result.update(run.config)
+        result.update({"id": run.id})
+        summary_data.append(flatten_dict(result))  #get result and config
+    ans = pd.DataFrame(summary_data).set_index(["id"])
+    if summary_file_path is not None:
+        ans.to_csv(summary_file_path)  #save file
+    return ans
 
 
 def flatten_dict(d, parent_key='', sep='_'):
