@@ -489,6 +489,36 @@ def theta_ml(y, mu):
 
 @register_preprocessor("normalize")
 class Log1P(AnnDataTransform):
+    """Logarithmize the data matrix.
+
+    Computes :math:`X = \\log(X + 1)`,
+    where :math:`log` denotes the natural logarithm unless a different base is given.
+
+    Parameters
+    ----------
+    data
+        The (annotated) data matrix of shape `n_obs` × `n_vars`.
+        Rows correspond to cells and columns to genes.
+    base
+        Base of the logarithm. Natural logarithm is used by default.
+    copy
+        If an :class:`~anndata.AnnData` is passed, determines whether a copy
+        is returned.
+    chunked
+        Process the data matrix in chunks, which will save memory.
+        Applies only to :class:`~anndata.AnnData`.
+    chunk_size
+        `n_obs` of the chunks to process the data in.
+    layer
+        Entry of layers to transform.
+    obsm
+        Entry of obsm to transform.
+
+    Returns
+    -------
+    Returns or updates `data`, depending on `copy`.
+
+    """
 
     def __init__(self, **kwargs):
         super().__init__(sc.pp.log1p, **kwargs)
@@ -496,6 +526,58 @@ class Log1P(AnnDataTransform):
 
 @register_preprocessor("normalize")
 class NormalizeTotal(AnnDataTransform):
+    """Normalize counts per cell.
 
-    def __init__(self, **kwargs):
-        super().__init__(sc.pp.normalize_total, **kwargs)
+    Normalize each cell by total counts over all genes,
+    so that every cell has the same total count after normalization.
+    If choosing `target_sum=1e6`, this is CPM normalization.
+
+    If `exclude_highly_expressed=True`, very highly expressed genes are excluded
+    from the computation of the normalization factor (size factor) for each
+    cell. This is meaningful as these can strongly influence the resulting
+    normalized values for all other genes [Weinreb17]_.
+
+    Similar functions are used, for example, by Seurat [Satija15]_, Cell Ranger
+    [Zheng17]_ or SPRING [Weinreb17]_.
+
+    Params
+    ------
+    adata
+        The annotated data matrix of shape `n_obs` × `n_vars`.
+        Rows correspond to cells and columns to genes.
+    target_sum
+        If `None`, after normalization, each observation (cell) has a total
+        count equal to the median of total counts for observations (cells)
+        before normalization.
+    exclude_highly_expressed_and_max_fraction
+        If exclude_highly_expressed_and_max_fraction > 0,exclude (very) highly
+        expressed genes for the computation of thenormalization factor
+        (size factor) for each cell. A gene is consideredhighly expressed,
+        if it has more than `exclude_highly_expressed_and_max_fraction` of the total counts
+        in at least one cell. The not-excluded genes will sum up to
+        `target_sum`.
+    key_added
+        Name of the field in `adata.obs` where the normalization factor is
+        stored.
+    layer
+        Layer to normalize instead of `X`. If `None`, `X` is normalized.
+    inplace
+        Whether to update `adata` or return dictionary with normalized copies of
+        `adata.X` and `adata.layers`.
+    copy
+        Whether to modify copied input object. Not compatible with inplace=False.
+
+    Returns
+    -------
+    Returns dictionary with normalized copies of `adata.X` and `adata.layers`
+    or updates `adata` with normalized version of the original
+    `adata.X` and `adata.layers`, depending on `inplace`.
+
+    """
+
+    def __init__(self, exclude_highly_expressed_and_max_fraction: Optional[float] = None, **kwargs):
+        if exclude_highly_expressed_and_max_fraction < 0:
+            super().__init__(sc.pp.normalize_total, exclude_highly_expressed=False, **kwargs)
+        else:
+            super().__init__(sc.pp.normalize_total, exclude_highly_expressed=True,
+                             max_fraction=exclude_highly_expressed_and_max_fraction, **kwargs)
