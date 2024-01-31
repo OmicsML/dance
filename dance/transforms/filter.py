@@ -921,24 +921,25 @@ class FilterGenesScanpyOrder(BaseTransform):
                  min_cells: Optional[Union[float, int]] = None, max_counts: Optional[int] = None,
                  max_cells: Optional[Union[float, int]] = None, split_name: Optional[str] = None,
                  channel: Optional[str] = None, channel_type: Optional[str] = "X", **kwargs):
+        super().__init__(**kwargs)
         if order_index < 0 or order_index >= len(filter_genes_orders):
             raise KeyError(f"An integer between 0 and {len(filter_genes_orders)-1} should be chosen")
         self.filter_genes_order = filter_genes_orders[order_index]
         self.logger.info(f"choose filter_genes_order f{self.filter_genes_order}")
-        self.geneScanpyOrderDict = {
-            "min_counts":
-            FilterGenesScanpy(min_counts=min_counts, split_name=split_name, channel=channel, channel_type=channel_type,
-                              **kwargs),
-            "min_cells":
-            FilterGenesScanpy(min_cells=min_cells, split_name=split_name, channel=channel, channel_type=channel_type,
-                              **kwargs),
-            "max_counts":
-            FilterGenesScanpy(max_counts=max_counts, split_name=split_name, channel=channel, channel_type=channel_type,
-                              **kwargs),
-            "max_cells":
-            FilterGenesScanpy(max_cells=max_cells, split_name=split_name, channel=channel, channel_type=channel_type,
-                              **kwargs)
+        geneParameterDict = {
+            "min_counts": min_counts,
+            "min_cells": min_cells,
+            "max_counts": max_counts,
+            "max_cells": max_cells
         }
+        self.geneScanpyOrderDict = {}
+        for key in geneParameterDict.keys():
+            if key in self.filter_genes_order:
+                self.geneScanpyOrderDict[key] = FilterGenesScanpy(**{key:
+                                                                     geneParameterDict[key]}, split_name=split_name,
+                                                                  channel=channel, channel_type=channel_type, **kwargs)
+            else:
+                self.logger.warning(f"{key} not in order,It makes no sense to set {key}")
 
     def __call__(self, data: Data):
         for parameter in self.filter_genes_order:

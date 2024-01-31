@@ -121,3 +121,13 @@ filter_genes_orders:
     - max_counts
     - min_cells
     - min_counts
+  24:
+    - max_counts
+    - min_cells
+    - min_counts
+  25:
+    - min_cells
+    - min_counts
+  26:
+    - min_counts
+  27: []
