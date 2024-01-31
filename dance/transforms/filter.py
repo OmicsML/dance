@@ -888,10 +888,6 @@ def gini_func(x, weights=None):
     return G_RSV
 
 
-filter_genes_orders = read_conditional_parameter(path='dance/conditional_parameter.yml',
-                                                 conditional_parameter="filter_genes_orders")
-
-
 @register_preprocessor("filter", "gene")
 class FilterGenesScanpyOrder(BaseTransform):
     """Scanpy filtering gene transformation with additional options.
@@ -922,6 +918,8 @@ class FilterGenesScanpyOrder(BaseTransform):
                  split_name: Optional[str] = None, channel: Optional[str] = None, channel_type: Optional[str] = "X",
                  **kwargs):
         super().__init__(**kwargs)
+        filter_genes_orders = read_conditional_parameter(path='dance/conditional_parameter.yml',
+                                                         conditional_parameter="filter_genes_orders")
         if order not in list(filter_genes_orders.values()):
             raise KeyError(f"An order in filter_genes_orders in dance/conditional_parameter.yml should be chosen")
         self.filter_genes_order = order
