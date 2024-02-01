@@ -917,12 +917,6 @@ class FilterGenesScanpyOrder(BaseTransform):
                  split_name: Optional[str] = None, channel: Optional[str] = None, channel_type: Optional[str] = "X",
                  **kwargs):
         super().__init__(**kwargs)
-        # filter_genes_orders = read_conditional_parameter(path='dance/conditional_parameter.yml',
-        #                                                  conditional_parameter="filter_genes_orders")
-
-        # if order not in list(filter_genes_orders.values()):
-        #     raise KeyError(f"An order in filter_genes_orders in dance/conditional_parameter.yml should be chosen")
-
         self.filter_genes_order = order
         self.logger.info(f"choose filter_genes_order f{self.filter_genes_order}")
         geneParameterDict = {
