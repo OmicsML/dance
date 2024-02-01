@@ -513,10 +513,6 @@ class Log1P(BaseTransform):
     obsm
         Entry of obsm to transform.
 
-    Returns
-    -------
-    Returns or updates `data`, depending on `copy`.
-
     """
 
     def __init__(self, base: Optional[Number] = None, copy: bool = False, chunked: bool = None,
@@ -570,12 +566,6 @@ class NormalizeTotal(BaseTransform):
         `adata.X` and `adata.layers`.
     copy
         Whether to modify copied input object. Not compatible with inplace=False.
-
-    Returns
-    -------
-    Returns dictionary with normalized copies of `adata.X` and `adata.layers`
-    or updates `adata` with normalized version of the original
-    `adata.X` and `adata.layers`, depending on `inplace`.
 
     """
 
