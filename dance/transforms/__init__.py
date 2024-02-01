@@ -7,7 +7,7 @@ from dance.transforms.gene_holdout import GeneHoldout
 from dance.transforms.interface import AnnDataTransform
 from dance.transforms.mask import CellwiseMaskData, MaskData
 from dance.transforms.misc import Compose, RemoveSplit, SaveRaw, SetConfig
-from dance.transforms.normalize import ScaleFeature, ScTransform
+from dance.transforms.normalize import Log1P, NormalizeTotal, ScaleFeature, ScTransform
 from dance.transforms.pseudobulk import CellGiottoTopicProfile, CellTopicProfile, CellTypeNums, PseudoMixture
 from dance.transforms.sc3_feature import SC3Feature
 from dance.transforms.scn_feature import SCNFeature
@@ -37,8 +37,10 @@ __all__ = [
     "FilterScanpy",
     "GeneHoldout",
     "GeneStats",
+    "Log1P",
     "MaskData",
     "MorphologyFeatureCNN",
+    "NormalizeTotal",
     "PseudoMixture",
     "RemoveSplit",
     "SC3Feature",

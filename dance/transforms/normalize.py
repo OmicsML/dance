@@ -579,8 +579,8 @@ class NormalizeTotal(AnnDataTransform):
 
     def __init__(self, max_fraction: Optional[float] = None, **kwargs):
 
-        self.logger.info("max_fraction must be valid")
         super().__init__(sc.pp.normalize_total, exclude_highly_expressed=True, max_fraction=max_fraction, **kwargs)
+        self.logger.info("max_fraction must be valid")
         if max_fraction == 1.0:
             self.logger.info(
                 "When max_fraction is equal to 1.0, it is equivalent to setting exclude_highly_expressed=False.")
