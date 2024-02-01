@@ -17,7 +17,6 @@ from dance.exceptions import DevError
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Dict, GeneSummaryMode, List, Literal, Logger, Optional, Tuple, Union
-from dance.utils.io import read_conditional_parameter
 
 
 def get_count(count_or_ratio: Optional[Union[float, int]], total: int) -> Optional[int]:

@@ -801,15 +801,15 @@ class PipelinePlaner(Pipeline):
 
 def save_summary_data(entity, project, sweep_id, summary_file_path):
     """
-    return result and parameter config,example:
+    The returned dataframe includes running time, results and corresponding hyperparameters, etc.
         --------------------------------------------------
-    | ID         | Runtime             | Timestamp           | Accuracy            | Step       | Wandb Runtime    | Pipeline        |
+    | id         | _runtime             | _timestamp           | acc          | _step      | _wandb_runtime    | pipeline.0        |
     --------------------------------------------------
     | 9hwsyumy   | 42.445390           | 1706685331.7032254  | 0.707978            | 0          | 41               | WeightedFeaturePCA |
     | sgsr5mw4   | 38.906304           | 1706685272.8555896  | 0.707978            | 0          | 37               | WeightedFeaturePCA |
     | czvfm197   | 48.190104           | 1706685217.4785476  | 0.331725            | 0          | 47               | CellPCA          |
     --------------------------------------------------
-
+    This is an example of the running results of svm in cell type annotation
     """
     try:
         import wandb
