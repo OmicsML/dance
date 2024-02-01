@@ -895,7 +895,7 @@ class FilterGenesScanpyOrder(BaseTransform):
     Parameters
     ----------
     order
-        Order of (min_counts,min_cells,max_counts,max_cells),e.g[min_counts,min_cells,max_counts,max_cells]
+        Order of (min_counts,min_cells,max_counts,max_cells),e.g["min_counts","min_cells","max_counts","max_cells"]
     min_counts
         Minimum number of counts required for a gene to be kept.
     min_cells

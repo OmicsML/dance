@@ -800,6 +800,17 @@ class PipelinePlaner(Pipeline):
 
 
 def save_summary_data(entity, project, sweep_id, summary_file_path):
+    """
+    return result and parameter config,example:
+        --------------------------------------------------
+    | ID         | Runtime             | Timestamp           | Accuracy            | Step       | Wandb Runtime    | Pipeline        |
+    --------------------------------------------------
+    | 9hwsyumy   | 42.445390           | 1706685331.7032254  | 0.707978            | 0          | 41               | WeightedFeaturePCA |
+    | sgsr5mw4   | 38.906304           | 1706685272.8555896  | 0.707978            | 0          | 37               | WeightedFeaturePCA |
+    | czvfm197   | 48.190104           | 1706685217.4785476  | 0.331725            | 0          | 47               | CellPCA          |
+    --------------------------------------------------
+
+    """
     try:
         import wandb
     except ModuleNotFoundError as e:
