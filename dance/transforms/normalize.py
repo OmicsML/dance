@@ -550,11 +550,13 @@ class NormalizeTotal(AnnDataTransform):
         count equal to the median of total counts for observations (cells)
         before normalization.
     max_fraction
-        When max_fraction is smaller than or equal to 1.0, set `exclude_highly_expressed=True`,
-        consider cells as highly expressed that have more counts than `max_fraction`
-        of the original total counts in at least one cell.Exclude (very) highly expressed genes
-        for the computation of thenormalization factor (size factor) for each cell.
-        When max_fraction is greater than 1.0, it is equivalent to setting
+        Consider cells as highly expressed that have more counts than `max_fraction`
+        of the original total counts in at least one cell.
+        Exclude (very) highly expressed genes for the computation of the
+        normalization factor (size factor) for each cell. A gene is considered
+        highly expressed, if it has more than `max_fraction` of the total counts
+        in at least one cell. The not-excluded genes will sum up to
+        `target_sum`.When max_fraction is equal to 1.0, it is equivalent to setting
         exclude_highly_expressed=False.
     key_added
         Name of the field in `adata.obs` where the normalization factor is
@@ -577,11 +579,8 @@ class NormalizeTotal(AnnDataTransform):
 
     def __init__(self, max_fraction: Optional[float] = None, **kwargs):
 
-        self.logger.info("Max_fraction must be valid")
-        if max_fraction <= 1.0:
-            super().__init__(sc.pp.normalize_total, exclude_highly_expressed=True, max_fraction=max_fraction, **kwargs)
-            self.logger.info("When max_fraction is smaller than or equal to 1.0, set `exclude_highly_expressed=True`.")
-        else:
-            super().__init__(sc.pp.normalize_total, exclude_highly_expressed=False, **kwargs)
+        self.logger.info("max_fraction must be valid")
+        super().__init__(sc.pp.normalize_total, exclude_highly_expressed=True, max_fraction=max_fraction, **kwargs)
+        if max_fraction == 1.0:
             self.logger.info(
-                "When max_fraction is greater than 1.0, it is equivalent to setting exclude_highly_expressed=False.")
+                "When max_fraction is equal to 1.0, it is equivalent to setting exclude_highly_expressed=False.")
