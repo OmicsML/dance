@@ -550,9 +550,12 @@ class NormalizeTotal(AnnDataTransform):
         count equal to the median of total counts for observations (cells)
         before normalization.
     max_fraction
-        Set `exclude_highly_expressed=True`, consider cells as highly expressed
-        that have more counts than `max_fraction` of the original total counts
-        in at least one cell.When max_fraction is equal to 1.0, it is equivalent to setting exclude_highly_expressed=False
+        When max_fraction is smaller than or equal to 1.0, set `exclude_highly_expressed=True`,
+        consider cells as highly expressed that have more counts than `max_fraction`
+        of the original total counts in at least one cell.Exclude (very) highly expressed genes
+        for the computation of thenormalization factor (size factor) for each cell.
+        When max_fraction is greater than 1.0, it is equivalent to setting
+        exclude_highly_expressed=False.
     key_added
         Name of the field in `adata.obs` where the normalization factor is
         stored.
@@ -572,6 +575,13 @@ class NormalizeTotal(AnnDataTransform):
 
     """
 
-    def __init__(self, exclude_highly_expressed_and_max_fraction: Optional[float] = None, **kwargs):
-        super().__init__(sc.pp.normalize_total, exclude_highly_expressed=True,
-                         max_fraction=exclude_highly_expressed_and_max_fraction, **kwargs)
+    def __init__(self, max_fraction: Optional[float] = None, **kwargs):
+
+        self.logger.info("Max_fraction must be valid")
+        if max_fraction <= 1.0:
+            super().__init__(sc.pp.normalize_total, exclude_highly_expressed=True, max_fraction=max_fraction, **kwargs)
+            self.logger.info("When max_fraction is smaller than or equal to 1.0, set `exclude_highly_expressed=True`.")
+        else:
+            super().__init__(sc.pp.normalize_total, exclude_highly_expressed=False, **kwargs)
+            self.logger.info(
+                "When max_fraction is greater than 1.0, it is equivalent to setting exclude_highly_expressed=False.")
