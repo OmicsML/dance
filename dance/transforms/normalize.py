@@ -533,7 +533,7 @@ class NormalizeTotal(BaseTransform):
     so that every cell has the same total count after normalization.
     If choosing `target_sum=1e6`, this is CPM normalization.
 
-    If `exclude_highly_expressed=True`, very highly expressed genes are excluded
+    If max_fraction is less than 1.0, very highly expressed genes are excluded
     from the computation of the normalization factor (size factor) for each
     cell. This is meaningful as these can strongly influence the resulting
     normalized values for all other genes [Weinreb17]_.
