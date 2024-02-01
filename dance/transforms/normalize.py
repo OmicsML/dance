@@ -1,5 +1,7 @@
 import os
 from multiprocessing import Manager, Pool
+from numbers import Number
+from typing import Iterable
 
 import anndata as ad
 import numpy as np
@@ -488,7 +490,7 @@ def theta_ml(y, mu):
 
 
 @register_preprocessor("normalize")
-class Log1P(AnnDataTransform):
+class Log1P(BaseTransform):
     """Logarithmize the data matrix.
 
     Computes :math:`X = \\log(X + 1)`,
@@ -496,9 +498,6 @@ class Log1P(AnnDataTransform):
 
     Parameters
     ----------
-    data
-        The (annotated) data matrix of shape `n_obs` × `n_vars`.
-        Rows correspond to cells and columns to genes.
     base
         Base of the logarithm. Natural logarithm is used by default.
     copy
@@ -520,12 +519,18 @@ class Log1P(AnnDataTransform):
 
     """
 
-    def __init__(self, **kwargs):
-        super().__init__(sc.pp.log1p, **kwargs)
+    def __init__(self, base: Optional[Number] = None, copy: bool = False, chunked: bool = None,
+                 chunk_size: Optional[int] = None, layer: Optional[str] = None, obsm: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.transform = AnnDataTransform(sc.pp.log1p, base=base, chunked=chunked, chunk_size=chunk_size, layer=layer,
+                                          obsm=obsm, copy=copy, **kwargs)
+
+    def __call__(self, data: Data):
+        self.transform(data=data)
 
 
 @register_preprocessor("normalize")
-class NormalizeTotal(AnnDataTransform):
+class NormalizeTotal(BaseTransform):
     """Normalize counts per cell.
 
     Normalize each cell by total counts over all genes,
@@ -542,9 +547,6 @@ class NormalizeTotal(AnnDataTransform):
 
     Params
     ------
-    adata
-        The annotated data matrix of shape `n_obs` × `n_vars`.
-        Rows correspond to cells and columns to genes.
     target_sum
         If `None`, after normalization, each observation (cell) has a total
         count equal to the median of total counts for observations (cells)
@@ -577,10 +579,18 @@ class NormalizeTotal(AnnDataTransform):
 
     """
 
-    def __init__(self, max_fraction: Optional[float] = None, **kwargs):
+    def __init__(self, target_sum: Optional[float] = None, max_fraction: float = 0.05, key_added: Optional[str] = None,
+                 layer: Optional[str] = None, layers: Union[Literal['all'], Iterable[str]] = None,
+                 layer_norm: Optional[str] = None, inplace: bool = True, copy: bool = False, **kwargs):
 
-        super().__init__(sc.pp.normalize_total, exclude_highly_expressed=True, max_fraction=max_fraction, **kwargs)
+        super().__init__(**kwargs)
+        self.transform = AnnDataTransform(sc.pp.normalize_total, target_sum=target_sum, key_added=key_added,
+                                          layer=layer, layers=layers, layer_norm=layer_norm, inplace=inplace, copy=copy,
+                                          exclude_highly_expressed=True, max_fraction=max_fraction)
         self.logger.info("max_fraction must be valid")
         if max_fraction == 1.0:
             self.logger.info(
                 "When max_fraction is equal to 1.0, it is equivalent to setting exclude_highly_expressed=False.")
+
+    def __call__(self, data: Data):
+        self.transform(data)
