@@ -945,6 +945,31 @@ class FilterGenesScanpyOrder(BaseTransform):
 
 @register_preprocessor("filter", "gene")
 class HighlyVariableGenesRawCount(BaseTransform):
+    """Layer If provided, use `data.data.layers[layer]` for expression values instead of
+    `data.data.X`.
+
+    n_top_genes
+        Number of highly-variable genes to keep. Mandatory if `flavor='seurat_v3'`.
+    span
+        The fraction of the data (cells) used when estimating the variance in the loess
+        model fit if `flavor='seurat_v3'`.
+    subset
+        Inplace subset to highly-variable genes if `True` otherwise merely indicate
+        highly variable genes.
+    inplace
+        Whether to place calculated metrics in `.var` or return them.
+    batch_key
+        If specified, highly-variable genes are selected within each batch separately and merged.
+        This simple process avoids the selection of batch-specific genes and acts as a
+        lightweight batch correction method. For all flavors, genes are first sorted
+        by how many batches they are a HVG. For dispersion-based flavors ties are broken
+        by normalized dispersion. If `flavor = 'seurat_v3'`, ties are broken by the median
+        (across batches) rank based on within-batch normalized variance.
+    check_values
+        Check if counts in selected layer are integers. A Warning is returned if set to True.
+        Only used if `flavor='seurat_v3'`.
+
+    """
 
     def __init__(self, layer: Optional[str] = None, n_top_genes: Optional[int] = None, span: Optional[float] = 0.3,
                  subset: bool = False, inplace: bool = True, batch_key: Optional[str] = None, check_values: bool = True,
@@ -961,6 +986,34 @@ class HighlyVariableGenesRawCount(BaseTransform):
 
 @register_preprocessor("filter", "gene")
 class HighlyVariableGenesLogarithmizedByTopGenes(BaseTransform):
+    """Layer If provided, use `data.data.layers[layer]` for expression values instead of
+    `data.data.X`.
+
+    n_top_genes
+        Number of highly-variable genes to keep.
+    n_bins
+        Number of bins for binning the mean gene expression. Normalization is
+        done with respect to each bin. If just a single gene falls into a bin,
+        the normalized dispersion is artificially set to 1. You'll be informed
+        about this if you set `settings.verbosity = 4`.
+    flavor
+        Choose the flavor for identifying highly variable genes. For the dispersion
+        based methods in their default workflows, Seurat passes the cutoffs whereas
+        Cell Ranger passes `n_top_genes`.
+    subset
+        Inplace subset to highly-variable genes if `True` otherwise merely indicate
+        highly variable genes.
+    inplace
+        Whether to place calculated metrics in `.var` or return them.
+    batch_key
+        If specified, highly-variable genes are selected within each batch separately and merged.
+        This simple process avoids the selection of batch-specific genes and acts as a
+        lightweight batch correction method. For all flavors, genes are first sorted
+        by how many batches they are a HVG. For dispersion-based flavors ties are broken
+        by normalized dispersion. If `flavor = 'seurat_v3'`, ties are broken by the median
+        (across batches) rank based on within-batch normalized variance.
+
+    """
 
     def __init__(self, layer: Optional[str] = None, n_top_genes: Optional[int] = None, n_bins: int = 20,
                  flavor: Literal['seurat', 'cell_ranger'] = 'seurat', subset: bool = False, inplace: bool = True,
@@ -976,6 +1029,40 @@ class HighlyVariableGenesLogarithmizedByTopGenes(BaseTransform):
 
 @register_preprocessor("filter", "gene")
 class HighlyVariableGenesLogarithmizedByMeanAndDisp(BaseTransform):
+    """Layer If provided, use `data.data.layers[layer]` for expression values instead of
+    `data.data.X`.
+
+    min_mean
+        min_mean
+    max_mean
+        max_mean
+    min_disp
+        min_disp
+    max_disp
+        max_disp
+    n_bins
+        Number of bins for binning the mean gene expression. Normalization is
+        done with respect to each bin. If just a single gene falls into a bin,
+        the normalized dispersion is artificially set to 1. You'll be informed
+        about this if you set `settings.verbosity = 4`.
+    flavor
+        Choose the flavor for identifying highly variable genes. For the dispersion
+        based methods in their default workflows, Seurat passes the cutoffs whereas
+        Cell Ranger passes `n_top_genes`.
+    subset
+        Inplace subset to highly-variable genes if `True` otherwise merely indicate
+        highly variable genes.
+    inplace
+        Whether to place calculated metrics in `.var` or return them.
+    batch_key
+        If specified, highly-variable genes are selected within each batch separately and merged.
+        This simple process avoids the selection of batch-specific genes and acts as a
+        lightweight batch correction method. For all flavors, genes are first sorted
+        by how many batches they are a HVG. For dispersion-based flavors ties are broken
+        by normalized dispersion. If `flavor = 'seurat_v3'`, ties are broken by the median
+        (across batches) rank based on within-batch normalized variance.
+
+    """
 
     def __init__(self, layer: Optional[str] = None, min_disp: Optional[float] = 0.5, max_disp: Optional[float] = np.inf,
                  min_mean: Optional[float] = 0.0125, max_mean: Optional[float] = 3, n_bins: int = 20,
