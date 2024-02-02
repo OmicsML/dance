@@ -16,7 +16,8 @@ from dance.data.base import Data
 from dance.exceptions import DevError
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
-from dance.typing import Dict, GeneSummaryMode, List, Literal, Logger, Optional, Tuple, Union
+from dance.transforms.interface import AnnDataTransform
+from dance.typing import Dict, GeneSummaryMode, List, Literal, Logger, LogLevel, Optional, Tuple, Union
 
 
 def get_count(count_or_ratio: Optional[Union[float, int]], total: int) -> Optional[int]:
@@ -940,3 +941,47 @@ class FilterGenesScanpyOrder(BaseTransform):
         for parameter in self.filter_genes_order:
             geneScanpyOrder = self.geneScanpyOrderDict[parameter]
             geneScanpyOrder(data)
+
+
+@register_preprocessor("filter", "gene")
+class HighlyVariableGenesRawCount(BaseTransform):
+
+    def __init__(self, layer: Optional[str] = None, n_top_genes: Optional[int] = None, span: Optional[float] = 0.3,
+                 subset: bool = False, inplace: bool = True, batch_key: Optional[str] = None, check_values: bool = True,
+                 **kwargs):
+        super().__init__(**kwargs)
+        self.transform = AnnDataTransform(
+            sc.pp.highly_variable_genes, layer=layer, n_top_genes=n_top_genes, batch_key=batch_key,
+            check_values=check_values, span=span, subset=subset, inplace=inplace, flavor='seurat_v3'
+        )  #see https://scanpy.readthedocs.io/en/stable/generated/scanpy.pp.highly_variable_genes.html
+
+    def __call__(self, data: Data):
+        self.transform(data)
+
+
+@register_preprocessor("filter", "gene")
+class HighlyVariableGenesLogarithmizedByTopGenes(BaseTransform):
+
+    def __init__(self, layer: Optional[str] = None, n_top_genes: Optional[int] = None, n_bins: int = 20,
+                 flavor: Literal['seurat', 'cell_ranger'] = 'seurat', subset: bool = False, inplace: bool = True,
+                 batch_key: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.transform = AnnDataTransform(sc.pp.highly_variable_genes, layer=layer, n_top_genes=n_top_genes,
+                                          n_bins=n_bins, flavor=flavor, subset=subset, inplace=inplace,
+                                          batch_key=batch_key)
+
+    def __call__(self, data: Data):
+        self.transform(data)
+
+
+@register_preprocessor("filter", "gene")
+class HighlyVariableGenesLogarithmizedByMeanAndDisp(BaseTransform):
+
+    def __init__(self, layer: Optional[str] = None, min_disp: Optional[float] = 0.5, max_disp: Optional[float] = np.inf,
+                 min_mean: Optional[float] = 0.0125, max_mean: Optional[float] = 3, n_bins: int = 20,
+                 flavor: Literal['seurat', 'cell_ranger'] = 'seurat', subset: bool = False, inplace: bool = True,
+                 batch_key: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.transform = AnnDataTransform(sc.pp.highly_variable_genes, layer=layer, min_disp=min_disp,
+                                          max_disp=max_disp, min_mean=min_mean, max_mean=max_mean, n_bins=n_bins,
+                                          flavor=flavor, subset=subset, inplace=inplace, batch_key=batch_key)
