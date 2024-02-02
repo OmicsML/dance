@@ -971,7 +971,7 @@ class HighlyVariableGenesRawCount(BaseTransform):
 
     """
 
-    def __init__(self, layer: Optional[str] = None, n_top_genes: Optional[int] = None, span: Optional[float] = 0.3,
+    def __init__(self, layer: Optional[str] = None, n_top_genes: Optional[int] = 1000, span: Optional[float] = 0.3,
                  subset: bool = False, inplace: bool = True, batch_key: Optional[str] = None, check_values: bool = True,
                  **kwargs):
         super().__init__(**kwargs)

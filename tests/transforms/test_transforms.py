@@ -3,7 +3,9 @@ import pytest
 from anndata import AnnData
 
 from dance.data import Data
-from dance.transforms import FilterGenesScanpyOrder, Log1P, NormalizeTotal
+from dance.transforms import (FilterGenesScanpyOrder, HighlyVariableGenesLogarithmizedByMeanAndDisp,
+                              HighlyVariableGenesLogarithmizedByTopGenes, HighlyVariableGenesRawCount, Log1P,
+                              NormalizeTotal)
 
 SEED = 123
 
@@ -11,7 +13,7 @@ SEED = 123
 @pytest.fixture
 def toy_data():
     x = np.random.default_rng(SEED).random((50, 30)) * 100
-    adata = AnnData(X=x, dtype=np.int32)
+    adata = AnnData(X=x)
     data = Data(adata.copy())
     return adata, data
 
@@ -48,3 +50,18 @@ def test_log1p():
     assert (data.data.X == np.array([[0.6931471805599453, 0.6931471805599453, 0.6931471805599453],
                                      [0.6931471805599453, 0.6931471805599453, 0.6931471805599453],
                                      [1.3862943611198906, 0.0, 0.0]])).all()
+
+
+def test_hvg(toy_data, subtests):
+    adata, data = toy_data
+    with subtests.test("HighlyVariableGenesRawCount"):
+        hvg = HighlyVariableGenesRawCount(n_top_genes=20)
+        hvg(data)
+        assert adata.X.shape[0] == data.data.X.shape[0]
+    with subtests.test("HighlyVariableGenesLogarithmizedByTopGenes"):
+        hvg = HighlyVariableGenesLogarithmizedByTopGenes()
+        hvg(data)
+        assert adata.X.shape[0] == data.data.X.shape[0]
+    with subtests.test("HighlyVariableGenesLogarithmizedByMeanAndDisp"):
+        hvg(data)
+        assert adata.X.shape[0] == data.data.X.shape[0]
