@@ -12,7 +12,7 @@ SEED = 123
 
 @pytest.fixture
 def toy_data():
-    x = np.random.default_rng(SEED).random((50, 30)) * 100
+    x = np.random.default_rng(SEED).random((50, 30)) * 10
     adata = AnnData(X=x)
     data = Data(adata.copy())
     return adata, data
@@ -40,14 +40,15 @@ def test_filter_cells_scanpy_order(toy_data, order):
     assert X.shape[1] == data.shape[1]
 
 
-def test_hvg(toy_data, subtests):
-    adata, data = toy_data
+def test_hvg(subtests):
+    adata = AnnData(X=np.log1p(np.array(np.arange(1500)).reshape(50, 30)))
+    data = Data(adata.copy())
     with subtests.test("HighlyVariableGenesRawCount"):
         hvg = HighlyVariableGenesRawCount(n_top_genes=20)
         hvg(data)
         assert adata.X.shape[0] == data.data.X.shape[0]
     with subtests.test("HighlyVariableGenesLogarithmizedByTopGenes"):
-        hvg = HighlyVariableGenesLogarithmizedByTopGenes()
+        hvg = HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=20)
         hvg(data)
         assert adata.X.shape[0] == data.data.X.shape[0]
     with subtests.test("HighlyVariableGenesLogarithmizedByMeanAndDisp"):
