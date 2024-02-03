@@ -1,10 +1,11 @@
 import argparse
 import pprint
+from pathlib import Path
 from typing import get_args
 
-import wandb
 from sklearn.random_projection import GaussianRandomProjection
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
@@ -53,8 +54,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     logger.setLevel(args.log_level)
     logger.info(f"\n{pprint.pformat(vars(args))}")
-
-    pipeline_planer = PipelinePlaner.from_config_file(f"examples/tuning/cta_svm/{args.tune_mode}_tuning_config.yaml")
+    MAINDIR = Path(__file__).resolve().parent
+    PipelinePlaner.from_config_file(f"{MAINDIR}/{args.tune_mode}_tuning_config.yaml")
 
     def evaluate_pipeline():
         wandb.init()
