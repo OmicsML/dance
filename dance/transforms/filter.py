@@ -913,10 +913,11 @@ class FilterGenesScanpyOrder(BaseTransform):
 
     """
 
-    def __init__(self, order: list, min_counts: Optional[int] = None, min_cells: Optional[Union[float, int]] = None,
-                 max_counts: Optional[int] = None, max_cells: Optional[Union[float, int]] = None,
-                 split_name: Optional[str] = None, channel: Optional[str] = None, channel_type: Optional[str] = "X",
-                 **kwargs):
+    def __init__(self, order: list = ["min_counts", "min_cells", "max_counts",
+                                      "max_cells"], min_counts: Optional[int] = None,
+                 min_cells: Optional[Union[float, int]] = None, max_counts: Optional[int] = None,
+                 max_cells: Optional[Union[float, int]] = None, split_name: Optional[str] = None,
+                 channel: Optional[str] = None, channel_type: Optional[str] = "X", **kwargs):
         super().__init__(**kwargs)
         self.filter_genes_order = order
         self.logger.info(f"choose filter_genes_order f{self.filter_genes_order}")
@@ -1104,10 +1105,11 @@ class FilterCellsScanpyOrder(BaseTransform):
 
     """
 
-    def __init__(self, order: list, min_counts: Optional[int] = None, min_genes: Optional[Union[float, int]] = None,
-                 max_counts: Optional[int] = None, max_genes: Optional[Union[float, int]] = None,
-                 split_name: Optional[str] = None, channel: Optional[str] = None, channel_type: Optional[str] = "X",
-                 **kwargs):
+    def __init__(self, order: list = ["min_counts", "min_genes", "max_counts",
+                                      "max_genes"], min_counts: Optional[int] = None,
+                 min_genes: Optional[Union[float, int]] = None, max_counts: Optional[int] = None,
+                 max_genes: Optional[Union[float, int]] = None, split_name: Optional[str] = None,
+                 channel: Optional[str] = None, channel_type: Optional[str] = "X", **kwargs):
         super().__init__(**kwargs)
         self.filter_cells_order = order
         self.logger.info(f"choose filter_cells_order f{self.filter_cells_order}")
