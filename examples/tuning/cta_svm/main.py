@@ -85,7 +85,7 @@ if __name__ == "__main__":
 
         wandb.finish()
 
-    pipeline_planer.wandb_sweep_agent(evaluate_pipeline, sweep_id=args.sweep_id, count=1)
+    pipeline_planer.wandb_sweep_agent(evaluate_pipeline, sweep_id=args.sweep_id, count=3)
 """To reproduce SVM benchmarks, please refer to command lines below:
 
 Mouse Brain
