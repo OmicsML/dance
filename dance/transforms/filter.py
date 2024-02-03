@@ -913,8 +913,8 @@ class FilterGenesScanpyOrder(BaseTransform):
 
     """
 
-    def __init__(self, order: list = ["min_counts", "min_cells", "max_counts",
-                                      "max_cells"], min_counts: Optional[int] = None,
+    def __init__(self, order: "list[str]" = ["min_counts", "min_cells", "max_counts",
+                                             "max_cells"], min_counts: Optional[int] = None,
                  min_cells: Optional[Union[float, int]] = None, max_counts: Optional[int] = None,
                  max_cells: Optional[Union[float, int]] = None, split_name: Optional[str] = None,
                  channel: Optional[str] = None, channel_type: Optional[str] = "X", **kwargs):
@@ -1105,8 +1105,8 @@ class FilterCellsScanpyOrder(BaseTransform):
 
     """
 
-    def __init__(self, order: list = ["min_counts", "min_genes", "max_counts",
-                                      "max_genes"], min_counts: Optional[int] = None,
+    def __init__(self, order: "list[str]" = ["min_counts", "min_genes", "max_counts",
+                                             "max_genes"], min_counts: Optional[int] = None,
                  min_genes: Optional[Union[float, int]] = None, max_counts: Optional[int] = None,
                  max_genes: Optional[Union[float, int]] = None, split_name: Optional[str] = None,
                  channel: Optional[str] = None, channel_type: Optional[str] = "X", **kwargs):
