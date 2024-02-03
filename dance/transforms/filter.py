@@ -1072,3 +1072,6 @@ class HighlyVariableGenesLogarithmizedByMeanAndDisp(BaseTransform):
         self.transform = AnnDataTransform(sc.pp.highly_variable_genes, layer=layer, min_disp=min_disp,
                                           max_disp=max_disp, min_mean=min_mean, max_mean=max_mean, n_bins=n_bins,
                                           flavor=flavor, subset=subset, inplace=inplace, batch_key=batch_key)
+
+    def __call__(self, data: Data):
+        self.transform(data)

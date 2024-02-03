@@ -63,5 +63,6 @@ def test_hvg(toy_data, subtests):
         hvg(data)
         assert adata.X.shape[0] == data.data.X.shape[0]
     with subtests.test("HighlyVariableGenesLogarithmizedByMeanAndDisp"):
+        hvg = HighlyVariableGenesLogarithmizedByMeanAndDisp()
         hvg(data)
         assert adata.X.shape[0] == data.data.X.shape[0]
