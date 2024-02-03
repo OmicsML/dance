@@ -281,7 +281,7 @@ class PipelinePlaner(Pipeline):
         return self._wandb_config
 
     def _resolve_pelem_plan(self, idx: int) -> Optional[List[str]]:
-        # NOTE: we need to use the raw config here instaed of the pipeline
+        # NOTE: we need to use the raw config here instead of the pipeline
         # element action object, as obtained by self[idx], since that does not
         # contain the extra information about tuning settings we need, e.g.,
         # the inclusion and exlusion settings.

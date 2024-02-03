@@ -1,6 +1,11 @@
 type: preprocessor
 tune_mode: pipeline
 pipeline:
+  - type: filter.gene
+    include:
+      - HighlyVariableGenesLogarithmizedByMeanAndDisp
+      - HighlyVariableGenesRawCount
+      - HighlyVariableGenesLogarithmizedByTopGenes
   - type: feature.cell
     include:
       - WeightedFeaturePCA

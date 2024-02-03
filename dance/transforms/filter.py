@@ -1015,7 +1015,7 @@ class HighlyVariableGenesLogarithmizedByTopGenes(BaseTransform):
 
     """
 
-    def __init__(self, layer: Optional[str] = None, n_top_genes: Optional[int] = None, n_bins: int = 20,
+    def __init__(self, layer: Optional[str] = None, n_top_genes: Optional[int] = 1000, n_bins: int = 20,
                  flavor: Literal['seurat', 'cell_ranger'] = 'seurat', subset: bool = False, inplace: bool = True,
                  batch_key: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
