@@ -3,9 +3,9 @@ import pytest
 from anndata import AnnData
 
 from dance.data import Data
-from dance.transforms import (FilterGenesScanpyOrder, HighlyVariableGenesLogarithmizedByMeanAndDisp,
-                              HighlyVariableGenesLogarithmizedByTopGenes, HighlyVariableGenesRawCount, Log1P,
-                              NormalizeTotal)
+from dance.transforms import (FilterCellsScanpyOrder, FilterGenesScanpyOrder,
+                              HighlyVariableGenesLogarithmizedByMeanAndDisp, HighlyVariableGenesLogarithmizedByTopGenes,
+                              HighlyVariableGenesRawCount, Log1P, NormalizeTotal)
 
 SEED = 123
 
@@ -27,6 +27,17 @@ def test_filter_genes_scanpy_order(toy_data, order):
     filterGenesScanpy(data)
     X = data.get_feature(return_type="numpy")
     assert X.shape[0] == data.shape[0]
+
+
+@pytest.mark.parametrize('order',
+                         [['min_counts', 'min_genes', 'max_counts', 'max_genes'],
+                          ['max_counts', 'min_genes', 'min_counts'], ['min_genes', 'min_counts'], ['min_counts'], []])
+def test_filter_cells_scanpy_order(toy_data, order):
+    adata, data = toy_data
+    filterCellsScanpy = FilterCellsScanpyOrder(order=order, min_counts=1, min_genes=1, max_counts=3000, max_genes=20)
+    filterCellsScanpy(data)
+    X = data.get_feature(return_type="numpy")
+    assert X.shape[1] == data.shape[1]
 
 
 def test_normalize_total(subtests):

@@ -1075,3 +1075,60 @@ class HighlyVariableGenesLogarithmizedByMeanAndDisp(BaseTransform):
 
     def __call__(self, data: Data):
         self.transform(data)
+
+
+@register_preprocessor("filter", "cell")
+class FilterCellsScanpyOrder(BaseTransform):
+    """Scanpy filtering cell transformation with additional options.
+
+    Allow passing gene counts as ratio
+
+    Parameters
+    ----------
+    order
+        Order of (min_counts,min_genes,max_counts,max_genes),e.g["min_counts","min_genes","max_counts","max_genes"]
+    min_counts
+        Minimum number of counts required for a cell to be kept.
+    min_genes
+        Minimum number (or ratio) of genes required for a cell to be kept.
+    max_counts
+        Maximum number of counts required for a cell to be kept.
+    max_genes
+        Maximum number (or ratio) of genes required for a cell to be kept.
+    split_name
+        Which split to be used for filtering.
+    channel
+        Channel to be used for filtering.
+    channel_type
+        Channel type to be used for filtering.
+
+    """
+
+    def __init__(self, order: list, min_counts: Optional[int] = None, min_genes: Optional[Union[float, int]] = None,
+                 max_counts: Optional[int] = None, max_genes: Optional[Union[float, int]] = None,
+                 split_name: Optional[str] = None, channel: Optional[str] = None, channel_type: Optional[str] = "X",
+                 **kwargs):
+        super().__init__(**kwargs)
+        self.filter_cells_order = order
+        self.logger.info(f"choose filter_cells_order f{self.filter_cells_order}")
+        cellParameterDict = {
+            "min_counts": min_counts,
+            "min_genes": min_genes,
+            "max_counts": max_counts,
+            "max_genes": max_genes
+        }
+        if not set(order).issubset(set(cellParameterDict.keys())):
+            raise KeyError(f"An order should be in {cellParameterDict.keys()}")
+        self.cellScanpyOrderDict = {}
+        for key in cellParameterDict.keys():
+            if key in self.filter_cells_order:
+                self.cellScanpyOrderDict[key] = FilterCellsScanpy(**{key:
+                                                                     cellParameterDict[key]}, split_name=split_name,
+                                                                  channel=channel, channel_type=channel_type, **kwargs)
+            else:
+                self.logger.warning(f"{key} not in order,It makes no sense to set {key}")
+
+    def __call__(self, data: Data):
+        for parameter in self.filter_cells_order:
+            geneScanpyOrder = self.cellScanpyOrderDict[parameter]
+            geneScanpyOrder(data)
