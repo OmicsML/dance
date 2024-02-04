@@ -1,7 +1,5 @@
 import os
 from multiprocessing import Manager, Pool
-from numbers import Number
-from typing import Iterable
 
 import anndata as ad
 import numpy as np
@@ -17,7 +15,7 @@ from dance.data.base import Data
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.transforms.interface import AnnDataTransform
-from dance.typing import Dict, List, Literal, NormMode, Optional, Union
+from dance.typing import Dict, Iterable, List, Literal, NormMode, Number, Optional, Union
 from dance.utils.matrix import normalize
 
 

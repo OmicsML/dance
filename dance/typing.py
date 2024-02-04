@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import os
 from logging import Logger
+from numbers import Number
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
     Dict,
+    Iterable,
     Iterator,
     List,
     Literal,
@@ -48,12 +50,14 @@ __all__ = [
     "FeatType",
     "FileExistHandle",
     "GeneSummaryMode",
+    "Iterable",
     "Iterator",
     "List",
     "LogLevel",
     "Logger",
     "Mapping",
     "NormMode",
+    "Number",
     "Optional",
     "ReturnedFeat",
     "Sequence",
