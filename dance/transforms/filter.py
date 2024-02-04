@@ -973,7 +973,7 @@ class HighlyVariableGenesRawCount(BaseTransform):
     """
 
     def __init__(self, layer: Optional[str] = None, n_top_genes: Optional[int] = 1000, span: Optional[float] = 0.3,
-                 subset: bool = False, inplace: bool = True, batch_key: Optional[str] = None, check_values: bool = True,
+                 subset: bool = True, inplace: bool = True, batch_key: Optional[str] = None, check_values: bool = True,
                  **kwargs):
         super().__init__(**kwargs)
         self.transform = AnnDataTransform(
@@ -1017,7 +1017,7 @@ class HighlyVariableGenesLogarithmizedByTopGenes(BaseTransform):
     """
 
     def __init__(self, layer: Optional[str] = None, n_top_genes: Optional[int] = 1000, n_bins: int = 20,
-                 flavor: Literal['seurat', 'cell_ranger'] = 'seurat', subset: bool = False, inplace: bool = True,
+                 flavor: Literal['seurat', 'cell_ranger'] = 'seurat', subset: bool = True, inplace: bool = True,
                  batch_key: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
         self.transform = AnnDataTransform(sc.pp.highly_variable_genes, layer=layer, n_top_genes=n_top_genes,
@@ -1067,7 +1067,7 @@ class HighlyVariableGenesLogarithmizedByMeanAndDisp(BaseTransform):
 
     def __init__(self, layer: Optional[str] = None, min_disp: Optional[float] = 0.5, max_disp: Optional[float] = np.inf,
                  min_mean: Optional[float] = 0.0125, max_mean: Optional[float] = 3, n_bins: int = 20,
-                 flavor: Literal['seurat', 'cell_ranger'] = 'seurat', subset: bool = False, inplace: bool = True,
+                 flavor: Literal['seurat', 'cell_ranger'] = 'seurat', subset: bool = True, inplace: bool = True,
                  batch_key: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
         self.transform = AnnDataTransform(sc.pp.highly_variable_genes, layer=layer, min_disp=min_disp,
