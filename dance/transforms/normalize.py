@@ -490,7 +490,7 @@ def theta_ml(y, mu):
 
 
 @register_preprocessor("normalize")
-class Log1P(BaseTransform):
+class Log1P(AnnDataTransform):
     """Logarithmize the data matrix.
 
     Computes :math:`X = \\log(X + 1)`,
@@ -513,20 +513,21 @@ class Log1P(BaseTransform):
     obsm
         Entry of obsm to transform.
 
+    See also
+    --------
+    This is a wrapper for
+    https://scanpy.readthedocs.io/en/stable/generated/scanpy.pp.log1p.html
+
     """
 
     def __init__(self, base: Optional[Number] = None, copy: bool = False, chunked: bool = None,
                  chunk_size: Optional[int] = None, layer: Optional[str] = None, obsm: Optional[str] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.transform = AnnDataTransform(sc.pp.log1p, base=base, chunked=chunked, chunk_size=chunk_size, layer=layer,
-                                          obsm=obsm, copy=copy, **kwargs)
-
-    def __call__(self, data: Data):
-        self.transform(data=data)
+        super().__init__(sc.pp.log1p, base=base, chunked=chunked, chunk_size=chunk_size, layer=layer, obsm=obsm,
+                         copy=copy, **kwargs)
 
 
 @register_preprocessor("normalize")
-class NormalizeTotal(BaseTransform):
+class NormalizeTotal(AnnDataTransform):
     """Normalize counts per cell.
 
     Normalize each cell by total counts over all genes,
@@ -536,10 +537,7 @@ class NormalizeTotal(BaseTransform):
     If max_fraction is less than 1.0, very highly expressed genes are excluded
     from the computation of the normalization factor (size factor) for each
     cell. This is meaningful as these can strongly influence the resulting
-    normalized values for all other genes [Weinreb17]_.
-
-    Similar functions are used, for example, by Seurat [Satija15]_, Cell Ranger
-    [Zheng17]_ or SPRING [Weinreb17]_.
+    normalized values for all other genes.
 
     Params
     ------
@@ -567,20 +565,20 @@ class NormalizeTotal(BaseTransform):
     copy
         Whether to modify copied input object. Not compatible with inplace=False.
 
+
+    See also
+    --------
+    This is a wrapper for
+    https://scanpy.readthedocs.io/en/stable/generated/scanpy.pp.normalize_total.html
+
     """
 
     def __init__(self, target_sum: Optional[float] = None, max_fraction: float = 0.05, key_added: Optional[str] = None,
                  layer: Optional[str] = None, layers: Union[Literal['all'], Iterable[str]] = None,
                  layer_norm: Optional[str] = None, inplace: bool = True, copy: bool = False, **kwargs):
+        super().__init__(sc.pp.normalize_total, target_sum=target_sum, key_added=key_added, layer=layer, layers=layers,
+                         layer_norm=layer_norm, inplace=inplace, copy=copy, exclude_highly_expressed=True,
+                         max_fraction=max_fraction)
 
-        super().__init__(**kwargs)
-        self.transform = AnnDataTransform(sc.pp.normalize_total, target_sum=target_sum, key_added=key_added,
-                                          layer=layer, layers=layers, layer_norm=layer_norm, inplace=inplace, copy=copy,
-                                          exclude_highly_expressed=True, max_fraction=max_fraction)
-        self.logger.info("max_fraction must be valid")
         if max_fraction == 1.0:
-            self.logger.info(
-                "When max_fraction is equal to 1.0, it is equivalent to setting exclude_highly_expressed=False.")
-
-    def __call__(self, data: Data):
-        self.transform(data)
+            self.logger.info("max_fraction set to 1.0, this is equivalent to setting exclude_highly_expressed=False.")
