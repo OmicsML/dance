@@ -576,7 +576,7 @@ class NormalizeTotal(AnnDataTransform):
                  layer_norm: Optional[str] = None, inplace: bool = True, copy: bool = False, **kwargs):
         super().__init__(sc.pp.normalize_total, target_sum=target_sum, key_added=key_added, layer=layer, layers=layers,
                          layer_norm=layer_norm, inplace=inplace, copy=copy, exclude_highly_expressed=True,
-                         max_fraction=max_fraction)
+                         max_fraction=max_fraction, **kwargs)
 
         if max_fraction == 1.0:
             self.logger.info("max_fraction set to 1.0, this is equivalent to setting exclude_highly_expressed=False.")

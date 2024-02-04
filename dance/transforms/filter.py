@@ -17,7 +17,7 @@ from dance.exceptions import DevError
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.transforms.interface import AnnDataTransform
-from dance.typing import Dict, GeneSummaryMode, List, Literal, Logger, LogLevel, Optional, Tuple, Union
+from dance.typing import Dict, GeneSummaryMode, List, Literal, Logger, Optional, Tuple, Union
 from dance.utils import default
 
 
@@ -1002,7 +1002,8 @@ class HighlyVariableGenesRawCount(AnnDataTransform):
                  subset: bool = True, inplace: bool = True, batch_key: Optional[str] = None, check_values: bool = True,
                  **kwargs):
         super().__init__(sc.pp.highly_variable_genes, layer=layer, n_top_genes=n_top_genes, batch_key=batch_key,
-                         check_values=check_values, span=span, subset=subset, inplace=inplace, flavor="seurat_v3")
+                         check_values=check_values, span=span, subset=subset, inplace=inplace, flavor="seurat_v3",
+                         **kwargs)
 
 
 @register_preprocessor("filter", "gene")
@@ -1049,7 +1050,7 @@ class HighlyVariableGenesLogarithmizedByTopGenes(AnnDataTransform):
                  flavor: Literal["seurat", "cell_ranger"] = "seurat", subset: bool = True, inplace: bool = True,
                  batch_key: Optional[str] = None, **kwargs):
         super().__init__(sc.pp.highly_variable_genes, layer=layer, n_top_genes=n_top_genes, n_bins=n_bins,
-                         flavor=flavor, subset=subset, inplace=inplace, batch_key=batch_key)
+                         flavor=flavor, subset=subset, inplace=inplace, batch_key=batch_key, **kwargs)
 
 
 @register_preprocessor("filter", "gene")
@@ -1104,7 +1105,7 @@ class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
                  batch_key: Optional[str] = None, **kwargs):
         super().__init__(sc.pp.highly_variable_genes, layer=layer, min_disp=min_disp, max_disp=max_disp,
                          min_mean=min_mean, max_mean=max_mean, n_bins=n_bins, flavor=flavor, subset=subset,
-                         inplace=inplace, batch_key=batch_key)
+                         inplace=inplace, batch_key=batch_key, **kwargs)
 
 
 @register_preprocessor("filter", "cell")
