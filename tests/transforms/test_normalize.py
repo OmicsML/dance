@@ -31,5 +31,5 @@ def test_log1p(assert_ary_isclose):
     log1p(data)
 
     ans = np.log1p(x)
-    assert data.data.X.shape[0] == adata.X.shape[0]
+    assert data.data.X.shape == adata.X.shape
     assert_ary_isclose(data.data.X, ans)

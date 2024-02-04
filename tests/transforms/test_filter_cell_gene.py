@@ -43,7 +43,7 @@ def test_filter_genes_scanpy_order(toy_data, order, assert_ary_isclose):
         sc.pp.filter_genes(adata, **{i: kwargs[i]})
     ans = adata.X
 
-    assert data.data.X.shape[0] == ans.shape[0]
+    assert data.data.X.shape == ans.shape
     assert_ary_isclose(data.data.X, ans)
 
 
@@ -67,7 +67,7 @@ def test_filter_cells_scanpy_order(toy_data, order, assert_ary_isclose):
         sc.pp.filter_cells(adata, **{i: kwargs[i]})
     ans = adata.X
 
-    assert data.data.X.shape[0] == ans.shape[0]
+    assert data.data.X.shape == ans.shape
     assert_ary_isclose(data.data.X, ans)
 
     with subtests.test("HighlyVariableGenesRawCount"):
