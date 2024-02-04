@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import scanpy as sc
 from anndata import AnnData
 
 from dance.data import Data
@@ -32,12 +33,18 @@ def toy_data():
         [],
     ],
 )
-def test_filter_genes_scanpy_order(toy_data, order):
+def test_filter_genes_scanpy_order(toy_data, order, assert_ary_isclose):
     adata, data = toy_data
-    filterGenesScanpy = FilterGenesScanpyOrder(order=order, min_counts=1, min_cells=1, max_counts=3000, max_cells=20)
+    kwargs = dict(min_counts=1, min_cells=1, max_counts=3000, max_cells=20)
+    filterGenesScanpy = FilterGenesScanpyOrder(order=order, **kwargs)
     filterGenesScanpy(data)
-    X = data.get_feature(return_type="numpy")
-    assert X.shape[0] == data.shape[0]
+
+    for i in order:
+        sc.pp.filter_genes(adata, **{i: kwargs[i]})
+    ans = adata.X
+
+    assert data.data.X.shape[0] == ans.shape[0]
+    assert_ary_isclose(data.data.X, ans)
 
 
 @pytest.mark.parametrize(
@@ -50,17 +57,18 @@ def test_filter_genes_scanpy_order(toy_data, order):
         [],
     ],
 )
-def test_filter_cells_scanpy_order(toy_data, order):
+def test_filter_cells_scanpy_order(toy_data, order, assert_ary_isclose):
     adata, data = toy_data
-    filterCellsScanpy = FilterCellsScanpyOrder(order=order, min_counts=1, min_genes=1, max_counts=3000, max_genes=20)
+    kwargs = dict(min_counts=1, min_genes=1, max_counts=3000, max_genes=20)
+    filterCellsScanpy = FilterCellsScanpyOrder(order=order, **kwargs)
     filterCellsScanpy(data)
-    X = data.get_feature(return_type="numpy")
-    assert X.shape[1] == data.shape[1]
 
+    for i in order:
+        sc.pp.filter_cells(adata, **{i: kwargs[i]})
+    ans = adata.X
 
-def test_hvg(subtests):
-    adata = AnnData(X=np.log1p(np.array(np.arange(1500)).reshape(50, 30)))
-    data = Data(adata.copy())
+    assert data.data.X.shape[0] == ans.shape[0]
+    assert_ary_isclose(data.data.X, ans)
 
     with subtests.test("HighlyVariableGenesRawCount"):
         hvg = HighlyVariableGenesRawCount(n_top_genes=20)
