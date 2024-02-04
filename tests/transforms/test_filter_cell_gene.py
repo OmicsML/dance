@@ -26,12 +26,12 @@ def toy_data():
 
 
 @pytest.mark.parametrize(
-    'order',
+    "order",
     [
-        ['min_counts', 'min_cells', 'max_counts', 'max_cells'],
-        ['max_counts', 'min_cells', 'min_counts'],
-        ['min_cells', 'min_counts'],
-        ['min_counts'],
+        ["min_counts", "min_cells", "max_counts", "max_cells"],
+        ["max_counts", "min_cells", "min_counts"],
+        ["min_cells", "min_counts"],
+        ["min_counts"],
         [],
     ],
 )
@@ -50,12 +50,12 @@ def test_filter_genes_scanpy_order(toy_data, order, assert_ary_isclose):
 
 
 @pytest.mark.parametrize(
-    'order',
+    "order",
     [
-        ['min_counts', 'min_genes', 'max_counts', 'max_genes'],
-        ['max_counts', 'min_genes', 'min_counts'],
-        ['min_genes', 'min_counts'],
-        ['min_counts'],
+        ["min_counts", "min_genes", "max_counts", "max_genes"],
+        ["max_counts", "min_genes", "min_counts"],
+        ["min_genes", "min_counts"],
+        ["min_counts"],
         [],
     ],
 )
@@ -73,18 +73,23 @@ def test_filter_cells_scanpy_order(toy_data, order, assert_ary_isclose):
     assert_ary_isclose(data.data.X, ans)
 
 
-@pytest.mark.parametrize("hvg_func,sc_hvg_func", [
-    (partial(HighlyVariableGenesRawCount,
-             n_top_genes=20), partial(sc.pp.highly_variable_genes, n_top_genes=20, flavor="seurat_v3", subset=True)),
-    (
-        partial(HighlyVariableGenesLogarithmizedByTopGenes, n_top_genes=20),
-        partial(sc.pp.highly_variable_genes, n_top_genes=20, flavor="seurat", subset=True),
-    ),
-    (
-        HighlyVariableGenesLogarithmizedByMeanAndDisp,
-        partial(sc.pp.highly_variable_genes, flavor="seurat", subset=True),
-    ),
-])
+@pytest.mark.parametrize(
+    "hvg_func,sc_hvg_func",
+    [
+        (
+            partial(HighlyVariableGenesRawCount, n_top_genes=20),
+            partial(sc.pp.highly_variable_genes, n_top_genes=20, flavor="seurat_v3", subset=True),
+        ),
+        (
+            partial(HighlyVariableGenesLogarithmizedByTopGenes, n_top_genes=20),
+            partial(sc.pp.highly_variable_genes, n_top_genes=20, flavor="seurat", subset=True),
+        ),
+        (
+            HighlyVariableGenesLogarithmizedByMeanAndDisp,
+            partial(sc.pp.highly_variable_genes, flavor="seurat", subset=True),
+        ),
+    ],
+)  # yapf: disable
 def test_hvg(hvg_func, sc_hvg_func, assert_ary_isclose):
     adata = AnnData(X=np.log1p(np.array(np.arange(1500)).reshape(50, 30)))
     data = Data(adata.copy())
