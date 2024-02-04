@@ -1,3 +1,5 @@
+from functools import partial
+
 import numpy as np
 import pytest
 import scanpy as sc
@@ -70,17 +72,29 @@ def test_filter_cells_scanpy_order(toy_data, order, assert_ary_isclose):
     assert data.data.X.shape == ans.shape
     assert_ary_isclose(data.data.X, ans)
 
-    with subtests.test("HighlyVariableGenesRawCount"):
-        hvg = HighlyVariableGenesRawCount(n_top_genes=20)
-        hvg(data)
-        assert adata.X.shape[0] == data.data.X.shape[0]
 
-    with subtests.test("HighlyVariableGenesLogarithmizedByTopGenes"):
-        hvg = HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=20)
-        hvg(data)
-        assert adata.X.shape[0] == data.data.X.shape[0]
+@pytest.mark.parametrize("hvg_func,sc_hvg_func", [
+    (partial(HighlyVariableGenesRawCount,
+             n_top_genes=20), partial(sc.pp.highly_variable_genes, n_top_genes=20, flavor="seurat_v3", subset=True)),
+    (
+        partial(HighlyVariableGenesLogarithmizedByTopGenes, n_top_genes=20),
+        partial(sc.pp.highly_variable_genes, n_top_genes=20, flavor="seurat", subset=True),
+    ),
+    (
+        HighlyVariableGenesLogarithmizedByMeanAndDisp,
+        partial(sc.pp.highly_variable_genes, flavor="seurat", subset=True),
+    ),
+])
+def test_hvg(hvg_func, sc_hvg_func, assert_ary_isclose):
+    adata = AnnData(X=np.log1p(np.array(np.arange(1500)).reshape(50, 30)))
+    data = Data(adata.copy())
 
-    with subtests.test("HighlyVariableGenesLogarithmizedByMeanAndDisp"):
-        hvg = HighlyVariableGenesLogarithmizedByMeanAndDisp()
-        hvg(data)
-        assert adata.X.shape[0] == data.data.X.shape[0]
+    hvg = hvg_func()
+    hvg(data)
+
+    # Expected results
+    sc_hvg_func(adata)
+    ans = adata.X
+
+    assert data.data.X.shape == ans.shape
+    assert_ary_isclose(data.data.X, ans)
