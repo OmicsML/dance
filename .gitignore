@@ -1,9 +1,15 @@
-build/
-
-.tox
-
-__pycache__
-
-*.egg*
-
+# System
 .DS_Store
+
+# Tools
+.tox
+wandb
+
+# Data
+*.pkl
+*.pt
+
+# Build
+*.egg*
+__pycache__
+build/

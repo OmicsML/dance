@@ -12,10 +12,13 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import MinMaxScaler, PolynomialFeatures
 
 from dance import logger as default_logger
+from dance.data.base import Data
 from dance.exceptions import DevError
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
+from dance.transforms.interface import AnnDataTransform
 from dance.typing import Dict, GeneSummaryMode, List, Literal, Logger, Optional, Tuple, Union
+from dance.utils import default
 
 
 def get_count(count_or_ratio: Optional[Union[float, int]], total: int) -> Optional[int]:
@@ -884,3 +887,293 @@ def gini_func(x, weights=None):
     G_RSV = G_num / mean_RSV
 
     return G_RSV
+
+
+@register_preprocessor("filter", "gene")
+class FilterGenesScanpyOrder(BaseTransform):
+    """Scanpy filtering gene transformation with additional options.
+
+    Parameters
+    ----------
+    order
+        Order of (min_counts, min_cells, max_counts, max_cells). For example,
+        ``["min_counts", "min_cells", "max_counts", "max_cells"]`` or ``["max_counts", "min_cells"]``.
+        If not set, will be set by default to ``["min_counts", "min_cells", "max_counts", "max_cells"]``.
+    min_counts
+        Minimum number of counts required for a gene to be kept.
+    min_cells
+        Minimum number (or ratio) of cells required for a gene to be kept.
+    max_counts
+        Maximum number of counts required for a gene to be kept.
+    max_cells
+        Maximum number (or ratio) of cells required for a gene to be kept.
+    split_name
+        Which split to be used for filtering.
+    channel
+        Channel to be used for filtering.
+    channel_type
+        Channel type to be used for filtering.
+
+    """
+
+    def __init__(
+        self,
+        order: Optional[List[str]] = None,
+        min_counts: Optional[int] = None,
+        min_cells: Optional[Union[float, int]] = None,
+        max_counts: Optional[int] = None,
+        max_cells: Optional[Union[float, int]] = None,
+        split_name: Optional[str] = None,
+        channel: Optional[str] = None,
+        channel_type: Optional[str] = "X",
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.filter_genes_order = default(
+            order,
+            ["min_counts", "min_cells", "max_counts", "max_cells"],
+        )
+        self.logger.info(f"Filter genes order: {self.filter_genes_order}")
+        geneParameterDict = {
+            "min_counts": min_counts,
+            "min_cells": min_cells,
+            "max_counts": max_counts,
+            "max_cells": max_cells
+        }
+        if not set(order).issubset(set(geneParameterDict.keys())):
+            raise KeyError(f"An order should be in {geneParameterDict.keys()}")
+        self.geneScanpyOrderDict = {}
+        for key in geneParameterDict.keys():
+            if key in self.filter_genes_order:
+                self.geneScanpyOrderDict[key] = FilterGenesScanpy(
+                    **{key: geneParameterDict[key]},
+                    split_name=split_name,
+                    channel=channel,
+                    channel_type=channel_type,
+                    **kwargs,
+                )
+            else:
+                self.logger.warning(f"{key} not in order,It makes no sense to set {key}")
+
+    def __call__(self, data: Data):
+        for parameter in self.filter_genes_order:
+            geneScanpyOrder = self.geneScanpyOrderDict[parameter]
+            geneScanpyOrder(data)
+
+
+@register_preprocessor("filter", "gene")
+class HighlyVariableGenesRawCount(AnnDataTransform):
+    """Filter for highly variable genes using raw count matrix.
+
+    Parameters
+    ----------
+    layer
+        If provided, then use `data.data.layers[layer]` for expression values instead of the
+        default ``data.data.X``.
+    n_top_genes
+        Number of highly-variable genes to keep.
+    span
+        The fraction of the data (cells) used when estimating the variance in the loess
+        model fit if `flavor="seurat_v3"`.
+    subset
+        Inplace subset to highly-variable genes if `True` otherwise merely indicate
+        highly variable genes.
+    inplace
+        Whether to place calculated metrics in `.var` or return them.
+    batch_key
+        If specified, highly-variable genes are selected within each batch separately and merged.
+        This simple process avoids the selection of batch-specific genes and acts as a
+        lightweight batch correction method. For all flavors, genes are first sorted
+        by how many batches they are a HVG. For dispersion-based flavors ties are broken
+        by normalized dispersion. If `flavor = "seurat_v3"`, ties are broken by the median
+        (across batches) rank based on within-batch normalized variance.
+    check_values
+        Check if counts in selected layer are integers. A Warning is returned if set to True.
+        Only used if `flavor="seurat_v3"`.
+
+    See also
+    --------
+    This is a wrapper for
+    https://scanpy.readthedocs.io/en/stable/generated/scanpy.pp.highly_variable_genes.html
+
+    """
+
+    def __init__(self, layer: Optional[str] = None, n_top_genes: Optional[int] = 1000, span: Optional[float] = 0.3,
+                 subset: bool = True, inplace: bool = True, batch_key: Optional[str] = None, check_values: bool = True,
+                 **kwargs):
+        super().__init__(sc.pp.highly_variable_genes, layer=layer, n_top_genes=n_top_genes, batch_key=batch_key,
+                         check_values=check_values, span=span, subset=subset, inplace=inplace, flavor="seurat_v3",
+                         **kwargs)
+
+
+@register_preprocessor("filter", "gene")
+class HighlyVariableGenesLogarithmizedByTopGenes(AnnDataTransform):
+    """Filter for highly variable genes based on top genes.
+
+    Parameters
+    ----------
+    layer
+        If provided, then use data.data.layers[layer]` for expression values instead of the
+        default `data.data.X`.
+    n_top_genes
+        Number of highly-variable genes to keep.
+    n_bins
+        Number of bins for binning the mean gene expression. Normalization is
+        done with respect to each bin. If just a single gene falls into a bin,
+        the normalized dispersion is artificially set to 1. You'll be informed
+        about this if you set `settings.verbosity = 4`.
+    flavor
+        Choose the flavor for identifying highly variable genes. For the dispersion
+        based methods in their default workflows, Seurat passes the cutoffs whereas
+        Cell Ranger passes `n_top_genes`.
+    subset
+        Inplace subset to highly-variable genes if `True` otherwise merely indicate
+        highly variable genes.
+    inplace
+        Whether to place calculated metrics in `.var` or return them.
+    batch_key
+        If specified, highly-variable genes are selected within each batch separately and merged.
+        This simple process avoids the selection of batch-specific genes and acts as a
+        lightweight batch correction method. For all flavors, genes are first sorted
+        by how many batches they are a HVG. For dispersion-based flavors ties are broken
+        by normalized dispersion. If `flavor = "seurat_v3"`, ties are broken by the median
+        (across batches) rank based on within-batch normalized variance.
+
+    See also
+    --------
+    This is a wrapper for
+    https://scanpy.readthedocs.io/en/stable/generated/scanpy.pp.highly_variable_genes.html
+
+    """
+
+    def __init__(self, layer: Optional[str] = None, n_top_genes: Optional[int] = 1000, n_bins: int = 20,
+                 flavor: Literal["seurat", "cell_ranger"] = "seurat", subset: bool = True, inplace: bool = True,
+                 batch_key: Optional[str] = None, **kwargs):
+        super().__init__(sc.pp.highly_variable_genes, layer=layer, n_top_genes=n_top_genes, n_bins=n_bins,
+                         flavor=flavor, subset=subset, inplace=inplace, batch_key=batch_key, **kwargs)
+
+
+@register_preprocessor("filter", "gene")
+class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
+    """Filter for highly variable genes based on mean and dispersion.
+
+    Parameters
+    ----------
+    layer
+        If provided, then use data.data.layers[layer]` for expression values instead of the
+        default `data.data.X`.
+    min_mean
+        min_mean
+    max_mean
+        max_mean
+    min_disp
+        min_disp
+    max_disp
+        max_disp
+    n_bins
+        Number of bins for binning the mean gene expression. Normalization is
+        done with respect to each bin. If just a single gene falls into a bin,
+        the normalized dispersion is artificially set to 1. You'll be informed
+        about this if you set `settings.verbosity = 4`.
+    flavor
+        Choose the flavor for identifying highly variable genes. For the dispersion
+        based methods in their default workflows, Seurat passes the cutoffs whereas
+        Cell Ranger passes `n_top_genes`.
+    subset
+        Inplace subset to highly-variable genes if `True` otherwise merely indicate
+        highly variable genes.
+    inplace
+        Whether to place calculated metrics in `.var` or return them.
+    batch_key
+        If specified, highly-variable genes are selected within each batch separately and merged.
+        This simple process avoids the selection of batch-specific genes and acts as a
+        lightweight batch correction method. For all flavors, genes are first sorted
+        by how many batches they are a HVG. For dispersion-based flavors ties are broken
+        by normalized dispersion. If `flavor = "seurat_v3"`, ties are broken by the median
+        (across batches) rank based on within-batch normalized variance.
+
+    See also
+    --------
+    This is a wrapper for
+    https://scanpy.readthedocs.io/en/stable/generated/scanpy.pp.highly_variable_genes.html
+
+    """
+
+    def __init__(self, layer: Optional[str] = None, min_disp: Optional[float] = 0.5, max_disp: Optional[float] = np.inf,
+                 min_mean: Optional[float] = 0.0125, max_mean: Optional[float] = 3, n_bins: int = 20,
+                 flavor: Literal["seurat", "cell_ranger"] = "seurat", subset: bool = True, inplace: bool = True,
+                 batch_key: Optional[str] = None, **kwargs):
+        super().__init__(sc.pp.highly_variable_genes, layer=layer, min_disp=min_disp, max_disp=max_disp,
+                         min_mean=min_mean, max_mean=max_mean, n_bins=n_bins, flavor=flavor, subset=subset,
+                         inplace=inplace, batch_key=batch_key, **kwargs)
+
+
+@register_preprocessor("filter", "cell")
+class FilterCellsScanpyOrder(BaseTransform):
+    """Scanpy filtering cell transformation with additional options.
+
+    Allow passing gene counts as ratio
+
+    Parameters
+    ----------
+    order
+        Order of (min_counts, min_cells, max_counts, max_cells). For example,
+        ``["min_counts", "min_genes", "max_counts", "max_genes"]`` or ``["max_counts", "min_genes"]``.
+        If not set, will be set by default to ``["min_counts", "min_genes", "max_counts", "max_genes"]``.
+    min_counts
+        Minimum number of counts required for a cell to be kept.
+    min_genes
+        Minimum number (or ratio) of genes required for a cell to be kept.
+    max_counts
+        Maximum number of counts required for a cell to be kept.
+    max_genes
+        Maximum number (or ratio) of genes required for a cell to be kept.
+    split_name
+        Which split to be used for filtering.
+    channel
+        Channel to be used for filtering.
+    channel_type
+        Channel type to be used for filtering.
+
+    """
+
+    def __init__(
+        self,
+        order: Optional[List[str]] = None,
+        min_counts: Optional[int] = None,
+        min_genes: Optional[Union[float, int]] = None,
+        max_counts: Optional[int] = None,
+        max_genes: Optional[Union[float, int]] = None,
+        split_name: Optional[str] = None,
+        channel: Optional[str] = None,
+        channel_type: Optional[str] = "X",
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.filter_cells_order = default(order, ["min_counts", "min_genes", "max_counts", "max_genes"])
+        self.logger.info(f"Filter cells order: {self.filter_cells_order}")
+        cellParameterDict = {
+            "min_counts": min_counts,
+            "min_genes": min_genes,
+            "max_counts": max_counts,
+            "max_genes": max_genes
+        }
+        if not set(order).issubset(set(cellParameterDict.keys())):
+            raise KeyError(f"An order should be in {cellParameterDict.keys()}")
+        self.cellScanpyOrderDict = {}
+        for key in cellParameterDict.keys():
+            if key in self.filter_cells_order:
+                self.cellScanpyOrderDict[key] = FilterCellsScanpy(
+                    **{key: cellParameterDict[key]},
+                    split_name=split_name,
+                    channel=channel,
+                    channel_type=channel_type,
+                    **kwargs,
+                )
+            else:
+                self.logger.warning(f"{key} not in order,It makes no sense to set {key}")
+
+    def __call__(self, data: Data):
+        for parameter in self.filter_cells_order:
+            geneScanpyOrder = self.cellScanpyOrderDict[parameter]
+            geneScanpyOrder(data)

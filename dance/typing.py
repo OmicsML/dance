@@ -2,8 +2,24 @@ from __future__ import annotations
 
 import os
 from logging import Logger
-from typing import (TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Literal, Mapping, Optional, Sequence, Set,
-                    Tuple, Type, Union)
+from numbers import Number
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Literal,
+    Mapping,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+    Union,
+)
 
 import numpy as np
 from anndata import AnnData
@@ -34,12 +50,14 @@ __all__ = [
     "FeatType",
     "FileExistHandle",
     "GeneSummaryMode",
+    "Iterable",
     "Iterator",
     "List",
     "LogLevel",
     "Logger",
     "Mapping",
     "NormMode",
+    "Number",
     "Optional",
     "ReturnedFeat",
     "Sequence",

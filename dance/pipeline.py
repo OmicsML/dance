@@ -3,6 +3,7 @@ import inspect
 from copy import deepcopy
 from pprint import pformat
 
+import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
 from dance import logger
@@ -280,7 +281,7 @@ class PipelinePlaner(Pipeline):
         return self._wandb_config
 
     def _resolve_pelem_plan(self, idx: int) -> Optional[List[str]]:
-        # NOTE: we need to use the raw config here instaed of the pipeline
+        # NOTE: we need to use the raw config here instead of the pipeline
         # element action object, as obtained by self[idx], since that does not
         # contain the extra information about tuning settings we need, e.g.,
         # the inclusion and exlusion settings.
@@ -796,3 +797,66 @@ class PipelinePlaner(Pipeline):
         wandb.agent(sweep_id, function=function, entity=entity, project=project, count=count)
 
         return entity, project, sweep_id
+
+
+def save_summary_data(entity, project, sweep_id, summary_file_path):
+    """Download sweep summary data from wandb and save to file.
+
+    The returned dataframe includes running time, results and corresponding hyperparameters, etc.
+
+    .. code-block:: txt
+
+        -----------------------------------------------------------------------------------------------------------
+        | id         | _runtime    | _timestamp      | acc   | _step      | _wandb_runtime   | pipeline.0         |
+        -----------------------------------------------------------------------------------------------------------
+        | 9hwsyumy   | 42.445390   | 1706685331.70  | 0.707  | 0          | 41               | WeightedFeaturePCA |
+        | sgsr5mw4   | 38.906304   | 1706685272.85  | 0.707  | 0          | 37               | WeightedFeaturePCA |
+        | czvfm197   | 48.190104   | 1706685217.47  | 0.331  | 0          | 47               | CellPCA            |
+        -----------------------------------------------------------------------------------------------------------
+
+    """
+    try:
+        import wandb
+    except ModuleNotFoundError as e:
+        raise ImportError("wandb not installed. Please install wandb first: $ pip install wandb") from e
+
+    sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
+    summary_data = []
+
+    for run in sweep.runs:
+        result = dict(run.summary._json_dict).copy()
+        result.update(run.config)
+        result.update({"id": run.id})
+        summary_data.append(flatten_dict(result))  # get result and config
+    ans = pd.DataFrame(summary_data).set_index(["id"])
+
+    if summary_file_path is not None:
+        ans.to_csv(summary_file_path)  # save file
+
+    return ans
+
+
+def flatten_dict(d, *, parent_key="", sep="_"):
+    """Flatten the nested dictionary, and the parent key is the prefix of the child.
+
+    Parameters
+    ----------
+    d
+        The dictionary to flatten.
+    parent_key
+        Parent key.
+    sep
+        Delimiter to use to string parent keys together with the current key.
+
+    return:
+      flattened dictionary
+
+    """
+    items = []
+    for k, v in d.items():
+        new_key = parent_key + sep + k if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)

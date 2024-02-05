@@ -13,8 +13,15 @@ import pandas as pd
 
 from dance import logger
 from dance.modules.base import BaseRegressionMethod
-from dance.transforms import (CellTopicProfile, Compose, FilterGenesCommon, FilterGenesMarker, FilterGenesMatch,
-                              FilterGenesPercentile, SetConfig)
+from dance.transforms import (
+    CellTopicProfile,
+    Compose,
+    FilterGenesCommon,
+    FilterGenesMarker,
+    FilterGenesMatch,
+    FilterGenesPercentile,
+    SetConfig,
+)
 from dance.typing import Any, LogLevel, Optional, Tuple
 from dance.utils.matrix import normalize, pairwise_distance
 

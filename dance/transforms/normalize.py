@@ -4,6 +4,7 @@ from multiprocessing import Manager, Pool
 import anndata as ad
 import numpy as np
 import pandas as pd
+import scanpy as sc
 import scipy.sparse as sp
 import statsmodels.discrete.discrete_model
 import statsmodels.nonparametric.kernel_regression
@@ -13,7 +14,8 @@ from scipy import stats
 from dance.data.base import Data
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
-from dance.typing import Dict, List, Literal, NormMode, Optional, Union
+from dance.transforms.interface import AnnDataTransform
+from dance.typing import Dict, Iterable, List, Literal, NormMode, Number, Optional, Union
 from dance.utils.matrix import normalize
 
 
@@ -483,3 +485,98 @@ def theta_ml(y, mu):
     t0 = max(t0, 0)
 
     return t0
+
+
+@register_preprocessor("normalize")
+class Log1P(AnnDataTransform):
+    """Logarithmize the data matrix.
+
+    Computes :math:`X = \\log(X + 1)`,
+    where :math:`log` denotes the natural logarithm unless a different base is given.
+
+    Parameters
+    ----------
+    base
+        Base of the logarithm. Natural logarithm is used by default.
+    copy
+        If an :class:`~anndata.AnnData` is passed, determines whether a copy
+        is returned.
+    chunked
+        Process the data matrix in chunks, which will save memory.
+        Applies only to :class:`~anndata.AnnData`.
+    chunk_size
+        `n_obs` of the chunks to process the data in.
+    layer
+        Entry of layers to transform.
+    obsm
+        Entry of obsm to transform.
+
+    See also
+    --------
+    This is a wrapper for
+    https://scanpy.readthedocs.io/en/stable/generated/scanpy.pp.log1p.html
+
+    """
+
+    def __init__(self, base: Optional[Number] = None, copy: bool = False, chunked: bool = None,
+                 chunk_size: Optional[int] = None, layer: Optional[str] = None, obsm: Optional[str] = None, **kwargs):
+        super().__init__(sc.pp.log1p, base=base, chunked=chunked, chunk_size=chunk_size, layer=layer, obsm=obsm,
+                         copy=copy, **kwargs)
+
+
+@register_preprocessor("normalize")
+class NormalizeTotal(AnnDataTransform):
+    """Normalize counts per cell.
+
+    Normalize each cell by total counts over all genes,
+    so that every cell has the same total count after normalization.
+    If choosing `target_sum=1e6`, this is CPM normalization.
+
+    If max_fraction is less than 1.0, very highly expressed genes are excluded
+    from the computation of the normalization factor (size factor) for each
+    cell. This is meaningful as these can strongly influence the resulting
+    normalized values for all other genes.
+
+    Params
+    ------
+    target_sum
+        If `None`, after normalization, each observation (cell) has a total
+        count equal to the median of total counts for observations (cells)
+        before normalization.
+    max_fraction
+        Consider cells as highly expressed that have more counts than `max_fraction`
+        of the original total counts in at least one cell.
+        Exclude (very) highly expressed genes for the computation of the
+        normalization factor (size factor) for each cell. A gene is considered
+        highly expressed, if it has more than `max_fraction` of the total counts
+        in at least one cell. The not-excluded genes will sum up to
+        `target_sum`.When max_fraction is equal to 1.0, it is equivalent to setting
+        exclude_highly_expressed=False.
+    key_added
+        Name of the field in `adata.obs` where the normalization factor is
+        stored.
+    layer
+        Layer to normalize instead of `X`. If `None`, `X` is normalized.
+    inplace
+        Whether to update `adata` or return dictionary with normalized copies of
+        `adata.X` and `adata.layers`.
+    copy
+        Whether to modify copied input object. Not compatible with inplace=False.
+
+
+    See also
+    --------
+    This is a wrapper for
+    https://scanpy.readthedocs.io/en/stable/generated/scanpy.pp.normalize_total.html
+
+    """
+
+    def __init__(self, target_sum: Optional[float] = None, max_fraction: float = 0.05, key_added: Optional[str] = None,
+                 layer: Optional[str] = None, layers: Union[Literal['all'], Iterable[str]] = None,
+                 layer_norm: Optional[str] = None, inplace: bool = True, copy: bool = False, **kwargs):
+        super().__init__(sc.pp.normalize_total, target_sum=target_sum, key_added=key_added, layer=layer, layers=layers,
+                         layer_norm=layer_norm, inplace=inplace, copy=copy, exclude_highly_expressed=True,
+                         max_fraction=max_fraction, **kwargs)
+
+        if max_fraction == 1.0:
+            self.logger.info("max_fraction set to 1.0, this is equivalent to setting exclude_highly_expressed=False.")

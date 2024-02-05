@@ -7,8 +7,14 @@ import scanpy as sc
 from dance import logger
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.scgnn2 import ScGNN2
-from dance.transforms import (AnnDataTransform, CellwiseMaskData, Compose, FilterCellsScanpy, FilterGenesScanpy,
-                              FilterGenesTopK)
+from dance.transforms import (
+    AnnDataTransform,
+    CellwiseMaskData,
+    Compose,
+    FilterCellsScanpy,
+    FilterGenesScanpy,
+    FilterGenesTopK,
+)
 from dance.utils import set_seed
 
 if __name__ == "__main__":

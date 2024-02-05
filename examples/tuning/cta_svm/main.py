@@ -1,5 +1,6 @@
 import argparse
 import pprint
+from pathlib import Path
 from typing import get_args
 
 import wandb
@@ -8,7 +9,7 @@ from sklearn.random_projection import GaussianRandomProjection
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
-from dance.pipeline import PipelinePlaner
+from dance.pipeline import PipelinePlaner, save_summary_data
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import LogLevel
@@ -53,8 +54,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     logger.setLevel(args.log_level)
     logger.info(f"\n{pprint.pformat(vars(args))}")
-
-    pipeline_planer = PipelinePlaner.from_config_file(f"{args.tune_mode}_tuning_config.yaml")
+    MAINDIR = Path(__file__).resolve().parent
+    pipeline_planer = PipelinePlaner.from_config_file(f"{MAINDIR}/{args.tune_mode}_tuning_config.yaml")
 
     def evaluate_pipeline():
         wandb.init()
@@ -84,7 +85,9 @@ if __name__ == "__main__":
 
         wandb.finish()
 
-    pipeline_planer.wandb_sweep_agent(evaluate_pipeline, sweep_id=args.sweep_id, count=3)
+    entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(evaluate_pipeline, sweep_id=args.sweep_id, count=3)
+
+    # save_summary_data(entity,project,sweep_id,"temp.csv")
 """To reproduce SVM benchmarks, please refer to command lines below:
 
 Mouse Brain

@@ -19,8 +19,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dance.modules.base import BaseRegressionMethod
-from dance.transforms import (AnnDataTransform, CellwiseMaskData, Compose, FilterCellsScanpy, FilterGenesScanpy,
-                              SaveRaw, SetConfig)
+from dance.transforms import (
+    AnnDataTransform,
+    CellwiseMaskData,
+    Compose,
+    FilterCellsScanpy,
+    FilterGenesScanpy,
+    SaveRaw,
+    SetConfig,
+)
 from dance.transforms.graph import FeatureFeatureGraph
 from dance.typing import LogLevel
 

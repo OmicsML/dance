@@ -25,8 +25,16 @@ from sklearn.metrics import adjusted_rand_score
 from torch.utils.data import DataLoader, TensorDataset
 
 from dance.modules.base import BaseRegressionMethod
-from dance.transforms import (AnnDataTransform, CellwiseMaskData, Compose, FilterCellsScanpy, FilterGenesScanpy,
-                              GeneHoldout, SaveRaw, SetConfig)
+from dance.transforms import (
+    AnnDataTransform,
+    CellwiseMaskData,
+    Compose,
+    FilterCellsScanpy,
+    FilterGenesScanpy,
+    GeneHoldout,
+    SaveRaw,
+    SetConfig,
+)
 from dance.typing import Any, List, LogLevel, Optional, Tuple
 
 

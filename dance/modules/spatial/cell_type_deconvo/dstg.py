@@ -20,8 +20,15 @@ from torch.nn.parameter import Parameter
 
 from dance import logger
 from dance.modules.base import BaseRegressionMethod
-from dance.transforms import (AnnDataTransform, Compose, FilterGenesCommon, PseudoMixture, RemoveSplit, ScaleFeature,
-                              SetConfig)
+from dance.transforms import (
+    AnnDataTransform,
+    Compose,
+    FilterGenesCommon,
+    PseudoMixture,
+    RemoveSplit,
+    ScaleFeature,
+    SetConfig,
+)
 from dance.transforms.graph import DSTGraph
 from dance.typing import Any, LogLevel, Optional, Tuple
 from dance.utils import get_device
