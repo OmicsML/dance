@@ -1,4 +1,4 @@
-name: Test Examples
+name: Test Benchmark Examples
 
 on:
   workflow_dispatch:
@@ -20,6 +20,9 @@ jobs:
       fail-fast: false
 
     steps:
+      # XXX: [2024-02-05] MSU ICER HPCC GLIBC 2.27 not setup correctly to be
+      # compatible with higher version GCCcore (11.x). Need to use v3 to
+      # bypass the GLIBC 2.27 error due to node20 for now.
       - uses: actions/checkout@v3
 
       - name: Check CUDA
@@ -31,4 +34,4 @@ jobs:
           pip install tox -U
 
       - name: Test with tox
-        run: tox -e py38-gpu-test
+        run: tox -e py39-gpu-lightbenchtest
