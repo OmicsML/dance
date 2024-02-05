@@ -20,7 +20,10 @@ jobs:
       fail-fast: false
 
     steps:
-      - uses: actions/checkout@v4
+      # XXX: [2024-02-05] MSU ICER HPCC GLIBC 2.27 not setup correctly to be
+      # compatible with higher version GCCcore (11.x). Need to use v3 to
+      # bypass the GLIBC 2.27 error due to node20 for now.
+      - uses: actions/checkout@v3
 
       - name: Check CUDA
         run: nvcc -V
