@@ -1,4 +1,4 @@
-name: Test Examples
+name: Test Benchmark Examples
 
 on:
   workflow_dispatch:
@@ -31,4 +31,4 @@ jobs:
           pip install tox -U
 
       - name: Test with tox
-        run: tox -e py38-gpu-test
+        run: tox -e py39-gpu-lightbenchtest
