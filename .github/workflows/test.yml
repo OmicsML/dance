@@ -14,7 +14,7 @@ jobs:
       matrix:
         # os: [ubuntu-latest, windows-latest]
         os: [ubuntu-latest]
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.9', '3.10', '3.11'] # PyTorch does not support '3.12' yet [2024-02-05]
 
     steps:
       - uses: actions/checkout@v4
