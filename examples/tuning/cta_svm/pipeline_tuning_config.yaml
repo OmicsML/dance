@@ -38,7 +38,7 @@ pipeline:
 wandb:
   entity: danceteam
   project: dance-dev
-  method: bayes
+  method: grid #try grid to provide a comprehensive search
   metric:
     name: acc  # val/acc
     goal: maximize
