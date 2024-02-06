@@ -3,9 +3,9 @@ import pprint
 from pathlib import Path
 from typing import get_args
 
-import wandb
 from sklearn.random_projection import GaussianRandomProjection
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
@@ -83,7 +83,8 @@ if __name__ == "__main__":
         # Train and evaluate the model
         model.fit(x_train, y_train_converted)
         score = model.score(x_valid, y_valid)
-        wandb.log({"acc": score})
+        test_score = model.score(x_test, y_test)
+        wandb.log({"acc": score, "test_acc": test_score})
 
         wandb.finish()
 
