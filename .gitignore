@@ -13,3 +13,5 @@ wandb
 *.egg*
 __pycache__
 build/
+
+data
