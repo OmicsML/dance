@@ -94,7 +94,7 @@ if __name__ == "__main__":
 """To reproduce SVM benchmarks, please refer to command lines below:
 
 Mouse Brain
-$ python main.py --tune_mode (pipeline/params) --species mouse --tissue Brain --train_dataset 753 3285 --test_dataset 2695
+$ python main.py --tune_mode (pipeline/params) --species mouse --tissue Brain --train_dataset 753 --test_dataset 2695 --valid_dataset 3285
 
 Mouse Spleen
 $ python main.py --tune_mode (pipeline/params) --species mouse --tissue Spleen --train_dataset 1970 --test_dataset 1759
