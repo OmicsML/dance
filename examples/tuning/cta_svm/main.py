@@ -3,9 +3,9 @@ import pprint
 from pathlib import Path
 from typing import get_args
 
-import wandb
 from sklearn.random_projection import GaussianRandomProjection
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
@@ -46,7 +46,8 @@ if __name__ == "__main__":
     parser.add_argument("--species", default="mouse")
     parser.add_argument("--test_dataset", nargs="+", default=[2695], type=int, help="list of dataset id")
     parser.add_argument("--tissue", default="Brain")  # TODO: Add option for different tissue name for train/test
-    parser.add_argument("--train_dataset", nargs="+", default=[753, 3285], type=int, help="list of dataset id")
+    parser.add_argument("--train_dataset", nargs="+", default=[753], type=int, help="list of dataset id")
+    parser.add_argument("--valid_dataset", nargs="+", default=[3285], type=int, help="list of dataset id")
     parser.add_argument("--tune_mode", default="pipeline", choices=["pipeline", "params"])
     parser.add_argument("--seed", type=int, default=10)
     parser.add_argument("--sweep_id", type=str, default=None)
@@ -65,7 +66,8 @@ if __name__ == "__main__":
 
         # Load raw data
         data = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
-                                         species=args.species, tissue=args.tissue).load_data()
+                                         valid_dataset=args.valid_dataset, species=args.species, tissue=args.tissue,
+                                         data_dir="./data").load_data()
 
         # Prepare preprocessing pipeline and apply it to data
         kwargs = {args.tune_mode: dict(wandb.config)}
@@ -77,10 +79,10 @@ if __name__ == "__main__":
         x_train, y_train = data.get_train_data()
         y_train_converted = y_train.argmax(1)  # convert one-hot representation into label index representation
         x_test, y_test = data.get_test_data()
-
+        x_valid, y_valid = data.get_val_data()
         # Train and evaluate the model
         model.fit(x_train, y_train_converted)
-        score = model.score(x_test, y_test)
+        score = model.score(x_valid, y_valid)
         wandb.log({"acc": score})
 
         wandb.finish()
