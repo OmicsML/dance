@@ -1,5 +1,6 @@
 import importlib
 import inspect
+import itertools
 from copy import deepcopy
 from pprint import pformat
 
@@ -860,3 +861,54 @@ def flatten_dict(d, *, parent_key="", sep="_"):
         else:
             items.append((new_key, v))
     return dict(items)
+
+
+def generate_combinations_with_required_elements(elements, required_indexes):
+    required_elements = [elements[required_index] for required_index in required_indexes]
+    optional_elements = [x for x in elements if x not in required_elements]
+
+    # Sort optional elements in the same order as in the `elements` list
+    optional_elements.sort(key=lambda x: elements.index(x))
+
+    # Generate all possible combinations of optional elements
+    optional_combinations = []
+    for i in range(len(optional_elements) + 1):
+        optional_combinations += list(itertools.combinations(optional_elements, i))
+
+    # Combine required elements with optional combinations to get all possible combinations
+    all_combinations = []
+    for optional_combination in optional_combinations:
+        all_combinations.append([x for x in elements if x in required_elements or x in optional_combination])
+    return all_combinations
+
+
+def generate_subsets(path, tune_mode, save_directory, required_indexes):
+    """Generated automatically subsets for original yaml. YAML can be generated
+    automatically, but obviously still need to manually tune the parameters to avoid
+    errors. When part of the process is omitted, the function parameters need to be
+    changed, otherwise an error will be reported, so different YAML adjustments are
+    required.
+
+    Parameters
+    ----------
+    path
+        origin yaml file path
+    tune_mode
+        tune mode
+    save_directory
+        subset yaml files save path
+    required_types
+        required_types in origin yaml
+
+    """
+    config = OmegaConf.load(path)
+    dict_config = DictConfig(config)
+    nums = dict_config[tune_mode]
+    subsets = generate_combinations_with_required_elements(nums, required_indexes)
+    configs = []
+    for index, subset in enumerate(subsets):
+        config_copy = dict_config.copy()
+        config_copy[tune_mode] = subset
+        configs.append(config_copy)
+        OmegaConf.save(config_copy, f"{save_directory}_{index}_{tune_mode}_tuning_config.yaml")
+    return configs
