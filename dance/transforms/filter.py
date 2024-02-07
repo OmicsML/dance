@@ -490,7 +490,7 @@ class FilterGenesTopK(FilterGenes):
 
     def __init__(
         self,
-        num_genes: int,
+        num_genes: int = 1000,
         top: bool = True,
         *,
         mode: GeneSummaryMode = "cv",
@@ -636,8 +636,8 @@ class FilterGenesRegression(BaseTransform):
     """
     _DISPLAY_ATTRS = ("num_genes", )
 
-    def __init__(self, method: str, num_genes: int = 400, *, channel: Optional[str] = None, mod: Optional[str] = None,
-                 skip_count_check: bool = False, **kwargs):
+    def __init__(self, method: str = "enclasc", num_genes: int = 1000, *, channel: Optional[str] = None,
+                 mod: Optional[str] = None, skip_count_check: bool = False, **kwargs):
         super().__init__(**kwargs)
 
         self.num_genes = num_genes
@@ -940,7 +940,7 @@ class FilterGenesScanpyOrder(BaseTransform):
             "max_counts": max_counts,
             "max_cells": max_cells
         }
-        if not set(order).issubset(set(geneParameterDict.keys())):
+        if not set(self.filter_genes_order).issubset(set(geneParameterDict.keys())):
             raise KeyError(f"An order should be in {geneParameterDict.keys()}")
         self.geneScanpyOrderDict = {}
         for key in geneParameterDict.keys():
@@ -1158,7 +1158,7 @@ class FilterCellsScanpyOrder(BaseTransform):
             "max_counts": max_counts,
             "max_genes": max_genes
         }
-        if not set(order).issubset(set(cellParameterDict.keys())):
+        if not set(self.filter_cells_order).issubset(set(cellParameterDict.keys())):
             raise KeyError(f"An order should be in {cellParameterDict.keys()}")
         self.cellScanpyOrderDict = {}
         for key in cellParameterDict.keys():

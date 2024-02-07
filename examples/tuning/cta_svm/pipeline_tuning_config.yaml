@@ -16,6 +16,17 @@ pipeline:
       - FilterGenesTopK
       - FilterGenesRegression
       - FilterGenesScanpyOrder
+    default_params:
+      FilterGenesScanpyOrder:
+        order: ["min_counts", "min_cells", "max_counts", "max_cells"]
+        min_counts: 1
+        max_counts: 5000
+        min_cells: 1
+        max_cells: 5000
+      HighlyVariableGenesLogarithmizedByMeanAndDisp:
+        max_mean: 20
+        min_disp: 0.1
+        min_mean: 0
   - type: feature.cell
     include:
       - WeightedFeaturePCA
