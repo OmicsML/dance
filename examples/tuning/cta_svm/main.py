@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
         wandb.finish()
 
-    entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(evaluate_pipeline, sweep_id=args.sweep_id, count=12)
+    entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(evaluate_pipeline, sweep_id=args.sweep_id, count=112)
 
     # save_summary_data(entity,project,sweep_id,"temp.csv")
 """To reproduce SVM benchmarks, please refer to command lines below:
