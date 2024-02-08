@@ -5,4 +5,4 @@ python examples/tuning/cta_svm/main.py --config_dir=config_yamls/subset_3_  --co
 python examples/tuning/cta_svm/main.py --config_dir=config_yamls/subset_4_  --count=28 > data/4.log 2>&1 &
 python examples/tuning/cta_svm/main.py --config_dir=config_yamls/subset_5_  --count=16 > data/5.log 2>&1 &
 python examples/tuning/cta_svm/main.py --config_dir=config_yamls/subset_6_  --count=28 > data/6.log 2>&1 &
-#python examples/tuning/cta_svm/main.py --config_dir=config_yamls/subset_7_  --count=112 > data/7.log 2>&1 & # Already running by default
+python examples/tuning/cta_svm/main.py --config_dir=config_yamls/subset_7_  --count=112 > data/7.log 2>&1 &
