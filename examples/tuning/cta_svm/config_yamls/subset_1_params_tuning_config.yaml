@@ -1,6 +1,6 @@
-type: preprocessor
-tune_mode: params
-pipeline:
-  - type: normalize
-    target: ScTransform
-    params_to_tune:
+# type: preprocessor
+# tune_mode: params
+# pipeline:
+#   - type: normalize
+#     target: ScTransform
+#     params_to_tune:
