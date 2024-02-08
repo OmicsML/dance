@@ -889,6 +889,8 @@ def generate_subsets(path, tune_mode, save_directory, required_indexes):
     changed, otherwise an error will be reported, so different YAML adjustments are
     required.
 
+    Conveniently generate multiple yamls, such as generating (A, B, C), (A, B), (A, C), (B, C), (A), (B), (C) yaml based on pipelines A, B, and C for the next experiment
+
     Parameters
     ----------
     path
