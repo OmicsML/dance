@@ -7,6 +7,11 @@ pipeline:
       - ScTransform
       - Log1P
       - NormalizeTotal
+    default_params:
+      ScTransform:
+        min_cells: 2
+        n_genes: 3000
+        bin_size: 200
   - type: misc
     target: SetConfig
     params:
