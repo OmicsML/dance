@@ -3,9 +3,9 @@ import pprint
 from pathlib import Path
 from typing import get_args
 
-import wandb
 from sklearn.random_projection import GaussianRandomProjection
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     parser.add_argument("--valid_dataset", nargs="+", default=[3285], type=int, help="list of dataset id")
     parser.add_argument("--tune_mode", default="pipeline", choices=["pipeline", "params"])
     parser.add_argument("--seed", type=int, default=10)
-    parser.add_argument("--count", type=int, default=10)
+    parser.add_argument("--count", type=int, default=28)
     parser.add_argument("--config_dir", default="", type=str)
     parser.add_argument("--sweep_id", type=str, default=None)
 

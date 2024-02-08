@@ -250,15 +250,14 @@ class ScTransform(BaseTransform):
 
         return idx_dict
 
-    def __call__(self, data):
+    def __call__(self, data: Data):
         if isinstance(data.data.X, sp.spmatrix):
             self.logger.warning("Native support for sparse matrix is not implemented yet, "
                                 "converting to dense array explicitly.")
             data.data.X = data.data.X.A
-
         # idx_dict = self._get_idx_dict(data)
         # for name, idx in idx_dict.items():
-        selected_data = data.data.copy()
+        selected_data = data.data
         X = selected_data.X.copy()
         X = sp.csr_matrix(X)
         X.eliminate_zeros()
@@ -398,8 +397,6 @@ class ScTransform(BaseTransform):
         w[gn] = genes_log_gmean
         selected_data.var['genes_step1_sct'] = z
         selected_data.var['log10_gmean_sct'] = w
-        data.data = selected_data
-        return selected_data
 
 
 def gmean(X, axis=0, eps=1):
