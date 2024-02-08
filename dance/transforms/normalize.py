@@ -15,7 +15,7 @@ from dance.data.base import Data
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.transforms.interface import AnnDataTransform
-from dance.typing import Dict, Iterable, List, Literal, NormMode, Number, Optional, Union
+from dance.typing import Dict, Iterable, List, Literal, LogLevel, NormMode, Number, Optional, Union
 from dance.utils.matrix import normalize
 
 
@@ -398,7 +398,7 @@ class ScTransform(BaseTransform):
         w[gn] = genes_log_gmean
         selected_data.var['genes_step1_sct'] = z
         selected_data.var['log10_gmean_sct'] = w
-
+        data.data = selected_data
         return selected_data
 
 
@@ -580,3 +580,15 @@ class NormalizeTotal(AnnDataTransform):
 
         if max_fraction == 1.0:
             self.logger.info("max_fraction set to 1.0, this is equivalent to setting exclude_highly_expressed=False.")
+
+
+@register_preprocessor("normalize")
+class NormalizePlaceHolder(BaseTransform):
+    """Maybe you can also use a blank placeholder to express skipping, which is more
+    concise and needs to be discussed."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __call__(self, data: Data) -> Data:
+        return super().__call__(data)
