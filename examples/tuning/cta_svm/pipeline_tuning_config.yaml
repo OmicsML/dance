@@ -3,10 +3,10 @@ tune_mode: pipeline
 pipeline:
   - type: normalize
     include:
-      # - ScaleFeature
+      - ScaleFeature
       - ScTransform
-      # - Log1P
-      # - NormalizeTotal
+      - Log1P
+      - NormalizeTotal
   - type: filter.gene
     include:
       - HighlyVariableGenesLogarithmizedByMeanAndDisp
