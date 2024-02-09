@@ -13,7 +13,7 @@ trap "echo Try using source instead of sh? && trap - ERR && return 1" ERR
 
 # Check required version specification input
 if [ -z $1 ]; then
-    echo "ERROR: Please provide CUDA information, available options are [cpu,cu118]"
+    echo "ERROR: Please provide CUDA information, available options are [cpu,cu118,cu121]"
     return 1
 fi
 
@@ -27,23 +27,22 @@ else
 fi
 
 # Torch related dependency versions
-PYTORCH_VERSION=2.0.1
-TORCHVISION_VERSION=0.15.2
-TORCHAUDIO_VERSION=2.0.2
-PYG_VERSION=2.3.1
-DGL_VERSION=1.1.2
+PYTORCH_VERSION=2.1.1  # XXX: pytorch>=2.1.2 incompatibility issue with DGL 1.1.3 (https://discuss.dgl.ai/t/4244)
+TORCHVISION_VERSION=0.16.1
+PYG_VERSION=2.4.0
+DGL_VERSION=1.1.3  # XXX: 2.0.0 issues with GLIBC (https://github.com/dmlc/dgl/issues/7046)
 
 # Set CUDA variable (use CPU if not set)
 CUDA_VERSION=${1:-cpu}
 echo "CUDA_VERSION=${CUDA_VERSION}"
 case $CUDA_VERSION in
     cpu)
-        PYTORCH_CUDA_OPT="cpuonly -c pytorch"
-        DGL_CHANNEL="dglteam"
+        PYTORCH_CHANNEL="--index-url https://download.pytorch.org/whl/cpu"
+        DGL_CHANNEL="-f https://data.dgl.ai/wheels/repo.html"
         ;;
-    cu118)
-        PYTORCH_CUDA_OPT="pytorch-cuda=11.8 -c pytorch -c nvidia"
-        DGL_CHANNEL="dglteam/label/cu118"
+    cu118 | cu121)
+        PYTORCH_CHANNEL="--index-url https://download.pytorch.org/whl/${CUDA_VERSION}"
+        DGL_CHANNEL="-f https://data.dgl.ai/wheels/${CUDA_VERSION}/repo.html"
         ;;
     *)
         echo "ERROR: Unrecognized CUDA_VERSION=${CUDA_VERSION}"
@@ -52,14 +51,13 @@ case $CUDA_VERSION in
 esac
 
 # Create environment
-conda create -n ${envname} python=3.9 -y
+conda create -n ${envname} python=3.11 -y
 conda activate ${envname}
 
 # Install CUDA enabled dependencies
-conda install pytorch=${PYTORCH_VERSION} torchvision=${TORCHVISION_VERSION} \
-    torchaudio=${TORCHAUDIO_VERSION} ${PYTORCH_CUDA_OPT} -y
-conda install pyg=${PYG_VERSION} -c pyg -y
-conda install dgl=${DGL_VERSION} -c ${DGL_CHANNEL} -y
+pip install torch==${PYTORCH_VERSION} torchvision=${TORCHVISION_VERSION} ${PYTORCH_CHANNEL}
+pip install torch_geometric==${PYG_VERSION}
+pip install dgl==${DGL_VERSION} ${DGL_CHANNEL}
 
 # Install the rest of the dependencies
 pip install -r requirements.txt
