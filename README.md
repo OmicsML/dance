@@ -134,23 +134,23 @@ source install.sh cu118 dance-env
 First create a conda environment for dance (optional)
 
 ```bash
-conda create -n dance python=3.8 -y && conda activate dance
+conda create -n dance python=3.11 -y && conda activate dance
 ```
 
 Then, install CUDA enabled packages (PyTorch, PyG, DGL):
 
 ```bash
-conda install pytorch=2.0.1 torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia -y
-conda install pyg=2.3.1 -c pyg -y
-conda install dgl=1.1.2 -c dglteam/label/cu118 -y
+pip install torch==2.1.1 torchvision==0.16.1 --index-url https://download.pytorch.org/whl/cu118
+pip install torch_geometric==2.4.0
+pip install dgl==1.1.3 -f https://data/dgl.ai/wheels/cu118/repo.html
 ```
 
 Alternatively, install these dependencies for CPU only:
 
 ```bash
-conda install pytorch=2.0.1 torchvision torchaudio cpuonly -c pytorch -y
-conda install pyg=2.3.1 -c pyg -y
-conda install dgl=1.1.2 -c dglteam -y
+pip install torch==2.1.1 torchvision==0.16.1 --index-url https://download.pytorch.org/whl/cpu
+pip install torch_geometric==2.4.0
+pip install dgl==1.1.3 -f https://data/dgl.ai/wheels/repo.html
 ```
 
 For more information about installation or other CUDA version options, check out the installation pages for the corresponding packages
@@ -170,8 +170,7 @@ pip install pydance
 Or, install the latest dev version from source
 
 ```bash
-git clone https://github.com/OmicsML/dance.git
-cd dance
+git clone https://github.com/OmicsML/dance.git && cd dance
 pip install -e .
 ```
 
