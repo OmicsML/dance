@@ -58,7 +58,7 @@ class CellTypeAnnotationDataset(BaseDataset):
         self.data_dir = data_dir
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
-        self.valid_dataset = valid_dataset
+        self.valid_dataset = train_dataset if valid_dataset is None else valid_dataset
         self.species = species
         self.tissue = tissue
         self.train_dir = train_dir

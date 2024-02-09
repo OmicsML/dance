@@ -9,9 +9,10 @@ wandb
 *.pkl
 *.pt
 
+
 # Build
 *.egg*
 __pycache__
 build/
 
-data
+temp_data

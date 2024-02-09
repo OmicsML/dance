@@ -66,3 +66,5 @@ mouse,Brain,3285,valid,valid_mouse_Brain3285_celltype.csv,https://www.dropbox.co
 mouse,Brain,753,train,train_mouse_Brain753_celltype.csv,https://www.dropbox.com/s/x2katwk93z06sgw?dl=1,train_mouse_Brain753_data.csv,https://www.dropbox.com/s/3f3wbplgo3xa4ww?dl=1
 mouse,Kidney,4682,train,train_mouse_Kidney4682_celltype.csv,https://www.dropbox.com/s/3plrve7g9v428ec?dl=1,train_mouse_Kidney4682_data.csv,https://www.dropbox.com/s/olf5nirtieu1ikq?dl=1
 mouse,Spleen,1970,train,train_mouse_Spleen1970_celltype.csv,https://www.dropbox.com/s/3ea64vk546fjxvr?dl=1,train_mouse_Spleen1970_data.csv,https://www.dropbox.com/s/c4te0fr1qicqki8?dl=1
+mouse,Kidney,4682,valid,valid_mouse_Kidney4682_celltype.csv,https://www.dropbox.com/s/3plrve7g9v428ec?dl=1,valid_mouse_Kidney4682_data.csv,https://www.dropbox.com/s/olf5nirtieu1ikq?dl=1
+mouse,Spleen,1970,valid,valid_mouse_Spleen1970_celltype.csv,https://www.dropbox.com/s/3ea64vk546fjxvr?dl=1,valid_mouse_Spleen1970_data.csv,https://www.dropbox.com/s/c4te0fr1qicqki8?dl=1
