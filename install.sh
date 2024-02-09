@@ -30,7 +30,7 @@ fi
 PYTORCH_VERSION=2.1.1  # XXX: pytorch>=2.1.2 incompatibility issue with DGL 1.1.3 (https://discuss.dgl.ai/t/4244)
 TORCHVISION_VERSION=0.16.1
 PYG_VERSION=2.4.0
-DGL_VERSION=1.1.3  # XXX: 2.0.0 issues with GLIBC https://github.com/dmlc/dgl/issues/7046
+DGL_VERSION=1.1.3  # XXX: 2.0.0 issues with GLIBC (https://github.com/dmlc/dgl/issues/7046)
 
 # Set CUDA variable (use CPU if not set)
 CUDA_VERSION=${1:-cpu}
