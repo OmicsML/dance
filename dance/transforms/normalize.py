@@ -378,7 +378,7 @@ class ScTransform(BaseTransform):
         x, y = X.nonzero()
         y = np.array([d[i] for i in y])
         data = X.data
-        Xnew = sp.coo_matrix((data, (x, y)), shape=selected_data.shape).tocsr()
+        Xnew = sp.coo_matrix((data, (x, y)), shape=selected_data.shape).toarray()
         selected_data.X = Xnew
         for c in full_model_pars.columns:
             selected_data.var[c + '_sct'] = full_model_pars[c]
