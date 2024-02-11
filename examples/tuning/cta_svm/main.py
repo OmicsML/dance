@@ -3,9 +3,9 @@ import pprint
 from pathlib import Path
 from typing import get_args
 
-import wandb
 from sklearn.random_projection import GaussianRandomProjection
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
@@ -104,16 +104,5 @@ $ python main.py --tune_mode (pipeline/params) --species mouse --tissue Spleen -
 
 Mouse Kidney
 $ python main.py --tune_mode (pipeline/params) --species mouse --tissue Kidney --train_dataset 4682 --test_dataset 203
-
-"""
-"""
-The 3 processes with the highest test_acc in step 2
-+----------+-------+-------+----------------+----------+----------+----------------+-----------------------------------------------+------------+------------+
-|    id    |  acc  | _step | _wandb_runtime | _runtime | test_acc |   _timestamp   |                   pipeline.0                  | pipeline.1 | pipeline.2 |
-+----------+-------+-------+----------------+----------+----------+----------------+-----------------------------------------------+------------+------------+
-| xiw6kslu | 0.921 |   0   |      114       | 116.029  |  0.948   | 1707453391.309 |             FilterGenesScanpyOrder            |  CellPCA   |            |
-| 6xworzvg | 0.922 |   0   |       88       |  90.123  |  0.947   | 1707453507.545 |             FilterGenesScanpyOrder            |  CellSVD   |            |
-| usp2mgd2 |  0.93 |   0   |       36       |  37.643  |   0.94   | 1707454232.814 | HighlyVariableGenesLogarithmizedByMeanAndDisp |  CellSVD   |            |
-+----------+-------+-------+----------------+----------+----------+----------------+-----------------------------------------------+------------+------------+
 
 """
