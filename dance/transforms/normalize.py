@@ -577,15 +577,3 @@ class NormalizeTotal(AnnDataTransform):
 
         if max_fraction == 1.0:
             self.logger.info("max_fraction set to 1.0, this is equivalent to setting exclude_highly_expressed=False.")
-
-
-@register_preprocessor("normalize")
-class NormalizePlaceHolder(BaseTransform):
-    """Maybe you can also use a blank placeholder to express skipping, which is more
-    concise and needs to be discussed."""
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def __call__(self, data: Data) -> Data:
-        return super().__call__(data)
