@@ -5,6 +5,7 @@ import os
 from copy import deepcopy
 from functools import reduce
 from operator import mul
+from pathlib import Path
 from pprint import pformat
 
 import pandas as pd
@@ -876,7 +877,7 @@ def generate_combinations_with_required_elements(elements, required_indexes):
 
     # Generate all possible combinations of optional elements
     optional_combinations = []
-    for i in range(len(optional_elements) + 1):
+    for i in range(1, len(optional_elements) + 1):
         optional_combinations += list(itertools.combinations(optional_elements, i))
 
     # Combine required elements with optional combinations to get all possible combinations
@@ -886,7 +887,8 @@ def generate_combinations_with_required_elements(elements, required_indexes):
     return all_combinations
 
 
-def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, required_indexes):
+def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, required_indexes, save_config=True,
+                     root_path=None):
     """Generated automatically subsets for original yaml. YAML can be generated
     automatically, but obviously still need to manually tune the parameters to avoid
     errors. When part of the process is omitted, the function parameters need to be
@@ -912,11 +914,15 @@ def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, requir
     Returns
     --------
     command_str: str
-        command_str,such as "python ~/dance/examples/tuning/cta_svm/main.py --config_dir=config_yamls/pipeline/subset_1_  --count=4 > temp_data/1.log 2>&1 &"
+        command_str,such as "python examples/tuning/cta_svm/main.py --config_dir=config_yamls/pipeline/subset_0_  --count=4 > temp_data/1.log 2>&1 &"
     configs: list
         yamls for pipeline subsets
 
     """
+    DANCEDIR = Path(__file__).resolve().parent.parent
+    root_path = DANCEDIR if root_path is None else root_path
+    save_directory = f"{root_path}/{save_directory}"
+    path = f"{root_path}/{path}"
     config = OmegaConf.load(path)
     dict_config = DictConfig(config)
     nums = dict_config[tune_mode]
@@ -928,7 +934,9 @@ def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, requir
         config_copy[tune_mode] = subset
         configs.append(config_copy)
         save_path = f"{save_directory}/subset_{index}_{tune_mode}_tuning_config.yaml"
+        if save_config:
+            OmegaConf.save(config_copy, save_path)
         count = reduce(mul, [len(p["include"]) if "include" in p else 1 for p in subset])
-        command_str = command_str + f"python {file_path} --config_dir={os.path.relpath(save_directory,os.path.dirname(file_path))}/subset_{index}_ --count={count} > {log_dir}/{index}.log 2>&1 &\n"
-        OmegaConf.save(config_copy, save_path)
+        config_dir = os.path.relpath(os.path.dirname(save_path), os.path.dirname(os.path.join(root_path, file_path)))
+        command_str = command_str + f"python {file_path} --config_dir={config_dir}/subset_{index}_ --count={count} > {log_dir}/{index}.log 2>&1 &\n"
     return command_str, configs
