@@ -9,7 +9,7 @@ pipeline:
         max: 0.5
       max_disp:
         min: 1.0
-        max: !!float .inf
+        max: 100.0
       min_mean:
         min: 0.0
         max: 0.0125
