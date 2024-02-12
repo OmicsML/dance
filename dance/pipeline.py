@@ -928,7 +928,7 @@ def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, requir
     nums = dict_config[tune_mode]
     subsets = generate_combinations_with_required_elements(nums, required_indexes)
     configs = []
-    command_str = "#!/bin/bash \nlog_dir=" + log_dir + " \nmkdir -p ${log_dir}\n"
+    command_str = "#!/bin/bash\nlog_dir=" + log_dir + "\nmkdir -p ${log_dir}\n"
     for index, subset in enumerate(subsets):
         config_copy = dict_config.copy()
         config_copy[tune_mode] = subset
