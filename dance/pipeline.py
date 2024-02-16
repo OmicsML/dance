@@ -944,8 +944,8 @@ def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, requir
 
 def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/",
                    conf_load_path="examples/tuning/cta_svm/cell_type_annotation_default_params.yaml",
-                   result_load_path="examples/tuning/cta_svm/results/pipeline/best_test_acc.csv",
-                   required_funs=["SetConfig"], required_indexes=[-1], root_path=None):
+                   result_load_path="examples/tuning/cta_svm/results/pipeline/best_test_acc.csv", metric="test_acc",
+                   ascending=False, top_k=3, required_funs=["SetConfig"], required_indexes=[-1], root_path=None):
     """Generate the configuration file of step 3 based on the results of step 2.
 
     Parameters
@@ -956,6 +956,12 @@ def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/"
         Parameter search range of all preprocessing functions under a specific algorithm task
     result_load_path
         The storage path of the result of step 2
+    metric
+        Evaluation criteria
+    ascending
+        The order of the results of step 2
+    top_k
+        The number of steps 2 selected
     required_funs
         Required functions in step 3
     required_indexes
@@ -970,7 +976,7 @@ def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/"
     conf_load_path = os.path.join(root_path, conf_load_path)
     result_load_path = os.path.join(root_path, result_load_path)
     conf = OmegaConf.load(conf_load_path)
-    result = pd.read_csv(result_load_path)
+    result = pd.read_csv(result_load_path).sort_values(by=metric, ascending=ascending).head(top_k)
     columns = sorted([col for col in result.columns if col.startswith("pipeline")])
     pipeline_names = result.loc[:, columns].values
     count = 0
