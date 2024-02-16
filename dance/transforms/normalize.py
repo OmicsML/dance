@@ -90,15 +90,15 @@ class ScaleFeature(BaseTransform):
         return idx_dict
 
     def __call__(self, data):
-        data.data.obsm[self.out] = data.data.X.copy()
         if isinstance(data.data.X, sp.spmatrix):
             self.logger.warning("Native support for sparse matrix is not implemented yet, "
                                 "converting to dense array explicitly.")
-            data.data.obsm[self.out] = data.data.X.A.copy()
+            data.data.X = data.data.X.A
+
         idx_dict = self._get_idx_dict(data)
         for name, idx in idx_dict.items():
             self.logger.info(f"Scaling {name} (n={len(idx):,})")
-            data.data.obsm[self.out] = normalize(data.data.obsm[self.out], mode=self.mode, axis=self.axis, eps=self.eps)
+            data.data.X[idx] = normalize(data.data.X[idx], mode=self.mode, axis=self.axis, eps=self.eps)
 
 
 class ScTransformR(BaseTransform):
@@ -163,7 +163,7 @@ class ScTransformR(BaseTransform):
 
             # Convert to anndata
             adata.X = r_floatmatrix.T
-            data.data.obsm[self.out] = adata.X
+            data.data.X = adata.X
             return data
 
 
@@ -379,8 +379,7 @@ class ScTransform(BaseTransform):
         y = np.array([d[i] for i in y])
         data = X.data
         Xnew = sp.coo_matrix((data, (x, y)), shape=selected_data.shape).toarray()
-        # selected_data.X = Xnew
-        selected_data.obsm[self.out] = Xnew
+        selected_data.X = Xnew
         for c in full_model_pars.columns:
             selected_data.var[c + '_sct'] = full_model_pars[c]
 
@@ -521,12 +520,6 @@ class Log1P(AnnDataTransform):
         super().__init__(sc.pp.log1p, base=base, chunked=chunked, chunk_size=chunk_size, layer=layer, obsm=obsm,
                          copy=copy, **kwargs)
 
-    def __call__(self, data):
-        origin_data = data.data.X.copy()
-        super().__call__(data)
-        data.data.obsm[self.out] = data.data.X
-        data.data.X = origin_data
-
 
 @register_preprocessor("normalize")
 class NormalizeTotal(AnnDataTransform):
@@ -584,19 +577,3 @@ class NormalizeTotal(AnnDataTransform):
 
         if max_fraction == 1.0:
             self.logger.info("max_fraction set to 1.0, this is equivalent to setting exclude_highly_expressed=False.")
-
-    def __call__(self, data):
-        origin_data = data.data.X.copy()
-        super().__call__(data)
-        data.data.obsm[self.out] = data.data.X
-        data.data.X = origin_data
-
-
-@register_preprocessor("normalize")
-class NormalizePlaceHolder(AnnDataTransform):
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def __call__(self, data):
-        data.data.obsm[self.out] = data.data.X
