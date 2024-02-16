@@ -129,6 +129,27 @@ class CellSVD(BaseTransform):
 
 
 @register_preprocessor("feature", "cell")
+class FeatureCellPlaceHolder(BaseTransform):
+    """Used as a placeholder to skip the process.
+
+    Parameters
+    ----------
+    n_components
+        it will not be used
+
+    """
+
+    def __init__(self, n_components: int = 400, *, channel: Optional[str] = None, mod: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.channel = channel
+        self.mod = mod
+
+    def __call__(self, data):
+        feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
+        data.data.obsm[self.out] = feat
+
+
+@register_preprocessor("feature", "cell")
 class BatchFeature(BaseTransform):
     """Assign statistical batch features for each cell."""
 

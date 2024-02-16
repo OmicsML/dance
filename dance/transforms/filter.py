@@ -1054,6 +1054,17 @@ class HighlyVariableGenesLogarithmizedByTopGenes(AnnDataTransform):
 
 
 @register_preprocessor("filter", "gene")
+class FilterGenesPlaceHolder(BaseTransform):
+    """Used as a placeholder to skip the process."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __call__(self, data: Data) -> Data:
+        return data
+
+
+@register_preprocessor("filter", "gene")
 class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
     """Filter for highly variable genes based on mean and dispersion.
 
