@@ -1,5 +1,5 @@
 type: preprocessor
-tune_mode: pipeline
+tune_mode: params
 pipeline:
   - type: normalize
     include:
