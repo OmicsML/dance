@@ -896,7 +896,7 @@ def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, requir
     required.
 
     Conveniently generate multiple yamls, such as generating (A, B, C), (A, B), (A, C), (B, C), (A), (B), (C) yaml based on pipelines A, B, and C for the next experiment
-
+    Returns the running commands and configurations of different subsets of yaml.
     Parameters
     ----------
     path
