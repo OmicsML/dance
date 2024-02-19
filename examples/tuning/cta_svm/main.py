@@ -3,13 +3,13 @@ import pprint
 from pathlib import Path
 from typing import get_args
 
-import wandb
 from sklearn.random_projection import GaussianRandomProjection
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
-from dance.pipeline import PipelinePlaner, save_summary_data
+from dance.pipeline import PipelinePlaner, get_step3_yaml, save_summary_data
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import LogLevel
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     parser.add_argument("--count", type=int, default=28)
     parser.add_argument("--config_dir", default="", type=str)
     parser.add_argument("--sweep_id", type=str, default=None)
-
+    parser.add_argument("--result_name", default="best_test_acc.csv", type=str)
     args = parser.parse_args()
     logger.setLevel(args.log_level)
     logger.info(f"\n{pprint.pformat(vars(args))}")
@@ -92,8 +92,9 @@ if __name__ == "__main__":
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
-
-    # save_summary_data(entity,project,sweep_id,"temp.csv")
+    save_summary_data(entity, project, sweep_id, f"{MAINDIR}/results/{args.tune_mode}/{args.result_name}")
+    if args.tune_mode == "pipeline":
+        get_step3_yaml(result_load_path=f"examples/tuning/cta_svm/results/pipeline/{args.result_name}")
 """To reproduce SVM benchmarks, please refer to command lines below:
 
 Mouse Brain
