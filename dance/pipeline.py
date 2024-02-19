@@ -855,8 +855,17 @@ def flatten_dict(d, *, parent_key="", sep="_"):
         Delimiter to use to string parent keys together with the current key.
 
     Returns
-    --------
-      flattened dictionary
+    -------
+    dict
+        Flattened dictionary.
+
+    Example
+    -------
+    >>> dict1 = {"a": {"x": 1, "y": {"z": 2}}, "b": 3}
+    >>> flatten_dict(dict1)
+    {"a_x": 1, "a_y_z": 2, "b": 3}
+    >>> flatten_dict(dict1, sep=".")
+    {"a.x": 1, "a.y.z": 2, "b": 3}
 
     """
     items = []
@@ -890,34 +899,42 @@ def generate_combinations_with_required_elements(elements, required_indexes):
 
 def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, required_indexes, save_config=True,
                      root_path=None):
-    """Generated automatically subsets for original yaml. YAML can be generated
-    automatically, but obviously still need to manually tune the parameters to avoid
-    errors. When part of the process is omitted, the function parameters need to be
-    changed, otherwise an error will be reported, so different YAML adjustments are
-    required.
+    """Generate subsets of original pipeline plan.
 
-    Conveniently generate multiple yamls, such as generating (A, B, C), (A, B), (A, C), (B, C), (A), (B), (C) yaml based on pipelines A, B, and C for the next experiment
-    Returns the running commands and configurations of different subsets of yaml.
+    Generate multiple yamls from the original pipeline yaml. For example, given the original pipeline plan consisting
+    A, B, and C, it will then generate (A, B, C), (A, B), (A, C), (B, C), (A), (B), (C) yamls. Additionally, it will
+    also return the running commands and configurations of different subsets of yaml.
+
+    Notes
+    -----
+    YAML can be generated automatically, but obviously still need to manually tune the parameters to avoid errors.
+    When part of the process is omitted, the function parameters need to be changed, otherwise an error will be
+    reported, so different YAML adjustments are required.
+
     Parameters
     ----------
     path
-        origin yaml file path
+        Path to the origin pipeline plan yaml file.
     tune_mode
-        tune mode
+        Tuning mode.
     save_directory
-        subset yaml files save path
+        Directory to save the generated subset yaml files.
     file_path
-        python execution file, usually the file name is main
+        Python execution file, usually the file name is main.
     log_dir
-        log storage path
+        Directory to save the run log when executing the pipeline tuning scripts.
     required_indexes
-        index in required type of origin yaml
+        index in required type of origin yaml.
+    root_path
+        Root directory to search for the yaml and save the generated yamls.
+
     Returns
     --------
     command_str: str
-        command_str,such as "python examples/tuning/cta_svm/main.py --config_dir=config_yamls/pipeline/subset_0_  --count=4 > temp_data/1.log 2>&1 &"
+        Command string to run, e.g., "python examples/tuning/cta_svm/main.py \
+        --config_dir=config_yamls/pipeline/subset_0_  --count=4 > temp_data/1.log 2>&1 &"
     configs: list
-        yamls for pipeline subsets
+        Configs for the generated pipeline subsets.
 
     """
     root_path = default(root_path, CURDIR)
@@ -951,23 +968,23 @@ def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/"
     Parameters
     ----------
     conf_save_path
-        Storage directory of the configuration file generated in step 3
+        Directory to save the configuration file generated in step 3.
     conf_load_path
-        Parameter search range of all preprocessing functions under a specific algorithm task
+        Parameter search range of all preprocessing functions under a specific algorithm task.
     result_load_path
-        The storage path of the result of step 2
+        Path for the result of step 2.
     metric
-        Evaluation criteria
+        Evaluation criteria.
     ascending
-        The order of the results of step 2
+        The order of the results of step 2.
     top_k
-        The number of steps 2 selected
+        The number of steps 2 selected.
     required_funs
-        Required functions in step 3
+        Required functions in step 3.
     required_indexes
-        Location of required functions in step 3
+        Location of required functions in step 3.
     root_path
-        root path of all paths, defaults to the directory where the script is called
+        root path of all paths, defaults to the directory where the script is called.
 
     """
     root_path = default(root_path, CURDIR)
