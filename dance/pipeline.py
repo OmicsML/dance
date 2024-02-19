@@ -15,6 +15,7 @@ from dance import logger
 from dance.config import Config
 from dance.exceptions import DevError
 from dance.registry import REGISTRY, REGISTRY_PREFIX, Registry, resolve_from_registry
+from dance.settings import CURDIR
 from dance.typing import Any, Callable, ConfigLike, Dict, FileExistHandle, List, Optional, PathLike, Tuple, Union
 from dance.utils import Color, default
 
@@ -919,8 +920,7 @@ def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, requir
         yamls for pipeline subsets
 
     """
-    DANCEDIR = Path(__file__).resolve().parent.parent
-    root_path = DANCEDIR if root_path is None else root_path
+    root_path = default(root_path, CURDIR)
     save_directory = f"{root_path}/{save_directory}"
     path = f"{root_path}/{path}"
     config = OmegaConf.load(path)
@@ -967,11 +967,10 @@ def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/"
     required_indexes
         Location of required functions in step 3
     root_path
-        root path of all paths
+        root path of all paths, defaults to the directory where the script is called
 
     """
-    DANCEDIR = Path(__file__).resolve().parent.parent
-    root_path = DANCEDIR if root_path is None else root_path
+    root_path = default(root_path, CURDIR)
     conf_save_path = os.path.join(root_path, conf_save_path)
     conf_load_path = os.path.join(root_path, conf_load_path)
     result_load_path = os.path.join(root_path, result_load_path)

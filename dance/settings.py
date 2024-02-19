@@ -43,7 +43,10 @@ def change_log_level(name: str = "dance", /, *, level: Union[str, int]):
     logging.getLogger(name).setLevel(level)
 
 
-METADIR = Path(__file__).resolve().parent / "metadata"
+CURDIR = Path().resolve()
+DANCEDIR = Path(__file__).resolve().parents[1]
+DANCEPKGDIR = DANCEDIR / "dance"
+METADIR = DANCEPKGDIR / "metadata"
 
 __all__ = [
     "change_log_level",
