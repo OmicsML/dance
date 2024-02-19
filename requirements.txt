@@ -24,4 +24,4 @@ tables==3.9.2
 threadpoolctl==3.2.0
 tifffile==2023.7.10
 torchnmf==0.3.5
-tqdm==4.66.1
+tqdm==4.66.2
