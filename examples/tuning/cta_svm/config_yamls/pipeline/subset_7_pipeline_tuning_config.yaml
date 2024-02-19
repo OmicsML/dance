@@ -23,7 +23,11 @@ pipeline:
       - FilterGenesScanpyOrder
     default_params:
       FilterGenesScanpyOrder:
-        order: ["min_counts", "min_cells", "max_counts", "max_cells"]
+        order:
+          - min_counts
+          - min_cells
+          - max_counts
+          - max_cells
         min_counts: 1
         max_counts: 5000
         min_cells: 1
@@ -37,7 +41,7 @@ pipeline:
       - WeightedFeaturePCA
       - CellPCA
       - CellSVD
-      - GaussRandProjFeature  # Registered custom preprocessing func
+      - GaussRandProjFeature
     params:
       n_components: 400
       out: feature.cell
@@ -54,7 +58,7 @@ pipeline:
 wandb:
   entity: danceteam
   project: dance-dev
-  method: grid # Use grid for a comprehensive search
+  method: grid
   metric:
-    name: acc  # val/acc
+    name: acc
     goal: maximize

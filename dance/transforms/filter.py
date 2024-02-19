@@ -19,6 +19,7 @@ from dance.transforms.base import BaseTransform
 from dance.transforms.interface import AnnDataTransform
 from dance.typing import Dict, GeneSummaryMode, List, Literal, Logger, Optional, Tuple, Union
 from dance.utils import default
+from dance.utils.status import deprecated
 
 
 def get_count(count_or_ratio: Optional[Union[float, int]], total: int) -> Optional[int]:
@@ -490,7 +491,7 @@ class FilterGenesTopK(FilterGenes):
 
     def __init__(
         self,
-        num_genes: int,
+        num_genes: int = 1000,
         top: bool = True,
         *,
         mode: GeneSummaryMode = "cv",
@@ -636,8 +637,8 @@ class FilterGenesRegression(BaseTransform):
     """
     _DISPLAY_ATTRS = ("num_genes", )
 
-    def __init__(self, method: str, num_genes: int = 400, *, channel: Optional[str] = None, mod: Optional[str] = None,
-                 skip_count_check: bool = False, **kwargs):
+    def __init__(self, method: str = "enclasc", num_genes: int = 1000, *, channel: Optional[str] = None,
+                 mod: Optional[str] = None, skip_count_check: bool = False, **kwargs):
         super().__init__(**kwargs)
 
         self.num_genes = num_genes
@@ -940,7 +941,7 @@ class FilterGenesScanpyOrder(BaseTransform):
             "max_counts": max_counts,
             "max_cells": max_cells
         }
-        if not set(order).issubset(set(geneParameterDict.keys())):
+        if not set(self.filter_genes_order).issubset(set(geneParameterDict.keys())):
             raise KeyError(f"An order should be in {geneParameterDict.keys()}")
         self.geneScanpyOrderDict = {}
         for key in geneParameterDict.keys():
@@ -1054,6 +1055,18 @@ class HighlyVariableGenesLogarithmizedByTopGenes(AnnDataTransform):
 
 
 @register_preprocessor("filter", "gene")
+@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+class FilterGenesPlaceHolder(BaseTransform):
+    """Used as a placeholder to skip the process."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __call__(self, data: Data) -> Data:
+        return data
+
+
+@register_preprocessor("filter", "gene")
 class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
     """Filter for highly variable genes based on mean and dispersion.
 
@@ -1158,7 +1171,7 @@ class FilterCellsScanpyOrder(BaseTransform):
             "max_counts": max_counts,
             "max_genes": max_genes
         }
-        if not set(order).issubset(set(cellParameterDict.keys())):
+        if not set(self.filter_cells_order).issubset(set(cellParameterDict.keys())):
             raise KeyError(f"An order should be in {cellParameterDict.keys()}")
         self.cellScanpyOrderDict = {}
         for key in cellParameterDict.keys():

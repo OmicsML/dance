@@ -8,6 +8,7 @@ wandb
 # Data
 *.pkl
 *.pt
+temp_data
 
 # Build
 *.egg*

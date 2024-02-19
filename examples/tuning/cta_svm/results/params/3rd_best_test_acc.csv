@@ -1,0 +1,2 @@
+id,_runtime,_step,_timestamp,_wandb_runtime,acc,params.0.max_cells,params.0.max_counts,params.0.min_cells,params.0.min_counts,params.0.order,params.1.n_components,test_acc
+j2n9hvx5,35.878,0,1707640520.019,34,0.914,4315,3698,10,1,"['min_cells', 'max_cells', 'max_counts', 'min_counts']",789,0.947

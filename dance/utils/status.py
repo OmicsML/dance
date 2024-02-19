@@ -1,15 +1,25 @@
 import functools
+import inspect
 
 from dance import logger
 from dance.typing import Any, Optional
+from dance.utils import Color, default
 
 
-def deprecated(func):
+def deprecated(func=None, *, msg=None, version_removed=None):
     """Wrap a function that is to be deprecated with a deprecation warning message."""
+
+    if func is None:
+        return functools.partial(deprecated, msg=msg, version_removed=version_removed)
+
+    when = default(version_removed, "soon")
+    when = "soon" if version_removed is None else f"in {version_removed}"
+    reason = "" if msg is None else Color("red")(f"\n   Reason: {msg}")
 
     @functools.wraps(func)
     def wrapped_func(*args, **kwargs):
-        logger.warning(f"The function {func!r} is deprecated and will be removed soon.")
+        logger.warning(f"The function {func.__name__!r} ({inspect.getabsfile(func)}) "
+                       f"is deprecated and will be removed {when}{reason}")
         return func(*args, **kwargs)
 
     return wrapped_func

@@ -1,0 +1,15 @@
+type: preprocessor
+tune_mode: pipeline
+pipeline:
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        label_channel: cell_type
+wandb:
+  entity: danceteam
+  project: dance-dev
+  method: grid
+  metric:
+    name: acc
+    goal: maximize

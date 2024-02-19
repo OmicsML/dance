@@ -3,7 +3,7 @@ from functools import partial
 
 import pytest
 
-from dance.pipeline import Action, Pipeline, PipelinePlaner
+from dance.pipeline import Action, Pipeline, PipelinePlaner, generate_subsets
 from dance.registry import Registry
 
 
@@ -1023,3 +1023,20 @@ def test_pipeline_planer_wandb_integration(planer_toy_registry):
             },
         },
     }
+
+
+def test_pipeline_subset():
+    command_str, configs = generate_subsets("examples/tuning/cta_svm/pipeline_tuning_config.yaml", "pipeline",
+                                            "examples/tuning/cta_svm/config_yamls/pipeline",
+                                            "examples/tuning/cta_svm/main.py", "temp_data", [-1], False)
+    assert repr(command_str) == repr("""#!/bin/bash
+log_dir=temp_data
+mkdir -p ${log_dir}
+python examples/tuning/cta_svm/main.py --config_dir=config_yamls/pipeline/subset_0_ --count=4 > temp_data/0.log 2>&1 &
+python examples/tuning/cta_svm/main.py --config_dir=config_yamls/pipeline/subset_1_ --count=7 > temp_data/1.log 2>&1 &
+python examples/tuning/cta_svm/main.py --config_dir=config_yamls/pipeline/subset_2_ --count=4 > temp_data/2.log 2>&1 &
+python examples/tuning/cta_svm/main.py --config_dir=config_yamls/pipeline/subset_3_ --count=28 > temp_data/3.log 2>&1 &
+python examples/tuning/cta_svm/main.py --config_dir=config_yamls/pipeline/subset_4_ --count=16 > temp_data/4.log 2>&1 &
+python examples/tuning/cta_svm/main.py --config_dir=config_yamls/pipeline/subset_5_ --count=28 > temp_data/5.log 2>&1 &
+python examples/tuning/cta_svm/main.py --config_dir=config_yamls/pipeline/subset_6_ --count=112 > temp_data/6.log 2>&1 &
+""")

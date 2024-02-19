@@ -1,0 +1,2 @@
+id,_runtime,_step,_timestamp,_wandb_runtime,acc,params.0.flavor,params.0.max_disp,params.0.max_mean,params.0.min_disp,params.0.min_mean,params.0.n_bins,params.1.n_components,test_acc
+4q08d9dq,35.472,0,1707640444.779,34,0.918,cell_ranger,68.944,9.271,0.153,0.004,19,990,0.962

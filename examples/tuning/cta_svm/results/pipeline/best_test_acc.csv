@@ -1,0 +1,4 @@
+id,acc,_step,_wandb_runtime,_runtime,test_acc,_timestamp,pipeline.0,pipeline.1,pipeline.2
+xiw6kslu,0.921,0,114,116.029,0.948,1707453391.309,FilterGenesScanpyOrder,CellPCA,
+6xworzvg,0.922,0,88,90.123,0.947,1707453507.545,FilterGenesScanpyOrder,CellSVD,
+usp2mgd2,0.93,0,36,37.643,0.94,1707454232.814,HighlyVariableGenesLogarithmizedByMeanAndDisp,CellSVD,

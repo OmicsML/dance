@@ -7,6 +7,7 @@ pipeline:
       - ScTransform
       - Log1P
       - NormalizeTotal
+      - NormalizePlaceHolder
     default_params:
       ScTransform:
         min_cells: 2
@@ -21,6 +22,7 @@ pipeline:
       - FilterGenesTopK
       - FilterGenesRegression
       - FilterGenesScanpyOrder
+      - FilterGenesPlaceHolder
     default_params:
       FilterGenesScanpyOrder:
         order: ["min_counts", "min_cells", "max_counts", "max_cells"]
@@ -38,6 +40,7 @@ pipeline:
       - CellPCA
       - CellSVD
       - GaussRandProjFeature  # Registered custom preprocessing func
+      - FeatureCellPlaceHolder
     params:
       n_components: 400
       out: feature.cell
@@ -54,7 +57,7 @@ pipeline:
 wandb:
   entity: danceteam
   project: dance-dev
-  method: grid # Use grid for a comprehensive search
+  method: grid #try grid to provide a comprehensive search
   metric:
     name: acc  # val/acc
     goal: maximize

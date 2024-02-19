@@ -6,6 +6,7 @@ from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Optional
 from dance.utils.matrix import normalize
+from dance.utils.status import deprecated
 
 
 @register_preprocessor("feature", "cell")
@@ -126,6 +127,28 @@ class CellSVD(BaseTransform):
         data.data.obsm[self.out] = cell_feat
 
         return data
+
+
+@register_preprocessor("feature", "cell")
+@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+class FeatureCellPlaceHolder(BaseTransform):
+    """Used as a placeholder to skip the process.
+
+    Parameters
+    ----------
+    n_components
+        it will not be used
+
+    """
+
+    def __init__(self, n_components: int = 400, *, channel: Optional[str] = None, mod: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.channel = channel
+        self.mod = mod
+
+    def __call__(self, data):
+        feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
+        data.data.obsm[self.out] = feat
 
 
 @register_preprocessor("feature", "cell")

@@ -1,6 +1,11 @@
 import importlib
 import inspect
+import itertools
+import os
 from copy import deepcopy
+from functools import reduce
+from operator import mul
+from pathlib import Path
 from pprint import pformat
 
 import pandas as pd
@@ -10,6 +15,7 @@ from dance import logger
 from dance.config import Config
 from dance.exceptions import DevError
 from dance.registry import REGISTRY, REGISTRY_PREFIX, Registry, resolve_from_registry
+from dance.settings import CURDIR
 from dance.typing import Any, Callable, ConfigLike, Dict, FileExistHandle, List, Optional, PathLike, Tuple, Union
 from dance.utils import Color, default
 
@@ -848,15 +854,158 @@ def flatten_dict(d, *, parent_key="", sep="_"):
     sep
         Delimiter to use to string parent keys together with the current key.
 
-    return:
-      flattened dictionary
+    Returns
+    -------
+    dict
+        Flattened dictionary.
+
+    Example
+    -------
+    >>> dict1 = {"a": {"x": 1, "y": {"z": 2}}, "b": 3}
+    >>> flatten_dict(dict1)
+    {"a_x": 1, "a_y_z": 2, "b": 3}
+    >>> flatten_dict(dict1, sep=".")
+    {"a.x": 1, "a.y.z": 2, "b": 3}
 
     """
     items = []
     for k, v in d.items():
         new_key = parent_key + sep + k if parent_key else k
         if isinstance(v, dict):
-            items.extend(flatten_dict(v, new_key, sep).items())
+            items.extend(flatten_dict(d=v, parent_key=new_key, sep=sep).items())
         else:
             items.append((new_key, v))
     return dict(items)
+
+
+def generate_combinations_with_required_elements(elements, required_indexes):
+    required_elements = [elements[required_index] for required_index in required_indexes]
+    optional_elements = [x for x in elements if x not in required_elements]
+
+    # Sort optional elements in the same order as in the `elements` list
+    optional_elements.sort(key=lambda x: elements.index(x))
+
+    # Generate all possible combinations of optional elements
+    optional_combinations = []
+    for i in range(1, len(optional_elements) + 1):
+        optional_combinations += list(itertools.combinations(optional_elements, i))
+
+    # Combine required elements with optional combinations to get all possible combinations
+    all_combinations = []
+    for optional_combination in optional_combinations:
+        all_combinations.append([x for x in elements if x in required_elements or x in optional_combination])
+    return all_combinations
+
+
+def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, required_indexes, save_config=True,
+                     root_path=None):
+    """Generate subsets of original pipeline plan.
+
+    Generate multiple yamls from the original pipeline yaml. For example, given the original pipeline plan consisting
+    A, B, and C, it will then generate (A, B, C), (A, B), (A, C), (B, C), (A), (B), (C) yamls. Additionally, it will
+    also return the running commands and configurations of different subsets of yaml.
+
+    Notes
+    -----
+    YAML can be generated automatically, but obviously still need to manually tune the parameters to avoid errors.
+    When part of the process is omitted, the function parameters need to be changed, otherwise an error will be
+    reported, so different YAML adjustments are required.
+
+    Parameters
+    ----------
+    path
+        Path to the origin pipeline plan yaml file.
+    tune_mode
+        Tuning mode.
+    save_directory
+        Directory to save the generated subset yaml files.
+    file_path
+        Python execution file, usually the file name is main.
+    log_dir
+        Directory to save the run log when executing the pipeline tuning scripts.
+    required_indexes
+        index in required type of origin yaml.
+    root_path
+        Root directory to search for the yaml and save the generated yamls.
+
+    Returns
+    --------
+    command_str: str
+        Command string to run, e.g., "python examples/tuning/cta_svm/main.py \
+        --config_dir=config_yamls/pipeline/subset_0_  --count=4 > temp_data/1.log 2>&1 &"
+    configs: list
+        Configs for the generated pipeline subsets.
+
+    """
+    root_path = default(root_path, CURDIR)
+    save_directory = f"{root_path}/{save_directory}"
+    path = f"{root_path}/{path}"
+    config = OmegaConf.load(path)
+    dict_config = DictConfig(config)
+    nums = dict_config[tune_mode]
+    subsets = generate_combinations_with_required_elements(nums, required_indexes)
+    configs = []
+    command_str = "#!/bin/bash\nlog_dir=" + log_dir + "\nmkdir -p ${log_dir}\n"
+    for index, subset in enumerate(subsets):
+        config_copy = dict_config.copy()
+        config_copy[tune_mode] = subset
+        configs.append(config_copy)
+        save_path = f"{save_directory}/subset_{index}_{tune_mode}_tuning_config.yaml"
+        if save_config:
+            OmegaConf.save(config_copy, save_path)
+        count = reduce(mul, [len(p["include"]) if "include" in p else 1 for p in subset])
+        config_dir = os.path.relpath(os.path.dirname(save_path), os.path.dirname(os.path.join(root_path, file_path)))
+        command_str = command_str + f"python {file_path} --config_dir={config_dir}/subset_{index}_ --count={count} > {log_dir}/{index}.log 2>&1 &\n"
+    return command_str, configs
+
+
+def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/",
+                   conf_load_path="examples/tuning/cta_svm/cell_type_annotation_default_params.yaml",
+                   result_load_path="examples/tuning/cta_svm/results/pipeline/best_test_acc.csv", metric="test_acc",
+                   ascending=False, top_k=3, required_funs=["SetConfig"], required_indexes=[-1], root_path=None):
+    """Generate the configuration file of step 3 based on the results of step 2.
+
+    Parameters
+    ----------
+    conf_save_path
+        Directory to save the configuration file generated in step 3.
+    conf_load_path
+        Parameter search range of all preprocessing functions under a specific algorithm task.
+    result_load_path
+        Path for the result of step 2.
+    metric
+        Evaluation criteria.
+    ascending
+        The order of the results of step 2.
+    top_k
+        The number of steps 2 selected.
+    required_funs
+        Required functions in step 3.
+    required_indexes
+        Location of required functions in step 3.
+    root_path
+        root path of all paths, defaults to the directory where the script is called.
+
+    """
+    root_path = default(root_path, CURDIR)
+    conf_save_path = os.path.join(root_path, conf_save_path)
+    conf_load_path = os.path.join(root_path, conf_load_path)
+    result_load_path = os.path.join(root_path, result_load_path)
+    conf = OmegaConf.load(conf_load_path)
+    result = pd.read_csv(result_load_path).sort_values(by=metric, ascending=ascending).head(top_k)
+    columns = sorted([col for col in result.columns if col.startswith("pipeline")])
+    pipeline_names = result.loc[:, columns].values
+    count = 0
+    for row in pipeline_names:
+        pipeline = []
+        row = [i for i in row]
+        for i, f in zip(required_indexes, required_funs):
+            row.insert(i, f)
+        for x in row:
+            for k in conf.pipeline:
+                if k["target"] == x:
+                    pipeline.append(k)
+        temp_conf = conf.copy()
+        temp_conf.pipeline = pipeline
+        count += 1
+        OmegaConf.save(temp_conf, f"{conf_save_path}/{count}_test_acc_params_tuning_config.yaml")

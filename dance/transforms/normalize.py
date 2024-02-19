@@ -15,8 +15,9 @@ from dance.data.base import Data
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.transforms.interface import AnnDataTransform
-from dance.typing import Dict, Iterable, List, Literal, NormMode, Number, Optional, Union
+from dance.typing import Dict, Iterable, List, Literal, LogLevel, NormMode, Number, Optional, Union
 from dance.utils.matrix import normalize
+from dance.utils.status import deprecated
 
 
 @register_preprocessor("normalize")
@@ -250,15 +251,14 @@ class ScTransform(BaseTransform):
 
         return idx_dict
 
-    def __call__(self, data):
+    def __call__(self, data: Data):
         if isinstance(data.data.X, sp.spmatrix):
             self.logger.warning("Native support for sparse matrix is not implemented yet, "
                                 "converting to dense array explicitly.")
             data.data.X = data.data.X.A
-
         # idx_dict = self._get_idx_dict(data)
         # for name, idx in idx_dict.items():
-        selected_data = data.data.copy()
+        selected_data = data.data
         X = selected_data.X.copy()
         X = sp.csr_matrix(X)
         X.eliminate_zeros()
@@ -379,7 +379,7 @@ class ScTransform(BaseTransform):
         x, y = X.nonzero()
         y = np.array([d[i] for i in y])
         data = X.data
-        Xnew = sp.coo_matrix((data, (x, y)), shape=selected_data.shape).tocsr()
+        Xnew = sp.coo_matrix((data, (x, y)), shape=selected_data.shape).toarray()
         selected_data.X = Xnew
         for c in full_model_pars.columns:
             selected_data.var[c + '_sct'] = full_model_pars[c]
@@ -398,8 +398,6 @@ class ScTransform(BaseTransform):
         w[gn] = genes_log_gmean
         selected_data.var['genes_step1_sct'] = z
         selected_data.var['log10_gmean_sct'] = w
-
-        return selected_data
 
 
 def gmean(X, axis=0, eps=1):
@@ -580,3 +578,15 @@ class NormalizeTotal(AnnDataTransform):
 
         if max_fraction == 1.0:
             self.logger.info("max_fraction set to 1.0, this is equivalent to setting exclude_highly_expressed=False.")
+
+
+@register_preprocessor("normalize")
+@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+class NormalizePlaceHolder(BaseTransform):
+    """Used as a placeholder to skip the process."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __call__(self, data: Data) -> Data:
+        return data
