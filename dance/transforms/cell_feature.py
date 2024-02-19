@@ -6,6 +6,7 @@ from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Optional
 from dance.utils.matrix import normalize
+from dance.utils.status import deprecated
 
 
 @register_preprocessor("feature", "cell")
@@ -129,6 +130,7 @@ class CellSVD(BaseTransform):
 
 
 @register_preprocessor("feature", "cell")
+@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
 class FeatureCellPlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process.
 

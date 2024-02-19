@@ -17,6 +17,7 @@ from dance.transforms.base import BaseTransform
 from dance.transforms.interface import AnnDataTransform
 from dance.typing import Dict, Iterable, List, Literal, LogLevel, NormMode, Number, Optional, Union
 from dance.utils.matrix import normalize
+from dance.utils.status import deprecated
 
 
 @register_preprocessor("normalize")
@@ -580,6 +581,7 @@ class NormalizeTotal(AnnDataTransform):
 
 
 @register_preprocessor("normalize")
+@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
 class NormalizePlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process."""
 

@@ -19,6 +19,7 @@ from dance.transforms.base import BaseTransform
 from dance.transforms.interface import AnnDataTransform
 from dance.typing import Dict, GeneSummaryMode, List, Literal, Logger, Optional, Tuple, Union
 from dance.utils import default
+from dance.utils.status import deprecated
 
 
 def get_count(count_or_ratio: Optional[Union[float, int]], total: int) -> Optional[int]:
@@ -1054,6 +1055,7 @@ class HighlyVariableGenesLogarithmizedByTopGenes(AnnDataTransform):
 
 
 @register_preprocessor("filter", "gene")
+@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
 class FilterGenesPlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process."""
 
