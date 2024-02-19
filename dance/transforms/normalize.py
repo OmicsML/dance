@@ -579,7 +579,7 @@ class NormalizeTotal(AnnDataTransform):
             self.logger.info("max_fraction set to 1.0, this is equivalent to setting exclude_highly_expressed=False.")
 
 
-@register_preprocessor("feature", "cell")
+@register_preprocessor("normalize")
 class NormalizePlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process."""
 
