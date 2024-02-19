@@ -54,7 +54,7 @@ pipeline:
 wandb:
   entity: danceteam
   project: dance-dev
-  method: grid #try grid to provide a comprehensive search
+  method: grid # Use grid for a comprehensive search
   metric:
     name: acc  # val/acc
     goal: maximize
