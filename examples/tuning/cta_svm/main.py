@@ -1,11 +1,12 @@
 import argparse
 import pprint
+import sys
 from pathlib import Path
 from typing import get_args
 
-import wandb
 from sklearn.random_projection import GaussianRandomProjection
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
@@ -94,7 +95,8 @@ if __name__ == "__main__":
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, f"{MAINDIR}/results/{args.tune_mode}/{args.result_name}")
     if args.tune_mode == "pipeline":
-        get_step3_yaml(result_load_path=f"examples/tuning/cta_svm/results/pipeline/{args.result_name}")
+        get_step3_yaml(result_load_path=f"examples/tuning/cta_svm/results/pipeline/{args.result_name}",
+                       required_indexes=[sys.maxsize])
 """To reproduce SVM benchmarks, please refer to command lines below:
 
 Mouse Brain
