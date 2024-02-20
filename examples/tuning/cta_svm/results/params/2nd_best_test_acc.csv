@@ -1,2 +1,11 @@
-id,_runtime,_step,_timestamp,_wandb_runtime,acc,params.0.flavor,params.0.max_disp,params.0.max_mean,params.0.min_disp,params.0.min_mean,params.0.n_bins,params.1.n_components,test_acc
-4q08d9dq,35.472,0,1707640444.779,34,0.918,cell_ranger,68.944,9.271,0.153,0.004,19,990,0.962
+id,acc,_step,_wandb_runtime,_runtime,test_acc,_timestamp,params.0.order,params.0.max_cells,params.0.min_cells,params.0.max_counts,params.0.min_counts,params.1.n_components
+unsk0duh,0.9430745840072632,0,40,42.3688383102417,0.38107606768608093,1708429496.4038663,"['max_cells', 'max_counts', 'min_counts', 'min_cells']",4378,10,4912,2,132
+0fnubljp,0.9442922472953796,0,39,41.09266686439514,0.38181817531585693,1708429427.452705,"['max_cells', 'min_cells', 'max_counts', 'min_counts']",3450,6,4652,2,104
+7vvmlgzp,0.9312024116516112,0,36,38.07455396652222,0.9265305995941162,1708429374.732007,"['max_cells', 'max_counts', 'min_counts', 'min_cells']",1210,1,3546,5,206
+nn5panbq,0.9333333373069764,0,38,40.34204411506653,0.938033401966095,1708429319.609364,"['max_cells', 'max_counts', 'min_counts', 'min_cells']",4891,1,4719,1,236
+2l3jkrcj,0.9378995299339294,0,36,37.92058873176575,0.9413729310035706,1708429261.4353037,"['max_cells', 'max_counts', 'min_cells', 'min_counts']",4494,1,3616,4,187
+qlc1i5in,0.938812792301178,0,40,43.64310646057129,0.9194805026054382,1708429206.8861244,"['max_cells', 'min_counts', 'max_counts', 'min_cells']",2894,5,4817,3,206
+ux20a73f,0.9156773090362548,0,45,46.55073261260986,0.6096475124359131,1708429139.0186677,"['max_counts', 'max_cells', 'min_counts', 'min_cells']",1368,10,4567,7,696
+tger83rc,0.9105022549629213,0,43,44.965502977371216,0.3814471364021301,1708429075.632312,"['max_cells', 'min_counts', 'min_cells', 'max_counts']",857,8,4076,2,980
+mjjjtngf,0.913241982460022,0,44,46.57162094116211,0.946196675300598,1708429006.0068529,"['min_cells', 'min_counts', 'max_cells', 'max_counts']",4038,7,3338,4,661
+kaobq6iz,0.9382039308547974,0,44,47.16235017776489,0.8645640015602112,1708428934.2167542,"['max_cells', 'max_counts', 'min_counts', 'min_cells']",2831,4,4922,5,209

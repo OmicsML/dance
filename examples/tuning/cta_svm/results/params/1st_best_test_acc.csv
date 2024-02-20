@@ -1,2 +1,11 @@
-id,_runtime,_step,_timestamp,_wandb_runtime,acc,params.0.max_cells,params.0.max_counts,params.0.min_cells,params.0.min_counts,params.0.order,params.1.n_components,test_acc
-iz8l94id,40.001,0,1707640107.549,38,0.92,3066,4591,7,3,"['max_counts', 'max_cells', 'min_counts', 'min_cells']",509,0.95
+id,acc,_step,_wandb_runtime,_runtime,test_acc,_timestamp,params.0.order,params.0.max_cells,params.0.min_cells,params.0.max_counts,params.0.min_counts,params.1.n_components
+6x91wflb,0.943683385848999,0,38,41.208717346191406,0.3833024203777313,1708429478.6921954,"['max_cells', 'min_cells', 'max_counts', 'min_counts']",4615,5,4639,2,100
+93lf2x7q,0.9421613216400146,0,40,42.21879887580872,0.3877550959587097,1708429410.97778,"['max_cells', 'max_counts', 'min_cells', 'min_counts']",4821,2,3517,3,102
+ko0y7eb6,0.9433789849281312,0,34,36.50892901420593,0.3814471364021301,1708429347.342648,"['max_counts', 'max_cells', 'min_counts', 'min_cells']",4746,1,4484,2,121
+y56v82vb,0.9403348565101624,0,39,41.17905902862549,0.4593692123889923,1708429291.665632,"['max_counts', 'min_cells', 'max_cells', 'min_counts']",4920,5,4426,2,178
+qyn8dl3y,0.9397260546684264,0,37,39.60475707054138,0.40482375025749207,1708429236.376466,"['max_cells', 'min_cells', 'min_counts', 'max_counts']",4410,6,4899,1,185
+1hwax395,0.9184170365333556,0,45,48.0124089717865,0.94768089056015,1708429179.917315,"['max_cells', 'min_counts', 'min_cells', 'max_counts']",4716,9,4212,1,543
+5ee31kns,0.9184170365333556,0,42,44.16258430480957,0.949165105819702,1708429116.6383424,"['max_cells', 'min_counts', 'min_cells', 'max_counts']",3017,7,4406,4,557
+lz3pv37l,0.9050228595733644,0,37,39.09097957611084,0.37996289134025574,1708429054.479457,"['min_cells', 'min_counts', 'max_cells', 'max_counts']",631,4,2863,10,752
+583zxudu,0.908066987991333,0,39,41.2013738155365,0.37588125467300415,1708428997.6481297,"['min_counts', 'max_counts', 'max_cells', 'min_cells']",541,1,3569,4,448
+jau5dx3k,0.9184170365333556,0,47,49.27417945861816,0.945083498954773,1708428936.2607036,"['max_cells', 'min_counts', 'min_cells', 'max_counts']",2759,9,4370,3,543
