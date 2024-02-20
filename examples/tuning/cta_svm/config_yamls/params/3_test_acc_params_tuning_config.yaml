@@ -42,5 +42,5 @@ wandb:
   project: dance-dev
   method: bayes
   metric:
-    name: acc  # val/acc
+    name: acc
     goal: maximize

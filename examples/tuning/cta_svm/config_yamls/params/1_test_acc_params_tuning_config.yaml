@@ -6,30 +6,102 @@ pipeline:
     params_to_tune:
       order:
         values:
-          - ['min_counts', 'min_cells', 'max_counts', 'max_cells']
-          - ['min_counts', 'min_cells', 'max_cells', 'max_counts']
-          - ['min_counts', 'max_counts', 'min_cells', 'max_cells']
-          - ['min_counts', 'max_counts', 'max_cells', 'min_cells']
-          - ['min_counts', 'max_cells', 'min_cells', 'max_counts']
-          - ['min_counts', 'max_cells', 'max_counts', 'min_cells']
-          - ['min_cells', 'min_counts', 'max_counts', 'max_cells']
-          - ['min_cells', 'min_counts', 'max_cells', 'max_counts']
-          - ['min_cells', 'max_counts', 'min_counts', 'max_cells']
-          - ['min_cells', 'max_counts', 'max_cells', 'min_counts']
-          - ['min_cells', 'max_cells', 'min_counts', 'max_counts']
-          - ['min_cells', 'max_cells', 'max_counts', 'min_counts']
-          - ['max_counts', 'min_counts', 'min_cells', 'max_cells']
-          - ['max_counts', 'min_counts', 'max_cells', 'min_cells']
-          - ['max_counts', 'min_cells', 'min_counts', 'max_cells']
-          - ['max_counts', 'min_cells', 'max_cells', 'min_counts']
-          - ['max_counts', 'max_cells', 'min_counts', 'min_cells']
-          - ['max_counts', 'max_cells', 'min_cells', 'min_counts']
-          - ['max_cells', 'min_counts', 'min_cells', 'max_counts']
-          - ['max_cells', 'min_counts', 'max_counts', 'min_cells']
-          - ['max_cells', 'min_cells', 'min_counts', 'max_counts']
-          - ['max_cells', 'min_cells', 'max_counts', 'min_counts']
-          - ['max_cells', 'max_counts', 'min_counts', 'min_cells']
-          - ['max_cells', 'max_counts', 'min_cells', 'min_counts']
+          - - min_counts
+            - min_cells
+            - max_counts
+            - max_cells
+          - - min_counts
+            - min_cells
+            - max_cells
+            - max_counts
+          - - min_counts
+            - max_counts
+            - min_cells
+            - max_cells
+          - - min_counts
+            - max_counts
+            - max_cells
+            - min_cells
+          - - min_counts
+            - max_cells
+            - min_cells
+            - max_counts
+          - - min_counts
+            - max_cells
+            - max_counts
+            - min_cells
+          - - min_cells
+            - min_counts
+            - max_counts
+            - max_cells
+          - - min_cells
+            - min_counts
+            - max_cells
+            - max_counts
+          - - min_cells
+            - max_counts
+            - min_counts
+            - max_cells
+          - - min_cells
+            - max_counts
+            - max_cells
+            - min_counts
+          - - min_cells
+            - max_cells
+            - min_counts
+            - max_counts
+          - - min_cells
+            - max_cells
+            - max_counts
+            - min_counts
+          - - max_counts
+            - min_counts
+            - min_cells
+            - max_cells
+          - - max_counts
+            - min_counts
+            - max_cells
+            - min_cells
+          - - max_counts
+            - min_cells
+            - min_counts
+            - max_cells
+          - - max_counts
+            - min_cells
+            - max_cells
+            - min_counts
+          - - max_counts
+            - max_cells
+            - min_counts
+            - min_cells
+          - - max_counts
+            - max_cells
+            - min_cells
+            - min_counts
+          - - max_cells
+            - min_counts
+            - min_cells
+            - max_counts
+          - - max_cells
+            - min_counts
+            - max_counts
+            - min_cells
+          - - max_cells
+            - min_cells
+            - min_counts
+            - max_counts
+          - - max_cells
+            - min_cells
+            - max_counts
+            - min_counts
+          - - max_cells
+            - max_counts
+            - min_counts
+            - min_cells
+          - - max_cells
+            - max_counts
+            - min_cells
+            - min_counts
       min_counts:
         min: 1
         max: 10
@@ -61,5 +133,5 @@ wandb:
   project: dance-dev
   method: bayes
   metric:
-    name: acc  # val/acc
+    name: acc
     goal: maximize
