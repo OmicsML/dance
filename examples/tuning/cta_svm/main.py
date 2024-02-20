@@ -4,9 +4,9 @@ import sys
 from pathlib import Path
 from typing import get_args
 
-import wandb
 from sklearn.random_projection import GaussianRandomProjection
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
@@ -51,6 +51,7 @@ if __name__ == "__main__":
     parser.add_argument("--valid_dataset", nargs="+", default=[3285], type=int, help="list of dataset id")
     parser.add_argument("--tune_mode", default="pipeline", choices=["pipeline", "params"])
     parser.add_argument("--seed", type=int, default=10)
+    parser.add_argument("--pipeline_top_k", type=int, default=3)
     parser.add_argument("--count", type=int, default=28)
     parser.add_argument("--config_dir", default="", type=str)
     parser.add_argument("--sweep_id", type=str, default=None)
@@ -96,7 +97,7 @@ if __name__ == "__main__":
     save_summary_data(entity, project, sweep_id, f"{MAINDIR}/results/{args.tune_mode}/{args.result_name}")
     if args.tune_mode == "pipeline":
         get_step3_yaml(result_load_path=f"examples/tuning/cta_svm/results/pipeline/{args.result_name}",
-                       required_indexes=[sys.maxsize])
+                       required_indexes=[sys.maxsize], top_k=args.pipeline_top_k)
 """To reproduce SVM benchmarks, please refer to command lines below:
 
 Mouse Brain
