@@ -838,10 +838,10 @@ def save_summary_data(entity, project, sweep_id, summary_file_path, conf_load_pa
         summary_data.append(flatten_dict(result))  # get result and config
     ans = pd.DataFrame(summary_data).set_index(["id"])
     conf = OmegaConf.load(conf_load_path)
-    if tune_mode == "pipeline" or tune_mode == "both":
+    if tune_mode == "pipeline":
         pipelines = conf.pipeline
         for i, pipeline in enumerate(pipelines):
-            ans.rename({f"pipeline.{i}", pipeline.type})
+            ans.rename(columns={f"pipeline.{i}": pipeline.type}, inplace=True)
     if tune_mode == "params":
         params = conf.pipeline
         re_dict = {}
@@ -1026,5 +1026,5 @@ def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/"
                     pipeline.append(k)
         temp_conf = conf.copy()
         temp_conf.pipeline = pipeline
-        count += 1
         OmegaConf.save(temp_conf, f"{conf_save_path}/{count}_test_acc_params_tuning_config.yaml")
+        count += 1
