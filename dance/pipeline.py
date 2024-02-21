@@ -2,6 +2,8 @@ import importlib
 import inspect
 import itertools
 import os
+import re
+import sys
 from copy import deepcopy
 from functools import reduce
 from operator import mul
@@ -805,7 +807,7 @@ class PipelinePlaner(Pipeline):
         return entity, project, sweep_id
 
 
-def save_summary_data(entity, project, sweep_id, summary_file_path):
+def save_summary_data(entity, project, sweep_id, summary_file_path, conf_load_path, tune_mode):
     """Download sweep summary data from wandb and save to file.
 
     The returned dataframe includes running time, results and corresponding hyperparameters, etc.
@@ -835,6 +837,22 @@ def save_summary_data(entity, project, sweep_id, summary_file_path):
         result.update({"id": run.id})
         summary_data.append(flatten_dict(result))  # get result and config
     ans = pd.DataFrame(summary_data).set_index(["id"])
+    conf = OmegaConf.load(conf_load_path)
+    if tune_mode == "pipeline" or tune_mode == "both":
+        pipelines = conf.pipeline
+        for i, pipeline in enumerate(pipelines):
+            ans.rename({f"pipeline.{i}", pipeline.type})
+    if tune_mode == "params":
+        params = conf.pipeline
+        re_dict = {}
+        for i, param in enumerate(params):
+            re_dict.update({f"params.{i}": param.target})
+        update_cols = []
+        for column in ans.columns:
+            for k, v in re_dict.items():
+                column = re.sub(k, v, column)
+            update_cols.append(column)
+        ans.columns = update_cols
 
     if summary_file_path is not None:
         ans.to_csv(summary_file_path)  # save file
@@ -962,7 +980,8 @@ def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, requir
 def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/",
                    conf_load_path="examples/tuning/cta_svm/cell_type_annotation_default_params.yaml",
                    result_load_path="examples/tuning/cta_svm/results/pipeline/best_test_acc.csv", metric="test_acc",
-                   ascending=False, top_k=3, required_funs=["SetConfig"], required_indexes=[-1], root_path=None):
+                   ascending=False, top_k=3, required_funs=["SetConfig"], required_indexes=[sys.maxsize],
+                   root_path=None):
     """Generate the configuration file of step 3 based on the results of step 2.
 
     Parameters
