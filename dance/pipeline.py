@@ -5,7 +5,7 @@ import os
 import re
 import sys
 from copy import deepcopy
-from functools import reduce
+from functools import partial, reduce
 from operator import mul
 from pathlib import Path
 from pprint import pformat
@@ -841,7 +841,7 @@ def save_summary_data(entity, project, sweep_id, summary_file_path, conf_load_pa
     if tune_mode == "pipeline":
         pipelines = conf.pipeline
         for i, pipeline in enumerate(pipelines):
-            ans.rename(columns={f"pipeline.{i}": pipeline.type}, inplace=True)
+            ans.rename(columns={f"pipeline.{i}": f"pipeline_{pipeline.type}"}, inplace=True)
     if tune_mode == "params":
         params = conf.pipeline
         re_dict = {}
@@ -1028,3 +1028,16 @@ def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/"
         temp_conf.pipeline = pipeline
         OmegaConf.save(temp_conf, f"{conf_save_path}/{count}_test_acc_params_tuning_config.yaml")
         count += 1
+
+
+def run_step3(MAINDIR, evaluate_pipeline, tune_mode="params", sweep_id=None, both_k=10, pipeline_top_k=3):
+    for i in range(pipeline_top_k):
+        pipeline_planer = PipelinePlaner.from_config_file(
+            f"{MAINDIR}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml")
+        entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
+            partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=sweep_id,
+            count=both_k)  #Score can be recorded for each epoch
+        save_summary_data(
+            entity, project, sweep_id, f"{MAINDIR}/results/{tune_mode}/{i}_best_test_acc.csv",
+            conf_load_path=f"{MAINDIR}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml",
+            tune_mode=tune_mode)

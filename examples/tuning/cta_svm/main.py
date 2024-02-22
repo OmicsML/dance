@@ -3,16 +3,17 @@ import os
 import pprint
 import subprocess
 import sys
+from functools import partial
 from pathlib import Path
 from typing import get_args
 
-import wandb
 from sklearn.random_projection import GaussianRandomProjection
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
-from dance.pipeline import PipelinePlaner, get_step3_yaml, save_summary_data
+from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import LogLevel
@@ -44,7 +45,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--dense_dim", type=int, default=400, help="dim of PCA")
-    parser.add_argument("--gpu", type=int, default=-1, help="GPU id, set to -1 for CPU")
+    parser.add_argument("--gpu", type=int, default=0, help="GPU id, set to -1 for CPU")
     parser.add_argument("--log_level", type=str, default="INFO", choices=get_args(LogLevel))
     parser.add_argument("--species", default="mouse")
     parser.add_argument("--test_dataset", nargs="+", default=[2695], type=int, help="list of dataset id")
@@ -53,12 +54,12 @@ if __name__ == "__main__":
     parser.add_argument("--valid_dataset", nargs="+", default=[3285], type=int, help="list of dataset id")
     parser.add_argument("--tune_mode", default="pipeline", choices=["pipeline", "params"])
     parser.add_argument("--seed", type=int, default=10)
-    parser.add_argument("--pipeline_top_k", type=int, default=3)
-    parser.add_argument("--count", type=int, default=28)
+    parser.add_argument("--pipeline_top_k", type=int, default=2)
+    parser.add_argument("--count", type=int, default=2)
     parser.add_argument("--config_dir", default="", type=str)
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--both", action="store_true")
-    parser.add_argument("--both_k", type=int, default=10)
+    parser.add_argument("--both_k", type=int, default=2)
     parser.add_argument("--result_name", default="best_test_acc.csv", type=str)
     args = parser.parse_args()
     logger.setLevel(args.log_level)
@@ -66,7 +67,7 @@ if __name__ == "__main__":
     MAINDIR = Path(__file__).resolve().parent
     pipeline_planer = PipelinePlaner.from_config_file(f"{MAINDIR}/{args.config_dir}{args.tune_mode}_tuning_config.yaml")
 
-    def evaluate_pipeline():
+    def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
 
         set_seed(args.seed)
@@ -78,7 +79,7 @@ if __name__ == "__main__":
                                          data_dir="./temp_data").load_data()
 
         # Prepare preprocessing pipeline and apply it to data
-        kwargs = {args.tune_mode: dict(wandb.config)}
+        kwargs = {tune_mode: dict(wandb.config)}
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
@@ -105,10 +106,8 @@ if __name__ == "__main__":
         get_step3_yaml(result_load_path=f"examples/tuning/cta_svm/results/pipeline/{args.result_name}",
                        required_indexes=[sys.maxsize], top_k=args.pipeline_top_k)
         if args.both:
-            for i in range(args.pipeline_top_k):
-                os.system(
-                    f"python {__file__} --result_name={i}_best_test_acc.csv --config_dir=config_yamls/params/{i}_test_acc_  --tune_mode=params --count={args.both_k} > temp_data/{i}.log 2>&1"
-                )
+            run_step3(MAINDIR, evaluate_pipeline, tune_mode="params", sweep_id=None, both_k=args.both_k,
+                      pipeline_top_k=args.pipeline_top_k)
 """To reproduce SVM benchmarks, please refer to command lines below:
 
 Mouse Brain
