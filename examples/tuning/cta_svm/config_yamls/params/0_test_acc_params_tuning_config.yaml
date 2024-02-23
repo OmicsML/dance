@@ -115,7 +115,7 @@ pipeline:
         min: 500
         max: 5000
   - type: feature.cell
-    target: CellSVD
+    target: CellPCA
     params:
       out: feature.cell
     params_to_tune:

@@ -2,118 +2,27 @@ type: preprocessor
 tune_mode: params
 pipeline:
   - type: filter.gene
-    target: FilterGenesScanpyOrder
+    target: HighlyVariableGenesLogarithmizedByMeanAndDisp
     params_to_tune:
-      order:
+      min_disp:
+        min: 0.05
+        max: 0.5
+      max_disp:
+        min: 1.0
+        max: 100.0
+      min_mean:
+        min: 0.0
+        max: 0.0125
+      max_mean:
+        min: 3.0
+        max: 20.0
+      n_bins:
+        min: 10
+        max: 30
+      flavor:
         values:
-          - - min_counts
-            - min_cells
-            - max_counts
-            - max_cells
-          - - min_counts
-            - min_cells
-            - max_cells
-            - max_counts
-          - - min_counts
-            - max_counts
-            - min_cells
-            - max_cells
-          - - min_counts
-            - max_counts
-            - max_cells
-            - min_cells
-          - - min_counts
-            - max_cells
-            - min_cells
-            - max_counts
-          - - min_counts
-            - max_cells
-            - max_counts
-            - min_cells
-          - - min_cells
-            - min_counts
-            - max_counts
-            - max_cells
-          - - min_cells
-            - min_counts
-            - max_cells
-            - max_counts
-          - - min_cells
-            - max_counts
-            - min_counts
-            - max_cells
-          - - min_cells
-            - max_counts
-            - max_cells
-            - min_counts
-          - - min_cells
-            - max_cells
-            - min_counts
-            - max_counts
-          - - min_cells
-            - max_cells
-            - max_counts
-            - min_counts
-          - - max_counts
-            - min_counts
-            - min_cells
-            - max_cells
-          - - max_counts
-            - min_counts
-            - max_cells
-            - min_cells
-          - - max_counts
-            - min_cells
-            - min_counts
-            - max_cells
-          - - max_counts
-            - min_cells
-            - max_cells
-            - min_counts
-          - - max_counts
-            - max_cells
-            - min_counts
-            - min_cells
-          - - max_counts
-            - max_cells
-            - min_cells
-            - min_counts
-          - - max_cells
-            - min_counts
-            - min_cells
-            - max_counts
-          - - max_cells
-            - min_counts
-            - max_counts
-            - min_cells
-          - - max_cells
-            - min_cells
-            - min_counts
-            - max_counts
-          - - max_cells
-            - min_cells
-            - max_counts
-            - min_counts
-          - - max_cells
-            - max_counts
-            - min_counts
-            - min_cells
-          - - max_cells
-            - max_counts
-            - min_cells
-            - min_counts
-      min_counts:
-        min: 1
-        max: 10
-      min_cells:
-        min: 1
-        max: 10
-      max_counts:
-        min: 500
-        max: 5000
-      max_cells:
-        min: 500
-        max: 5000
+          - seurat
+          - cell_ranger
   - type: feature.cell
     target: CellSVD
     params:

@@ -841,7 +841,7 @@ def save_summary_data(entity, project, sweep_id, summary_file_path, conf_load_pa
     if tune_mode == "pipeline":
         pipelines = conf.pipeline
         for i, pipeline in enumerate(pipelines):
-            ans.rename(columns={f"pipeline.{i}": f"pipeline_{pipeline.type}"}, inplace=True)
+            ans.rename(columns={f"pipeline.{i}": f"pipeline_{i}_{pipeline.type}"}, inplace=True)
     if tune_mode == "params":
         params = conf.pipeline
         re_dict = {}
@@ -1032,6 +1032,7 @@ def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/"
 
 def run_step3(MAINDIR, evaluate_pipeline, tune_mode="params", sweep_id=None, both_k=10, pipeline_top_k=3):
     for i in range(pipeline_top_k):
+        sweep_id = None
         pipeline_planer = PipelinePlaner.from_config_file(
             f"{MAINDIR}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml")
         entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
