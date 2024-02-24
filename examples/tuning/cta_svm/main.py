@@ -4,9 +4,9 @@ import sys
 from pathlib import Path
 from typing import get_args
 
-import wandb
 from sklearn.random_projection import GaussianRandomProjection
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
@@ -51,12 +51,10 @@ if __name__ == "__main__":
     parser.add_argument("--valid_dataset", nargs="+", default=[3285], type=int, help="list of dataset id")
     parser.add_argument("--tune_mode", default="pipeline", choices=["pipeline", "params"])
     parser.add_argument("--seed", type=int, default=10)
-    parser.add_argument("--pipeline_top_k", type=int, default=3)
     parser.add_argument("--count", type=int, default=2)
     parser.add_argument("--config_dir", default="", type=str)
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--both", action="store_true")
-    parser.add_argument("--both_k", type=int, default=10)
     parser.add_argument("--result_name", default="best_test_acc.csv", type=str)
     args = parser.parse_args()
     logger.setLevel(args.log_level)
@@ -101,10 +99,10 @@ if __name__ == "__main__":
                       tune_mode=args.tune_mode)
     if args.tune_mode == "pipeline":
         get_step3_yaml(result_load_path=f"examples/tuning/cta_svm/results/pipeline/{args.result_name}",
-                       required_indexes=[sys.maxsize], top_k=args.pipeline_top_k)
+                       required_indexes=[sys.maxsize], step2_pipeline_planer=pipeline_planer)
         if args.both:
-            run_step3(MAINDIR, evaluate_pipeline, tune_mode="params", sweep_id=None, both_k=args.both_k,
-                      pipeline_top_k=args.pipeline_top_k)
+            run_step3(MAINDIR, evaluate_pipeline, tune_mode="params", sweep_id=None,
+                      step2_pipeline_planer=pipeline_planer)
 """To reproduce SVM benchmarks, please refer to command lines below:
 
 Mouse Brain

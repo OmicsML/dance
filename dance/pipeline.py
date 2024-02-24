@@ -977,11 +977,15 @@ def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, requir
     return command_str, configs
 
 
+DEFAULT_PIPELINE_TOP_K = 3
+DEFAULT_STEP3_K = 10
+
+
 def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/",
                    conf_load_path="examples/tuning/cta_svm/cell_type_annotation_default_params.yaml",
                    result_load_path="examples/tuning/cta_svm/results/pipeline/best_test_acc.csv", metric="test_acc",
-                   ascending=False, top_k=3, required_funs=["SetConfig"], required_indexes=[sys.maxsize],
-                   root_path=None):
+                   ascending=False, step2_pipeline_planer=None, required_funs=["SetConfig"],
+                   required_indexes=[sys.maxsize], root_path=None):
     """Generate the configuration file of step 3 based on the results of step 2.
 
     Parameters
@@ -1011,7 +1015,8 @@ def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/"
     conf_load_path = os.path.join(root_path, conf_load_path)
     result_load_path = os.path.join(root_path, result_load_path)
     conf = OmegaConf.load(conf_load_path)
-    result = pd.read_csv(result_load_path).sort_values(by=metric, ascending=ascending).head(top_k)
+    pipeline_top_k = default(step2_pipeline_planer.config.pipeline_top_k, DEFAULT_PIPELINE_TOP_K)
+    result = pd.read_csv(result_load_path).sort_values(by=metric, ascending=ascending).head(pipeline_top_k)
     columns = sorted([col for col in result.columns if col.startswith("pipeline")])
     pipeline_names = result.loc[:, columns].values
     count = 0
@@ -1030,14 +1035,16 @@ def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/"
         count += 1
 
 
-def run_step3(MAINDIR, evaluate_pipeline, tune_mode="params", sweep_id=None, both_k=10, pipeline_top_k=3):
+def run_step3(MAINDIR, evaluate_pipeline, step2_pipeline_planer: PipelinePlaner, tune_mode="params", sweep_id=None):
+    pipeline_top_k = default(step2_pipeline_planer.config.pipeline_top_k, DEFAULT_PIPELINE_TOP_K)
+    step3_k = default(step2_pipeline_planer.config.step3_k, DEFAULT_STEP3_K)
     for i in range(pipeline_top_k):
         sweep_id = None
         pipeline_planer = PipelinePlaner.from_config_file(
             f"{MAINDIR}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml")
         entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
             partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=sweep_id,
-            count=both_k)  #Score can be recorded for each epoch
+            count=step3_k)  #Score can be recorded for each epoch
         save_summary_data(
             entity, project, sweep_id, f"{MAINDIR}/results/{tune_mode}/{i}_best_test_acc.csv",
             conf_load_path=f"{MAINDIR}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml",
