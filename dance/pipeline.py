@@ -1023,12 +1023,14 @@ def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/"
     for row in pipeline_names:
         pipeline = []
         row = [i for i in row]
-        for i, f in zip(required_indexes, required_funs):
-            row.insert(i, f)
         for x in row:
             for k in conf.pipeline:
                 if k["target"] == x:
                     pipeline.append(k)
+        for i, f in zip(required_indexes, required_funs):
+            for k in step2_pipeline_planer.config.pipeline:
+                if "target" in k and k["target"] == f:
+                    pipeline.insert(i, k)
         temp_conf = conf.copy()
         temp_conf.pipeline = pipeline
         OmegaConf.save(temp_conf, f"{conf_save_path}/{count}_test_acc_params_tuning_config.yaml")

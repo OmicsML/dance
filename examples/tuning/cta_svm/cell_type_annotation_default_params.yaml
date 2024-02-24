@@ -187,12 +187,7 @@ pipeline:
           - standardize
           - minmax
           - l2
-  - type: misc
-    target: SetConfig
-    params:
-      config_dict:
-        feature_channel: feature.cell
-        label_channel: cell_type
+
 wandb:
   entity: danceteam
   project: dance-dev
