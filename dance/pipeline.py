@@ -344,7 +344,9 @@ class PipelinePlaner(Pipeline):
         # Register full config and tune mode
         self._config = Config(cfg)
         self._tune_mode = self.config.get(self.TUNE_MODE_KEY)
-
+        if self.tune_mode == "pipeline_params":
+            self._tune_mode = "pipeline"
+            logger.info("tune mode is set to pipeline_params,tune_mode will first be converted to pipeline")
         pipeline_config = self.config[self.PIPELINE_KEY]
         pipeline_length = len(pipeline_config)
         if pipeline_length < 1:
@@ -516,6 +518,7 @@ class PipelinePlaner(Pipeline):
         self,
         *,
         pipeline: Optional[Union[Dict[str, Any], List[str]]] = None,
+        pipeline_params: Optional[Union[Dict[str, Any], List[str]]] = None,
         params: Optional[Union[Dict[str, Any], List[Optional[Dict[str, Any]]]]] = None,
         validate: bool = True,
         strict_params_check: bool = False,
@@ -525,11 +528,18 @@ class PipelinePlaner(Pipeline):
         See more detailed info from :meth:`generate`.
 
         """
+
         # Pre-checks
-        if pipeline is None and params is None:
-            raise ValueError("At least one of 'pipeline' or 'params' must be specified.")
-        elif pipeline is None and self.tune_mode == "pipeline":
-            raise ValueError("'pipeline' must be specified as tune mode is set to pipeline")
+        if pipeline is None and params is None and pipeline_params is None:
+            raise ValueError("At least one of 'pipeline' or 'params' or 'pipeline_params' must be specified.")
+        elif self.tune_mode == "pipeline":
+            if pipeline is None and pipeline_params is None:
+                raise ValueError("'pipeline' or 'pipeline_params' must be specified as tune mode is set to pipeline")
+            elif pipeline_params is not None and pipeline is not None:
+                raise ValueError("Only one of 'pipeline_params' and 'pipeline' can exist")
+            elif pipeline_params is not None and pipeline is None:
+                logger.info("The content in pipeline_params will be converted to pipeline")
+                pipeline = pipeline_params
         elif params is None and self.tune_mode == "params":
             raise ValueError("'params' must be specified as tune mode is set to params")
 
@@ -571,6 +581,7 @@ class PipelinePlaner(Pipeline):
         *,
         pipeline: Optional[List[str]] = None,
         params: Optional[List[Optional[Dict[str, Any]]]] = None,
+        pipeline_params: Optional[List[str]] = None,
         **kwargs,
     ) -> Pipeline:
         """Generate pipeline based on specified pipeline and params settings.
@@ -632,7 +643,8 @@ class PipelinePlaner(Pipeline):
             }
 
         """
-        config = self.generate_config(pipeline=pipeline, params=params)
+
+        config = self.generate_config(pipeline=pipeline, params=params, pipeline_params=pipeline_params)
         return Pipeline(config, **kwargs)
 
     def search_space(self) -> Dict[str, Any]:
@@ -838,7 +850,7 @@ def save_summary_data(entity, project, sweep_id, summary_file_path, conf_load_pa
         summary_data.append(flatten_dict(result))  # get result and config
     ans = pd.DataFrame(summary_data).set_index(["id"])
     conf = OmegaConf.load(conf_load_path)
-    if tune_mode == "pipeline":
+    if tune_mode == "pipeline" or tune_mode == "pipeline_params":
         pipelines = conf.pipeline
         for i, pipeline in enumerate(pipelines):
             ans.rename(columns={f"pipeline.{i}": f"pipeline_{i}_{pipeline.type}"}, inplace=True)
@@ -981,11 +993,10 @@ DEFAULT_PIPELINE_TOP_K = 3
 DEFAULT_STEP3_K = 10
 
 
-def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/",
-                   conf_load_path="examples/tuning/cta_svm/cell_type_annotation_default_params.yaml",
-                   result_load_path="examples/tuning/cta_svm/results/pipeline/best_test_acc.csv", metric="test_acc",
-                   ascending=False, step2_pipeline_planer=None, required_funs=["SetConfig"],
-                   required_indexes=[sys.maxsize], root_path=None):
+def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="cell_type_annotation_default_params.yaml",
+                   result_load_path="results/pipeline/best_test_acc.csv", metric="test_acc", ascending=False,
+                   step2_pipeline_planer=None, required_funs=["SetConfig"], required_indexes=[sys.maxsize],
+                   root_path=None):
     """Generate the configuration file of step 3 based on the results of step 2.
 
     Parameters

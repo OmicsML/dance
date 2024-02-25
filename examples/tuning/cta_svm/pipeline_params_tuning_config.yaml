@@ -1,7 +1,7 @@
 type: preprocessor
-tune_mode: pipeline
-pipeline_top_k: 3
-step3_k: 10
+tune_mode: pipeline_params
+pipeline_top_k: 2
+step3_k: 2
 pipeline:
   - type: normalize
     include:
