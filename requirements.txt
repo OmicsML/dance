@@ -21,7 +21,7 @@ scikit-misc==0.3.1
 scipy==1.11.4
 statsmodels==0.14.0
 tables==3.9.2
-threadpoolctl==3.2.0
+threadpoolctl==3.3.0
 tifffile==2024.2.12
 torchnmf==0.3.5
 tqdm==4.66.2
