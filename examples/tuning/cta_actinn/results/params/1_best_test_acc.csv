@@ -1,0 +1,3 @@
+id,acc,_step,_wandb_runtime,_runtime,test_acc,_timestamp,Log1P.base,FilterGenesPercentile.mode,FilterGenesPercentile.max_val,FilterGenesPercentile.min_val,CellSVD.n_components
+vmibfmmn,1.0,0,29,32.06745982170105,0.37293916940689087,1708957504.7935038,3.0289541063332233,cv,98,9,567
+gp4gsi5s,0.9994924068450928,0,30,33.04103136062622,0.5031268000602722,1708957446.0841863,5.635795093837723,rv,97,5,413

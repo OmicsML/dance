@@ -4,9 +4,9 @@ import sys
 from pathlib import Path
 from typing import get_args
 
-import wandb
 from sklearn.random_projection import GaussianRandomProjection
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
@@ -54,7 +54,6 @@ if __name__ == "__main__":
     parser.add_argument("--count", type=int, default=2)
     parser.add_argument("--config_dir", default="", type=str)
     parser.add_argument("--sweep_id", type=str, default=None)
-    # parser.add_argument("--both", action="store_true")
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     args = parser.parse_args()
     logger.setLevel(args.log_level)
@@ -98,8 +97,8 @@ if __name__ == "__main__":
                       conf_load_path=f"{MAINDIR}/{args.config_dir}{args.tune_mode}_tuning_config.yaml",
                       tune_mode=args.tune_mode)
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
-        get_step3_yaml(result_load_path=f"{args.summary_file_path}", required_indexes=[sys.maxsize],
-                       step2_pipeline_planer=pipeline_planer)
+        get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
+                       conf_load_path="../step3_default_params.yaml")
         if args.tune_mode == "pipeline_params":
             run_step3(MAINDIR, evaluate_pipeline, tune_mode="params", sweep_id=None,
                       step2_pipeline_planer=pipeline_planer)

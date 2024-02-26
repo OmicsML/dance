@@ -1,0 +1,65 @@
+type: preprocessor
+tune_mode: pipeline_params
+pipeline_top_k: 2
+step3_k: 2
+pipeline:
+  - type: normalize
+    include:
+      - ScaleFeature
+      - ScTransform
+      - Log1P
+      - NormalizeTotal
+      - NormalizePlaceHolder
+    default_params:
+      ScTransform:
+        min_cells: 2
+        n_genes: 3000
+        bin_size: 200
+  - type: filter.gene
+    include:
+      - HighlyVariableGenesLogarithmizedByMeanAndDisp
+      - HighlyVariableGenesRawCount
+      - HighlyVariableGenesLogarithmizedByTopGenes
+      - FilterGenesPercentile
+      - FilterGenesTopK
+      - FilterGenesRegression
+      - FilterGenesScanpyOrder
+      - FilterGenesPlaceHolder
+    default_params:
+      FilterGenesScanpyOrder:
+        order: ["min_counts", "min_cells", "max_counts", "max_cells"]
+        min_counts: 1
+        max_counts: 5000
+        min_cells: 1
+        max_cells: 5000
+      HighlyVariableGenesLogarithmizedByMeanAndDisp:
+        max_mean: 20
+        min_disp: 0.1
+        min_mean: 0
+  - type: feature.cell
+    include:
+      - WeightedFeaturePCA
+      - CellPCA
+      - CellSVD
+      - GaussRandProjFeature  # Registered custom preprocessing func
+      - FeatureCellPlaceHolder
+    params:
+      n_components: 400
+      out: feature.cell
+      log_level: INFO
+    default_params:
+      WeightedFeaturePCA:
+        split_name: train
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        feature_channel: feature.cell
+        label_channel: cell_type
+wandb:
+  entity: danceteam
+  project: dance-dev
+  method: grid #try grid to provide a comprehensive search
+  metric:
+    name: acc  # val/acc
+    goal: maximize
