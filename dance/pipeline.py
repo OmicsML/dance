@@ -993,7 +993,7 @@ DEFAULT_PIPELINE_TOP_K = 3
 DEFAULT_STEP3_K = 10
 
 
-def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="cell_type_annotation_default_params.yaml",
+def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_default_params.yaml",
                    result_load_path="results/pipeline/best_test_acc.csv", metric="test_acc", ascending=False,
                    step2_pipeline_planer=None, required_funs=["SetConfig"], required_indexes=[sys.maxsize],
                    root_path=None):
