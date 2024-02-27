@@ -40,25 +40,27 @@ pipeline:
     include:
       - WeightedFeaturePCA
       - WeightedFeatureSVD
-      - CellPCA
-      - CellSVD
-      - GaussRandProjFeature  # Registered custom preprocessing func
       - FeatureCellPlaceHolder
-
     params:
-      n_components: 400
       out: feature.cell
       log_level: INFO
     default_params:
       WeightedFeaturePCA:
+        n_components: 400
         split_name: train
       WeightedFeatureSVD:
+        n_components: 400
         split_name: train
+  - type: feature.cell
+    target: SCNFeature
+    params:
+      num_top_genes: 10
+      num_top_gene_pairs: 25
   - type: misc
     target: SetConfig
     params:
       config_dict:
-        feature_channel: feature.cell
+        feature_channel: SCNFeature
         label_channel: cell_type
 wandb:
   entity: danceteam

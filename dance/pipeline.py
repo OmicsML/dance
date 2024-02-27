@@ -1062,3 +1062,11 @@ def run_step3(MAINDIR, evaluate_pipeline, step2_pipeline_planer: PipelinePlaner,
             entity, project, sweep_id, f"{MAINDIR}/results/{tune_mode}/{i}_best_test_acc.csv",
             conf_load_path=f"{MAINDIR}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml",
             tune_mode=tune_mode)
+
+
+# def get_params(preprocessing_pipeline:Pipeline,type,key,name):
+#     ans=[]
+#     pips=list(filter(lambda p: p.type==type, preprocessing_pipeline.config.pipeline))
+#     for p in pips:
+#         ans.append(p[key][name])
+#     return ans

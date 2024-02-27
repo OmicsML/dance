@@ -44,7 +44,6 @@ pipeline:
       - CellSVD
       - GaussRandProjFeature  # Registered custom preprocessing func
       - FeatureCellPlaceHolder
-
     params:
       n_components: 400
       out: feature.cell

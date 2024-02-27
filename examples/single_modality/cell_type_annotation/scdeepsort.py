@@ -47,7 +47,7 @@ if __name__ == "__main__":
 
         # Load data and perform necessary preprocessing
         dataloader = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
-                                               train_dataset=args.train_dataset)
+                                               train_dataset=args.train_dataset, data_dir="./temp_data")
         data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
         # Obtain training and testing data
@@ -58,13 +58,18 @@ if __name__ == "__main__":
         # Get cell feature graph for scDeepSort
         # TODO: make api for the following block?
         g = data.data.uns["CellFeatureGraph"]
+
+        feat = data.get_feature(return_type="default")
+        num_cells, num_feats = feat.shape
+
         num_genes = data.shape[1]
+
         gene_ids = torch.arange(num_genes)
         train_cell_ids = torch.LongTensor(data.train_idx) + num_genes
         test_cell_ids = torch.LongTensor(data.test_idx) + num_genes
         g_train = g.subgraph(torch.concat((gene_ids, train_cell_ids)))
         g_test = g.subgraph(torch.concat((gene_ids, test_cell_ids)))
-
+        num_f = g.ndata["features"].shape[1]
         # Train and evaluate the model
         model.fit(g_train, y_train, epochs=args.n_epochs, lr=args.lr, weight_decay=args.weight_decay,
                   val_ratio=args.test_rate)

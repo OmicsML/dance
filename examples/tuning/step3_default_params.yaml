@@ -41,6 +41,11 @@ pipeline:
         values: [null, 1e3, 1e4, 1e5, 1e6]
       max_fraction:
         values: [0.01, 0.05, 0.5, 0.7, 1.0]
+
+  - type: normalize
+    target: NormalizePlaceHolder
+
+
   - type: filter.gene
     target: FilterGenesPercentile
     params_to_tune:
@@ -156,6 +161,10 @@ pipeline:
           - seurat
           - cell_ranger
 
+  - type: filter.gene
+    target: FilterGenesPlaceHolder
+
+
   - type: feature.cell
     target: CellPCA
     params:
@@ -187,7 +196,25 @@ pipeline:
           - standardize
           - minmax
           - l2
-
+  - type: feature.cell
+    target: WeightedFeatureSVD
+    params:
+      out: feature.cell
+    params_to_tune:
+      n_components:
+        min: 100
+        max: 1000
+      feat_norm_mode:
+        values:
+          - null
+          - normalize
+          - standardize
+          - minmax
+          - l2
+  - type: feature.cell
+    target: FeatureCellPlaceHolder
+    params:
+      out: feature.cell
 wandb:
   entity: danceteam
   project: dance-dev

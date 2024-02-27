@@ -1,7 +1,7 @@
 type: preprocessor
 tune_mode: pipeline_params
-pipeline_top_k: 2
-step3_k: 2
+pipeline_top_k: 3
+step3_k: 10
 pipeline:
   - type: normalize
     include:
@@ -39,6 +39,7 @@ pipeline:
   - type: feature.cell
     include:
       - WeightedFeaturePCA
+      - WeightedFeatureSVD
       - CellPCA
       - CellSVD
       - GaussRandProjFeature  # Registered custom preprocessing func
@@ -49,6 +50,8 @@ pipeline:
       log_level: INFO
     default_params:
       WeightedFeaturePCA:
+        split_name: train
+      WeightedFeatureSVD:
         split_name: train
   - type: misc
     target: SetConfig
