@@ -195,6 +195,7 @@ class FeatureCellPlaceHolder(BaseTransform):
         super().__init__(**kwargs)
         self.channel = channel
         self.mod = mod
+        self.logger.info("n_components in FeatureCellPlaceHolder is used to make the parameters consistent and will not have any actual effect.")
 
     def __call__(self, data):
         """If we follow WeightedFeaturePCA, then gene_feat should be the transpose of
