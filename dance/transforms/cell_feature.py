@@ -69,7 +69,7 @@ class WeightedFeatureSVD(BaseTransform):
     Parameters
     ----------
     n_components
-        Number of PCs to use.
+        Desired dimensionality of output data.
     split_name
         Which split to use to compute the gene SVD. If not set, use all data.
     feat_norm_mode
