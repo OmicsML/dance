@@ -4,9 +4,9 @@ import sys
 from pathlib import Path
 from typing import get_args
 
-import wandb
 from sklearn.random_projection import GaussianRandomProjection
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
@@ -93,9 +93,7 @@ if __name__ == "__main__":
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
-    save_summary_data(entity, project, sweep_id, f"{MAINDIR}/{args.summary_file_path}",
-                      conf_load_path=f"{MAINDIR}/{args.config_dir}{args.tune_mode}_tuning_config.yaml",
-                      tune_mode=args.tune_mode)
+    save_summary_data(entity, project, sweep_id, f"{MAINDIR}/{args.summary_file_path}")
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{MAINDIR.parent}/step3_default_params.yaml", root_path=MAINDIR)

@@ -824,7 +824,7 @@ class PipelinePlaner(Pipeline):
         return entity, project, sweep_id
 
 
-def save_summary_data(entity, project, sweep_id, summary_file_path, conf_load_path, tune_mode):
+def save_summary_data(entity, project, sweep_id, summary_file_path):
     """Download sweep summary data from wandb and save to file.
 
     The returned dataframe includes running time, results and corresponding hyperparameters, etc.
