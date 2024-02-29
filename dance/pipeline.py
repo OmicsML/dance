@@ -281,6 +281,10 @@ class PipelinePlaner(Pipeline):
         return getattr(self, "_candidate_pipelines", None)
 
     @property
+    def candidate_names(self) -> Optional[List[str]]:
+        return getattr(self, "_candidate_names", None)
+
+    @property
     def candidate_params(self) -> Optional[List[Dict[str, Any]]]:
         return getattr(self, "_candidate_params", None)
 
@@ -297,7 +301,7 @@ class PipelinePlaner(Pipeline):
 
         # Use fixed target if available
         if pelem_config.get(self.TARGET_KEY) is not None:
-            return None
+            return None, None
 
         # Disallow setting includes and excludes at the same time
         if all(pelem_config.get(i) is not None for i in (self.PELEM_INCLUDE_KEY, self.PELEM_EXCLUDE_KEY)):
@@ -305,7 +309,7 @@ class PipelinePlaner(Pipeline):
                              f" at the same time:\n{self.config[self.PIPELINE_KEY][idx]}")
 
         # Obtain valid candidate target options
-        scope = self[idx].full_type
+        scope = self[idx].full_type  #!!!!!!!!
         try:
             candidates = {i.replace(f"{scope}.", "", 1) for i in self._registry.children(scope, non_leaf_node=False)}
         except KeyError as e:
@@ -329,7 +333,7 @@ class PipelinePlaner(Pipeline):
                              f"{self.config[self.PIPELINE_KEY][idx]}\n"
                              f"All available targets under the scope {scope!r}: {candidates}")
 
-        return sorted(filtered_candidates)
+        return sorted(filtered_candidates), scope
 
     @Pipeline.config.setter
     def config(self, cfg: ConfigLike):
@@ -373,12 +377,12 @@ class PipelinePlaner(Pipeline):
 
         # Set up candidate plans and default params
         self._default_params = [None] * pipeline_length
-
+        self._candidate_names = [None] * pipeline_length
         if self.tune_mode == "pipeline":
             self._candidate_pipelines = [None] * pipeline_length
             for i in range(pipeline_length):
                 self._default_params[i] = pipeline_config[i].get(self.DEFAULT_PARAMS_KEY)
-                self._candidate_pipelines[i] = self._resolve_pelem_plan(i)
+                self._candidate_pipelines[i], self._candidate_names[i] = self._resolve_pelem_plan(i)
 
         elif self.tune_mode == "params":
             self._candidate_params = [None] * pipeline_length
@@ -394,6 +398,7 @@ class PipelinePlaner(Pipeline):
                 # Set tuning params
                 if val := pipeline_config[i].get(self.TUNING_PARAMS_KEY):
                     self._candidate_params[i] = OmegaConf.to_container(val)
+                    self._candidate_names[i] = self[i].target
 
             # Make sure targets are set
             missed_target_idx = [
@@ -425,7 +430,7 @@ class PipelinePlaner(Pipeline):
             pipeline_dict = pipeline
             pipeline = [None] * pipeline_length
             for i, j in pipeline_dict.items():
-                idx = int(i.split(f"{Pipeline.PIPELINE_KEY}.", 1)[1])
+                idx = int(i.split(f"{Pipeline.PIPELINE_KEY}.", 1)[1].split(".", 1)[0])
                 logger.debug(f"Setting pipeline element {idx} to {j}")
                 pipeline[idx] = j
 
@@ -454,7 +459,7 @@ class PipelinePlaner(Pipeline):
             params_dict = params
             params = [None] * pipeline_length
             for i, j in params_dict.items():
-                idx, key = i.split(f"{Pipeline.PARAMS_KEY}.", 1)[1].split(".", 1)
+                idx, _, key = i.split(f"{Pipeline.PARAMS_KEY}.", 1)[1].split(".", 2)
                 idx = int(idx)
                 logger.debug(f"Setting {key!r} for pipeline element {idx} to {j}")
 
@@ -749,19 +754,19 @@ class PipelinePlaner(Pipeline):
 
     def _pipeline_search_space(self) -> Dict[str, str]:
         search_space = {
-            f"{self.PIPELINE_KEY}.{i}": {
+            f"{self.PIPELINE_KEY}.{i}.{n}": {
                 "values": j
             }
-            for i, j in enumerate(self.candidate_pipelines) if j is not None
+            for i, (j, n) in enumerate(zip(self.candidate_pipelines, self.candidate_names)) if j is not None
         }
         return search_space
 
     def _params_search_space(self) -> Dict[str, Dict[str, Optional[Union[str, float]]]]:
         search_space = {}
-        for i, param_dict in enumerate(self.candidate_params):
+        for i, (param_dict, n) in enumerate(zip(self.candidate_params, self.candidate_names)):
             if param_dict is not None:
                 for key, val in param_dict.items():
-                    search_space[f"{self.PARAMS_KEY}.{i}.{key}"] = val
+                    search_space[f"{self.PARAMS_KEY}.{i}.{n}.{key}"] = val
         return search_space
 
     def wandb_sweep_config(self) -> Dict[str, Any]:
@@ -849,22 +854,23 @@ def save_summary_data(entity, project, sweep_id, summary_file_path, conf_load_pa
         result.update({"id": run.id})
         summary_data.append(flatten_dict(result))  # get result and config
     ans = pd.DataFrame(summary_data).set_index(["id"])
-    conf = OmegaConf.load(conf_load_path)
-    if tune_mode == "pipeline" or tune_mode == "pipeline_params":
-        pipelines = conf.pipeline
-        for i, pipeline in enumerate(pipelines):
-            ans.rename(columns={f"pipeline.{i}": f"pipeline_{i}_{pipeline.type}"}, inplace=True)
-    if tune_mode == "params":
-        params = conf.pipeline
-        re_dict = {}
-        for i, param in enumerate(params):
-            re_dict.update({f"params.{i}": param.target})
-        update_cols = []
-        for column in ans.columns:
-            for k, v in re_dict.items():
-                column = re.sub(k, v, column)
-            update_cols.append(column)
-        ans.columns = update_cols
+    ans.sort_index(axis=1, inplace=True)
+    # conf = OmegaConf.load(conf_load_path)
+    # if tune_mode == "pipeline" or tune_mode == "pipeline_params":
+    #     pipelines = conf.pipeline
+    #     for i, pipeline in enumerate(pipelines):
+    #         ans.rename(columns={f"pipeline.{i}": f"pipeline_{i}_{pipeline.type}"}, inplace=True)
+    # if tune_mode == "params":
+    #     params = conf.pipeline
+    #     re_dict = {}
+    #     for i, param in enumerate(params):
+    #         re_dict.update({f"params.{i}": param.target})
+    #     update_cols = []
+    #     for column in ans.columns:
+    #         for k, v in re_dict.items():
+    #             column = re.sub(k, v, column)
+    #         update_cols.append(column)
+    #     ans.columns = update_cols
 
     if summary_file_path is not None:
         ans.to_csv(summary_file_path)  # save file
