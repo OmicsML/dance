@@ -309,7 +309,7 @@ class PipelinePlaner(Pipeline):
                              f" at the same time:\n{self.config[self.PIPELINE_KEY][idx]}")
 
         # Obtain valid candidate target options
-        scope = self[idx].full_type  #!!!!!!!!
+        scope = self[idx].full_type
         try:
             candidates = {i.replace(f"{scope}.", "", 1) for i in self._registry.children(scope, non_leaf_node=False)}
         except KeyError as e:
@@ -855,22 +855,6 @@ def save_summary_data(entity, project, sweep_id, summary_file_path, conf_load_pa
         summary_data.append(flatten_dict(result))  # get result and config
     ans = pd.DataFrame(summary_data).set_index(["id"])
     ans.sort_index(axis=1, inplace=True)
-    # conf = OmegaConf.load(conf_load_path)
-    # if tune_mode == "pipeline" or tune_mode == "pipeline_params":
-    #     pipelines = conf.pipeline
-    #     for i, pipeline in enumerate(pipelines):
-    #         ans.rename(columns={f"pipeline.{i}": f"pipeline_{i}_{pipeline.type}"}, inplace=True)
-    # if tune_mode == "params":
-    #     params = conf.pipeline
-    #     re_dict = {}
-    #     for i, param in enumerate(params):
-    #         re_dict.update({f"params.{i}": param.target})
-    #     update_cols = []
-    #     for column in ans.columns:
-    #         for k, v in re_dict.items():
-    #             column = re.sub(k, v, column)
-    #         update_cols.append(column)
-    #     ans.columns = update_cols
 
     if summary_file_path is not None:
         ans.to_csv(summary_file_path)  # save file
