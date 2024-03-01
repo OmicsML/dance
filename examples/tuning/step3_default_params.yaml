@@ -28,6 +28,8 @@ pipeline:
       bw_adjust:
         min: 1.0
         max: 5.0
+      params:
+        processes_num: 8
   - type: normalize
     target: Log1P
     params_to_tune:

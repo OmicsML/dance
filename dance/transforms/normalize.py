@@ -194,7 +194,8 @@ class ScTransform(BaseTransform):
         Number of genes a single bin contain.
     bw_adjust
         Bandwidth adjusting parameter.
-
+    processes_num
+        Number of processes.
     Reference
     ---------
     https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1874-1
@@ -204,16 +205,17 @@ class ScTransform(BaseTransform):
     _DISPLAY_ATTRS = ("mode", "eps", "split_names", "batch_key")
 
     def __init__(
-        self,
-        split_names: Optional[Union[Literal["ALL"], List[str]]] = None,
-        batch_key: Optional[str] = None,
-        min_cells: int = 5,
-        gmean_eps: int = 1,
-        n_genes: Optional[int] = 2000,
-        n_cells: Optional[int] = None,
-        bin_size: int = 500,
-        bw_adjust: float = 3,
-        **kwargs,
+            self,
+            split_names: Optional[Union[Literal["ALL"], List[str]]] = None,
+            batch_key: Optional[str] = None,
+            min_cells: int = 5,
+            gmean_eps: int = 1,
+            n_genes: Optional[int] = 2000,
+            n_cells: Optional[int] = None,
+            bin_size: int = 500,
+            bw_adjust: float = 3,
+            processes_num=os.cpu_count(),
+            **kwargs,
     ):
         super().__init__(**kwargs)
         self.split_names = split_names
@@ -224,6 +226,7 @@ class ScTransform(BaseTransform):
         self.n_cells = n_cells
         self.bin_size = bin_size
         self.bw_adjust = bw_adjust
+        self.processes_num = processes_num
 
     def _get_idx_dict(self, data) -> List[Dict[str, List[int]]]:
         # TODO: refactor out this function; reduce ropied code.
@@ -320,7 +323,8 @@ class ScTransform(BaseTransform):
             mm = np.vstack((np.ones(data_step1.shape[0]), data_step1['log_umi'].values.flatten())).T
 
             pc_chunksize = umi_bin.shape[1] // os.cpu_count() + 1
-            pool = Pool(os.cpu_count(), _parallel_init, [genes_bin_regress, umi_bin, gn, mm, ps])
+
+            pool = Pool(self.processes_num, _parallel_init, [genes_bin_regress, umi_bin, gn, mm, ps])
             try:
                 pool.map(_parallel_wrapper, range(umi_bin.shape[1]), chunksize=pc_chunksize)
             finally:
@@ -389,7 +393,6 @@ class ScTransform(BaseTransform):
 
         for c in model_pars.columns:
             selected_data.var[c + '_step1_sct'] = model_pars[c]
-        print(selected_data)
 
         z = pd.Series(index=gn, data=np.zeros(gn.size, dtype='int'))
         z[gn[genes_step1]] = 1

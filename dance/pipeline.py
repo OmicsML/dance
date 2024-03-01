@@ -824,7 +824,7 @@ class PipelinePlaner(Pipeline):
         return entity, project, sweep_id
 
 
-def save_summary_data(entity, project, sweep_id, summary_file_path):
+def save_summary_data(entity, project, sweep_id, summary_file_path, root_path):
     """Download sweep summary data from wandb and save to file.
 
     The returned dataframe includes running time, results and corresponding hyperparameters, etc.
@@ -844,7 +844,7 @@ def save_summary_data(entity, project, sweep_id, summary_file_path):
         import wandb
     except ModuleNotFoundError as e:
         raise ImportError("wandb not installed. Please install wandb first: $ pip install wandb") from e
-
+    summary_file_path = os.path.join(root_path, summary_file_path)
     sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
     summary_data = []
 
@@ -857,6 +857,7 @@ def save_summary_data(entity, project, sweep_id, summary_file_path):
     ans.sort_index(axis=1, inplace=True)
 
     if summary_file_path is not None:
+        os.makedirs(os.path.dirname(summary_file_path), exist_ok=True)
         ans.to_csv(summary_file_path)  # save file
 
     return ans
@@ -1013,7 +1014,7 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
     """
     root_path = default(root_path, CURDIR)
     conf_save_path = os.path.join(root_path, conf_save_path)
-    conf_load_path = os.path.join(root_path, conf_load_path)
+    # conf_load_path = os.path.join(root_path, conf_load_path)
     result_load_path = os.path.join(root_path, result_load_path)
     conf = OmegaConf.load(conf_load_path)
     pipeline_top_k = default(step2_pipeline_planer.config.pipeline_top_k, DEFAULT_PIPELINE_TOP_K)
@@ -1034,21 +1035,23 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
                     pipeline.insert(i, k)
         temp_conf = conf.copy()
         temp_conf.pipeline = pipeline
+
+        os.makedirs(os.path.dirname(conf_save_path), exist_ok=True)
         OmegaConf.save(temp_conf, f"{conf_save_path}/{count}_test_acc_params_tuning_config.yaml")
         count += 1
 
 
-def run_step3(MAINDIR, evaluate_pipeline, step2_pipeline_planer: PipelinePlaner, tune_mode="params", sweep_id=None):
+def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlaner, tune_mode="params"):
     pipeline_top_k = default(step2_pipeline_planer.config.pipeline_top_k, DEFAULT_PIPELINE_TOP_K)
     step3_k = default(step2_pipeline_planer.config.step3_k, DEFAULT_STEP3_K)
     for i in range(pipeline_top_k):
-        sweep_id = None
         pipeline_planer = PipelinePlaner.from_config_file(
-            f"{MAINDIR}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml")
-        entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
-            partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=sweep_id,
+            f"{root_path}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml")
+        entity, project, step3_sweep_id = pipeline_planer.wandb_sweep_agent(
+            partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=None,
             count=step3_k)  #Score can be recorded for each epoch
-        save_summary_data(entity, project, sweep_id, f"{MAINDIR}/results/{tune_mode}/{i}_best_test_acc.csv")
+        save_summary_data(entity, project, step3_sweep_id, f"results/{tune_mode}/{i}_best_test_acc.csv",
+                          root_path=root_path)
 
 
 # def get_params(preprocessing_pipeline:Pipeline,type,key,name):
