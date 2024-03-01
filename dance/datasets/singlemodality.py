@@ -52,7 +52,7 @@ class CellTypeAnnotationDataset(BaseDataset):
 
     def __init__(self, full_download=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
                  valid_dataset=None, train_dir="train", test_dir="test", valid_dir="valid", map_path="map",
-                 data_dir="./"):
+                 data_dir="./", train_as_valid=True):
         super().__init__(data_dir, full_download)
 
         self.data_dir = data_dir
@@ -65,6 +65,27 @@ class CellTypeAnnotationDataset(BaseDataset):
         self.test_dir = test_dir
         self.valid_dir = valid_dir
         self.map_path = map_path
+        self.train_as_valid = train_as_valid
+        self.bench_url_dict = self.BENCH_URL_DICT.copy()
+        self.available_data = self.AVAILABLE_DATA.copy()
+        if self.train_as_valid:
+            self.train2valid()
+
+    def train2valid(self):
+        logger.info("Copy train_dataset and use it as valid_dataset")
+        temp_ava_data = self.available_data.copy()
+        temp_ben_url_dict = self.bench_url_dict.copy()
+        for data in self.available_data:
+            if data["split"] == "train":
+                end_data = data.copy()
+                end_data['split'] = 'valid'
+                temp_ava_data.append(end_data)
+
+        for k, v in self.bench_url_dict.items():
+            if k.startswith("train"):
+                temp_ben_url_dict[k.replace("train", "valid", 1)] = v
+        self.available_data = temp_ava_data
+        self.bench_url_dict = temp_ben_url_dict
 
     def download_all(self):
         if self.is_complete():
@@ -98,7 +119,7 @@ class CellTypeAnnotationDataset(BaseDataset):
 
         filenames = self.get_all_filenames()
         # Download training and testing data
-        for name, url in self.BENCH_URL_DICT.items():
+        for name, url in self.bench_url_dict.items():
             parts = name.split("_")  # [train|test]_{species}_{tissue}{id}_[celltype|data].csv
             filename = "_".join(parts[1:])
             if filename in filenames:
@@ -126,7 +147,7 @@ class CellTypeAnnotationDataset(BaseDataset):
 
     def is_complete(self):
         """Check if benchmarking data is complete."""
-        for name in self.BENCH_URL_DICT:
+        for name in self.bench_url_dict:
             if any(i not in name for i in (self.species, self.tissue)):
                 continue
             filename = name[name.find(self.species):]
