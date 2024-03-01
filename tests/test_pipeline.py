@@ -204,10 +204,10 @@ def test_pipeline_planer_construction(subtests, planer_toy_registry):
             ],
         }
         assert p.search_space() == {
-            "pipeline.0": {
+            "pipeline.0.b": {
                 "values": ["func_b0", "func_b1", "func_b2"]
             },
-            "pipeline.1": {
+            "pipeline.1.c": {
                 "values": ["func_c0", "func_c1", "func_c2"]
             },
         }
@@ -242,10 +242,10 @@ def test_pipeline_planer_construction(subtests, planer_toy_registry):
             ],
         }
         assert p.search_space() == {
-            "pipeline.0": {
+            "pipeline.0.b": {
                 "values": ["func_b1", "func_b2"]
             },
-            "pipeline.1": {
+            "pipeline.1.c": {
                 "values": ["func_c1"]
             },
         }
@@ -280,10 +280,10 @@ def test_pipeline_planer_construction(subtests, planer_toy_registry):
             ],
         }
         assert p.search_space() == {
-            "pipeline.0": {
+            "pipeline.0.b": {
                 "values": ["func_b0"]
             },
-            "pipeline.1": {
+            "pipeline.1.c": {
                 "values": ["func_c0", "func_c2"]
             },
         }
@@ -339,7 +339,7 @@ def test_pipeline_planer_construction(subtests, planer_toy_registry):
         p = PipelinePlaner(cfg, _registry=r)
 
         assert p.base_config == {"type": "a", "pipeline": [{"type": "b"}]}
-        assert p.search_space() == {"pipeline.0": {"values": ["func_b0"]}}
+        assert p.search_space() == {"pipeline.0.b": {"values": ["func_b0"]}}
 
     with subtests.test("Case 0", tune_mode="params"):
         # Simple multiple choice params plan for only the first element
@@ -383,10 +383,10 @@ def test_pipeline_planer_construction(subtests, planer_toy_registry):
             ]
         }
         assert p.search_space() == {
-            "params.0.x": {
+            "params.0.func_b1.x": {
                 "values": ["x1", "x2", "x3"]
             },
-            "params.0.y": {
+            "params.0.func_b1.y": {
                 "values": ["y1", "y2", "y3"]
             },
         }
@@ -454,17 +454,17 @@ def test_pipeline_planer_construction(subtests, planer_toy_registry):
             ]
         }
         assert p.search_space() == {
-            "params.0.x": {
+            "params.0.func_b1.x": {
                 "values": ["x1", "x2", "x3"]
             },
-            "params.0.y": {
+            "params.0.func_b1.y": {
                 "values": ["y1", "y2", "y3"]
             },
-            "params.1.z": {
+            "params.1.func_c1.z": {
                 "min": 0,
                 "max": 1
             },
-            "params.2.z": {
+            "params.2.func_c1.z": {
                 "min": -10.,
                 "max": 10.
             },
@@ -624,7 +624,7 @@ def test_pipeline_planer_generation(subtests, planer_toy_registry):
         # Option 1: list of param dict
         assert dict(p.generate_config(params=[{"x": "x1"}, None])) == ans
         # Option 2: wandb type config
-        assert dict(p.generate_config(params={"params.0.x": "x1"})) == ans
+        assert dict(p.generate_config(params={"params.0.func_b1.x": "x1"})) == ans
 
         with pytest.raises(ValueError):
             # Unknown param key 'y'
@@ -896,7 +896,7 @@ def test_pipeline_planer_generation(subtests, planer_toy_registry):
             None,
         ]
         assert p.search_space() == {
-            "pipeline.0": {
+            "pipeline.0.b": {
                 "values": ["func_b0", "func_b1", "func_b2"]
             },
         }
@@ -1004,7 +1004,7 @@ def test_pipeline_planer_wandb_integration(planer_toy_registry):
     }
 
     assert p.search_space() == {
-        "pipeline.0": {
+        "pipeline.0.b": {
             "values": ["func_b0", "func_b1", "func_b2"],
         },
     }
@@ -1018,7 +1018,7 @@ def test_pipeline_planer_wandb_integration(planer_toy_registry):
             "goal": "maximize",
         },
         "parameters": {
-            "pipeline.0": {
+            "pipeline.0.b": {
                 "values": ["func_b0", "func_b1", "func_b2"],
             },
         },

@@ -333,7 +333,7 @@ class PipelinePlaner(Pipeline):
                              f"{self.config[self.PIPELINE_KEY][idx]}\n"
                              f"All available targets under the scope {scope!r}: {candidates}")
 
-        return sorted(filtered_candidates), scope
+        return sorted(filtered_candidates), self[idx].type
 
     @Pipeline.config.setter
     def config(self, cfg: ConfigLike):
@@ -1048,10 +1048,7 @@ def run_step3(MAINDIR, evaluate_pipeline, step2_pipeline_planer: PipelinePlaner,
         entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
             partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=sweep_id,
             count=step3_k)  #Score can be recorded for each epoch
-        save_summary_data(
-            entity, project, sweep_id, f"{MAINDIR}/results/{tune_mode}/{i}_best_test_acc.csv",
-            conf_load_path=f"{MAINDIR}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml",
-            tune_mode=tune_mode)
+        save_summary_data(entity, project, sweep_id, f"{MAINDIR}/results/{tune_mode}/{i}_best_test_acc.csv")
 
 
 # def get_params(preprocessing_pipeline:Pipeline,type,key,name):
