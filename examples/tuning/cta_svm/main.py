@@ -60,10 +60,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     logger.setLevel(args.log_level)
     logger.info(f"\n{pprint.pformat(vars(args))}")
-    file_root_path = Path("_".join([
-        "/".join([str(num) for num in dataset])
-        for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
-    ])).resolve()
+    file_root_path = Path(
+        args.root_path, "_".join([
+            "/".join([str(num) for num in dataset])
+            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
+        ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
 
