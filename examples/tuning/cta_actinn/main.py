@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import get_args
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
@@ -38,14 +38,19 @@ if __name__ == "__main__":
 
     parser.add_argument("--tune_mode", default="pipeline_params", choices=["pipeline", "params", "pipeline_params"])
     parser.add_argument("--count", type=int, default=2)
-    parser.add_argument("--config_dir", default="", type=str)
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
+    parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
     args = parser.parse_args()
     logger.setLevel(args.log_level)
     logger.info(f"\n{pprint.pformat(vars(args))}")
-    MAINDIR = Path(__file__).resolve().parent
-    pipeline_planer = PipelinePlaner.from_config_file(f"{MAINDIR}/{args.config_dir}{args.tune_mode}_tuning_config.yaml")
+    file_root_path = Path(
+        args.root_path, "_".join([
+            "/".join([str(num) for num in dataset])
+            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
+        ])).resolve()
+    logger.info(f"\n files is saved in {file_root_path}")
+    pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
 
     logger.setLevel(args.log_level)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
@@ -84,13 +89,13 @@ if __name__ == "__main__":
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
-    save_summary_data(entity, project, sweep_id, f"{MAINDIR}/{args.summary_file_path}")
+    save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
-                       conf_load_path="../step3_default_params.yaml")
+                       conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
+                       root_path=file_root_path)
         if args.tune_mode == "pipeline_params":
-            run_step3(MAINDIR, evaluate_pipeline, tune_mode="params", sweep_id=None,
-                      step2_pipeline_planer=pipeline_planer)
+            run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """To reproduce ACTINN benchmarks, please refer to command lines below:
 
 Mouse Brain
