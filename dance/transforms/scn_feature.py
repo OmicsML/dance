@@ -39,13 +39,15 @@ class SCNFeature(BaseTransform):
     def __call__(self, data):
         split_idx = data.get_split_idx(self.split_name)
         all_exp_df = data.data.to_df(self.channel)  # TODO: return as numpy or sparse csr to improve efficiency?
+        #all_exp_df should contain gene names, so dimensionality reduction is not easy
         cell_type_df = data.get_feature(return_type="default", channel="cell_type", channel_type="obsm").iloc[split_idx]
 
         # Get normalized features
         adata = data.data[split_idx].copy()
-        sc.pp.filter_genes(adata, min_counts=1)
-        sc.pp.highly_variable_genes(adata, max_mean=4, subset=True)
-        sc.pp.scale(adata, max_value=10)
+        # sc.pp.filter_genes(adata, min_counts=1)
+        # sc.pp.highly_variable_genes(adata, max_mean=4, subset=True)
+        # sc.pp.scale(adata, max_value=10)
+        # Filtering shouldn't be here
         norm_exp_df = adata.to_df()
         cell_type_df = cell_type_df.loc[adata.obs_names]  # not necessary, but kept here in case we subsample cells
 
