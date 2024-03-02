@@ -1042,6 +1042,20 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
 
 
 def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlaner, tune_mode="params"):
+    """Run step 3 by default.
+
+    Parameters
+    ----------
+    root_path
+        root path of all paths, defaults to the directory where the script is called.
+    evaluate_pipeline
+        Evaluation function
+    step2_pipeline_planer
+        Pipeline_planer of step2
+    tune_mode
+        tune_mode can only be set to params
+
+    """
     pipeline_top_k = default(step2_pipeline_planer.config.pipeline_tuning_top_k, DEFAULT_PIPELINE_TUNING_TOP_K)
     step3_k = default(step2_pipeline_planer.config.parameter_tuning_freq_n, DEFAULT_PARAMETER_TUNING_FREQ_N)
     for i in range(pipeline_top_k):
