@@ -1,7 +1,7 @@
 type: preprocessor
 tune_mode: pipeline_params
-pipeline_top_k: 2
-step3_k: 2
+pipeline_tuning_top_k: 2
+parameter_tuning_freq_n: 2
 pipeline:
   - type: normalize
     include:
@@ -15,6 +15,7 @@ pipeline:
         min_cells: 2
         n_genes: 3000
         bin_size: 200
+        processes_num: 8
   - type: filter.gene
     include:
       - HighlyVariableGenesLogarithmizedByMeanAndDisp

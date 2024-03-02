@@ -980,8 +980,8 @@ def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, requir
     return command_str, configs
 
 
-DEFAULT_PIPELINE_TOP_K = 3
-DEFAULT_STEP3_K = 10
+DEFAULT_PIPELINE_TUNING_TOP_K = 3
+DEFAULT_PARAMETER_TUNING_FREQ_N = 10
 
 
 def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_default_params.yaml",
@@ -1017,7 +1017,7 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
     # conf_load_path = os.path.join(root_path, conf_load_path)
     result_load_path = os.path.join(root_path, result_load_path)
     conf = OmegaConf.load(conf_load_path)
-    pipeline_top_k = default(step2_pipeline_planer.config.pipeline_top_k, DEFAULT_PIPELINE_TOP_K)
+    pipeline_top_k = default(step2_pipeline_planer.config.pipeline_tuning_top_k, DEFAULT_PIPELINE_TUNING_TOP_K)
     result = pd.read_csv(result_load_path).sort_values(by=metric, ascending=ascending).head(pipeline_top_k)
     columns = sorted([col for col in result.columns if col.startswith("pipeline")])
     pipeline_names = result.loc[:, columns].values
@@ -1042,8 +1042,8 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
 
 
 def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlaner, tune_mode="params"):
-    pipeline_top_k = default(step2_pipeline_planer.config.pipeline_top_k, DEFAULT_PIPELINE_TOP_K)
-    step3_k = default(step2_pipeline_planer.config.step3_k, DEFAULT_STEP3_K)
+    pipeline_top_k = default(step2_pipeline_planer.config.pipeline_tuning_top_k, DEFAULT_PIPELINE_TUNING_TOP_K)
+    step3_k = default(step2_pipeline_planer.config.parameter_tuning_freq_n, DEFAULT_PARAMETER_TUNING_FREQ_N)
     for i in range(pipeline_top_k):
         pipeline_planer = PipelinePlaner.from_config_file(
             f"{root_path}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml")
