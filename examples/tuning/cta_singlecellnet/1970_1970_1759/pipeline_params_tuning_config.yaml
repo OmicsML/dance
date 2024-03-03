@@ -5,27 +5,27 @@ parameter_tuning_freq_n: 10
 pipeline:
   - type: normalize
     include:
-      # - ScaleFeature
-      # - ScTransform
+      - ScaleFeature
+      - ScTransform
       - Log1P
-      # - NormalizeTotal
-      # - NormalizePlaceHolder
+      - NormalizeTotal
+      - NormalizePlaceHolder
     default_params:
       ScTransform:
         min_cells: 2
         n_genes: 3000
-        bin_size: 200
+        bin_size: 50
         processes_num: 8
   - type: filter.gene
     include:
-      # - HighlyVariableGenesLogarithmizedByMeanAndDisp
-      # - HighlyVariableGenesRawCount
-      # - HighlyVariableGenesLogarithmizedByTopGenes
-      # - FilterGenesPercentile
+      - HighlyVariableGenesLogarithmizedByMeanAndDisp
+      - HighlyVariableGenesRawCount
+      - HighlyVariableGenesLogarithmizedByTopGenes
+      - FilterGenesPercentile
       - FilterGenesTopK
-      # - FilterGenesRegression
-      # - FilterGenesScanpyOrder
-      # - FilterGenesPlaceHolder
+      - FilterGenesRegression
+      - FilterGenesScanpyOrder
+      - FilterGenesPlaceHolder
     default_params:
       FilterGenesScanpyOrder:
         order: ["min_counts", "min_cells", "max_counts", "max_cells"]
@@ -37,29 +37,32 @@ pipeline:
         max_mean: 20
         min_disp: 0.1
         min_mean: 0
-  - type: feature.cell
-    include:
-      - WeightedFeaturePCA
-      # - WeightedFeatureSVD
-      - CellPCA
-      - CellSVD
-      - GaussRandProjFeature  # Registered custom preprocessing func
-      - FeatureCellPlaceHolder
-    params:
-      out: feature.cell
-      log_level: INFO
-    default_params:
-      WeightedFeaturePCA:
-        n_components: 400
-        split_name: train
-      WeightedFeatureSVD:
-        n_components: 400
-        split_name: train
+      # FilterGenesTopK:
+  # - type: feature.cell
+  #   include:
+  #     # - WeightedFeaturePCA
+  #     # - WeightedFeatureSVD
+  #     # - CellPCA
+  #     - CellSVD
+  #     # - GaussRandProjFeature  # Registered custom preprocessing func
+  #     # - FeatureCellPlaceHolder
+  #   params:
+  #     out: feature.cell
+  #     log_level: INFO
+  #   default_params:
+  #     WeightedFeaturePCA:
+  #       n_components: 400
+  #       split_name: train
+  #     WeightedFeatureSVD:
+  #       n_components: 400
+  #       split_name: train
   - type: feature.cell
     target: SCNFeature
     params:
       num_top_genes: 10
       num_top_gene_pairs: 25
+      alpha2: 0.0005
+      mu: 1
   - type: misc
     target: SetConfig
     params:

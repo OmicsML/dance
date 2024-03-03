@@ -1,3 +1,0 @@
-id,acc,_step,_wandb_runtime,_runtime,test_acc,_timestamp,pipeline_0_normalize,pipeline_1_filter.gene,pipeline_2_feature.cell
-u5otnv5f,0.9979695677757264,0,27,29.836161136627197,0.31552016735076904,1709000337.9722342,Log1P,FilterGenesPercentile,CellSVD
-c27ql2hm,0.9994924068450928,0,114,116.6877121925354,0.6191017627716064,1709000287.92457,Log1P,FilterGenesPercentile,CellPCA

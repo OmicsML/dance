@@ -1,0 +1,41 @@
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: normalize
+    target: ScaleFeature
+    params_to_tune:
+      mode:
+        values:
+          - normalize
+          - standardize
+          - minmax
+          - l2
+      eps:
+        values:
+          - -1
+          - 0.1
+          - 0.3
+          - 0.5
+          - 0.7
+  - type: filter.gene
+    target: FilterGenesPlaceHolder
+  - type: feature.cell
+    target: SCNFeature
+    params:
+      num_top_genes: 10
+      num_top_gene_pairs: 25
+      alpha2: 0.0005
+      mu: 1
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        feature_channel: SCNFeature
+        label_channel: cell_type
+wandb:
+  entity: danceteam
+  project: dance-dev
+  method: bayes
+  metric:
+    name: acc
+    goal: maximize

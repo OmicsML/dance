@@ -1,0 +1,138 @@
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: normalize
+    target: NormalizePlaceHolder
+  - type: filter.gene
+    target: FilterGenesScanpyOrder
+    params_to_tune:
+      order:
+        values:
+          - - min_counts
+            - min_cells
+            - max_counts
+            - max_cells
+          - - min_counts
+            - min_cells
+            - max_cells
+            - max_counts
+          - - min_counts
+            - max_counts
+            - min_cells
+            - max_cells
+          - - min_counts
+            - max_counts
+            - max_cells
+            - min_cells
+          - - min_counts
+            - max_cells
+            - min_cells
+            - max_counts
+          - - min_counts
+            - max_cells
+            - max_counts
+            - min_cells
+          - - min_cells
+            - min_counts
+            - max_counts
+            - max_cells
+          - - min_cells
+            - min_counts
+            - max_cells
+            - max_counts
+          - - min_cells
+            - max_counts
+            - min_counts
+            - max_cells
+          - - min_cells
+            - max_counts
+            - max_cells
+            - min_counts
+          - - min_cells
+            - max_cells
+            - min_counts
+            - max_counts
+          - - min_cells
+            - max_cells
+            - max_counts
+            - min_counts
+          - - max_counts
+            - min_counts
+            - min_cells
+            - max_cells
+          - - max_counts
+            - min_counts
+            - max_cells
+            - min_cells
+          - - max_counts
+            - min_cells
+            - min_counts
+            - max_cells
+          - - max_counts
+            - min_cells
+            - max_cells
+            - min_counts
+          - - max_counts
+            - max_cells
+            - min_counts
+            - min_cells
+          - - max_counts
+            - max_cells
+            - min_cells
+            - min_counts
+          - - max_cells
+            - min_counts
+            - min_cells
+            - max_counts
+          - - max_cells
+            - min_counts
+            - max_counts
+            - min_cells
+          - - max_cells
+            - min_cells
+            - min_counts
+            - max_counts
+          - - max_cells
+            - min_cells
+            - max_counts
+            - min_counts
+          - - max_cells
+            - max_counts
+            - min_counts
+            - min_cells
+          - - max_cells
+            - max_counts
+            - min_cells
+            - min_counts
+      min_counts:
+        min: 1
+        max: 10
+      min_cells:
+        min: 1
+        max: 10
+      max_counts:
+        min: 500
+        max: 5000
+      max_cells:
+        min: 500
+        max: 5000
+  - type: feature.cell
+    target: SCNFeature
+    params:
+      num_top_genes: 10
+      num_top_gene_pairs: 25
+      alpha2: 0.0005
+      mu: 1
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        feature_channel: SCNFeature
+        label_channel: cell_type
+wandb:
+  entity: danceteam
+  project: dance-dev
+  method: bayes
+  metric:
+    name: acc
+    goal: maximize

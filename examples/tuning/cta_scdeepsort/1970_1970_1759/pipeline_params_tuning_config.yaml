@@ -5,11 +5,11 @@ parameter_tuning_freq_n: 10
 pipeline:
   - type: normalize
     include:
-      # - ScaleFeature
-      # - ScTransform
+      - ScaleFeature
+      - ScTransform
       - Log1P
-      # - NormalizeTotal
-      # - NormalizePlaceHolder
+      - NormalizeTotal
+      - NormalizePlaceHolder
     default_params:
       ScTransform:
         min_cells: 2
@@ -18,14 +18,14 @@ pipeline:
         processes_num: 8
   - type: filter.gene
     include:
-      # - HighlyVariableGenesLogarithmizedByMeanAndDisp
-      # - HighlyVariableGenesRawCount
-      # - HighlyVariableGenesLogarithmizedByTopGenes
-      # - FilterGenesPercentile
+      - HighlyVariableGenesLogarithmizedByMeanAndDisp
+      - HighlyVariableGenesRawCount
+      - HighlyVariableGenesLogarithmizedByTopGenes
+      - FilterGenesPercentile
       - FilterGenesTopK
-      # - FilterGenesRegression
-      # - FilterGenesScanpyOrder
-      # - FilterGenesPlaceHolder
+      - FilterGenesRegression
+      - FilterGenesScanpyOrder
+      - FilterGenesPlaceHolder
     default_params:
       FilterGenesScanpyOrder:
         order: ["min_counts", "min_cells", "max_counts", "max_cells"]
@@ -40,10 +40,7 @@ pipeline:
   - type: feature.cell
     include:
       - WeightedFeaturePCA
-      # - WeightedFeatureSVD
-      - CellPCA
-      - CellSVD
-      - GaussRandProjFeature  # Registered custom preprocessing func
+      - WeightedFeatureSVD
       - FeatureCellPlaceHolder
     params:
       out: feature.cell
@@ -55,16 +52,14 @@ pipeline:
       WeightedFeatureSVD:
         n_components: 400
         split_name: train
-  - type: feature.cell
-    target: SCNFeature
+  - type: graph.cell
+    target: CellFeatureGraph
     params:
-      num_top_genes: 10
-      num_top_gene_pairs: 25
+      cell_feature_channel: feature.cell
   - type: misc
     target: SetConfig
     params:
       config_dict:
-        feature_channel: SCNFeature
         label_channel: cell_type
 wandb:
   entity: danceteam

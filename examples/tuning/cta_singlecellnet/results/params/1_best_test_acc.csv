@@ -1,3 +1,0 @@
-id,acc,_step,_wandb_runtime,_runtime,test_acc,_timestamp,Log1P.base,FilterGenesPercentile.mode,FilterGenesPercentile.max_val,FilterGenesPercentile.min_val,WeightedFeaturePCA.n_components,WeightedFeaturePCA.feat_norm_mode
-qmiaeabs,1.0,0,33,36.25746726989746,0.0,1709038756.7480323,4.996097483718756,cv,95,4,535,minmax
-n2565n3l,0.9934009909629822,0,29,32.76466488838196,0.6577600909607731,1709038675.6844468,4.367968054870213,sum,95,6,193,standardize
