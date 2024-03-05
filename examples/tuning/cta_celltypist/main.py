@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import get_args
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.celltypist import Celltypist
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
     file_root_path = Path(
         args.root_path, "_".join([
-            "/".join([str(num) for num in dataset])
+            "-".join([str(num) for num in dataset])
             for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")

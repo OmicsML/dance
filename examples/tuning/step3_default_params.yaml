@@ -28,8 +28,8 @@ pipeline:
       bw_adjust:
         min: 1.0
         max: 5.0
-      params:
-        processes_num: 8
+    params:
+      processes_num: 8
   - type: normalize
     target: Log1P
     params_to_tune:
@@ -214,11 +214,20 @@ pipeline:
           - minmax
           - l2
   - type: feature.cell
+    target: GaussRandProjFeature
+    params:
+      out: feature.cell
+      log_level: INFO
+    params_to_tune:
+      n_components:
+        min: 100
+        max: 1000
+  - type: feature.cell
     target: FeatureCellPlaceHolder
     params:
       out: feature.cell
 wandb:
-  entity: danceteam
+  entity: xzy11632
   project: dance-dev
   method: bayes
   metric:

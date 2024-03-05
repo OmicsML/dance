@@ -1005,6 +1005,7 @@ class HighlyVariableGenesRawCount(AnnDataTransform):
         super().__init__(sc.pp.highly_variable_genes, layer=layer, n_top_genes=n_top_genes, batch_key=batch_key,
                          check_values=check_values, span=span, subset=subset, inplace=inplace, flavor="seurat_v3",
                          **kwargs)
+        self.logger.info("Expects count data")
 
 
 @register_preprocessor("filter", "gene")
@@ -1052,6 +1053,7 @@ class HighlyVariableGenesLogarithmizedByTopGenes(AnnDataTransform):
                  batch_key: Optional[str] = None, **kwargs):
         super().__init__(sc.pp.highly_variable_genes, layer=layer, n_top_genes=n_top_genes, n_bins=n_bins,
                          flavor=flavor, subset=subset, inplace=inplace, batch_key=batch_key, **kwargs)
+        self.logger.info("Expects logarithmized data")
 
 
 @register_preprocessor("filter", "gene")
@@ -1119,6 +1121,7 @@ class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
         super().__init__(sc.pp.highly_variable_genes, layer=layer, min_disp=min_disp, max_disp=max_disp,
                          min_mean=min_mean, max_mean=max_mean, n_bins=n_bins, flavor=flavor, subset=subset,
                          inplace=inplace, batch_key=batch_key, **kwargs)
+        self.logger.info("Expects logarithmized data")
 
 
 @register_preprocessor("filter", "cell")

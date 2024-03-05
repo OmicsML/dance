@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import get_args
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.singlecellnet import SingleCellNet
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
     file_root_path = Path(
         args.root_path, "_".join([
-            "/".join([str(num) for num in dataset])
+            "-".join([str(num) for num in dataset])
             for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
@@ -90,7 +90,8 @@ if __name__ == "__main__":
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        required_funs=["SCNFeature", "SetConfig"], required_indexes=[sys.maxsize - 1, sys.maxsize],
-                       conf_load_path="../step3_default_params.yaml", root_path=file_root_path)
+                       conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
+                       root_path=file_root_path)
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """To reproduce SingleCellNet benchmarks, please refer to command lines below:
@@ -104,4 +105,18 @@ $ python singlecellnet.py --species mouse --tissue Spleen --train_dataset 1970 -
 Mouse Kidney
 $ python singlecellnet.py --species mouse --tissue Kidney --train_dataset 4682 --test_dataset 203
 
+Human Brain
+$ python main.py --tune_mode --species human --tissue Brain --train_dataset 328 --test_dataset 138 --valid_dataset 328
+
+Human CD4
+$ python main.py --species human --tissue CD4 --train_dataset 1013 1247 598 732 767 768 770 784 845 864 --test_dataset 315 340 376 381 390 404 437 490 551 559 --valid_dataset 1013 1247 598 732 767 768 770 784 845 864 --count 240
+
+Human CD8
+$ python main.py --species human --tissue CD8 --train_dataset 1027 1357 1641 517 706 777 850 972  --test_dataset 245 332 377 398 405 455 470 492 --valid_dataset 1027 1357 1641 517 706 777 850 972 --count 240
+
+Human Spleen
+$ python main.py --species human --tissue Spleen --train_dataset 3043 3777 4029 4115 4362 4657  --test_dataset 1729 2125 2184 2724 2743 --valid_dataset 3043 3777 4029 4115 4362 4657 --count 240
+
+Human Immune
+$ python main.py --species human --tissue Immune --train_dataset 11407 1519 636 713 9054 9258 --test_dataset 1925 205 3323 6509 7572 --valid_dataset 11407 1519 636 713 9054 9258 --count 240
 """

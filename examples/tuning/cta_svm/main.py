@@ -5,9 +5,9 @@ import string
 from pathlib import Path
 from typing import get_args
 
-import wandb
 from sklearn.random_projection import GaussianRandomProjection
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     logger.info(f"\n{pprint.pformat(vars(args))}")
     file_root_path = Path(
         args.root_path, "_".join([
-            "/".join([str(num) for num in dataset])
+            "-".join([str(num) for num in dataset])
             for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
@@ -116,5 +116,11 @@ $ python main.py --tune_mode (pipeline/params/pipeline_params) --species mouse -
 
 Mouse Kidney
 $ python main.py --tune_mode (pipeline/params/pipeline_params) --species mouse --tissue Kidney --train_dataset 4682 --test_dataset 203 --valid_dataset 4682
+
+Human Brain
+$ python main.py --tune_mode (pipeline/params/pipeline_params) --species human --tissue Brain --train_dataset 328 --test_dataset 138 --valid_dataset 328
+
+Human Spleen
+$ python main.py --species human --tissue Spleen --train_dataset 3043 3777 4029 4115 4362 4657  --test_dataset 1729 2125 2184 2724 2743 --valid_dataset 3043 3777 4029 4115 4362 4657 --count 240
 
 """

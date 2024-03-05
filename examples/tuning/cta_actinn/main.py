@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import get_args
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     logger.info(f"\n{pprint.pformat(vars(args))}")
     file_root_path = Path(
         args.root_path, "_".join([
-            "/".join([str(num) for num in dataset])
+            "-".join([str(num) for num in dataset])
             for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
@@ -106,5 +106,9 @@ $ python actinn.py --species mouse --tissue Spleen --train_dataset 1970 --test_d
 
 Mouse Kidney
 $ python actinn.py --species mouse --tissue Kidney --train_dataset 4682 --test_dataset 203
+
+Human CD4
+$ python main.py --species human --tissue CD4 --train_dataset 1013 1247 598 732 767 768 770 784 845 864 --test_dataset 315 340 376 381 390 404 437 490 551 559 --valid_dataset 1013 1247 598 732 767 768 770 784 845 864 --count 240
+
 
 """

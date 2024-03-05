@@ -6,8 +6,8 @@ from typing import get_args
 
 import numpy as np
 import torch
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     parser.add_argument("--hidden_dim", type=int, default=200, help="number of hidden gcn units")
     parser.add_argument("--log_level", type=str, default="INFO", choices=get_args(LogLevel))
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
-    parser.add_argument("--n_epochs", type=int, default=20, help="number of training epochs")
+    parser.add_argument("--n_epochs", type=int, default=300, help="number of training epochs")
     parser.add_argument("--n_layers", type=int, default=1, help="number of hidden gcn layers")
     parser.add_argument("--species", default="mouse", type=str)
     parser.add_argument("--test_dataset", nargs="+", type=int, default=[1759], help="Testing dataset IDs")
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
     file_root_path = Path(
         args.root_path, "_".join([
-            "/".join([str(num) for num in dataset])
+            "-".join([str(num) for num in dataset])
             for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
