@@ -1308,5 +1308,3 @@ class FilterCellsScanpyOrder(BaseTransform):
         for parameter in self.filter_cells_order:
             cellScanpyOrder = self.cellScanpyOrderDict[parameter]
             cellScanpyOrder(data)
-
-
