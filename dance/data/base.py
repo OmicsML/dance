@@ -5,16 +5,17 @@ from copy import deepcopy
 from functools import partial
 from operator import is_not
 from pprint import pformat
-import omegaconf
+
 import anndata
 import mudata
 import numpy as np
+import omegaconf
 import pandas as pd
 import scipy.sparse as sp
 import torch
 
 from dance import logger
-from dance.typing import Any, Dict, FeatType, Iterator, List, Literal, Optional, Sequence, Tuple, Union,ListConfig
+from dance.typing import Any, Dict, FeatType, Iterator, List, ListConfig, Literal, Optional, Sequence, Tuple, Union
 
 
 def _ensure_iter(val: Optional[Union[List[str], str]]) -> Iterator[Optional[str]]:
@@ -34,7 +35,7 @@ def _check_types_and_sizes(types, sizes):
         raise TypeError(f"Found mixed types: {types}. Input configs must be either all str or all lists.")
     elif ((type_ := types.pop()) == list) and (len(sizes) > 1):
         raise ValueError(f"Found mixed sizes lists: {sizes}. Input configs must be of same length.")
-    elif type_ not in (list, str,ListConfig):
+    elif type_ not in (list, str, ListConfig):
         raise TypeError(f"Unknownn type {type_} found in config.")
 
 
@@ -249,8 +250,8 @@ class BaseData(ABC):
         for config_key, config_val in config_dict.items():
             # New config
             if config_key not in self.config:
-                if isinstance(config_val,ListConfig):
-                    config_val=omegaconf.OmegaConf.to_object(config_val)
+                if isinstance(config_val, ListConfig):
+                    config_val = omegaconf.OmegaConf.to_object(config_val)
                     logger.warning(f"transform ListConfig {config_val} to List")
                 self.config[config_key] = config_val
                 logger.info(f"Setting config {config_key!r} to {config_val!r}")
