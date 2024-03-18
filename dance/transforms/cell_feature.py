@@ -4,7 +4,7 @@ from sklearn.decomposition import PCA, TruncatedSVD
 
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
-from dance.typing import Optional,Union
+from dance.typing import Optional, Union
 from dance.utils.matrix import normalize
 from dance.utils.status import deprecated
 
@@ -30,8 +30,8 @@ class WeightedFeaturePCA(BaseTransform):
 
     _DISPLAY_ATTRS = ("n_components", "split_name", "feat_norm_mode", "feat_norm_axis")
 
-    def __init__(self, n_components: Union[float, int] = 0.9, split_name: Optional[str] = None, feat_norm_mode: Optional[str] = None,
-                 feat_norm_axis: int = 0, **kwargs):
+    def __init__(self, n_components: Union[float, int] = 0.9, split_name: Optional[str] = None,
+                 feat_norm_mode: Optional[str] = None, feat_norm_axis: int = 0, **kwargs):
         super().__init__(**kwargs)
 
         self.n_components = n_components
@@ -80,10 +80,9 @@ class WeightedFeatureSVD(BaseTransform):
 
     _DISPLAY_ATTRS = ("n_components", "split_name", "feat_norm_mode", "feat_norm_axis")
 
-    def __init__(self, n_components: Union[float, int] = 0.9, split_name: Optional[str] = None, feat_norm_mode: Optional[str] = None,
-                 feat_norm_axis: int = 0, **kwargs):
+    def __init__(self, n_components: Union[float, int] = 0.9, split_name: Optional[str] = None,
+                 feat_norm_mode: Optional[str] = None, feat_norm_axis: int = 0, **kwargs):
         super().__init__(**kwargs)
-        
 
         self.n_components = n_components
         self.split_name = split_name
@@ -92,12 +91,12 @@ class WeightedFeatureSVD(BaseTransform):
 
     def __call__(self, data):
         feat = data.get_x(self.split_name)  # cell x genes
-        if isinstance(self.n_components,float):
-            n_components = min(feat.shape) - 1 
+        if isinstance(self.n_components, float):
+            n_components = min(feat.shape) - 1
             svd = TruncatedSVD(n_components=n_components)
             svd.fit_transform(feat)
             explained_variance = svd.explained_variance_ratio_.cumsum()
-            self.n_components= (explained_variance < self.n_components).sum() + 1
+            self.n_components = (explained_variance < self.n_components).sum() + 1
         if self.feat_norm_mode is not None:
             self.logger.info(f"Normalizing feature before PCA decomposition with mode={self.feat_norm_mode} "
                              f"and axis={self.feat_norm_axis}")
@@ -129,7 +128,8 @@ class CellPCA(BaseTransform):
 
     _DISPLAY_ATTRS = ("n_components", )
 
-    def __init__(self, n_components: Union[float, int] = 0.9, *, channel: Optional[str] = None, mod: Optional[str] = None, **kwargs):
+    def __init__(self, n_components: Union[float, int] = 0.9, *, channel: Optional[str] = None,
+                 mod: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
 
         self.n_components = n_components
@@ -163,7 +163,8 @@ class CellSVD(BaseTransform):
 
     _DISPLAY_ATTRS = ("n_components", )
 
-    def __init__(self, n_components: Union[float, int] = 0.9, *, channel: Optional[str] = None, mod: Optional[str] = None, **kwargs):
+    def __init__(self, n_components: Union[float, int] = 0.9, *, channel: Optional[str] = None,
+                 mod: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
 
         self.n_components = n_components
@@ -172,12 +173,12 @@ class CellSVD(BaseTransform):
 
     def __call__(self, data):
         feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
-        if isinstance(self.n_components,float):
-            n_components = min(feat.shape) - 1 
+        if isinstance(self.n_components, float):
+            n_components = min(feat.shape) - 1
             svd = TruncatedSVD(n_components=n_components)
             svd.fit_transform(feat)
             explained_variance = svd.explained_variance_ratio_.cumsum()
-            self.n_components= (explained_variance < self.n_components).sum() + 1
+            self.n_components = (explained_variance < self.n_components).sum() + 1
         svd = TruncatedSVD(n_components=self.n_components)
 
         cell_feat = svd.fit_transform(feat)
