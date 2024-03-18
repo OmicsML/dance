@@ -99,8 +99,8 @@ class FilterScanpy(BaseTransform):
         max_counts = self.max_counts
 
         # Determine whether we are dealing with cells or genes
-        basis = total_cells if self._FILTER_TARGET == "cells" else total_features
-        other_name = "cells" if self._FILTER_TARGET == "genes" else "genes"
+        basis = total_cells if self._FILTER_TARGET == "genes" else total_features
+        other_name = "cells" if self._FILTER_TARGET == "genes" else "genes"  
         opts = {
             "min_counts": min_counts,
             "max_counts": max_counts,
@@ -1125,6 +1125,18 @@ class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
 
 
 @register_preprocessor("filter", "cell")
+@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+class FilterCellsPlaceHolder(BaseTransform):
+    """Used as a placeholder to skip the process."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __call__(self, data: Data) -> Data:
+        return data
+
+
+@register_preprocessor("filter", "cell")
 class FilterCellsScanpyOrder(BaseTransform):
     """Scanpy filtering cell transformation with additional options.
 
@@ -1191,5 +1203,5 @@ class FilterCellsScanpyOrder(BaseTransform):
 
     def __call__(self, data: Data):
         for parameter in self.filter_cells_order:
-            geneScanpyOrder = self.cellScanpyOrderDict[parameter]
-            geneScanpyOrder(data)
+            cellScanpyOrder = self.cellScanpyOrderDict[parameter]
+            cellScanpyOrder(data)
