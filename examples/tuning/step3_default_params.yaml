@@ -1,3 +1,4 @@
+---
 type: preprocessor
 tune_mode: params
 pipeline:
@@ -5,7 +6,7 @@ pipeline:
     target: ScaleFeature
     params_to_tune:
       mode:
-        values: ["normalize", "standardize", "minmax", "l2"]
+        values: [normalize, standardize, minmax, l2]
       eps:
         values: [-1, 0.1, 0.3, 0.5, 0.7]
   - type: normalize
@@ -43,11 +44,8 @@ pipeline:
         values: [null, 1e3, 1e4, 1e5, 1e6]
       max_fraction:
         values: [0.01, 0.05, 0.5, 0.7, 1.0]
-
   - type: normalize
     target: NormalizePlaceHolder
-
-
   - type: filter.gene
     target: FilterGenesPercentile
     params_to_tune:
@@ -58,72 +56,85 @@ pipeline:
         min: 95
         max: 99
       mode:
-        values: ["sum", "var", "cv", "rv"]
+        values: [sum, var, cv, rv]
   - type: filter.gene
     target: FilterGenesTopK
     params_to_tune:
       num_genes:
         min: 100
-        max: 2000
+        max: 10000
       top:
         values: [true, false]
       mode:
-        values: ["sum", "var", "cv", "rv"]
+        values: [sum, var, cv, rv]
   - type: filter.gene
     target: FilterGenesRegression
     params_to_tune:
       method:
-        values: ["enclasc", "seurat3", "scmap"]
+        values: [enclasc, seurat3, scmap]
       num_genes:
         min: 100
-        max: 2000
+        max: 10000
   - type: filter.gene
     target: FilterGenesScanpyOrder
     params_to_tune:
       order:
         values:
-          - ['min_counts', 'min_cells', 'max_counts', 'max_cells']
-          - ['min_counts', 'min_cells', 'max_cells', 'max_counts']
-          - ['min_counts', 'max_counts', 'min_cells', 'max_cells']
-          - ['min_counts', 'max_counts', 'max_cells', 'min_cells']
-          - ['min_counts', 'max_cells', 'min_cells', 'max_counts']
-          - ['min_counts', 'max_cells', 'max_counts', 'min_cells']
-          - ['min_cells', 'min_counts', 'max_counts', 'max_cells']
-          - ['min_cells', 'min_counts', 'max_cells', 'max_counts']
-          - ['min_cells', 'max_counts', 'min_counts', 'max_cells']
-          - ['min_cells', 'max_counts', 'max_cells', 'min_counts']
-          - ['min_cells', 'max_cells', 'min_counts', 'max_counts']
-          - ['min_cells', 'max_cells', 'max_counts', 'min_counts']
-          - ['max_counts', 'min_counts', 'min_cells', 'max_cells']
-          - ['max_counts', 'min_counts', 'max_cells', 'min_cells']
-          - ['max_counts', 'min_cells', 'min_counts', 'max_cells']
-          - ['max_counts', 'min_cells', 'max_cells', 'min_counts']
-          - ['max_counts', 'max_cells', 'min_counts', 'min_cells']
-          - ['max_counts', 'max_cells', 'min_cells', 'min_counts']
-          - ['max_cells', 'min_counts', 'min_cells', 'max_counts']
-          - ['max_cells', 'min_counts', 'max_counts', 'min_cells']
-          - ['max_cells', 'min_cells', 'min_counts', 'max_counts']
-          - ['max_cells', 'min_cells', 'max_counts', 'min_counts']
-          - ['max_cells', 'max_counts', 'min_counts', 'min_cells']
-          - ['max_cells', 'max_counts', 'min_cells', 'min_counts']
+          - [min_counts, min_cells, max_counts, max_cells]
+          - [min_counts, min_cells, max_cells, max_counts]
+          - [min_counts, max_counts, min_cells, max_cells]
+          - [min_counts, max_counts, max_cells, min_cells]
+          - [min_counts, max_cells, min_cells, max_counts]
+          - [min_counts, max_cells, max_counts, min_cells]
+          - [min_cells, min_counts, max_counts, max_cells]
+          - [min_cells, min_counts, max_cells, max_counts]
+          - [min_cells, max_counts, min_counts, max_cells]
+          - [min_cells, max_counts, max_cells, min_counts]
+          - [min_cells, max_cells, min_counts, max_counts]
+          - [min_cells, max_cells, max_counts, min_counts]
+          - [max_counts, min_counts, min_cells, max_cells]
+          - [max_counts, min_counts, max_cells, min_cells]
+          - [max_counts, min_cells, min_counts, max_cells]
+          - [max_counts, min_cells, max_cells, min_counts]
+          - [max_counts, max_cells, min_counts, min_cells]
+          - [max_counts, max_cells, min_cells, min_counts]
+          - [max_cells, min_counts, min_cells, max_counts]
+          - [max_cells, min_counts, max_counts, min_cells]
+          - [max_cells, min_cells, min_counts, max_counts]
+          - [max_cells, min_cells, max_counts, min_counts]
+          - [max_cells, max_counts, min_counts, min_cells]
+          - [max_cells, max_counts, min_cells, min_counts]
+            #cta_problem
+            # min_counts:
+            #   min: 1
+            #   max: 10
+            # min_cells:
+            #   min: 1
+            #   max: 10
+            # max_counts: 
+            #   min: 500
+            #   max: 5000
+            # max_cells:
+            #   min: 500
+            #   max: 5000
       min_counts:
-        min: 1
-        max: 10
+          min: 3
+          max: 100
       min_cells:
-        min: 1
-        max: 10
-      max_counts:
-        min: 500
-        max: 5000
+        min: 0.0
+        max: 0.05
+      max_counts: 
+        min: 10000
+        max: 100000
       max_cells:
-        min: 500
-        max: 5000
+        min: 0.95
+        max: 1.0
   - type: filter.gene
     target: HighlyVariableGenesRawCount
     params_to_tune:
       n_top_genes:
         min: 100
-        max: 2000
+        max: 10000
       span:
         min: 0.1
         max: 0.6
@@ -132,14 +143,12 @@ pipeline:
     params_to_tune:
       n_top_genes:
         min: 100
-        max: 2000
+        max: 10000
       n_bins:
         min: 10
         max: 30
       flavor:
-        values:
-          - seurat
-          - cell_ranger
+        values: [seurat, cell_ranger]
   - type: filter.gene
     target: HighlyVariableGenesLogarithmizedByMeanAndDisp
     params_to_tune:
@@ -159,60 +168,88 @@ pipeline:
         min: 10
         max: 30
       flavor:
-        values:
-          - seurat
-          - cell_ranger
-
+        values: [seurat, cell_ranger]
   - type: filter.gene
     target: FilterGenesPlaceHolder
-
-
+  - type: filter.cell
+    target: FilterCellsScanpyOrder
+    params_to_tune:
+      order:
+        values:
+          - [min_counts, min_genes, max_counts, max_genes]
+          - [min_counts, min_genes, max_genes, max_counts]
+          - [min_counts, max_counts, min_genes, max_genes]
+          - [min_counts, max_counts, max_genes, min_genes]
+          - [min_counts, max_genes, min_genes, max_counts]
+          - [min_counts, max_genes, max_counts, min_genes]
+          - [min_genes, min_counts, max_counts, max_genes]
+          - [min_genes, min_counts, max_genes, max_counts]
+          - [min_genes, max_counts, min_counts, max_genes]
+          - [min_genes, max_counts, max_genes, min_counts]
+          - [min_genes, max_genes, min_counts, max_counts]
+          - [min_genes, max_genes, max_counts, min_counts]
+          - [max_counts, min_counts, min_genes, max_genes]
+          - [max_counts, min_counts, max_genes, min_genes]
+          - [max_counts, min_genes, min_counts, max_genes]
+          - [max_counts, min_genes, max_genes, min_counts]
+          - [max_counts, max_genes, min_counts, min_genes]
+          - [max_counts, max_genes, min_genes, min_counts]
+          - [max_genes, min_counts, min_genes, max_counts]
+          - [max_genes, min_counts, max_counts, min_genes]
+          - [max_genes, min_genes, min_counts, max_counts]
+          - [max_genes, min_genes, max_counts, min_counts]
+          - [max_genes, max_counts, min_counts, min_genes]
+          - [max_genes, max_counts, min_genes, min_counts]
+      min_counts:
+        min: 3
+        max: 1000
+      min_genes:
+        min: 0.0
+        max: 0.05
+      max_counts:
+        min: 10000
+        max: 100000
+      max_genes:
+        min: 0.95
+        max: 1.0
+  - type: filter.cell
+    target: FilterCellsPlaceHolder
   - type: feature.cell
     target: CellPCA
     params:
       out: feature.cell
     params_to_tune:
       n_components:
-        min: 100
-        max: 1000
+        min: 0.8
+        max: 0.95
   - type: feature.cell
     target: CellSVD
     params:
       out: feature.cell
     params_to_tune:
       n_components:
-        min: 100
-        max: 1000
+        min: 0.8
+        max: 0.95
   - type: feature.cell
     target: WeightedFeaturePCA
     params:
       out: feature.cell
     params_to_tune:
       n_components:
-        min: 100
-        max: 1000
+        min: 0.8
+        max: 0.95
       feat_norm_mode:
-        values:
-          - null
-          - normalize
-          - standardize
-          - minmax
-          - l2
+        values: [null, normalize, standardize, minmax, l2]
   - type: feature.cell
     target: WeightedFeatureSVD
     params:
       out: feature.cell
     params_to_tune:
       n_components:
-        min: 100
-        max: 1000
+        min: 0.8
+        max: 0.95
       feat_norm_mode:
-        values:
-          - null
-          - normalize
-          - standardize
-          - minmax
-          - l2
+        values: [null, normalize, standardize, minmax, l2]
   - type: feature.cell
     target: GaussRandProjFeature
     params:

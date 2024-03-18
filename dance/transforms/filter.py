@@ -62,6 +62,7 @@ class FilterScanpy(BaseTransform):
         split_name: Optional[str] = None,
         channel: Optional[str] = None,
         channel_type: Optional[str] = "X",
+        key_n_counts: Optional[str] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -70,7 +71,7 @@ class FilterScanpy(BaseTransform):
         self.min_genes_or_cells = min_genes_or_cells
         self.max_counts = max_counts
         self.max_genes_or_cells = max_genes_or_cells
-
+        self.key_n_counts=key_n_counts
         self.split_name = split_name
         self.channel = channel
         self.channel_type = channel_type
@@ -99,8 +100,8 @@ class FilterScanpy(BaseTransform):
         max_counts = self.max_counts
 
         # Determine whether we are dealing with cells or genes
-        basis = total_cells if self._FILTER_TARGET == "cells" else total_features
-        other_name = "cells" if self._FILTER_TARGET == "genes" else "genes"
+        basis = total_cells if self._FILTER_TARGET == "genes" else total_features
+        other_name = "cells" if self._FILTER_TARGET == "genes" else "genes"  
         opts = {
             "min_counts": min_counts,
             "max_counts": max_counts,
@@ -109,11 +110,25 @@ class FilterScanpy(BaseTransform):
         }
         subset_ind, _ = self._filter_func(x, inplace=False, **opts)
 
+        if self._FILTER_TARGET == "genes":
+            if self.key_n_counts is not None:
+                raise NotImplementedError
+        else:
+            if self.key_n_counts is not None:
+                if min_counts is not None or max_counts is not None:
+                    n_counts = np.sum(x, axis=1)
+                    data.data.obs[self.key_n_counts]=n_counts
+                else:
+                    n_genes = np.sum(x > 0, axis=1)
+                    data.data.obs[self.key_n_counts]=n_genes
+                # TODO test code
+
         if not subset_ind.all():
             subset_func = getattr(data.data, self._subsetting_func_name)
             self.logger.info(f"Subsetting {self._FILTER_TARGET} ({~subset_ind.sum():,} removed) due to {self}")
             subset_func(subset_ind)
 
+       
 
 @register_preprocessor("filter", "cell")
 class FilterCellsScanpy(FilterScanpy):
@@ -458,6 +473,8 @@ class FilterGenesPercentile(FilterGenes):
         percentile_lo = np.percentile(gene_summary, self.min_val)
         percentile_hi = np.percentile(gene_summary, self.max_val)
         return np.logical_and(gene_summary >= percentile_lo, gene_summary <= percentile_hi)
+
+
 
 
 @register_preprocessor("filter", "gene")
@@ -1125,6 +1142,34 @@ class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
 
 
 @register_preprocessor("filter", "cell")
+@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+class FilterCellsPlaceHolder(BaseTransform):
+    """Used as a placeholder to skip the process."""
+
+    def __init__(self, split_name: Optional[str] = None,
+        channel: Optional[str] = None,
+        channel_type: Optional[str] = "X",add_n_counts=True,
+        add_n_genes=True,**kwargs):
+        super().__init__(**kwargs)
+        self.split_name = split_name
+        self.channel = channel
+        self.channel_type = channel_type
+        self.add_n_counts=add_n_counts
+        self.add_n_genes=add_n_genes
+    def __call__(self, data: Data) -> Data:
+        x = data.get_feature(return_type="default", split_name=self.split_name, channel=self.channel,
+                             channel_type=self.channel_type)
+        n_counts = np.sum(x, axis=1)
+        n_genes = np.sum(x > 0, axis=1)
+        if self.add_n_counts:
+            data.data.obs["n_counts"]=n_counts
+        if self.add_n_genes:
+            data.data.obs["n_genes"]=n_genes#!!!! need to think
+
+        return data
+
+
+@register_preprocessor("filter", "cell")
 class FilterCellsScanpyOrder(BaseTransform):
     """Scanpy filtering cell transformation with additional options.
 
@@ -1163,7 +1208,8 @@ class FilterCellsScanpyOrder(BaseTransform):
         split_name: Optional[str] = None,
         channel: Optional[str] = None,
         channel_type: Optional[str] = "X",
-        **kwargs,
+        add_n_counts=True,
+        **kwargs
     ):
         super().__init__(**kwargs)
         self.filter_cells_order = default(order, ["min_counts", "min_genes", "max_counts", "max_genes"])
@@ -1184,12 +1230,16 @@ class FilterCellsScanpyOrder(BaseTransform):
                     split_name=split_name,
                     channel=channel,
                     channel_type=channel_type,
-                    **kwargs,
+                    key_n_counts="n_counts" if key in ("min_counts","max_counts") else "n_genes",
+                    **kwargs
                 )
             else:
                 self.logger.warning(f"{key} not in order,It makes no sense to set {key}")
 
     def __call__(self, data: Data):
         for parameter in self.filter_cells_order:
-            geneScanpyOrder = self.cellScanpyOrderDict[parameter]
-            geneScanpyOrder(data)
+            cellScanpyOrder = self.cellScanpyOrderDict[parameter]
+            cellScanpyOrder(data)
+        
+
+            
