@@ -111,19 +111,19 @@ pipeline:
             # min_cells:
             #   min: 1
             #   max: 10
-            # max_counts:
+            # max_counts: 
             #   min: 500
             #   max: 5000
             # max_cells:
             #   min: 500
             #   max: 5000
       min_counts:
-        min: 3
-        max: 100
+          min: 3
+          max: 100
       min_cells:
         min: 0.0
         max: 0.05
-      max_counts:
+      max_counts: 
         min: 10000
         max: 100000
       max_cells:
