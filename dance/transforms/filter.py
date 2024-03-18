@@ -71,7 +71,7 @@ class FilterScanpy(BaseTransform):
         self.min_genes_or_cells = min_genes_or_cells
         self.max_counts = max_counts
         self.max_genes_or_cells = max_genes_or_cells
-        self.key_n_counts=key_n_counts
+        self.key_n_counts = key_n_counts
         self.split_name = split_name
         self.channel = channel
         self.channel_type = channel_type
@@ -114,24 +114,23 @@ class FilterScanpy(BaseTransform):
             if self._FILTER_TARGET == "genes":
                 if min_counts is not None or max_counts is not None:
                     n_counts = np.sum(x, axis=0)
-                    data.data.var[self.key_n_counts]=n_counts
+                    data.data.var[self.key_n_counts] = n_counts
                 else:
                     n_cells = np.sum(x > 0, axis=0)
-                    data.data.var[self.key_n_counts]=n_cells
+                    data.data.var[self.key_n_counts] = n_cells
             else:
                 if min_counts is not None or max_counts is not None:
                     n_counts = np.sum(x, axis=1)
-                    data.data.obs[self.key_n_counts]=n_counts
+                    data.data.obs[self.key_n_counts] = n_counts
                 else:
                     n_genes = np.sum(x > 0, axis=1)
-                    data.data.obs[self.key_n_counts]=n_genes
+                    data.data.obs[self.key_n_counts] = n_genes
 
         if not subset_ind.all():
             subset_func = getattr(data.data, self._subsetting_func_name)
             self.logger.info(f"Subsetting {self._FILTER_TARGET} ({~subset_ind.sum():,} removed) due to {self}")
             subset_func(subset_ind)
 
-       
 
 @register_preprocessor("filter", "cell")
 class FilterCellsScanpy(FilterScanpy):
@@ -159,7 +158,6 @@ class FilterCellsScanpy(FilterScanpy):
         Whether to add n_counts
     add_n_genes
         Whether to add n_genes
-
 
     """
 
@@ -395,8 +393,8 @@ class FilterGenes(BaseTransform, ABC):
         self.channel = channel
         self.channel_type = channel_type
         self.whitelist_indicators = whitelist_indicators
-        self.add_n_counts=add_n_counts
-        self.add_n_cells=add_n_cells
+        self.add_n_counts = add_n_counts
+        self.add_n_cells = add_n_cells
 
     def _get_preserve_mask(self, gene_summary: np.ndarray) -> np.ndarray:
         """Select gene to be preserved and return as a mask."""
@@ -407,11 +405,11 @@ class FilterGenes(BaseTransform, ABC):
         if self.add_n_counts:
             self.logger.warning(f"n_counts will be added to the var of data")
             n_counts = np.sum(x, axis=0)
-            data.data.var[self.key_n_counts]=n_counts
+            data.data.var[self.key_n_counts] = n_counts
         if self.add_n_cells:
             self.logger.warning(f"n_cells will be added to the var of data")
             n_cells = np.sum(x > 0, axis=0)
-            data.data.var[self.key_n_counts]=n_cells
+            data.data.var[self.key_n_counts] = n_cells
         # Compute gene summary stats for filtering
         if self.mode == "sum":
             gene_summary = np.array(x.sum(0)).ravel()
@@ -478,6 +476,7 @@ class FilterGenesPercentile(FilterGenes):
         Whether to add n_counts
     add_n_cells
         Whether to add n_cells
+
     """
 
     _DISPLAY_ATTRS = ("min_val", "max_val", "mode")
@@ -511,8 +510,6 @@ class FilterGenesPercentile(FilterGenes):
         percentile_lo = np.percentile(gene_summary, self.min_val)
         percentile_hi = np.percentile(gene_summary, self.max_val)
         return np.logical_and(gene_summary >= percentile_lo, gene_summary <= percentile_hi)
-
-
 
 
 @register_preprocessor("filter", "gene")
@@ -1002,20 +999,20 @@ class FilterGenesScanpyOrder(BaseTransform):
             "max_counts": max_counts,
             "max_cells": max_cells
         }
-        self.add_n_counts=add_n_counts
-        self.add_n_cells=add_n_cells
+        self.add_n_counts = add_n_counts
+        self.add_n_cells = add_n_cells
         if not set(self.filter_genes_order).issubset(set(geneParameterDict.keys())):
             raise KeyError(f"An order should be in {geneParameterDict.keys()}")
         self.geneScanpyOrderDict = {}
         for key in geneParameterDict.keys():
             if key in self.filter_genes_order:
                 if key in self.filter_cells_order:
-                    if key in ("min_counts","max_counts") and self.add_n_counts:
-                        key_n_counts="n_counts"
-                    elif key in ("min_cells","max_cells") and self.add_n_cells:
-                        key_n_counts="n_cells"
+                    if key in ("min_counts", "max_counts") and self.add_n_counts:
+                        key_n_counts = "n_counts"
+                    elif key in ("min_cells", "max_cells") and self.add_n_cells:
+                        key_n_counts = "n_cells"
                     else:
-                        key_n_counts=None
+                        key_n_counts = None
                 self.geneScanpyOrderDict[key] = FilterGenesScanpy(
                     **{key: geneParameterDict[key]},
                     split_name=split_name,
@@ -1132,16 +1129,15 @@ class HighlyVariableGenesLogarithmizedByTopGenes(AnnDataTransform):
 class FilterGenesPlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process."""
 
-    def __init__(self,split_name: Optional[str] = None,
-        channel: Optional[str] = None,
-        channel_type: Optional[str] = "X",add_n_counts=True,
-        add_n_cells=True,**kwargs):
+    def __init__(self, split_name: Optional[str] = None, channel: Optional[str] = None,
+                 channel_type: Optional[str] = "X", add_n_counts=True, add_n_cells=True, **kwargs):
         super().__init__(**kwargs)
         self.split_name = split_name
         self.channel = channel
         self.channel_type = channel_type
-        self.add_n_counts=add_n_counts
-        self.add_n_cells=add_n_cells
+        self.add_n_counts = add_n_counts
+        self.add_n_cells = add_n_cells
+
     def __call__(self, data: Data) -> Data:
         x = data.get_feature(return_type="default", split_name=self.split_name, channel=self.channel,
                              channel_type=self.channel_type)
@@ -1149,10 +1145,10 @@ class FilterGenesPlaceHolder(BaseTransform):
         n_cells = np.sum(x > 0, axis=0)
         if self.add_n_counts:
             self.logger.warning(f"n_counts will be added to the var of data")
-            data.data.var["n_counts"]=n_counts
+            data.data.var["n_counts"] = n_counts
         if self.add_n_genes:
             self.logger.warning(f"n_cells will be added to the var of data")
-            data.data.var["n_cells"]=n_cells
+            data.data.var["n_cells"] = n_cells
         return data
 
 
@@ -1217,16 +1213,15 @@ class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
 class FilterCellsPlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process."""
 
-    def __init__(self, split_name: Optional[str] = None,
-        channel: Optional[str] = None,
-        channel_type: Optional[str] = "X",add_n_counts=True,
-        add_n_genes=True,**kwargs):
+    def __init__(self, split_name: Optional[str] = None, channel: Optional[str] = None,
+                 channel_type: Optional[str] = "X", add_n_counts=True, add_n_genes=True, **kwargs):
         super().__init__(**kwargs)
         self.split_name = split_name
         self.channel = channel
         self.channel_type = channel_type
-        self.add_n_counts=add_n_counts
-        self.add_n_genes=add_n_genes
+        self.add_n_counts = add_n_counts
+        self.add_n_genes = add_n_genes
+
     def __call__(self, data: Data) -> Data:
         x = data.get_feature(return_type="default", split_name=self.split_name, channel=self.channel,
                              channel_type=self.channel_type)
@@ -1234,10 +1229,10 @@ class FilterCellsPlaceHolder(BaseTransform):
         n_genes = np.sum(x > 0, axis=1)
         if self.add_n_counts:
             self.logger.warning(f"n_counts will be added to the obs of data")
-            data.data.obs["n_counts"]=n_counts
+            data.data.obs["n_counts"] = n_counts
         if self.add_n_genes:
             self.logger.warning(f"n_genes will be added to the obs of data")
-            data.data.obs["n_genes"]=n_genes
+            data.data.obs["n_genes"] = n_genes
 
         return data
 
@@ -1275,20 +1270,11 @@ class FilterCellsScanpyOrder(BaseTransform):
 
     """
 
-    def __init__(
-        self,
-        order: Optional[List[str]] = None,
-        min_counts: Optional[int] = None,
-        min_genes: Optional[Union[float, int]] = None,
-        max_counts: Optional[int] = None,
-        max_genes: Optional[Union[float, int]] = None,
-        split_name: Optional[str] = None,
-        channel: Optional[str] = None,
-        channel_type: Optional[str] = "X",
-        add_n_counts=True,
-        add_n_genes=True,
-        **kwargs
-    ):
+    def __init__(self, order: Optional[List[str]] = None, min_counts: Optional[int] = None,
+                 min_genes: Optional[Union[float, int]] = None, max_counts: Optional[int] = None,
+                 max_genes: Optional[Union[float, int]] = None, split_name: Optional[str] = None,
+                 channel: Optional[str] = None, channel_type: Optional[str] = "X", add_n_counts=True, add_n_genes=True,
+                 **kwargs):
         super().__init__(**kwargs)
         self.filter_cells_order = default(order, ["min_counts", "min_genes", "max_counts", "max_genes"])
         self.logger.info(f"Filter cells order: {self.filter_cells_order}")
@@ -1298,27 +1284,23 @@ class FilterCellsScanpyOrder(BaseTransform):
             "max_counts": max_counts,
             "max_genes": max_genes
         }
-        self.add_n_counts=add_n_counts
-        self.add_n_genes=add_n_genes
+        self.add_n_counts = add_n_counts
+        self.add_n_genes = add_n_genes
         if not set(self.filter_cells_order).issubset(set(cellParameterDict.keys())):
             raise KeyError(f"An order should be in {cellParameterDict.keys()}")
         self.cellScanpyOrderDict = {}
         for key in cellParameterDict.keys():
             if key in self.filter_cells_order:
-                if key in ("min_counts","max_counts") and self.add_n_counts:
-                    key_n_counts="n_counts"
-                elif key in ("min_genes","max_genes") and self.add_n_genes:
-                    key_n_counts="n_genes"
+                if key in ("min_counts", "max_counts") and self.add_n_counts:
+                    key_n_counts = "n_counts"
+                elif key in ("min_genes", "max_genes") and self.add_n_genes:
+                    key_n_counts = "n_genes"
                 else:
-                    key_n_counts=None
-                self.cellScanpyOrderDict[key] = FilterCellsScanpy(
-                    **{key: cellParameterDict[key]},
-                    split_name=split_name,
-                    channel=channel,
-                    channel_type=channel_type,
-                    key_n_counts=key_n_counts,
-                    **kwargs
-                )
+                    key_n_counts = None
+                self.cellScanpyOrderDict[key] = FilterCellsScanpy(**{key:
+                                                                     cellParameterDict[key]}, split_name=split_name,
+                                                                  channel=channel, channel_type=channel_type,
+                                                                  key_n_counts=key_n_counts, **kwargs)
             else:
                 self.logger.warning(f"{key} not in order,It makes no sense to set {key}")
 

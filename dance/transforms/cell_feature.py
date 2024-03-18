@@ -83,7 +83,6 @@ class WeightedFeatureSVD(BaseTransform):
     def __init__(self, n_components: Union[float, int] = 0.9, split_name: Optional[str] = None,
                  feat_norm_mode: Optional[str] = None, feat_norm_axis: int = 0, **kwargs):
         super().__init__(**kwargs)
-        
 
         self.n_components = n_components
         self.split_name = split_name
