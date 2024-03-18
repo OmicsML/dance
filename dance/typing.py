@@ -25,7 +25,7 @@ import numpy as np
 from anndata import AnnData
 from omegaconf import DictConfig, DictKeyType, Node
 from torch import Tensor
-
+from omegaconf.listconfig import ListConfig
 if TYPE_CHECKING:  # https://peps.python.org/pep-0563/#forward-references
     from dance.config import Config
 
