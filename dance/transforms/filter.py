@@ -101,7 +101,11 @@ class FilterScanpy(BaseTransform):
 
         # Determine whether we are dealing with cells or genes
         basis = total_cells if self._FILTER_TARGET == "genes" else total_features
+<<<<<<< HEAD
         other_name = "cells" if self._FILTER_TARGET == "genes" else "genes"  
+=======
+        other_name = "cells" if self._FILTER_TARGET == "genes" else "genes"
+>>>>>>> origin/celltype_annotation_automl
         opts = {
             "min_counts": min_counts,
             "max_counts": max_counts,
@@ -1146,6 +1150,7 @@ class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
 class FilterCellsPlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process."""
 
+<<<<<<< HEAD
     def __init__(self, split_name: Optional[str] = None,
         channel: Optional[str] = None,
         channel_type: Optional[str] = "X",add_n_counts=True,
@@ -1166,6 +1171,12 @@ class FilterCellsPlaceHolder(BaseTransform):
         if self.add_n_genes:
             data.data.obs["n_genes"]=n_genes#!!!! need to think
 
+=======
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __call__(self, data: Data) -> Data:
+>>>>>>> origin/celltype_annotation_automl
         return data
 
 
@@ -1240,6 +1251,9 @@ class FilterCellsScanpyOrder(BaseTransform):
         for parameter in self.filter_cells_order:
             cellScanpyOrder = self.cellScanpyOrderDict[parameter]
             cellScanpyOrder(data)
+<<<<<<< HEAD
         
 
             
+=======
+>>>>>>> origin/celltype_annotation_automl

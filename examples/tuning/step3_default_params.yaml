@@ -111,7 +111,11 @@ pipeline:
             # min_cells:
             #   min: 1
             #   max: 10
+<<<<<<< HEAD
             # max_counts: 
+=======
+            # max_counts:
+>>>>>>> origin/celltype_annotation_automl
             #   min: 500
             #   max: 5000
             # max_cells:
@@ -123,7 +127,11 @@ pipeline:
       min_cells:
         min: 0.0
         max: 0.05
+<<<<<<< HEAD
       max_counts: 
+=======
+      max_counts:
+>>>>>>> origin/celltype_annotation_automl
         min: 10000
         max: 100000
       max_cells:
