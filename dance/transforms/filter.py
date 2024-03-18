@@ -100,7 +100,7 @@ class FilterScanpy(BaseTransform):
 
         # Determine whether we are dealing with cells or genes
         basis = total_cells if self._FILTER_TARGET == "genes" else total_features
-        other_name = "cells" if self._FILTER_TARGET == "genes" else "genes"  
+        other_name = "cells" if self._FILTER_TARGET == "genes" else "genes"
         opts = {
             "min_counts": min_counts,
             "max_counts": max_counts,
