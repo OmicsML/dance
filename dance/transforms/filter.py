@@ -405,11 +405,11 @@ class FilterGenes(BaseTransform, ABC):
         if self.add_n_counts:
             self.logger.warning(f"n_counts will be added to the var of data")
             n_counts = np.sum(x, axis=0)
-            data.data.var[self.key_n_counts] = n_counts
+            data.data.var["n_counts"] = n_counts
         if self.add_n_cells:
             self.logger.warning(f"n_cells will be added to the var of data")
             n_cells = np.sum(x > 0, axis=0)
-            data.data.var[self.key_n_counts] = n_cells
+            data.data.var["n_cells"] = n_cells
         # Compute gene summary stats for filtering
         if self.mode == "sum":
             gene_summary = np.array(x.sum(0)).ravel()
