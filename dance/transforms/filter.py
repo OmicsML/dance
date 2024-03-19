@@ -227,16 +227,9 @@ class FilterGenesScanpy(FilterScanpy):
         key_n_counts: Optional[str] = None,
         **kwargs,
     ):
-        super().__init__(
-            min_counts=min_counts,
-            min_genes_or_cells=min_cells,
-            max_counts=max_counts,
-            max_genes_or_cells=max_cells,
-            split_name=split_name,
-            channel=channel,
-            channel_type=channel_type,
-            key_n_counts=key_n_counts**kwargs,
-        )
+        super().__init__(min_counts=min_counts, min_genes_or_cells=min_cells, max_counts=max_counts,
+                         max_genes_or_cells=max_cells, split_name=split_name, channel=channel,
+                         channel_type=channel_type, key_n_counts=key_n_counts, **kwargs)
 
 
 @register_preprocessor("filter", "gene")
