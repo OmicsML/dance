@@ -182,8 +182,7 @@ class FilterCellsScanpy(FilterScanpy):
             split_name=split_name,
             channel=channel,
             channel_type=channel_type,
-            key_n_counts=key_n_counts
-            **kwargs,
+            key_n_counts=key_n_counts**kwargs,
         )
 
 
@@ -210,7 +209,6 @@ class FilterGenesScanpy(FilterScanpy):
     key_n_counts
         The location to add n_counts or n_cells/genes. If it is None, it will not be added.
 
-
     """
 
     _DISPLAY_ATTRS = ("min_counts", "min_cells", "max_counts", "max_cells", "split_name")
@@ -236,8 +234,7 @@ class FilterGenesScanpy(FilterScanpy):
             split_name=split_name,
             channel=channel,
             channel_type=channel_type,
-            key_n_counts=key_n_counts
-            **kwargs,
+            key_n_counts=key_n_counts**kwargs,
         )
 
 
@@ -534,7 +531,6 @@ class FilterGenesTopK(FilterGenes):
     add_n_cells
         Whether to add n_cells
 
-
     """
 
     _DISPLAY_ATTRS = ("num_genes", "top", "mode")
@@ -558,8 +554,7 @@ class FilterGenesTopK(FilterGenes):
             channel_type=channel_type,
             whitelist_indicators=whitelist_indicators,
             add_n_counts=add_n_counts,
-            add_n_cells=add_n_cells
-            **kwargs,
+            add_n_cells=add_n_cells**kwargs,
         )
         self.num_genes = num_genes
         self.top = top
