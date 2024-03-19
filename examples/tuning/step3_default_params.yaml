@@ -118,8 +118,8 @@ pipeline:
             #   min: 500
             #   max: 5000
       min_counts:
-          min: 3
-          max: 100
+        min: 3
+        max: 100
       min_cells:
         min: 0.0
         max: 0.05
@@ -171,6 +171,8 @@ pipeline:
         values: [seurat, cell_ranger]
   - type: filter.gene
     target: FilterGenesPlaceHolder
+  - type: filter.gene
+    target: FilterGenesNumberPlaceHolder
   - type: filter.cell
     target: FilterCellsScanpyOrder
     params_to_tune:

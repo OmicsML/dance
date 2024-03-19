@@ -1151,6 +1151,17 @@ class FilterGenesPlaceHolder(BaseTransform):
 
 
 @register_preprocessor("filter", "gene")
+@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+class FilterGenesNumberPlaceHolder(BaseTransform):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __call__(self, data: Data) -> Data:
+        return data
+
+
+@register_preprocessor("filter", "gene")
 class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
     """Filter for highly variable genes based on mean and dispersion.
 
