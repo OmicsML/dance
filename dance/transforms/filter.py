@@ -154,10 +154,8 @@ class FilterCellsScanpy(FilterScanpy):
         Channel to be used for filtering.
     channel_type
         Channel type to be used for filtering.
-    add_n_counts
-        Whether to add n_counts
-    add_n_genes
-        Whether to add n_genes
+    key_n_counts
+        The location to add n_counts or n_cells/genes. If it is None, it will not be added.
 
     """
 
@@ -173,8 +171,7 @@ class FilterCellsScanpy(FilterScanpy):
         split_name: Optional[str] = None,
         channel: Optional[str] = None,
         channel_type: Optional[str] = "X",
-        add_n_counts=True,
-        add_n_cells=True,
+        key_n_counts: Optional[str] = None,
         **kwargs,
     ):
         super().__init__(
@@ -185,8 +182,7 @@ class FilterCellsScanpy(FilterScanpy):
             split_name=split_name,
             channel=channel,
             channel_type=channel_type,
-            add_n_counts=add_n_counts,
-            add_n_cells=add_n_cells,
+            key_n_counts=key_n_counts
             **kwargs,
         )
 
@@ -211,10 +207,9 @@ class FilterGenesScanpy(FilterScanpy):
         Channel to be used for filtering.
     channel_type
         Channel type to be used for filtering.
-    add_n_counts
-        Whether to add n_counts
-    add_n_cells
-        Whether to add n_cells
+    key_n_counts
+        The location to add n_counts or n_cells/genes. If it is None, it will not be added.
+
 
     """
 
@@ -230,8 +225,7 @@ class FilterGenesScanpy(FilterScanpy):
         split_name: Optional[str] = None,
         channel: Optional[str] = None,
         channel_type: Optional[str] = "X",
-        add_n_counts=True,
-        add_n_cells=True,
+        key_n_counts: Optional[str] = None,
         **kwargs,
     ):
         super().__init__(
@@ -242,8 +236,7 @@ class FilterGenesScanpy(FilterScanpy):
             split_name=split_name,
             channel=channel,
             channel_type=channel_type,
-            add_n_counts=add_n_counts,
-            add_n_cells=add_n_cells,
+            key_n_counts=key_n_counts
             **kwargs,
         )
 
@@ -536,6 +529,11 @@ class FilterGenesTopK(FilterGenes):
         A list of (or a single) :obj:`.var` columns that indicates the genes to be excluded from the filtering process.
         Note that these genes will still be used in the summary stats computation, and thus will still contribute to the
         threshold percentile. If not set, then no genes will be excluded from the filtering process.
+    add_n_counts
+        Whether to add n_counts
+    add_n_cells
+        Whether to add n_cells
+
 
     """
 
@@ -550,6 +548,8 @@ class FilterGenesTopK(FilterGenes):
         channel: Optional[str] = None,
         channel_type: Optional[str] = "X",
         whitelist_indicators: Optional[Union[str, List[str]]] = None,
+        add_n_counts=False,
+        add_n_cells=False,
         **kwargs,
     ):
         super().__init__(
@@ -557,6 +557,8 @@ class FilterGenesTopK(FilterGenes):
             channel=channel,
             channel_type=channel_type,
             whitelist_indicators=whitelist_indicators,
+            add_n_counts=add_n_counts,
+            add_n_cells=add_n_cells
             **kwargs,
         )
         self.num_genes = num_genes
@@ -1006,7 +1008,7 @@ class FilterGenesScanpyOrder(BaseTransform):
         self.geneScanpyOrderDict = {}
         for key in geneParameterDict.keys():
             if key in self.filter_genes_order:
-                if key in self.filter_cells_order:
+                if key in self.filter_genes_order:
                     if key in ("min_counts", "max_counts") and self.add_n_counts:
                         key_n_counts = "n_counts"
                     elif key in ("min_cells", "max_cells") and self.add_n_cells:
@@ -1146,7 +1148,7 @@ class FilterGenesPlaceHolder(BaseTransform):
         if self.add_n_counts:
             self.logger.warning(f"n_counts will be added to the var of data")
             data.data.var["n_counts"] = n_counts
-        if self.add_n_genes:
+        if self.add_n_cells:
             self.logger.warning(f"n_cells will be added to the var of data")
             data.data.var["n_cells"] = n_cells
         return data
