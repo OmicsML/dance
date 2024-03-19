@@ -555,7 +555,8 @@ class FilterGenesTopK(FilterGenes):
             channel_type=channel_type,
             whitelist_indicators=whitelist_indicators,
             add_n_counts=add_n_counts,
-            add_n_cells=add_n_cells**kwargs,
+            add_n_cells=add_n_cells,
+            **kwargs,
         )
         self.num_genes = num_genes
         self.top = top
@@ -724,7 +725,7 @@ class FilterGenesRegression(BaseTransform):
         x2 = drop_feat[select_index].reshape(-1, 1)
         y = np.log(feat_mean + 1)[select_index].reshape(-1, 1)
 
-        y_pred = LinearRegression().fit(x2, y).predict(x2)
+        y_pred = LinearRegression(n_jobs=8).fit(x2, y).predict(x2)
         scores[select_index] = (2 * y - y_pred - x1).ravel()
         feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
         return feat[:, feat_index]
