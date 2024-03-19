@@ -182,7 +182,8 @@ class FilterCellsScanpy(FilterScanpy):
             split_name=split_name,
             channel=channel,
             channel_type=channel_type,
-            key_n_counts=key_n_counts**kwargs,
+            key_n_counts=key_n_counts,
+            **kwargs,
         )
 
 
