@@ -701,7 +701,7 @@ class FilterGenesRegression(BaseTransform):
         func_dict = {"enclasc": self._filter_enclasc, "seurat3": self._filter_seurat3, "scmap": self._filter_scmap}
         if (filter_func := func_dict.get(self.method)) is None:
             raise ValueError(f"Unknown method {self.method}, supported options are: {list(func_dict)}.")
-        data.data.obsm[self.out] = filter_func(feat)
+        data.data.obsm[self.out] = filter_func(feat, self.num_genes)
         return data
 
     def _filter_enclasc(self, feat: np.ndarray, num_genes: int = 2000, logger: Logger = default_logger,
