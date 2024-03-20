@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 from scipy.sparse import csr_matrix
+from sklearn.model_selection import train_test_split
 
 from dance import logger
 from dance.data import Data
@@ -52,13 +53,12 @@ class CellTypeAnnotationDataset(BaseDataset):
 
     def __init__(self, full_download=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
                  valid_dataset=None, train_dir="train", test_dir="test", valid_dir="valid", map_path="map",
-                 data_dir="./", train_as_valid=True):
+                 data_dir="./", train_as_valid=False):
         super().__init__(data_dir, full_download)
 
         self.data_dir = data_dir
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
-        self.valid_dataset = train_dataset if valid_dataset is None else valid_dataset
         self.species = species
         self.tissue = tissue
         self.train_dir = train_dir
@@ -68,7 +68,9 @@ class CellTypeAnnotationDataset(BaseDataset):
         self.train_as_valid = train_as_valid
         self.bench_url_dict = self.BENCH_URL_DICT.copy()
         self.available_data = self.AVAILABLE_DATA.copy()
-        if self.train_as_valid:
+        self.valid_dataset=valid_dataset
+        if valid_dataset is None and self.train_as_valid:
+            self.valid_dataset = train_dataset 
             self.train2valid()
 
     def train2valid(self):
@@ -108,7 +110,7 @@ class CellTypeAnnotationDataset(BaseDataset):
 
     def get_all_filenames(self, filetype: str = "csv", feat_suffix: str = "data", label_suffix: str = "celltype"):
         filenames = []
-        for id in self.train_dataset + self.test_dataset + self.valid_dataset:
+        for id in self.train_dataset + self.test_dataset + (self.valid_dataset if self.valid_dataset is not None else []):
             filenames.append(f"{self.species}_{self.tissue}{id}_{feat_suffix}.{filetype}")
             filenames.append(f"{self.species}_{self.tissue}{id}_{label_suffix}.{filetype}")
         return filenames
@@ -136,7 +138,6 @@ class CellTypeAnnotationDataset(BaseDataset):
         check = [
             osp.join(self.data_dir, "train"),
             osp.join(self.data_dir, "test"),
-            osp.join(self.data_dir, "valid"),
             osp.join(self.data_dir, "pretrained")
         ]
         for i in check:
@@ -171,23 +172,39 @@ class CellTypeAnnotationDataset(BaseDataset):
     def _load_raw_data(self, ct_col: str = "Cell_type") -> Tuple[ad.AnnData, List[Set[str]], List[str], int]:
         species = self.species
         tissue = self.tissue
-        train_dataset_ids = self.train_dataset
-        test_dataset_ids = self.test_dataset
-        valid_dataset_ids = self.valid_dataset
-        data_dir = self.data_dir
-        train_dir = osp.join(data_dir, self.train_dir)
-        test_dir = osp.join(data_dir, self.test_dir)
-        valid_dir = osp.join(data_dir, self.valid_dir)
-        map_path = osp.join(data_dir, self.map_path, self.species)
+        if self.valid_dataset is not None:
+            train_dataset_ids = self.train_dataset
+            test_dataset_ids = self.test_dataset
+            valid_dataset_ids = self.valid_dataset
+            data_dir = self.data_dir
+            train_dir = osp.join(data_dir, self.train_dir)
+            test_dir = osp.join(data_dir, self.test_dir)
+            valid_dir = osp.join(data_dir, self.valid_dir)
+            map_path = osp.join(data_dir, self.map_path, self.species)
 
-        # Load raw data
-        train_feat_paths, train_label_paths = self._get_data_paths(train_dir, species, tissue, train_dataset_ids)
-        valid_feat_paths, valid_label_paths = self._get_data_paths(valid_dir, species, tissue, valid_dataset_ids)
-        test_feat_paths, test_label_paths = self._get_data_paths(test_dir, species, tissue, test_dataset_ids)
-        train_feat, valid_feat, test_feat = (self._load_dfs(paths, transpose=True)
-                                             for paths in (train_feat_paths, valid_feat_paths, test_feat_paths))
-        train_label, valid_label, test_label = (self._load_dfs(paths)
-                                                for paths in (train_label_paths, valid_label_paths, test_label_paths))
+            # Load raw data
+            train_feat_paths, train_label_paths = self._get_data_paths(train_dir, species, tissue, train_dataset_ids)
+            valid_feat_paths, valid_label_paths = self._get_data_paths(valid_dir, species, tissue, valid_dataset_ids)
+            test_feat_paths, test_label_paths = self._get_data_paths(test_dir, species, tissue, test_dataset_ids)
+            train_feat, valid_feat, test_feat = (self._load_dfs(paths, transpose=True)
+                                                for paths in (train_feat_paths, valid_feat_paths, test_feat_paths))
+            train_label, valid_label, test_label = (self._load_dfs(paths)
+                                                    for paths in (train_label_paths, valid_label_paths, test_label_paths))
+        else:
+            train_dataset_ids = self.train_dataset
+            test_dataset_ids = self.test_dataset
+            data_dir = self.data_dir
+            train_dir = osp.join(data_dir, self.train_dir)
+            test_dir = osp.join(data_dir, self.test_dir)
+            map_path = osp.join(data_dir, self.map_path, self.species)
+            train_feat_paths, train_label_paths = self._get_data_paths(train_dir, species, tissue, train_dataset_ids)
+            test_feat_paths, test_label_paths = self._get_data_paths(test_dir, species, tissue, test_dataset_ids)
+            train_feat, test_feat = (self._load_dfs(paths, transpose=True)
+                                                for paths in (train_feat_paths, test_feat_paths))
+            train_label, test_label = (self._load_dfs(paths)
+                                                    for paths in (train_label_paths, test_label_paths))
+            
+            train_feat,valid_feat,train_label,valid_label=train_test_split(train_feat,train_label,test_size=0.2)
 
         # Combine features (only use features that are present in the training data)
         train_size = train_feat.shape[0]
@@ -223,6 +240,7 @@ class CellTypeAnnotationDataset(BaseDataset):
         logger.info(f"Cell-types (n={len(idx_to_label)}):\n{pprint.pformat(idx_to_label)}")
 
         return adata, labels, idx_to_label, train_size, valid_size
+        
 
     def _raw_to_dance(self, raw_data):
         adata, cell_labels, idx_to_label, train_size, valid_size = raw_data
