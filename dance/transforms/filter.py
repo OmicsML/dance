@@ -750,7 +750,7 @@ class FilterGenesRegression(BaseTransform):
         x = np.log(feat_mean[select_index] + 1).reshape(-1, 1) * np.log(2.7) / np.log(2)
         y = np.log(drop_feat[select_index] * 100).reshape(-1, 1) * np.log(2.7) / np.log(2)
 
-        y_pred = LinearRegression().fit(x, y).y_pred(x)
+        y_pred = LinearRegression().fit(x, y).predict(x)
         scores[select_index] = (y - y_pred).ravel()
         feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
         return feat[:, feat_index]
