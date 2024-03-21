@@ -28,6 +28,7 @@ class Action:
     TARGET_KEY = "target"
     SCOPE_KEY = "scope"
     PARAMS_KEY = "params"
+    SKIP_FLAG = "_skip_"
 
     def __init__(
         self,
@@ -85,6 +86,16 @@ class Action:
     @property
     def params(self) -> Dict[str, Any]:
         return self._params
+
+    @property
+    def skip(self) -> bool:
+        """Return ``True`` if target is set to the skip flag.
+
+        This setting affect the pipeline object. When target is set to skip flag, then
+        this action will be skiped in the pipeline enumeration.
+
+        """
+        return self.target == self.SKIP_FLAG
 
     def _get_target(self):
         if self.scope.startswith(REGISTRY_PREFIX):
@@ -193,7 +204,8 @@ class Pipeline(Action):
         return self.config.to_yaml()
 
     def __iter__(self):
-        yield from self._pipeline
+        """Iterate over pipeline elements except for the skipped ones."""
+        yield from (p for p in self._pipeline if not p.skip)
 
     def __getitem__(self, idx: int) -> Action:
         return self._pipeline[idx]
@@ -254,6 +266,7 @@ class PipelinePlaner(Pipeline):
     DEFAULT_PARAMS_KEY = "default_params"
     PELEM_INCLUDE_KEY = "include"
     PELEM_EXCLUDE_KEY = "exclude"
+    PELEM_SKIP_KEY = "skippable"
     WANDB_KEY = "wandb"
     VALID_TUNE_MODES = ("pipeline", "params")
 
@@ -330,6 +343,11 @@ class PipelinePlaner(Pipeline):
             raise ValueError("Invalid pipeline tuning plan, must have at least one valid candidate:\n"
                              f"{self.config[self.PIPELINE_KEY][idx]}\n"
                              f"All available targets under the scope {scope!r}: {candidates}")
+
+        # Set skip option
+        if pelem_config.get(self.PELEM_SKIP_KEY, False):
+            logger.debug("Skip flag set, adding skip option.")
+            filtered_candidates.add(self.SKIP_FLAG)
 
         return sorted(filtered_candidates), self[idx].type
 
@@ -531,7 +549,6 @@ class PipelinePlaner(Pipeline):
         See more detailed info from :meth:`generate`.
 
         """
-
         # Pre-checks
         if pipeline is None and params is None and pipeline_params is None:
             raise ValueError("At least one of 'pipeline' or 'params' or 'pipeline_params' must be specified.")
@@ -646,7 +663,6 @@ class PipelinePlaner(Pipeline):
             }
 
         """
-
         config = self.generate_config(pipeline=pipeline, params=params, pipeline_params=pipeline_params)
         return Pipeline(config, **kwargs)
 
@@ -668,6 +684,7 @@ class PipelinePlaner(Pipeline):
                     "pipeline": [
                         {
                             "type": "filter.gene",
+                            "skippable": True,
                         },
                         {
                             "type": "feature.cell",
@@ -699,6 +716,7 @@ class PipelinePlaner(Pipeline):
                         "WeightedFeaturePCA",
                         "CellPCA",
                         "CellSVD",
+                        "_skip_",  # <- skip flag for skipping this step
                     ],
                 },
             }

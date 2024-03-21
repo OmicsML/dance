@@ -250,6 +250,51 @@ def test_pipeline_planer_construction(subtests, planer_toy_registry):
             },
         }
 
+    with subtests.test("Case 1", tune_mode="pipeline", skippable=True):
+        # Specify inclusion
+        cfg = {
+            "type":
+            "a",
+            "tune_mode":
+            "pipeline",
+            "pipeline": [
+                {
+                    "type": "b",
+                    "include": ["func_b1", "func_b2"],
+                    "skippable": True,
+                },
+                {
+                    "type": "c",
+                    "include": ["func_c1"],
+                },
+            ],
+        }
+        p = PipelinePlaner(cfg, _registry=r)
+
+        assert p.base_config == {
+            "type": "a",
+            "pipeline": [
+                {
+                    "type": "b"
+                },
+                {
+                    "type": "c"
+                },
+            ],
+        }
+        assert p.search_space() == {
+            "pipeline.0.b": {
+                # NOTE: we use sorted here in case we want to change SKIP_FLAG key in the future
+                "values": sorted(["func_b1", "func_b2", PipelinePlaner.SKIP_FLAG])
+            },
+            "pipeline.1.c": {
+                "values": ["func_c1"]
+            },
+        }
+
+        # NOTE: The first pelem was skipped as configured. We check it via string matching for simplicity.
+        assert repr(list(p.generate(pipeline=[PipelinePlaner.SKIP_FLAG, "func_c1"]))) == "[Action(func_c1)]"
+
     with subtests.test("Case 2", tune_mode="pipeline"):
         # Specify exlusion
         cfg = {
