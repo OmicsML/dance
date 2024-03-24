@@ -92,7 +92,7 @@ class FilterScanpy(BaseTransform):
             raise ValueError(f"Unknown filter target {self._FILTER_TARGET!r}")
 
     def __call__(self, data):
-        x = data.get_feature(return_type="default", split_name=self.split_name, channel=self.channel,
+        x = data.get_feature(return_type="numpy", split_name=self.split_name, channel=self.channel,
                              channel_type=self.channel_type)
         total_cells, total_features = x.shape
 
@@ -385,7 +385,7 @@ class FilterGenes(BaseTransform, ABC):
         ...
 
     def __call__(self, data):
-        x = data.get_feature(return_type="default", channel=self.channel, channel_type=self.channel_type)
+        x = data.get_feature(return_type="numpy", channel=self.channel, channel_type=self.channel_type)
         if self.add_n_counts:
             self.logger.warning(f"n_counts will be added to the var of data")
             n_counts = np.sum(x, axis=0)
@@ -1131,7 +1131,7 @@ class FilterGenesPlaceHolder(BaseTransform):
         self.add_n_cells = add_n_cells
 
     def __call__(self, data: Data) -> Data:
-        x = data.get_feature(return_type="default", split_name=self.split_name, channel=self.channel,
+        x = data.get_feature(return_type="numpy", split_name=self.split_name, channel=self.channel,
                              channel_type=self.channel_type)
         n_counts = np.sum(x, axis=0)
         n_cells = np.sum(x > 0, axis=0)
@@ -1226,7 +1226,7 @@ class FilterCellsPlaceHolder(BaseTransform):
         self.add_n_genes = add_n_genes
 
     def __call__(self, data: Data) -> Data:
-        x = data.get_feature(return_type="default", split_name=self.split_name, channel=self.channel,
+        x = data.get_feature(return_type="numpy", split_name=self.split_name, channel=self.channel,
                              channel_type=self.channel_type)
         n_counts = np.sum(x, axis=1)
         n_genes = np.sum(x > 0, axis=1)

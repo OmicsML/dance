@@ -116,7 +116,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         self.dropout = dropout
         self.hidden_dim = hidden_dim
         self.prj_path = Path().resolve()
-        self.save_path = self.prj_path / "deepimpute"
+        self.save_path = self.prj_path / f"{dataset}_deepimpute"
         if not self.save_path.exists():
             self.save_path.mkdir(parents=True)
         self.device = torch.device(f'cuda:{gpu}' if gpu != -1 and torch.cuda.is_available() else 'cpu')
