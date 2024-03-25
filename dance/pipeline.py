@@ -1051,8 +1051,8 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
                     pipeline.insert(i, k)
         temp_conf = conf.copy()
         temp_conf.pipeline = pipeline
-        temp_conf.wandb=step2_pipeline_planer.config.wandb
-        temp_conf.wandb.method="bayes"
+        temp_conf.wandb = step2_pipeline_planer.config.wandb
+        temp_conf.wandb.method = "bayes"
         os.makedirs(os.path.dirname(conf_save_path), exist_ok=True)
         OmegaConf.save(temp_conf, f"{conf_save_path}/{count}_test_acc_params_tuning_config.yaml")
         count += 1
