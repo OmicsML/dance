@@ -228,21 +228,39 @@ class ScDeepSort(BaseClassificationMethod):
         self.model.train()
         total_loss = total_size = 0
 
-        dataloader = DataLoader(graph=graph, indices=idx, graph_sampler=self.sampler, batch_size=self.batch_size,
-                                shuffle=True)
-        for _, _, blocks in dataloader:
-            blocks = [b.to(self.device) for b in blocks]
-            input_features = blocks[0].srcdata["features"]
-            output_labels = blocks[-1].dstdata["label"]
-            output_predictions = self.model(blocks, input_features)
+        if self.device=="cpu":
+            dataloader = DataLoader(graph=graph, indices=idx, graph_sampler=self.sampler, batch_size=self.batch_size,num_workers=4,
+                                    shuffle=True)
+            with dataloader.enable_cpu_affinity():  #only cpu, so don't commit
+                for _, _, blocks in dataloader:
+                    blocks = [b.to(self.device) for b in blocks]
+                    input_features = blocks[0].srcdata["features"]
+                    output_labels = blocks[-1].dstdata["label"]
+                    output_predictions = self.model(blocks, input_features)
 
-            loss = self.loss_fn(output_predictions, output_labels)
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+                    loss = self.loss_fn(output_predictions, output_labels)
+                    self.optimizer.zero_grad()
+                    loss.backward()
+                    self.optimizer.step()
 
-            total_size += (size := blocks[-1].num_dst_nodes())
-            total_loss += loss.item() * size
+                    total_size += (size := blocks[-1].num_dst_nodes())
+                    total_loss += loss.item() * size
+        else:
+            dataloader = DataLoader(graph=graph, indices=idx, graph_sampler=self.sampler, batch_size=self.batch_size,
+                                    shuffle=True)
+            for _, _, blocks in dataloader:
+                blocks = [b.to(self.device) for b in blocks]
+                input_features = blocks[0].srcdata["features"]
+                output_labels = blocks[-1].dstdata["label"]
+                output_predictions = self.model(blocks, input_features)
+
+                loss = self.loss_fn(output_predictions, output_labels)
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+
+                total_size += (size := blocks[-1].num_dst_nodes())
+                total_loss += loss.item() * size
 
         return total_loss / total_size
 
