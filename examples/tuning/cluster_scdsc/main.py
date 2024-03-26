@@ -1,7 +1,7 @@
 import argparse
-from pathlib import Path
 import pprint
 import sys
+from pathlib import Path
 
 import numpy as np
 import wandb
@@ -23,8 +23,11 @@ if __name__ == "__main__":
     Balance_para = [1, 0.01, 0.1, 0.1, 1]
 
     parser.add_argument("--data_dir", default="./data")
-    parser.add_argument("--dataset", type=str, default="worm_neuron_cell",
-                        choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell","human_pbmc2_cell","human_skin_cell","mouse_kidney_cell","human_ILCS_cell"])
+    parser.add_argument(
+        "--dataset", type=str, default="worm_neuron_cell", choices=[
+            "10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell", "human_pbmc2_cell",
+            "mouse_kidney_cl2", "mouse_kidney_drop"
+        ])
     # TODO: implement callbacks for "heat_kernel" and "cosine_normalized"
     parser.add_argument("--method", type=str, default="correlation", choices=["cosine", "correlation"])
     parser.add_argument("--batch_size", default=256, type=int)
@@ -60,12 +63,12 @@ if __name__ == "__main__":
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
     args = parser.parse_args()
-    args = parser.parse_args()
     aris = []
     logger.info(f"\n{pprint.pformat(vars(args))}")
     file_root_path = Path(args.root_path, args.dataset).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
+
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
         set_seed(args.seed)
@@ -114,18 +117,12 @@ if __name__ == "__main__":
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
-        get_step3_yaml(
-            result_load_path=f"{args.summary_file_path}",
-            step2_pipeline_planer=pipeline_planer,
-            conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
-            root_path=file_root_path,
-            required_funs=["NeighborGraph", "SetConfig"],
-            required_indexes=[sys.maxsize - 1, sys.maxsize],
-            metric="acc"
-        )
+        get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
+                       conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
+                       root_path=file_root_path, required_funs=["NeighborGraph", "SetConfig"],
+                       required_indexes=[sys.maxsize - 1, sys.maxsize], metric="acc")
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
-    
 """Reproduction information
 10X PBMC:
 python scdsc.py --dataset 10X_PBMC --sigma 0.5 --topk 10 --pretrain_epochs 100 --v 3 --n_enc_1 1024 --n_enc_3 64 --n_dec_1 64 --n_z1 64

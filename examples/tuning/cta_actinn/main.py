@@ -82,10 +82,10 @@ if __name__ == "__main__":
 
         model.fit(x_train, y_train, seed=args.seed, lr=args.learning_rate, num_epochs=args.num_epochs,
                   batch_size=args.batch_size, print_cost=args.print_cost)
-        train_score=model.score(x_train,y_train)
+        train_score = model.score(x_train, y_train)
         score = model.score(x_valid, y_valid)
         test_score = model.score(x_test, y_test)
-        wandb.log({"train_acc":train_score,"acc": score, "test_acc": test_score})
+        wandb.log({"train_acc": train_score, "acc": score, "test_acc": test_score})
         wandb.finish()
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(

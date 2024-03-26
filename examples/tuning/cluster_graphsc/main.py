@@ -4,8 +4,8 @@ import sys
 from pathlib import Path
 
 import numpy as np
-
 import wandb
+
 from dance import logger
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.graphsc import GraphSC
@@ -40,8 +40,11 @@ if __name__ == "__main__":
     parser.add_argument("-show", "--show_epoch_ari", action="store_true")
     parser.add_argument("-plot", "--plot", default=False, action="store_true")
     parser.add_argument("-dd", "--data_dir", default="./temp_data", type=str)
-    parser.add_argument("-data", "--dataset", default="worm_neuron_cell",
-                        choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell","mouse_kidney_10x","human_ILCS_cell"])
+    parser.add_argument(
+        "-data", "--dataset", default="worm_neuron_cell", choices=[
+            "10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell", "mouse_kidney_10x",
+            "human_ILCS_cell", "mouse_kidney_drop", "mouse_lung_cell"
+        ])
     parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--tune_mode", default="pipeline_params", choices=["pipeline", "params", "pipeline_params"])
@@ -93,18 +96,12 @@ if __name__ == "__main__":
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
-        get_step3_yaml(
-            result_load_path=f"{args.summary_file_path}",
-            step2_pipeline_planer=pipeline_planer,
-            conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
-            root_path=file_root_path,
-            required_funs=["CellFeatureGraph", "SetConfig"],
-            required_indexes=[sys.maxsize - 1, sys.maxsize],
-            metric="acc"
-        )
+        get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
+                       conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
+                       root_path=file_root_path, required_funs=["CellFeatureGraph", "SetConfig"],
+                       required_indexes=[sys.maxsize - 1, sys.maxsize], metric="acc")
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
-    
 """ Reproduction information
 10X PBMC:
 python graphsc.py --dataset 10X_PBMC --dropout 0.5

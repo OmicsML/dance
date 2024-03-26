@@ -49,7 +49,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_dataset", nargs="+", default=[2695], type=int, help="list of dataset id")
     parser.add_argument("--tissue", default="Brain")  # TODO: Add option for different tissue name for train/test
     parser.add_argument("--train_dataset", nargs="+", default=[753], type=int, help="list of dataset id")
-    parser.add_argument("--valid_dataset", nargs="+", default=[3285], type=int, help="list of dataset id")
+    parser.add_argument("--valid_dataset", nargs="+", default=None, type=int, help="list of dataset id")
     parser.add_argument("--tune_mode", default="pipeline_params", choices=["pipeline", "params", "pipeline_params"])
     parser.add_argument("--seed", type=int, default=10)
     parser.add_argument("--count", type=int, default=2)
@@ -62,7 +62,7 @@ if __name__ == "__main__":
     file_root_path = Path(
         args.root_path, "_".join([
             "-".join([str(num) for num in dataset])
-            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
+            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset] if dataset is not None
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         # Load raw data
         data = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
                                          valid_dataset=args.valid_dataset, species=args.species, tissue=args.tissue,
-                                         data_dir="./temp_data").load_data()
+                                         data_dir="../temp_data").load_data()
 
         # Prepare preprocessing pipeline and apply it to data
         kwargs = {tune_mode: dict(wandb.config)}
@@ -91,10 +91,10 @@ if __name__ == "__main__":
         x_valid, y_valid = data.get_val_data()
         # Train and evaluate the model
         model.fit(x_train, y_train_converted)
+        train_score = model.score(x_train, y_train)
         score = model.score(x_valid, y_valid)
         test_score = model.score(x_test, y_test)
-        wandb.log({"acc": score, "test_acc": test_score})
-
+        wandb.log({"train_acc": train_score, "acc": score, "test_acc": test_score})
         wandb.finish()
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
@@ -122,5 +122,8 @@ $ python main.py --tune_mode (pipeline/params/pipeline_params) --species human -
 
 Human Spleen
 $ python main.py --species human --tissue Spleen --train_dataset 3043 3777 4029 4115 4362 4657  --test_dataset 1729 2125 2184 2724 2743 --valid_dataset 3043 3777 4029 4115 4362 4657 --count 240
+
+
+main.py --species human --tissue Spleen --train_dataset 3043 3777 4029 4115 4362 4657 --test_dataset 1729 2125 2184 2724 2743 --valid_dataset 3043 3777 4029 4115 4362 4657 --count 240 --sweep_id=p1iletlj
 
 """
