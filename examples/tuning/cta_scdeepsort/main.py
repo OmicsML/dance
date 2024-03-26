@@ -6,8 +6,8 @@ from typing import get_args
 
 import numpy as np
 import torch
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_rate", type=float, default=0.2)
     parser.add_argument("--tissue", default="Spleen", type=str)
     parser.add_argument("--train_dataset", nargs="+", type=int, default=[1970], help="List of training dataset ids.")
-    parser.add_argument("--valid_dataset", nargs="+", default=[1970], help="List of valid dataset ids.")
+    parser.add_argument("--valid_dataset", nargs="+", default=None, help="List of valid dataset ids.")
     parser.add_argument("--weight_decay", type=float, default=5e-4, help="Weight for L2 loss")
     parser.add_argument("--seed", type=int, default=42)
 
@@ -44,11 +44,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     logger.setLevel(args.log_level)
-    logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
+    logger.info(f"Running ScDeepSort with the following parameters:\n{pprint.pformat(vars(args))}")
     file_root_path = Path(
         args.root_path, "_".join([
             "-".join([str(num) for num in dataset])
-            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
+            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset] if dataset is not None
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
@@ -60,7 +60,7 @@ if __name__ == "__main__":
         # Load data and perform necessary preprocessing
         data = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
                                          train_dataset=args.train_dataset, valid_dataset=args.valid_dataset,
-                                         data_dir="./temp_data").load_data()
+                                         data_dir="../temp_data").load_data()
         # Prepare preprocessing pipeline and apply it to data
         kwargs = {tune_mode: dict(wandb.config)}
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
@@ -68,7 +68,7 @@ if __name__ == "__main__":
         preprocessing_pipeline(data)
 
         # Obtain training and testing data
-        y_train = data.get_y(split_name="train", return_type="torch").argmax(1)
+        y_train = data.get_y(split_name="train", return_type="torch")
         y_valid = data.get_y(split_name="val", return_type="torch")
         y_test = data.get_y(split_name="test", return_type="torch")
 
@@ -90,11 +90,12 @@ if __name__ == "__main__":
         g_test = g.subgraph(torch.concat((gene_ids, test_cell_ids)))
 
         # Train and evaluate the model
-        model.fit(g_train, y_train, epochs=args.n_epochs, lr=args.lr, weight_decay=args.weight_decay,
+        model.fit(g_train, y_train.argmax(1), epochs=args.n_epochs, lr=args.lr, weight_decay=args.weight_decay,
                   val_ratio=args.test_rate)
+        train_score = model.score(g_train, y_train)
         score = model.score(g_valid, y_valid)
         test_score = model.score(g_test, y_test)
-        wandb.log({"acc": score, "test_acc": test_score})
+        wandb.log({"train_acc": train_score, "acc": score, "test_acc": test_score})
         wandb.finish()
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(

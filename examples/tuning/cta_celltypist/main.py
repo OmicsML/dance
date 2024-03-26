@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import get_args
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.celltypist import Celltypist
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_dataset", nargs="+", default=[1759], help="List of testing dataset ids.")
     parser.add_argument("--tissue", default="Spleen", type=str)
     parser.add_argument("--train_dataset", nargs="+", default=[1970], help="List of training dataset ids.")
-    parser.add_argument("--valid_dataset", nargs="+", default=[1970], help="List of valid dataset ids.")
+    parser.add_argument("--valid_dataset", nargs="+", default=None, help="List of valid dataset ids.")
     parser.add_argument("--not_use_SGD", action="store_true",
                         help="Training algorithm -- weather it will be stochastic gradient descent.")
     parser.add_argument("--seed", type=int, default=42)
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     file_root_path = Path(
         args.root_path, "_".join([
             "-".join([str(num) for num in dataset])
-            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
+            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset] if dataset is not None
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     MAINDIR = Path(__file__).resolve().parent
@@ -60,21 +60,21 @@ if __name__ == "__main__":
         # Load data and perform necessary preprocessing
         data = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
                                          species=args.species, tissue=args.tissue, valid_dataset=args.valid_dataset,
-                                         data_dir="./temp_data").load_data()
+                                         data_dir="../temp_data").load_data()
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
 
         # Obtain training and testing data
         x_train, y_train = data.get_train_data()
-        y_train = y_train.argmax(1)
         x_test, y_test = data.get_test_data()
         x_valid, y_valid = data.get_val_data()
 
         # Train and evaluate the model
-        model.fit(x_train, y_train, n_jobs=args.n_jobs, max_iter=args.max_iter, use_SGD=not args.not_use_SGD)
+        model.fit(x_train, y_train.argmax(1), n_jobs=args.n_jobs, max_iter=args.max_iter, use_SGD=not args.not_use_SGD)
+        train_score = model.score(x_train, y_train)
         score = model.score(x_valid, y_valid)
         test_score = model.score(x_test, y_test)
-        wandb.log({"acc": score, "test_acc": test_score})
+        wandb.log({"train_acc": train_score, "acc": score, "test_acc": test_score})
         wandb.finish()
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
