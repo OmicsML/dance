@@ -48,7 +48,7 @@ class CellwiseMaskData(BaseTransform):
 
     def __call__(self, data):
         rng = np.random.default_rng(self.seed)
-        feat = data.get_feature(return_type="default")
+        feat = data.get_feature(return_type="sparse")
         train_mask = np.ones(feat.shape, dtype=bool)
 
         for c in range(feat.shape[0]):
