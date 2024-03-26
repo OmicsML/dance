@@ -228,9 +228,9 @@ class ScDeepSort(BaseClassificationMethod):
         self.model.train()
         total_loss = total_size = 0
 
-        if self.device=="cpu":
-            dataloader = DataLoader(graph=graph, indices=idx, graph_sampler=self.sampler, batch_size=self.batch_size,num_workers=4,
-                                    shuffle=True)
+        if self.device == "cpu":
+            dataloader = DataLoader(graph=graph, indices=idx, graph_sampler=self.sampler, batch_size=self.batch_size,
+                                    num_workers=4, shuffle=True)
             with dataloader.enable_cpu_affinity():  #only cpu, so don't commit
                 for _, _, blocks in dataloader:
                     blocks = [b.to(self.device) for b in blocks]
