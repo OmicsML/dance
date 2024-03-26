@@ -157,7 +157,12 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.gnnmodel = GNNModel(in_feats=num_cells, out_feats=num_genes, dropout=dropout)
         self.aemodel = AEModel(in_feats=num_genes, dropout=dropout)
         self.model_params = list(self.aemodel.parameters()) + list(self.gnnmodel.parameters())
-        self.to(self.device)
+
+        if torch.cuda.device_count() > 1 and gpu != -1:
+            self = nn.DataParallel(self).to("cuda")
+            print(self.device_ids)
+        else:
+            self.to(self.device)
 
     @staticmethod
     def preprocessing_pipeline(min_cells: float = 0.1, threshold: float = 0.3, normalize_edges: bool = True,
@@ -309,12 +314,13 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.gnnmodel.train()
         self.aemodel.train()
         self.optimizer.zero_grad()
-        z_adj, z_adj_log_std, z_adj_mean = self.gnnmodel.forward(graph)
-        z_exp, mean, disp, pi = self.aemodel.forward(train_data, z_adj, self.size_factors)
-        loss_adj, loss_exp, log_lik, kl, train_loss = self.get_loss(train_data_raw, self.adj, z_adj, z_adj_log_std,
-                                                                    z_adj_mean, z_exp, mean, disp, pi, train_mask, le,
-                                                                    la, ke, ka)
-        valid_loss, _, _ = self.evaluate(train_data, train_data_raw, graph, valid_mask, le, la, ke, ka)
+        with torch.autocast(device_type="cuda", dtype=torch.float16):
+            z_adj, z_adj_log_std, z_adj_mean = self.gnnmodel.forward(graph)
+            z_exp, mean, disp, pi = self.aemodel.forward(train_data, z_adj, self.size_factors)
+            loss_adj, loss_exp, log_lik, kl, train_loss = self.get_loss(train_data_raw, self.adj, z_adj, z_adj_log_std,
+                                                                        z_adj_mean, z_exp, mean, disp, pi, train_mask,
+                                                                        le, la, ke, ka)
+            valid_loss, _, _ = self.evaluate(train_data, train_data_raw, graph, valid_mask, le, la, ke, ka)
         self.loss_adj = loss_adj.item()
         self.loss_exp = loss_exp.item()
         self.log_lik = log_lik.item()
