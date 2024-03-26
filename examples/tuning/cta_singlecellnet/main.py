@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import get_args
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.singlecellnet import SingleCellNet
@@ -31,7 +31,7 @@ if __name__ == "__main__":
                         help="List testing training dataset ids.")
     parser.add_argument("--tissue", default="Spleen", type=str)
     parser.add_argument("--train_dataset", type=int, nargs="+", default=[1970], help="List of training dataset ids.")
-    parser.add_argument("--valid_dataset", nargs="+", default=[1970], help="List of valid dataset ids.")
+    parser.add_argument("--valid_dataset", nargs="+", default=None, help="List of valid dataset ids.")
     parser.add_argument("--seed", type=int, default=10)
 
     parser.add_argument("--tune_mode", default="pipeline_params", choices=["pipeline", "params", "pipeline_params"])
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     file_root_path = Path(
         args.root_path, "_".join([
             "-".join([str(num) for num in dataset])
-            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
+            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset] if dataset is not None
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
@@ -68,7 +68,6 @@ if __name__ == "__main__":
 
         # Obtain training and testing data
         x_train, y_train = data.get_train_data(return_type="numpy")
-        y_train = y_train.argmax(1)  # convert one-hot representation into label index representation
         x_test, y_test = data.get_test_data(return_type="numpy")
         x_valid, y_valid = data.get_val_data(return_type="numpy")
 
@@ -77,11 +76,11 @@ if __name__ == "__main__":
         y_test = np.hstack([y_test, np.zeros((y_test.shape[0], 1))])
 
         # Train and evaluate the model
-        model.fit(x_train, y_train, stratify=args.stratify, num_rand=args.num_rand, random_state=args.seed)
+        model.fit(x_train, y_train.argmax(1), stratify=args.stratify, num_rand=args.num_rand, random_state=args.seed)
+        train_score = model.score(x_train, y_train)
         score = model.score(x_valid, y_valid)
         test_score = model.score(x_test, y_test)
-        wandb.log({"acc": score, "test_acc": test_score})
-
+        wandb.log({"train_acc": train_score, "acc": score, "test_acc": test_score})
         wandb.finish()
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
