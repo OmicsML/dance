@@ -79,7 +79,6 @@ def get_com(step2_data, r=2, alpha=0.8, columns=None):
 
 
 def get_frequent_itemsets(step2_data, threshold_per=0.1):
-    step2_data = step2_origin_data.dropna()
     threshold = int(len(step2_data) * threshold_per)
     df_sorted = step2_data.sort_values(metric_name, ascending=False)
     top_10_percent = df_sorted.head(threshold)
