@@ -73,16 +73,12 @@ if __name__ == '__main__':
         evaluate_pipeline, sweep_id=params.sweep_id, count=params.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=params.summary_file_path, root_path=file_root_path)
     if params.tune_mode == "pipeline" or params.tune_mode == "pipeline_params":
-        get_step3_yaml(
-            result_load_path=f"{params.summary_file_path}",
-            step2_pipeline_planer=pipeline_planer,
-            conf_load_path=f"{Path(params.root_path).resolve().parent}/step3_default_params.yaml",
-            root_path=file_root_path,
-            required_funs=["SaveRaw", "GeneHoldout", "CellwiseMaskData", "SetConfig"],
-            required_indexes=[2, sys.maxsize - 2, sys.maxsize - 1, sys.maxsize],
-            metric="RMSE",
-            ascending=True  #与yaml的wandb的metric中的goal需要一致起来
-        )
+        get_step3_yaml(result_load_path=f"{params.summary_file_path}", step2_pipeline_planer=pipeline_planer,
+                       conf_load_path=f"{Path(params.root_path).resolve().parent}/step3_default_params.yaml",
+                       root_path=file_root_path,
+                       required_funs=["SaveRaw", "GeneHoldout", "CellwiseMaskData",
+                                      "SetConfig"], required_indexes=[2, sys.maxsize - 2, sys.maxsize - 1,
+                                                                      sys.maxsize], metric="RMSE", ascending=True)
         if params.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """To reproduce deepimpute benchmarks, please refer to command lines belows:

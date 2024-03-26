@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import get_args
 
 import numpy as np
-
 import wandb
+
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.singlecellnet import SingleCellNet
@@ -60,7 +60,7 @@ if __name__ == "__main__":
         # Load data and perform necessary preprocessing
         data = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
                                          species=args.species, tissue=args.tissue, valid_dataset=args.valid_dataset,
-                                         data_dir="./temp_data").load_data(cache=args.cache)
+                                         data_dir="../temp_data").load_data(cache=args.cache)
         kwargs = {tune_mode: dict(wandb.config)}
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
@@ -118,4 +118,5 @@ $ python main.py --species human --tissue Spleen --train_dataset 3043 3777 4029 
 
 Human Immune
 $ python main.py --species human --tissue Immune --train_dataset 11407 1519 636 713 9054 9258 --test_dataset 1925 205 3323 6509 7572 --valid_dataset 11407 1519 636 713 9054 9258 --count 240
+
 """
