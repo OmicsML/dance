@@ -14,11 +14,11 @@ from dance.utils import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="train", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--data_dir", default="./temp_data", type=str)
+    parser.add_argument("--data_dir", default="./data", type=str)
     parser.add_argument(
         "--dataset", default="mouse_bladder_cell", type=str, choices=[
             "10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell", "mouse_kidney_cl2",
-            "mouse_kidney_drop", "human_pbmc2_cell", "human_skin_cell", "mouse_kidney_cell"
+            "mouse_kidney_drop"
         ])
     parser.add_argument("--k_neighbor", default=15, type=int)
     parser.add_argument("--highly_genes", default=3000, type=int)

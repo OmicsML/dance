@@ -42,9 +42,8 @@ if __name__ == "__main__":
     parser.add_argument("-dd", "--data_dir", default="./temp_data", type=str)
     parser.add_argument(
         "-data", "--dataset", default="worm_neuron_cell", choices=[
-            "10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell", "mouse_lung_cell",
-            "mouse_kidney_drop", "human_skin_cell", "mouse_kidney_cl2", "human_pbmc2_cell", "mouse_kidney_cell",
-            "human_ILCS_cell"
+            "10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell", "mouse_kidney_10x",
+            "human_ILCS_cell", "mouse_kidney_drop", "mouse_lung_cell"
         ])
     parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")

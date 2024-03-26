@@ -68,7 +68,6 @@ if __name__ == "__main__":
 
         # Obtain training and testing data
         x_train, y_train = data.get_train_data(return_type="numpy")
-        y_train = y_train.argmax(1)  # convert one-hot representation into label index representation
         x_test, y_test = data.get_test_data(return_type="numpy")
         x_valid, y_valid = data.get_val_data(return_type="numpy")
 
@@ -77,7 +76,7 @@ if __name__ == "__main__":
         y_test = np.hstack([y_test, np.zeros((y_test.shape[0], 1))])
 
         # Train and evaluate the model
-        model.fit(x_train, y_train, stratify=args.stratify, num_rand=args.num_rand, random_state=args.seed)
+        model.fit(x_train, y_train.argmax(1), stratify=args.stratify, num_rand=args.num_rand, random_state=args.seed)
         train_score = model.score(x_train, y_train)
         score = model.score(x_valid, y_valid)
         test_score = model.score(x_test, y_test)

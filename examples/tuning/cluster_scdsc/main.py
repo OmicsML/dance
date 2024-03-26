@@ -26,7 +26,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset", type=str, default="worm_neuron_cell", choices=[
             "10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell", "human_pbmc2_cell",
-            "human_skin_cell", "mouse_kidney_cell"
+            "mouse_kidney_cl2", "mouse_kidney_drop"
         ])
     # TODO: implement callbacks for "heat_kernel" and "cosine_normalized"
     parser.add_argument("--method", type=str, default="correlation", choices=["cosine", "correlation"])
@@ -62,7 +62,6 @@ if __name__ == "__main__":
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
-    args = parser.parse_args()
     args = parser.parse_args()
     aris = []
     logger.info(f"\n{pprint.pformat(vars(args))}")
