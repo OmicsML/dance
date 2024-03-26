@@ -25,7 +25,7 @@ if __name__ == "__main__":
     parser.add_argument("--hidden_dim", type=int, default=200, help="number of hidden gcn units")
     parser.add_argument("--log_level", type=str, default="INFO", choices=get_args(LogLevel))
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
-    parser.add_argument("--n_epochs", type=int, default=300, help="number of training epochs")
+    parser.add_argument("--n_epochs", type=int, default=50, help="number of training epochs")
     parser.add_argument("--n_layers", type=int, default=1, help="number of hidden gcn layers")
     parser.add_argument("--species", default="mouse", type=str)
     parser.add_argument("--test_dataset", nargs="+", type=int, default=[1759], help="Testing dataset IDs")
