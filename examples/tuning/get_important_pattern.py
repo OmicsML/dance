@@ -115,13 +115,4 @@ def summary_pattern(data_path):
 
 
 if __name__ == "__main__":
-    step2_origin_data = pd.read_csv(
-        "/home/zyxing/dance/examples/tuning/cluster_graphsc/10X_PBMC/results/pipeline/best_test_acc.csv")
-    step2_data = step2_origin_data.dropna()
-    print(step2_data.shape)
-    com_ans = get_com_all(step2_data)
-    apr_ans = get_frequent_itemsets(step2_data)
-    print("----------------")
-    print(com_ans)
-    print(apr_ans)
-    print(list(set(com_ans) & set(apr_ans)))
+    summary_pattern("/home/zyxing/dance/examples/tuning/cluster_graphsc/10X_PBMC/results/pipeline/best_test_acc.csv")
