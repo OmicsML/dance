@@ -461,21 +461,26 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             log_lik - kl
 
         """
-
+        origin_device = batch.device
+        params = [batch, adj_orig, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean, disp, pi, mask]
+        for index, param in enumerate(params):
+            if isinstance(param, torch.Tensor):
+                params[index] = params[index].cpu()
+        batch, adj_orig, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean, disp, pi, mask = params
         pos_weight = (adj_orig.shape[0]**2 - adj_orig.sum(axis=1)) / (adj_orig.sum(axis=1))
         norm_adj = adj_orig.shape[0] * adj_orig.shape[0] / float(
             (adj_orig.shape[0] * adj_orig.shape[0] - adj_orig.sum()) * 2)
         loss_adj = la * norm_adj * torch.mean(F.cross_entropy(z_adj, adj_orig, pos_weight))
 
         eps = 1e-10
-        mean = mean * torch.reshape(self.size_factors, (-1, 1))
+        mean = mean * (torch.reshape(self.size_factors, (-1, 1)).cpu())
         disp = torch.clamp(disp, max=1e6)
         t1 = torch.lgamma(disp + eps) + torch.lgamma(batch + 1) - torch.lgamma(batch + disp + eps)
         t2 = (disp + batch) * torch.log(1.0 + (mean / (disp + eps))) + (batch *
                                                                         (torch.log(disp + eps) - torch.log(mean + eps)))
         nb_loss = t1 + t2
         nb_loss = torch.where(torch.isnan(nb_loss),
-                              torch.zeros([nb_loss.shape[0], nb_loss.shape[1]]).to(self.device) + np.inf, nb_loss)
+                              torch.zeros([nb_loss.shape[0], nb_loss.shape[1]]).to(nb_loss.device) + np.inf, nb_loss)
         zero_nb = torch.pow(disp / (disp + mean + eps), disp)
         zero_case = -torch.log(pi + ((1 - pi) * zero_nb) + eps)
         loss_exp = torch.where(torch.lt(batch, 1e-8), zero_case, nb_loss)
@@ -487,6 +492,11 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         kl_exp = 0.5 / batch.shape[1] * torch.mean(F.mse_loss(z_exp, batch, reduction="none")[mask])
         kl = ka * kl_adj - ke * kl_exp
         loss = log_lik - kl
+        results = [loss_adj, loss_exp, log_lik, kl, loss]
+        for index, res in enumerate(results):
+            if isinstance(res, torch.Tensor):
+                results[index] = results[index].to(origin_device)
+        loss_adj, loss_exp, log_lik, kl, loss = results
         return loss_adj, loss_exp, log_lik, kl, loss
 
     def load_model(self):
