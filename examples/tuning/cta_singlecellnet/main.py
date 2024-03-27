@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import get_args
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.singlecellnet import SingleCellNet
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
     args = parser.parse_args()
     logger.setLevel(args.log_level)
-    logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
+    logger.info(f"{pprint.pformat(vars(args))}")
     file_root_path = Path(
         args.root_path, "_".join([
             "-".join([str(num) for num in dataset])
@@ -74,7 +74,7 @@ if __name__ == "__main__":
         # XXX: last column for 'unsure' label by the model
         # TODO: add option to base model score function to account for unsure
         y_test = np.hstack([y_test, np.zeros((y_test.shape[0], 1))])
-
+        y_valid = np.hstack([y_valid, np.zeros((y_valid.shape[0], 1))])
         # Train and evaluate the model
         model.fit(x_train, y_train.argmax(1), stratify=args.stratify, num_rand=args.num_rand, random_state=args.seed)
         train_score = model.score(x_train, y_train)

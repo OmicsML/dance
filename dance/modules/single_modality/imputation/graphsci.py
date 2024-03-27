@@ -233,51 +233,52 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         None
 
         """
-        # Get weighted adjacency matrix
-        u, v = graph.edges()
-        self.adj = torch.zeros((graph.num_nodes(), graph.num_nodes())).to(self.device)
-        self.adj_norm = torch.zeros((graph.num_nodes(), graph.num_nodes())).to(self.device)
-        self.adj[u.long(), v.long()] = torch.ones(graph.num_edges()).float().to(self.device)
-        self.adj_norm[u.long(), v.long()] = graph.edata['weight']
+        with torch.autocast(device_type="cuda", dtype=torch.float16):
+            # Get weighted adjacency matrix
+            u, v = graph.edges()
+            self.adj = torch.zeros((graph.num_nodes(), graph.num_nodes())).to(self.device)
+            self.adj_norm = torch.zeros((graph.num_nodes(), graph.num_nodes())).to(self.device)
+            self.adj[u.long(), v.long()] = torch.ones(graph.num_edges()).float().to(self.device)
+            self.adj_norm[u.long(), v.long()] = graph.edata['weight']
 
-        rng = np.random.default_rng(self.seed)
-        # Specify train validation split
-        if train_idx is None:
-            train_idx = range(len(train_data))
-        if mask is not None:
-            train_data_masked = self.maskdata(train_data, mask)
-            graph.ndata["feat"] = train_data_masked.float().T
-            train_mask = np.copy(mask)
-            test_idx = [i for i in range(len(train_data)) if i not in train_idx]
-            train_mask[test_idx] = False
-            valid_mask = ~mask
-            valid_mask[test_idx] = False
-        else:
-            train_data_masked = train_data
-            train_idx_permuted = rng.permutation(train_idx)
-            train_idx = train_idx_permuted[:int(len(train_idx_permuted) * 0.9)]
-            valid_idx = train_idx_permuted[int(len(train_idx_permuted) * 0.9):]
-            train_mask = np.zeros_like(train_data.cpu()).astype(bool)
-            train_mask[train_idx] = True
-            valid_mask = np.zeros_like(train_data.cpu()).astype(bool)
-            valid_mask[valid_idx] = True
+            rng = np.random.default_rng(self.seed)
+            # Specify train validation split
+            if train_idx is None:
+                train_idx = range(len(train_data))
+            if mask is not None:
+                train_data_masked = self.maskdata(train_data, mask)
+                graph.ndata["feat"] = train_data_masked.float().T
+                train_mask = np.copy(mask)
+                test_idx = [i for i in range(len(train_data)) if i not in train_idx]
+                train_mask[test_idx] = False
+                valid_mask = ~mask
+                valid_mask[test_idx] = False
+            else:
+                train_data_masked = train_data
+                train_idx_permuted = rng.permutation(train_idx)
+                train_idx = train_idx_permuted[:int(len(train_idx_permuted) * 0.9)]
+                valid_idx = train_idx_permuted[int(len(train_idx_permuted) * 0.9):]
+                train_mask = np.zeros_like(train_data.cpu()).astype(bool)
+                train_mask[train_idx] = True
+                valid_mask = np.zeros_like(train_data.cpu()).astype(bool)
+                valid_mask[valid_idx] = True
 
-        self.train_data_masked = train_data_masked
-        n_counts = train_data_raw.sum(1)
-        self.size_factors = n_counts / torch.median(n_counts)
-        self.weight_decay = weight_decay
-        self.optimizer = torch.optim.Adam(self.model_params, lr=lr, weight_decay=weight_decay)
+            self.train_data_masked = train_data_masked
+            n_counts = train_data_raw.sum(1)
+            self.size_factors = n_counts / torch.median(n_counts)
+            self.weight_decay = weight_decay
+            self.optimizer = torch.optim.Adam(self.model_params, lr=lr, weight_decay=weight_decay)
 
-        self.save_model()  # NOTE: prevent non-existing model loading error
-        for epoch in range(n_epochs):
-            self.train(train_data_masked, train_data_raw, graph, train_mask, valid_mask, le, la, ke, ka)
-            if not epoch:
-                min_valid_loss = self.valid_loss
-            elif min_valid_loss >= self.valid_loss:
-                min_valid_loss = self.valid_loss
-                self.save_model()
-            print(f"[Epoch%d], train_loss %.6f, adj_loss %.6f, express_loss %.6f, kl_loss %.6f, valid_loss %.6f" \
-                  % (epoch, self.train_loss, self.loss_adj, self.loss_exp, abs(self.kl), self.valid_loss))
+            self.save_model()  # NOTE: prevent non-existing model loading error
+            for epoch in range(n_epochs):
+                self.train(train_data_masked, train_data_raw, graph, train_mask, valid_mask, le, la, ke, ka)
+                if not epoch:
+                    min_valid_loss = self.valid_loss
+                elif min_valid_loss >= self.valid_loss:
+                    min_valid_loss = self.valid_loss
+                    self.save_model()
+                print(f"[Epoch%d], train_loss %.6f, adj_loss %.6f, express_loss %.6f, kl_loss %.6f, valid_loss %.6f" \
+                    % (epoch, self.train_loss, self.loss_adj, self.loss_exp, abs(self.kl), self.valid_loss))
 
     def train(self, train_data, train_data_raw, graph, train_mask, valid_mask, le=1, la=1, ke=1, ka=1):
         """Train function, gets loss and performs optimization step.
@@ -314,13 +315,12 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.gnnmodel.train()
         self.aemodel.train()
         self.optimizer.zero_grad()
-        with torch.autocast(device_type="cuda", dtype=torch.float16):
-            z_adj, z_adj_log_std, z_adj_mean = self.gnnmodel.forward(graph)
-            z_exp, mean, disp, pi = self.aemodel.forward(train_data, z_adj, self.size_factors)
-            loss_adj, loss_exp, log_lik, kl, train_loss = self.get_loss(train_data_raw, self.adj, z_adj, z_adj_log_std,
-                                                                        z_adj_mean, z_exp, mean, disp, pi, train_mask,
-                                                                        le, la, ke, ka)
-            valid_loss, _, _ = self.evaluate(train_data, train_data_raw, graph, valid_mask, le, la, ke, ka)
+        z_adj, z_adj_log_std, z_adj_mean = self.gnnmodel.forward(graph)
+        z_exp, mean, disp, pi = self.aemodel.forward(train_data, z_adj, self.size_factors)
+        loss_adj, loss_exp, log_lik, kl, train_loss = self.get_loss(train_data_raw, self.adj, z_adj, z_adj_log_std,
+                                                                    z_adj_mean, z_exp, mean, disp, pi, train_mask, le,
+                                                                    la, ke, ka)
+        valid_loss, _, _ = self.evaluate(train_data, train_data_raw, graph, valid_mask, le, la, ke, ka)
         self.loss_adj = loss_adj.item()
         self.loss_exp = loss_exp.item()
         self.log_lik = log_lik.item()

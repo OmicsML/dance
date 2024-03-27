@@ -1,4 +1,5 @@
 import argparse
+import gc
 import pprint
 import sys
 from pathlib import Path
@@ -6,8 +7,8 @@ from typing import get_args
 
 import numpy as np
 import torch
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
@@ -97,6 +98,8 @@ if __name__ == "__main__":
         test_score = model.score(g_test, y_test)
         wandb.log({"train_acc": train_score, "acc": score, "test_acc": test_score})
         wandb.finish()
+        gc.collect()
+        if args.device != "cpu": torch.cuda.empty_cache()
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch

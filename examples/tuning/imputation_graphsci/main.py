@@ -1,11 +1,11 @@
 import argparse
+import gc
 import sys
 from pathlib import Path
 
-import numpy as np
 import torch
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.graphsci import GraphSCI
@@ -51,6 +51,9 @@ if __name__ == '__main__':
     def evaluate_pipeline(tune_mode=params.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
         set_seed(params.seed)
+        gpu = params.gpu
+        device = "cpu" if params.gpu == -1 else f"cuda:{gpu}"
+
         data = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset,
                                  train_size=params.train_size).load_data()
         # Prepare preprocessing pipeline and apply it to data
@@ -59,7 +62,6 @@ if __name__ == '__main__':
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
 
-        device = "cpu" if params.gpu == -1 else f"cuda:{params.gpu}"
         X, X_raw, g, mask = data.get_x(return_type="default")
         X = torch.tensor(X.toarray()).float()
         X_raw = torch.tensor(X_raw.toarray()).float()
@@ -68,28 +70,26 @@ if __name__ == '__main__':
         g = g.to(device)
 
         model = GraphSCI(num_cells=X.shape[0], num_genes=X.shape[1], dataset=params.dataset, dropout=params.dropout,
-                         gpu=params.gpu, seed=params.seed)
+                         gpu=gpu, seed=params.seed)
         model.fit(X_train, X_raw_train, g, mask, params.le, params.la, params.ke, params.ka, params.n_epochs, params.lr,
                   params.weight_decay)
         model.load_model()
         imputed_data = model.predict(X_train, X_raw_train, g, mask)
         score = model.score(X, imputed_data, mask, metric='RMSE')
         wandb.log({"RMSE": score})
+        gc.collect()
+        torch.cuda.empty_cache()
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=params.sweep_id, count=params.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=params.summary_file_path, root_path=file_root_path)
     if params.tune_mode == "pipeline" or params.tune_mode == "pipeline_params":
-        get_step3_yaml(
-            result_load_path=f"{params.summary_file_path}",
-            step2_pipeline_planer=pipeline_planer,
-            conf_load_path=f"{Path(params.root_path).resolve().parent}/step3_default_params.yaml",
-            root_path=file_root_path,
-            required_funs=["SaveRaw", "FeatureFeatureGraph", "CellwiseMaskData", "SetConfig"],
-            required_indexes=[2, sys.maxsize - 2, sys.maxsize - 1, sys.maxsize],
-            metric="RMSE",
-            ascending=True  #与yaml的wandb的metric中的goal需要一致起来
-        )
+        get_step3_yaml(result_load_path=f"{params.summary_file_path}", step2_pipeline_planer=pipeline_planer,
+                       conf_load_path=f"{Path(params.root_path).resolve().parent}/step3_default_params.yaml",
+                       root_path=file_root_path,
+                       required_funs=["SaveRaw", "FeatureFeatureGraph", "CellwiseMaskData",
+                                      "SetConfig"], required_indexes=[2, sys.maxsize - 2, sys.maxsize - 1,
+                                                                      sys.maxsize], metric="RMSE", ascending=True)
         if params.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """To reproduce GraphSCI benchmarks, please refer to command lines belows:

@@ -701,7 +701,9 @@ class FilterGenesRegression(BaseTransform):
         func_dict = {"enclasc": self._filter_enclasc, "seurat3": self._filter_seurat3, "scmap": self._filter_scmap}
         if (filter_func := func_dict.get(self.method)) is None:
             raise ValueError(f"Unknown method {self.method}, supported options are: {list(func_dict)}.")
-        data.data.obsm[self.out] = filter_func(feat, self.num_genes)
+        # data.data.obsm[self.out] = filter_func(feat, self.num_genes)
+        gene_names = data.data.var_names[filter_func(feat, self.num_genes)]
+        data.data._inplace_subset_var(gene_names)
         return data
 
     def _filter_enclasc(self, feat: np.ndarray, num_genes: int = 2000, logger: Logger = default_logger,
@@ -721,7 +723,7 @@ class FilterGenesRegression(BaseTransform):
         y_pred = LinearRegression(n_jobs=8).fit(x2, y).predict(x2)
         scores[select_index] = (2 * y - y_pred - x1).ravel()
         feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
-        return feat[:, feat_index]
+        return feat_index
 
     def _filter_seurat3(self, feat: np.ndarray, num_genes: int = 2000, logger: Logger = default_logger,
                         no_check: bool = False) -> np.ndarray:
@@ -734,7 +736,7 @@ class FilterGenesRegression(BaseTransform):
         y_pred = LinearRegression().fit(x, feat_var_log).predict(x)
         scores = (feat_var_log - y_pred).ravel()
         feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
-        return feat[:, feat_index]
+        return feat_index
 
     def _filter_scmap(self, feat: np.ndarray, num_genes: int = 2000, logger: Logger = default_logger,
                       no_check: bool = False) -> np.ndarray:
@@ -753,7 +755,7 @@ class FilterGenesRegression(BaseTransform):
         y_pred = LinearRegression().fit(x, y).predict(x)
         scores[select_index] = (y - y_pred).ravel()
         feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
-        return feat[:, feat_index]
+        return feat_index
 
 
 @register_preprocessor("filter", "gene")
