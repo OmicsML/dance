@@ -1,0 +1,6 @@
+id,_runtime,_step,_timestamp,_wandb_runtime,acc,params.0.Log1P.base,params.1.HighlyVariableGenesLogarithmizedByTopGenes.flavor,params.1.HighlyVariableGenesLogarithmizedByTopGenes.n_bins,params.1.HighlyVariableGenesLogarithmizedByTopGenes.n_top_genes,params.2.WeightedFeaturePCA.feat_norm_mode,params.2.WeightedFeaturePCA.n_components,test_acc
+ar44hl0i,576.8246047496796,0.0,1709465187.8548057,575,0.8984771370887756,7.16137419867858,cell_ranger,19,1387,minmax,632,0.8084138631820679
+6lmb195b,618.9906692504883,0.0,1709464587.667832,617,0.7654822468757629,7.688777401989546,cell_ranger,14,1565,l2,706,0.0
+5oc1qu8u,,,,21,,7.665407365430792,cell_ranger,17,167,l2,106,
+pled4mg7,800.5276787281036,0.0,1709463901.3363938,799,0.5208121538162231,2.515426681662771,cell_ranger,21,967,normalize,506,0.0
+5ytlx4j2,146.91047024726868,0.0,1709463081.5764072,145,0.9045685529708862,7.506394575248425,cell_ranger,14,1486,minmax,596,0.9567936062812804

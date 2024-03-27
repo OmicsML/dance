@@ -157,7 +157,12 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.gnnmodel = GNNModel(in_feats=num_cells, out_feats=num_genes, dropout=dropout)
         self.aemodel = AEModel(in_feats=num_genes, dropout=dropout)
         self.model_params = list(self.aemodel.parameters()) + list(self.gnnmodel.parameters())
-        self.to(self.device)
+
+        if torch.cuda.device_count() > 1 and gpu != -1:
+            self = nn.DataParallel(self).to("cuda")
+            print(self.device_ids)
+        else:
+            self.to(self.device)
 
     @staticmethod
     def preprocessing_pipeline(min_cells: float = 0.1, threshold: float = 0.3, normalize_edges: bool = True,
@@ -228,51 +233,52 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         None
 
         """
-        # Get weighted adjacency matrix
-        u, v = graph.edges()
-        self.adj = torch.zeros((graph.num_nodes(), graph.num_nodes())).to(self.device)
-        self.adj_norm = torch.zeros((graph.num_nodes(), graph.num_nodes())).to(self.device)
-        self.adj[u.long(), v.long()] = torch.ones(graph.num_edges()).float().to(self.device)
-        self.adj_norm[u.long(), v.long()] = graph.edata['weight']
+        with torch.autocast(device_type="cuda", dtype=torch.float16):
+            # Get weighted adjacency matrix
+            u, v = graph.edges()
+            self.adj = torch.zeros((graph.num_nodes(), graph.num_nodes())).to(self.device)
+            self.adj_norm = torch.zeros((graph.num_nodes(), graph.num_nodes())).to(self.device)
+            self.adj[u.long(), v.long()] = torch.ones(graph.num_edges()).float().to(self.device)
+            self.adj_norm[u.long(), v.long()] = graph.edata['weight']
 
-        rng = np.random.default_rng(self.seed)
-        # Specify train validation split
-        if train_idx is None:
-            train_idx = range(len(train_data))
-        if mask is not None:
-            train_data_masked = self.maskdata(train_data, mask)
-            graph.ndata["feat"] = train_data_masked.float().T
-            train_mask = np.copy(mask)
-            test_idx = [i for i in range(len(train_data)) if i not in train_idx]
-            train_mask[test_idx] = False
-            valid_mask = ~mask
-            valid_mask[test_idx] = False
-        else:
-            train_data_masked = train_data
-            train_idx_permuted = rng.permutation(train_idx)
-            train_idx = train_idx_permuted[:int(len(train_idx_permuted) * 0.9)]
-            valid_idx = train_idx_permuted[int(len(train_idx_permuted) * 0.9):]
-            train_mask = np.zeros_like(train_data.cpu()).astype(bool)
-            train_mask[train_idx] = True
-            valid_mask = np.zeros_like(train_data.cpu()).astype(bool)
-            valid_mask[valid_idx] = True
+            rng = np.random.default_rng(self.seed)
+            # Specify train validation split
+            if train_idx is None:
+                train_idx = range(len(train_data))
+            if mask is not None:
+                train_data_masked = self.maskdata(train_data, mask)
+                graph.ndata["feat"] = train_data_masked.float().T
+                train_mask = np.copy(mask)
+                test_idx = [i for i in range(len(train_data)) if i not in train_idx]
+                train_mask[test_idx] = False
+                valid_mask = ~mask
+                valid_mask[test_idx] = False
+            else:
+                train_data_masked = train_data
+                train_idx_permuted = rng.permutation(train_idx)
+                train_idx = train_idx_permuted[:int(len(train_idx_permuted) * 0.9)]
+                valid_idx = train_idx_permuted[int(len(train_idx_permuted) * 0.9):]
+                train_mask = np.zeros_like(train_data.cpu()).astype(bool)
+                train_mask[train_idx] = True
+                valid_mask = np.zeros_like(train_data.cpu()).astype(bool)
+                valid_mask[valid_idx] = True
 
-        self.train_data_masked = train_data_masked
-        n_counts = train_data_raw.sum(1)
-        self.size_factors = n_counts / torch.median(n_counts)
-        self.weight_decay = weight_decay
-        self.optimizer = torch.optim.Adam(self.model_params, lr=lr, weight_decay=weight_decay)
+            self.train_data_masked = train_data_masked
+            n_counts = train_data_raw.sum(1)
+            self.size_factors = n_counts / torch.median(n_counts)
+            self.weight_decay = weight_decay
+            self.optimizer = torch.optim.Adam(self.model_params, lr=lr, weight_decay=weight_decay)
 
-        self.save_model()  # NOTE: prevent non-existing model loading error
-        for epoch in range(n_epochs):
-            self.train(train_data_masked, train_data_raw, graph, train_mask, valid_mask, le, la, ke, ka)
-            if not epoch:
-                min_valid_loss = self.valid_loss
-            elif min_valid_loss >= self.valid_loss:
-                min_valid_loss = self.valid_loss
-                self.save_model()
-            print(f"[Epoch%d], train_loss %.6f, adj_loss %.6f, express_loss %.6f, kl_loss %.6f, valid_loss %.6f" \
-                  % (epoch, self.train_loss, self.loss_adj, self.loss_exp, abs(self.kl), self.valid_loss))
+            self.save_model()  # NOTE: prevent non-existing model loading error
+            for epoch in range(n_epochs):
+                self.train(train_data_masked, train_data_raw, graph, train_mask, valid_mask, le, la, ke, ka)
+                if not epoch:
+                    min_valid_loss = self.valid_loss
+                elif min_valid_loss >= self.valid_loss:
+                    min_valid_loss = self.valid_loss
+                    self.save_model()
+                print(f"[Epoch%d], train_loss %.6f, adj_loss %.6f, express_loss %.6f, kl_loss %.6f, valid_loss %.6f" \
+                    % (epoch, self.train_loss, self.loss_adj, self.loss_exp, abs(self.kl), self.valid_loss))
 
     def train(self, train_data, train_data_raw, graph, train_mask, valid_mask, le=1, la=1, ke=1, ka=1):
         """Train function, gets loss and performs optimization step.
@@ -455,21 +461,26 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             log_lik - kl
 
         """
-
+        origin_device = batch.device
+        params = [batch, adj_orig, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean, disp, pi, mask]
+        for index, param in enumerate(params):
+            if isinstance(param, torch.Tensor):
+                params[index] = params[index].cpu()
+        batch, adj_orig, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean, disp, pi, mask = params
         pos_weight = (adj_orig.shape[0]**2 - adj_orig.sum(axis=1)) / (adj_orig.sum(axis=1))
         norm_adj = adj_orig.shape[0] * adj_orig.shape[0] / float(
             (adj_orig.shape[0] * adj_orig.shape[0] - adj_orig.sum()) * 2)
         loss_adj = la * norm_adj * torch.mean(F.cross_entropy(z_adj, adj_orig, pos_weight))
 
         eps = 1e-10
-        mean = mean * torch.reshape(self.size_factors, (-1, 1))
+        mean = mean * (torch.reshape(self.size_factors, (-1, 1)).cpu())
         disp = torch.clamp(disp, max=1e6)
         t1 = torch.lgamma(disp + eps) + torch.lgamma(batch + 1) - torch.lgamma(batch + disp + eps)
         t2 = (disp + batch) * torch.log(1.0 + (mean / (disp + eps))) + (batch *
                                                                         (torch.log(disp + eps) - torch.log(mean + eps)))
         nb_loss = t1 + t2
         nb_loss = torch.where(torch.isnan(nb_loss),
-                              torch.zeros([nb_loss.shape[0], nb_loss.shape[1]]).to(self.device) + np.inf, nb_loss)
+                              torch.zeros([nb_loss.shape[0], nb_loss.shape[1]]).to(nb_loss.device) + np.inf, nb_loss)
         zero_nb = torch.pow(disp / (disp + mean + eps), disp)
         zero_case = -torch.log(pi + ((1 - pi) * zero_nb) + eps)
         loss_exp = torch.where(torch.lt(batch, 1e-8), zero_case, nb_loss)
@@ -481,6 +492,11 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         kl_exp = 0.5 / batch.shape[1] * torch.mean(F.mse_loss(z_exp, batch, reduction="none")[mask])
         kl = ka * kl_adj - ke * kl_exp
         loss = log_lik - kl
+        results = [loss_adj, loss_exp, log_lik, kl, loss]
+        for index, res in enumerate(results):
+            if isinstance(res, torch.Tensor):
+                results[index] = results[index].to(origin_device)
+        loss_adj, loss_exp, log_lik, kl, loss = results
         return loss_adj, loss_exp, log_lik, kl, loss
 
     def load_model(self):

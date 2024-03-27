@@ -9,12 +9,13 @@ from pprint import pformat
 import anndata
 import mudata
 import numpy as np
+import omegaconf
 import pandas as pd
 import scipy.sparse as sp
 import torch
 
 from dance import logger
-from dance.typing import Any, Dict, FeatType, Iterator, List, Literal, Optional, Sequence, Tuple, Union
+from dance.typing import Any, Dict, FeatType, Iterator, List, ListConfig, Literal, Optional, Sequence, Tuple, Union
 
 
 def _ensure_iter(val: Optional[Union[List[str], str]]) -> Iterator[Optional[str]]:
@@ -34,7 +35,7 @@ def _check_types_and_sizes(types, sizes):
         raise TypeError(f"Found mixed types: {types}. Input configs must be either all str or all lists.")
     elif ((type_ := types.pop()) == list) and (len(sizes) > 1):
         raise ValueError(f"Found mixed sizes lists: {sizes}. Input configs must be of same length.")
-    elif type_ not in (list, str):
+    elif type_ not in (list, str, ListConfig):
         raise TypeError(f"Unknownn type {type_} found in config.")
 
 
@@ -240,7 +241,7 @@ class BaseData(ABC):
         label_configs = [j for i, j in config_dict.items() if i in self._LABEL_CONFIGS and j is not None]
 
         # Check type and length consistencies for feature and label configs
-        for i in (feature_configs, label_configs):
+        for i in [feature_configs, label_configs]:
             types = set(map(type, i))
             sizes = set(map(len, i))
             _check_types_and_sizes(types, sizes)
@@ -249,6 +250,9 @@ class BaseData(ABC):
         for config_key, config_val in config_dict.items():
             # New config
             if config_key not in self.config:
+                if isinstance(config_val, ListConfig):
+                    config_val = omegaconf.OmegaConf.to_object(config_val)
+                    logger.warning(f"transform ListConfig {config_val} to List")
                 self.config[config_key] = config_val
                 logger.info(f"Setting config {config_key!r} to {config_val!r}")
                 continue

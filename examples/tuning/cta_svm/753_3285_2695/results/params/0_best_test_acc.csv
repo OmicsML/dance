@@ -1,0 +1,11 @@
+id,_runtime,_step,_timestamp,_wandb_runtime,acc,params.1.FilterGenesScanpyOrder.max_cells,params.1.FilterGenesScanpyOrder.max_counts,params.1.FilterGenesScanpyOrder.min_cells,params.1.FilterGenesScanpyOrder.min_counts,params.1.FilterGenesScanpyOrder.order,params.2.CellPCA.n_components,test_acc
+p05o0g4q,114.45448303222656,0,1709460589.530722,112,0.9369863271713256,2022,3745,9,10,"['max_counts', 'min_counts', 'max_cells', 'min_cells']",181,0.945083498954773
+n6m6tzzp,89.33323431015015,0,1709460446.6647725,87,0.9211567640304564,1459,4249,10,9,"['max_counts', 'min_cells', 'min_counts', 'max_cells']",315,0.9346938729286194
+ug0b8k42,70.19708633422852,0,1709460336.3049884,68,0.9324200749397278,1440,4101,10,10,"['max_counts', 'max_cells', 'min_counts', 'min_cells']",190,0.9372912645339966
+81bktuy4,128.27578330039978,0,1709460252.2802052,126,0.9187214374542236,823,4509,8,9,"['min_cells', 'max_counts', 'min_counts', 'max_cells']",273,0.5692022442817688
+nxwqnwe9,186.35049033164975,0,1709460102.5821233,185,0.9214611649513244,1341,3819,9,10,"['min_cells', 'max_counts', 'min_counts', 'max_cells']",330,0.9272727370262146
+4j90b6my,171.56161999702454,0,1709459900.714277,169,0.917503833770752,2076,3086,7,10,"['max_counts', 'min_counts', 'min_cells', 'max_cells']",343,0.9276437759399414
+p4jretf1,125.93586468696594,0,1709459700.9342787,124,0.9235920906066896,1209,3955,7,10,"['max_counts', 'min_counts', 'min_cells', 'max_cells']",238,0.9231910705566406
+u7l9r6yj,135.61265015602112,0,1709459543.6404142,134,0.9111111164093018,1117,2928,9,5,"['max_cells', 'min_counts', 'max_counts', 'min_cells']",658,0.4430426657199859
+1d5grgrx,150.14980506896973,0,1709459379.793929,148,0.915372908115387,2814,3982,8,5,"['max_counts', 'min_counts', 'min_cells', 'max_cells']",735,0.9502782821655272
+cxoat4ty,217.10835146903992,0,1709459213.9177284,215,0.9181126356124878,1724,4058,10,4,"['min_cells', 'max_cells', 'min_counts', 'max_counts']",398,0.948051929473877
