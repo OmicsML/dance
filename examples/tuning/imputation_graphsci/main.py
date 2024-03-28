@@ -53,8 +53,7 @@ if __name__ == '__main__':
         wandb.init(settings=wandb.Settings(start_method='thread'))
         set_seed(params.seed)
         gpu = params.gpu
-
-        device = "cpu" if params.gpu == -1 else f"cuda:{gpu}"
+        device = "cpu" if gpu == -1 else f"cuda:{gpu}"
 
         data = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset,
                                  train_size=params.train_size).load_data()

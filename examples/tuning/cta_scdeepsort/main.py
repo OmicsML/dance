@@ -7,8 +7,8 @@ from typing import get_args
 
 import numpy as np
 import torch
-
 import wandb
+
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
