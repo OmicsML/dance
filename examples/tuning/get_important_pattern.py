@@ -1,8 +1,8 @@
 import itertools
-from itertools import combinations
-
-from pathlib import Path
 import pathlib
+from itertools import combinations
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -60,7 +60,7 @@ def get_important_pattern(test_accs, vis=True, alpha=0.8, title=""):
         return []
 
 
-def get_com(step2_data, r=2, alpha=0.8, columns=None,vis=True):
+def get_com(step2_data, r=2, alpha=0.8, columns=None, vis=True):
     ans = []
     for com in itertools.combinations(columns, r):
         test_accs_arrays = []
@@ -68,7 +68,7 @@ def get_com(step2_data, r=2, alpha=0.8, columns=None,vis=True):
             test_accs_arrays.append({"name": g[0], metric_name: list(g[1][metric_name])})
         test_accs = [i[metric_name] for i in test_accs_arrays]
         test_acc_names = [i["name"] for i in test_accs_arrays]
-        final_ranks = get_important_pattern(test_accs, alpha=alpha, title=" ".join(list(com)),vis=vis)
+        final_ranks = get_important_pattern(test_accs, alpha=alpha, title=" ".join(list(com)), vis=vis)
         if len(final_ranks) > 0:
             max_rank = max(final_ranks)
             max_rank_count = final_ranks.count(max_rank)
@@ -95,20 +95,21 @@ def get_frequent_itemsets(step2_data, threshold_per=0.1):
     return [tuple(a) for a in frequent_itemsets["itemsets"]]
 
 
-def get_com_all(step2_data,vis=True):
+def get_com_all(step2_data, vis=True):
     ans = []
     columns = sorted([col for col in step2_data.columns if col.startswith("pipeline")])
     for i in range(1, len(columns)):
-        ans += get_com(step2_data, i, columns=columns,vis=vis)
+        ans += get_com(step2_data, i, columns=columns, vis=vis)
     return ans
 
 
 def summary_pattern(data_path):
     step2_origin_data = pd.read_csv(data_path)
     step2_data = step2_origin_data.dropna()
-    com_ans = get_com_all(step2_data,vis=False)
+    com_ans = get_com_all(step2_data, vis=False)
     apr_ans = get_frequent_itemsets(step2_data)
     return list(set(com_ans) & set(apr_ans))
+
 
 # def list_files(directory,file_name="best_test_acc.csv",save_path="summary_file"):
 #     ans=[]
@@ -119,12 +120,14 @@ def summary_pattern(data_path):
 #                 algorithm,dataset=file_path.relative_to(directory).parts[:2]
 #                 ans.append({"algorithm":algorithm,"dataset":dataset,"summary_pattern":summary_pattern(file_path)})
 #     pd.DataFrame(ans).to_csv(save_path)
-def list_files(directory,file_name="best_test_acc.csv"):
+def list_files(directory, file_name="best_test_acc.csv"):
     path = Path(directory)
     for file_path in path.rglob('*'):
         if file_path.is_file():
-            if file_path.name==file_name:
-                with open(Path(file_path.parent.resolve(),"pipeline_summary_pattern.txt"),'w') as f:
+            if file_path.name == file_name:
+                with open(Path(file_path.parent.resolve(), "pipeline_summary_pattern.txt"), 'w') as f:
                     f.write(str(summary_pattern(file_path)))
-if __name__=="__main__":
+
+
+if __name__ == "__main__":
     list_files('/home/zyxing/dance/examples/tuning')
