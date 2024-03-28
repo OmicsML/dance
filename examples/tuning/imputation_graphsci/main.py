@@ -3,9 +3,10 @@ import gc
 import sys
 from pathlib import Path
 
+import numpy as np
 import torch
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.graphsci import GraphSCI
@@ -52,7 +53,7 @@ if __name__ == '__main__':
         wandb.init(settings=wandb.Settings(start_method='thread'))
         set_seed(params.seed)
         gpu = params.gpu
-        device = "cpu" if params.gpu == -1 else f"cuda:{gpu}"
+        device = "cpu" if gpu == -1 else f"cuda:{gpu}"
 
         data = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset,
                                  train_size=params.train_size).load_data()
@@ -63,8 +64,11 @@ if __name__ == '__main__':
         preprocessing_pipeline(data)
 
         X, X_raw, g, mask = data.get_x(return_type="default")
-        X = torch.tensor(X.toarray()).float()
-        X_raw = torch.tensor(X_raw.toarray()).float()
+        if not isinstance(X, np.ndarray):
+            X = X.toarray()
+            X_raw = X_raw.toarray()
+        X = torch.tensor(X).float()
+        X_raw = torch.tensor(X_raw).float()
         X_train = (X * mask).to(device)
         X_raw_train = (X_raw * mask).to(device)
         g = g.to(device)
