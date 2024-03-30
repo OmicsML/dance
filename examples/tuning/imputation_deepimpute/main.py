@@ -77,7 +77,7 @@ if __name__ == '__main__':
                        conf_load_path=f"{Path(params.root_path).resolve().parent}/step3_default_params.yaml",
                        root_path=file_root_path,
                        required_funs=["SaveRaw", "UpdateRaw", "GeneHoldout", "CellwiseMaskData", "SetConfig"],
-                       required_indexes=[2, 5, sys.maxsize - 2, sys.maxsize - 1,
+                       required_indexes=[2, 6, sys.maxsize - 2, sys.maxsize - 1,
                                          sys.maxsize], metric="RMSE", ascending=True)
         if params.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
