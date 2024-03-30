@@ -4,8 +4,8 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.deepimpute import DeepImpute
@@ -76,9 +76,9 @@ if __name__ == '__main__':
         get_step3_yaml(result_load_path=f"{params.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{Path(params.root_path).resolve().parent}/step3_default_params.yaml",
                        root_path=file_root_path,
-                       required_funs=["SaveRaw", "GeneHoldout", "CellwiseMaskData",
-                                      "SetConfig"], required_indexes=[2, sys.maxsize - 2, sys.maxsize - 1,
-                                                                      sys.maxsize], metric="RMSE", ascending=True)
+                       required_funs=["SaveRaw", "UpdateRaw", "GeneHoldout", "CellwiseMaskData", "SetConfig"],
+                       required_indexes=[2, 5, sys.maxsize - 2, sys.maxsize - 1,
+                                         sys.maxsize], metric="RMSE", ascending=True)
         if params.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """To reproduce deepimpute benchmarks, please refer to command lines belows:
