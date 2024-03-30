@@ -1049,6 +1049,14 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
             for k in step2_pipeline_planer.config.pipeline:
                 if "target" in k and k["target"] == f:
                     pipeline.insert(i, k)
+        for p1 in step2_pipeline_planer.config.pipeline:
+            if "step3_frozen" in p1 and p1["step3_frozen"]:
+                for p2 in pipeline:
+                    if p1["type"] == p2["type"]:
+                        if "params_to_tune" in p2: del p2["params_to_tune"]
+                        for target, d_p in p1.default_params.items():
+                            if target == p2["target"]:
+                                p2["params"] = d_p
         temp_conf = conf.copy()
         temp_conf.pipeline = pipeline
         temp_conf.wandb = step2_pipeline_planer.config.wandb
