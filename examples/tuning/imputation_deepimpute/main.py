@@ -61,8 +61,8 @@ if __name__ == '__main__':
         if not isinstance(X, np.ndarray):
             X = X.toarray()
             X_raw = X_raw.toarray()
-        X = torch.tensor(X.toarray()).float()
-        X_raw = torch.tensor(X_raw.toarray()).float()
+        X = torch.tensor(X).float()
+        X_raw = torch.tensor(X_raw).float()
         X_train = X * mask  # when mask is None, raise error
         model = DeepImpute(predictors, targets, params.dataset, params.sub_outputdim, params.hidden_dim, params.dropout,
                            params.seed, params.gpu)
