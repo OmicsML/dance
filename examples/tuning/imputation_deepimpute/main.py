@@ -4,8 +4,8 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.deepimpute import DeepImpute
@@ -58,6 +58,9 @@ if __name__ == '__main__':
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
         X, X_raw, targets, predictors, mask = data.get_x(return_type="default")
+        if not isinstance(X, np.ndarray):
+            X = X.toarray()
+            X_raw = X_raw.toarray()
         X = torch.tensor(X.toarray()).float()
         X_raw = torch.tensor(X_raw.toarray()).float()
         X_train = X * mask  # when mask is None, raise error
