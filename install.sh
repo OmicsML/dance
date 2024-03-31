@@ -55,7 +55,7 @@ conda create -n ${envname} python=3.11 -y
 conda activate ${envname}
 
 # Install CUDA enabled dependencies
-pip install torch==${PYTORCH_VERSION} torchvision=${TORCHVISION_VERSION} ${PYTORCH_CHANNEL}
+pip install torch==${PYTORCH_VERSION} torchvision==${TORCHVISION_VERSION} ${PYTORCH_CHANNEL}
 pip install torch_geometric==${PYG_VERSION}
 pip install dgl==${DGL_VERSION} ${DGL_CHANNEL}
 
