@@ -1,4 +1,5 @@
 import argparse
+import os
 import pprint
 import sys
 from pathlib import Path
@@ -22,7 +23,7 @@ if __name__ == "__main__":
     # Balance_para = [binary_crossentropy_loss, ce_loss, re_loss, zinb_loss, sigma]
     Balance_para = [1, 0.01, 0.1, 0.1, 1]
 
-    parser.add_argument("--data_dir", default="./data")
+    parser.add_argument("--data_dir", default="../temp_data")
     parser.add_argument(
         "--dataset", type=str, default="worm_neuron_cell", choices=[
             "10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell", "human_pbmc2_cell","mouse_lung_cell",
@@ -68,6 +69,7 @@ if __name__ == "__main__":
     file_root_path = Path(args.root_path, args.dataset).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
+    os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
 
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
