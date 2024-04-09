@@ -1,11 +1,12 @@
 import argparse
+import os
 import pprint
 import sys
 from pathlib import Path
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.scdeepcluster import ScDeepCluster
@@ -21,7 +22,7 @@ if __name__ == "__main__":
         help="resolution parameter, used by the Louvain algorithm, larger value for more number of clusters")
     parser.add_argument("--select_genes", default=0, type=int, help="number of selected genes, 0 means using all genes")
     parser.add_argument("--batch_size", default=256, type=int)
-    parser.add_argument("--data_dir", default="./data")
+    parser.add_argument("--data_dir", default="../temp_data")
     parser.add_argument(
         "--dataset", default="human_pbmc2_cell", type=str, choices=[
             "10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell", "human_pbmc2_cell",
@@ -53,6 +54,7 @@ if __name__ == "__main__":
     file_root_path = Path(args.root_path, args.dataset).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
+    os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
 
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))

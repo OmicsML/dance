@@ -1,11 +1,12 @@
 import argparse
+import os
 import pprint
 import sys
 from pathlib import Path
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.graphsc import GraphSC
@@ -39,7 +40,7 @@ if __name__ == "__main__":
     parser.add_argument("-eve", "--eval_epoch", action="store_true")
     parser.add_argument("-show", "--show_epoch_ari", action="store_true")
     parser.add_argument("-plot", "--plot", default=False, action="store_true")
-    parser.add_argument("-dd", "--data_dir", default="./temp_data", type=str)
+    parser.add_argument("-dd", "--data_dir", default="../temp_data", type=str)
     parser.add_argument(
         "-data", "--dataset", default="worm_neuron_cell", choices=[
             "10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell", "mouse_kidney_10x",
@@ -58,6 +59,7 @@ if __name__ == "__main__":
     file_root_path = Path(args.root_path, args.dataset).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
+    os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
 
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
