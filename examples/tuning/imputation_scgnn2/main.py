@@ -193,7 +193,7 @@ if __name__ == "__main__":
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
         train_mask, test_mask = data.get_x(return_type="default")
-        if not isinstance(train_mask,np.ndarray):
+        if not isinstance(train_mask, np.ndarray):
             x_train = data.data.X.A * train_mask
         else:
             x_train = data.data.X * train_mask
