@@ -4,8 +4,8 @@ from pathlib import Path
 from pprint import pformat
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.scgnn2 import ScGNN2
@@ -162,7 +162,7 @@ if __name__ == "__main__":
                         help="(float, default 1e-2) learning rate")
     parser.add_argument("--deconv_tune_epoch", type=int, default=20, help="(int, default 20) epoch")
     parser.add_argument("--deconv_tune_epsilon", type=float, default=1e-4, help="(float, default) epsilon")
-    parser.add_argument("--data_dir", type=str, default='data', help='test directory')
+    parser.add_argument("--data_dir", type=str, default='../temp_data', help='test directory')
     parser.add_argument("--dataset", default='mouse_brain_data', type=str, help="dataset id")
     parser.add_argument("--train_size", type=float, default=0.9, help="proportion of training set")
     parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
