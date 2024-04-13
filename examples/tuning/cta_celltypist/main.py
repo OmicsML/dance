@@ -1,11 +1,12 @@
 import argparse
+import gc
 import os
 import pprint
 from pathlib import Path
 from typing import get_args
-import gc
-import torch
+
 import numpy as np
+import torch
 import wandb
 
 from dance import logger
