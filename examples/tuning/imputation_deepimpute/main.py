@@ -26,7 +26,7 @@ if __name__ == '__main__':
     parser.add_argument("--patience", type=int, default=20, help="Early stopping patience")
     parser.add_argument("--min_cells", type=float, default=.05,
                         help="Minimum proportion of cells expressed required for a gene to pass filtering")
-    parser.add_argument("--data_dir", type=str, default='./temp_data', help='test directory')
+    parser.add_argument("--data_dir", type=str, default='../temp_data', help='test directory')
     parser.add_argument("--dataset", default='mouse_brain_data', type=str, help="dataset id")
     parser.add_argument("--n_top", type=int, default=5, help="Number of predictors.")
     parser.add_argument("--train_size", type=float, default=0.9, help="proportion of training set")
@@ -64,13 +64,14 @@ if __name__ == '__main__':
             X_raw = X_raw.toarray()
         X = torch.tensor(X).float()
         X_raw = torch.tensor(X_raw).float()
-        X_train = X * mask  # when mask is None, raise error
+        train_idx = data.train_idx
+        test_idx = data.test_idx
         model = DeepImpute(predictors, targets, params.dataset, params.sub_outputdim, params.hidden_dim, params.dropout,
                            params.seed, params.gpu)
 
-        model.fit(X_train, X_train, mask, params.batch_size, params.lr, params.n_epochs, params.patience)
-        imputed_data = model.predict(X_train, mask)
-        score = model.score(X, imputed_data, mask, metric='RMSE')
+        model.fit(X[train_idx], X[train_idx], mask, params.batch_size, params.lr, params.n_epochs, params.patience)
+        imputed_data = model.predict(X[test_idx], mask, test_idx)
+        score = model.score(X_raw[test_idx], imputed_data, mask, "RMSE", test_idx)
         wandb.log({"RMSE": score})
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
