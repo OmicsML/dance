@@ -68,9 +68,9 @@ if __name__ == '__main__':
         model = DeepImpute(predictors, targets, params.dataset, params.sub_outputdim, params.hidden_dim, params.dropout,
                            params.seed, params.gpu)
 
-        model.fit(X_train, X_train, mask, params.batch_size, params.lr, params.n_epochs, params.patience)
-        imputed_data = model.predict(X_train, mask)
-        score = model.score(X, imputed_data, mask, metric='RMSE')
+        model.fit(X[train_idx], X[train_idx], mask, params.batch_size, params.lr, params.n_epochs, params.patience)
+        imputed_data = model.predict(X[test_idx], mask, test_idx)
+        score = model.score(X_raw[test_idx], imputed_data,  mask, "RMSE",test_idx)
         wandb.log({"RMSE": score})
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
