@@ -70,7 +70,7 @@ if __name__ == '__main__':
 
         model.fit(X[train_idx], X[train_idx], mask, params.batch_size, params.lr, params.n_epochs, params.patience)
         imputed_data = model.predict(X[test_idx], mask, test_idx)
-        score = model.score(X_raw[test_idx], imputed_data,  mask, "RMSE",test_idx)
+        score = model.score(X_raw[test_idx], imputed_data, mask, "RMSE", test_idx)
         wandb.log({"RMSE": score})
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
