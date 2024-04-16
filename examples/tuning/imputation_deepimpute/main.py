@@ -4,8 +4,8 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.deepimpute import DeepImpute
@@ -60,6 +60,7 @@ if __name__ == '__main__':
         X, X_raw, targets, predictors, mask = data.get_x(return_type="default")
         if not isinstance(X, np.ndarray):
             X = X.toarray()
+        if not isinstance(X_raw, np.ndarray):
             X_raw = X_raw.toarray()
         X = torch.tensor(X).float()
         X_raw = torch.tensor(X_raw).float()
