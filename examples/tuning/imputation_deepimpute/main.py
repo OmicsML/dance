@@ -63,7 +63,8 @@ if __name__ == '__main__':
             X_raw = X_raw.toarray()
         X = torch.tensor(X).float()
         X_raw = torch.tensor(X_raw).float()
-        X_train = X * mask  # when mask is None, raise error
+        train_idx = data.train_idx
+        test_idx = data.test_idx
         model = DeepImpute(predictors, targets, params.dataset, params.sub_outputdim, params.hidden_dim, params.dropout,
                            params.seed, params.gpu)
 
