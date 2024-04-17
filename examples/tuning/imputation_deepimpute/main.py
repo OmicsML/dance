@@ -35,7 +35,7 @@ if __name__ == '__main__':
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--mask", type=bool, default=True, help="Mask data for validation.")
     parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
-    parser.add_argument("--tune_mode", default="pipeline", choices=["pipeline", "params", "pipeline_params"])
+    parser.add_argument("--tune_mode", default="pipeline_params", choices=["pipeline", "params", "pipeline_params"])
     parser.add_argument("--count", type=int, default=2)
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
@@ -79,7 +79,7 @@ if __name__ == '__main__':
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=params.sweep_id, count=params.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=params.summary_file_path, root_path=file_root_path)
-    if params.tune_mode == "pipeline_params":
+    if params.tune_mode == "pipeline" or params.tune_mode == "pipeline_params":
         get_step3_yaml(result_load_path=f"{params.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{Path(params.root_path).resolve().parent}/step3_default_params.yaml",
                        root_path=file_root_path,
