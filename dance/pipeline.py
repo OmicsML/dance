@@ -10,7 +10,7 @@ from pprint import pformat
 
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
-
+from wandb.errors import UsageError
 from dance import logger
 from dance.config import Config
 from dance.exceptions import DevError
@@ -1054,9 +1054,10 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
                 for p2 in pipeline:
                     if p1["type"] == p2["type"]:
                         if "params_to_tune" in p2: del p2["params_to_tune"]
-                        for target, d_p in p1.default_params.items():
-                            if target == p2["target"]:
-                                p2["params"] = d_p
+                        if "default_params" in p1:
+                            for target, d_p in p1.default_params.items():
+                                if target == p2["target"]:
+                                    p2["params"] = d_p
         temp_conf = conf.copy()
         temp_conf.pipeline = pipeline
         temp_conf.wandb = step2_pipeline_planer.config.wandb
@@ -1084,13 +1085,17 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
     pipeline_top_k = default(step2_pipeline_planer.config.pipeline_tuning_top_k, DEFAULT_PIPELINE_TUNING_TOP_K)
     step3_k = default(step2_pipeline_planer.config.parameter_tuning_freq_n, DEFAULT_PARAMETER_TUNING_FREQ_N)
     for i in range(pipeline_top_k):
-        pipeline_planer = PipelinePlaner.from_config_file(
-            f"{root_path}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml")
-        entity, project, step3_sweep_id = pipeline_planer.wandb_sweep_agent(
-            partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=None,
-            count=step3_k)  #Score can be recorded for each epoch
-        save_summary_data(entity, project, step3_sweep_id, f"results/{tune_mode}/{i}_best_test_acc.csv",
-                          root_path=root_path)
+        try:
+            pipeline_planer = PipelinePlaner.from_config_file(
+                f"{root_path}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml")
+            entity, project, step3_sweep_id = pipeline_planer.wandb_sweep_agent(
+                partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=None,
+                count=step3_k)  #Score can be recorded for each epoch
+            save_summary_data(entity, project, step3_sweep_id, f"results/{tune_mode}/{i}_best_test_acc.csv",
+                            root_path=root_path)
+        except UsageError:
+            logger.warning("continue")
+            continue
 
 
 # def get_params(preprocessing_pipeline:Pipeline,type,key,name):
