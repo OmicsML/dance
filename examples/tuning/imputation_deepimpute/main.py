@@ -26,7 +26,7 @@ if __name__ == '__main__':
     parser.add_argument("--patience", type=int, default=20, help="Early stopping patience")
     parser.add_argument("--min_cells", type=float, default=.05,
                         help="Minimum proportion of cells expressed required for a gene to pass filtering")
-    parser.add_argument("--data_dir", type=str, default='./temp_data', help='test directory')
+    parser.add_argument("--data_dir", type=str, default='../temp_data', help='test directory')
     parser.add_argument("--dataset", default='mouse_brain_data', type=str, help="dataset id")
     parser.add_argument("--n_top", type=int, default=5, help="Number of predictors.")
     parser.add_argument("--train_size", type=float, default=0.9, help="proportion of training set")
