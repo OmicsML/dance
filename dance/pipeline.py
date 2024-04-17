@@ -11,6 +11,7 @@ from pprint import pformat
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 from wandb.errors import UsageError
+
 from dance import logger
 from dance.config import Config
 from dance.exceptions import DevError
@@ -1092,7 +1093,7 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
                 partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=None,
                 count=step3_k)  #Score can be recorded for each epoch
             save_summary_data(entity, project, step3_sweep_id, f"results/{tune_mode}/{i}_best_test_acc.csv",
-                            root_path=root_path)
+                              root_path=root_path)
         except UsageError:
             logger.warning("continue")
             continue
