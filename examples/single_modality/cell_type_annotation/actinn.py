@@ -31,7 +31,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_dataset", nargs="+", default=[1970], help="List of training dataset ids.")
     parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
     parser.add_argument("--num_runs", type=int, default=1, help="Number of repetitions")
-
+    parser.add_argument("--val_size", type=float, default=0.0, help="val size")
     args = parser.parse_args()
     logger.setLevel(args.log_level)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     # Load data and perform necessary preprocessing
     dataloader = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
-                                           tissue=args.tissue, species=args.species)
+                                           tissue=args.tissue, species=args.species,val_size=args.val_size)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
     # Obtain training and testing data

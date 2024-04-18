@@ -31,7 +31,7 @@ if __name__ == "__main__":
     parser.add_argument("--weight_decay", type=float, default=5e-4, help="Weight for L2 loss")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--num_runs", type=int, default=1)
-
+    parser.add_argument("--val_size", type=float, default=0.0, help="val size")
     args = parser.parse_args()
     logger.setLevel(args.log_level)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
@@ -47,7 +47,7 @@ if __name__ == "__main__":
 
         # Load data and perform necessary preprocessing
         dataloader = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
-                                               train_dataset=args.train_dataset, data_dir="./")
+                                               train_dataset=args.train_dataset, data_dir="./",val_size=args.val_size)
         data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
         # Obtain training and testing data

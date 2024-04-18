@@ -53,7 +53,7 @@ class CellTypeAnnotationDataset(BaseDataset):
 
     def __init__(self, full_download=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
                  valid_dataset=None, train_dir="train", test_dir="test", valid_dir="valid", map_path="map",
-                 data_dir="./", train_as_valid=False):
+                 data_dir="./", train_as_valid=False,val_size=0.2):
         super().__init__(data_dir, full_download)
 
         self.data_dir = data_dir
@@ -72,6 +72,7 @@ class CellTypeAnnotationDataset(BaseDataset):
         if valid_dataset is None and self.train_as_valid:
             self.valid_dataset = train_dataset
             self.train2valid()
+        self.val_size=val_size
 
     def train2valid(self):
         logger.info("Copy train_dataset and use it as valid_dataset")
@@ -173,6 +174,7 @@ class CellTypeAnnotationDataset(BaseDataset):
     def _load_raw_data(self, ct_col: str = "Cell_type") -> Tuple[ad.AnnData, List[Set[str]], List[str], int]:
         species = self.species
         tissue = self.tissue
+        valid_feat = None
         if self.valid_dataset is not None:
             train_dataset_ids = self.train_dataset
             test_dataset_ids = self.test_dataset
@@ -204,43 +206,68 @@ class CellTypeAnnotationDataset(BaseDataset):
             train_feat, test_feat = (self._load_dfs(paths, transpose=True)
                                      for paths in (train_feat_paths, test_feat_paths))
             train_label, test_label = (self._load_dfs(paths) for paths in (train_label_paths, test_label_paths))
+            if self.val_size>0:
+                train_feat, valid_feat, train_label, valid_label = train_test_split(train_feat, train_label, test_size=self.val_size)
+        if valid_feat is not None:
+            # Combine features (only use features that are present in the training data)
+            train_size = train_feat.shape[0]
+            valid_size = valid_feat.shape[0]
+            feat_df = pd.concat(
+                train_feat.align(valid_feat, axis=1, join="left", fill_value=0) +
+                train_feat.align(test_feat, axis=1, join="left", fill_value=0)[1:]).fillna(0)
+            adata = ad.AnnData(feat_df, dtype=np.float32)
 
-            train_feat, valid_feat, train_label, valid_label = train_test_split(train_feat, train_label, test_size=0.2)
+            # Convert cell type labels and map test cell type names to train
+            cell_types = set(train_label[ct_col].unique())
+            idx_to_label = sorted(cell_types)
+            cell_type_mappings: Dict[str, Set[str]] = self.get_map_dict(map_path, tissue)
+            train_labels, valid_labels, test_labels = train_label[ct_col].tolist(), [], []
+            for i in valid_label[ct_col]:
+                valid_labels.append(i if i in cell_types else cell_type_mappings.get(i))
+            for i in test_label[ct_col]:
+                test_labels.append(i if i in cell_types else cell_type_mappings.get(i))
+            labels: List[Set[str]] = train_labels + valid_labels + test_labels
 
-        # Combine features (only use features that are present in the training data)
-        train_size = train_feat.shape[0]
-        valid_size = valid_feat.shape[0]
-        feat_df = pd.concat(
-            train_feat.align(valid_feat, axis=1, join="left", fill_value=0) +
-            train_feat.align(test_feat, axis=1, join="left", fill_value=0)[1:]).fillna(0)
-        adata = ad.AnnData(feat_df, dtype=np.float32)
+            logger.debug("Mapped valid cell-types:")
+            for i, j, k in zip(valid_label.index, valid_label[ct_col], valid_labels):
+                logger.debug(f"{i}:{j}\t-> {k}")
 
-        # Convert cell type labels and map test cell type names to train
-        cell_types = set(train_label[ct_col].unique())
-        idx_to_label = sorted(cell_types)
-        cell_type_mappings: Dict[str, Set[str]] = self.get_map_dict(map_path, tissue)
-        train_labels, valid_labels, test_labels = train_label[ct_col].tolist(), [], []
-        for i in valid_label[ct_col]:
-            valid_labels.append(i if i in cell_types else cell_type_mappings.get(i))
-        for i in test_label[ct_col]:
-            test_labels.append(i if i in cell_types else cell_type_mappings.get(i))
-        labels: List[Set[str]] = train_labels + valid_labels + test_labels
+            logger.debug("Mapped test cell-types:")
+            for i, j, k in zip(test_label.index, test_label[ct_col], test_labels):
+                logger.debug(f"{i}:{j}\t-> {k}")
 
-        logger.debug("Mapped valid cell-types:")
-        for i, j, k in zip(valid_label.index, valid_label[ct_col], valid_labels):
-            logger.debug(f"{i}:{j}\t-> {k}")
+            logger.info(f"Loaded expression data: {adata}")
+            logger.info(f"Number of training samples: {train_feat.shape[0]:,}")
+            logger.info(f"Number of valid samples: {valid_feat.shape[0]:,}")
+            logger.info(f"Number of testing samples: {test_feat.shape[0]:,}")
+            logger.info(f"Cell-types (n={len(idx_to_label)}):\n{pprint.pformat(idx_to_label)}")
 
-        logger.debug("Mapped test cell-types:")
-        for i, j, k in zip(test_label.index, test_label[ct_col], test_labels):
-            logger.debug(f"{i}:{j}\t-> {k}")
+            return adata, labels, idx_to_label, train_size, valid_size
+        else:
+            # Combine features (only use features that are present in the training data)
+            train_size = train_feat.shape[0]
+            feat_df = pd.concat(train_feat.align(test_feat, axis=1, join="left", fill_value=0)).fillna(0)
+            adata = ad.AnnData(feat_df, dtype=np.float32)
 
-        logger.info(f"Loaded expression data: {adata}")
-        logger.info(f"Number of training samples: {train_feat.shape[0]:,}")
-        logger.info(f"Number of valid samples: {valid_feat.shape[0]:,}")
-        logger.info(f"Number of testing samples: {test_feat.shape[0]:,}")
-        logger.info(f"Cell-types (n={len(idx_to_label)}):\n{pprint.pformat(idx_to_label)}")
+            # Convert cell type labels and map test cell type names to train
+            cell_types = set(train_label[ct_col].unique())
+            idx_to_label = sorted(cell_types)
+            cell_type_mappings: Dict[str, Set[str]] = self.get_map_dict(map_path, tissue)
+            train_labels, test_labels = train_label[ct_col].tolist(), []
+            for i in test_label[ct_col]:
+                test_labels.append(i if i in cell_types else cell_type_mappings.get(i))
+            labels: List[Set[str]] = train_labels + test_labels
 
-        return adata, labels, idx_to_label, train_size, valid_size
+            logger.debug("Mapped test cell-types:")
+            for i, j, k in zip(test_label.index, test_label[ct_col], test_labels):
+                logger.debug(f"{i}:{j}\t-> {k}")
+
+            logger.info(f"Loaded expression data: {adata}")
+            logger.info(f"Number of training samples: {train_feat.shape[0]:,}")
+            logger.info(f"Number of testing samples: {test_feat.shape[0]:,}")
+            logger.info(f"Cell-types (n={len(idx_to_label)}):\n{pprint.pformat(idx_to_label)}")
+
+            return adata, labels, idx_to_label, train_size,0
 
     def _raw_to_dance(self, raw_data):
         adata, cell_labels, idx_to_label, train_size, valid_size = raw_data
@@ -329,9 +356,10 @@ class ClusteringDataset(BaseDataset):
         return osp.exists(self.data_path)
 
     def _load_raw_data(self) -> Tuple[ad.AnnData, np.ndarray]:
-        with h5py.File(self.data_path, "r") as f:
-            x = np.array(f["X"])
-            y = np.array(f["Y"])
+        with open(self.data_path,"rb") as f_o:
+            with h5py.File(f_o, "r") as f:
+                x = np.array(f["X"])
+                y = np.array(f["Y"])
         adata = ad.AnnData(x, dtype=np.float32)
         return adata, y
 
