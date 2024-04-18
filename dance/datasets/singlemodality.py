@@ -53,7 +53,7 @@ class CellTypeAnnotationDataset(BaseDataset):
 
     def __init__(self, full_download=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
                  valid_dataset=None, train_dir="train", test_dir="test", valid_dir="valid", map_path="map",
-                 data_dir="./", train_as_valid=False,val_size=0.2):
+                 data_dir="./", train_as_valid=False, val_size=0.2):
         super().__init__(data_dir, full_download)
 
         self.data_dir = data_dir
@@ -72,7 +72,7 @@ class CellTypeAnnotationDataset(BaseDataset):
         if valid_dataset is None and self.train_as_valid:
             self.valid_dataset = train_dataset
             self.train2valid()
-        self.val_size=val_size
+        self.val_size = val_size
 
     def train2valid(self):
         logger.info("Copy train_dataset and use it as valid_dataset")
@@ -206,8 +206,9 @@ class CellTypeAnnotationDataset(BaseDataset):
             train_feat, test_feat = (self._load_dfs(paths, transpose=True)
                                      for paths in (train_feat_paths, test_feat_paths))
             train_label, test_label = (self._load_dfs(paths) for paths in (train_label_paths, test_label_paths))
-            if self.val_size>0:
-                train_feat, valid_feat, train_label, valid_label = train_test_split(train_feat, train_label, test_size=self.val_size)
+            if self.val_size > 0:
+                train_feat, valid_feat, train_label, valid_label = train_test_split(train_feat, train_label,
+                                                                                    test_size=self.val_size)
         if valid_feat is not None:
             # Combine features (only use features that are present in the training data)
             train_size = train_feat.shape[0]
@@ -267,7 +268,7 @@ class CellTypeAnnotationDataset(BaseDataset):
             logger.info(f"Number of testing samples: {test_feat.shape[0]:,}")
             logger.info(f"Cell-types (n={len(idx_to_label)}):\n{pprint.pformat(idx_to_label)}")
 
-            return adata, labels, idx_to_label, train_size,0
+            return adata, labels, idx_to_label, train_size, 0
 
     def _raw_to_dance(self, raw_data):
         adata, cell_labels, idx_to_label, train_size, valid_size = raw_data
@@ -356,7 +357,7 @@ class ClusteringDataset(BaseDataset):
         return osp.exists(self.data_path)
 
     def _load_raw_data(self) -> Tuple[ad.AnnData, np.ndarray]:
-        with open(self.data_path,"rb") as f_o:
+        with open(self.data_path, "rb") as f_o:
             with h5py.File(f_o, "r") as f:
                 x = np.array(f["X"])
                 y = np.array(f["Y"])

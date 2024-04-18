@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     # Load data and perform necessary preprocessing
     dataloader = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
-                                           tissue=args.tissue, species=args.species,val_size=args.val_size)
+                                           tissue=args.tissue, species=args.species, val_size=args.val_size)
     data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
     # Obtain training and testing data
