@@ -19,7 +19,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset", default="mouse_bladder_cell", type=str, choices=[
             "10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell", "mouse_kidney_cl2",
-            "mouse_kidney_10x", "mouse_lung_cell", "mouse_kidney_drop", "human_pbmc2_cell", "human_skin_cell"
+            "mouse_kidney_10x", "mouse_lung_cell", "mouse_kidney_drop", "mouse_kidney_cell"
         ])
     parser.add_argument("--k_neighbor", default=15, type=int)
     parser.add_argument("--highly_genes", default=3000, type=int)
@@ -91,8 +91,8 @@ if __name__ == "__main__":
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
-                       root_path=file_root_path, required_funs=["NeighborGraph", "SetConfig"],
-                       required_indexes=[sys.maxsize - 1, sys.maxsize], metric="acc")
+                       root_path=file_root_path, required_funs=["SaveRaw", "UpdateRaw", "NeighborGraph", "SetConfig"],
+                       required_indexes=[2, 5, sys.maxsize - 1, sys.maxsize], metric="acc")
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """Reproduction information
