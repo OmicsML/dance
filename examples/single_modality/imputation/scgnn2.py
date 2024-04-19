@@ -182,7 +182,7 @@ if __name__ == "__main__":
         preprocessing_pipeline = Compose(
             FilterGenesScanpy(min_cells=0.01),
             FilterCellsScanpy(min_genes=0.01),
-            # FilterGenesTopK(num_genes=2000, mode="var"),
+            FilterGenesTopK(num_genes=2000, mode="var"),
             CellwiseMaskData(),
             AnnDataTransform(sc.pp.log1p),
             log_level="INFO",
