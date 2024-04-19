@@ -5,8 +5,8 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.sctag import ScTAG
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset", default="mouse_bladder_cell", type=str, choices=[
             "10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell", "mouse_kidney_cl2",
-            "mouse_kidney_10x", "mouse_lung_cell", "mouse_kidney_drop"
+            "mouse_kidney_10x", "mouse_lung_cell", "mouse_kidney_drop", "human_pbmc2_cell", "human_skin_cell"
         ])
     parser.add_argument("--k_neighbor", default=15, type=int)
     parser.add_argument("--highly_genes", default=3000, type=int)
