@@ -91,7 +91,7 @@ if __name__ == "__main__":
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
-                       root_path=file_root_path, required_funs=["saveRaw", "updateRaw", "NeighborGraph", "SetConfig"],
+                       root_path=file_root_path, required_funs=["SaveRaw", "UpdateRaw", "NeighborGraph", "SetConfig"],
                        required_indexes=[2, 5, sys.maxsize - 1, sys.maxsize], metric="acc")
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
