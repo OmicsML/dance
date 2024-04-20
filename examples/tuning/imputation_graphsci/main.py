@@ -68,20 +68,21 @@ if __name__ == '__main__':
         X, X_raw, g, mask = data.get_x(return_type="default")
         if not isinstance(X, np.ndarray):
             X = X.toarray()
+        if not isinstance(X_raw, np.ndarray):
             X_raw = X_raw.toarray()
-        X = torch.tensor(X).float()
-        X_raw = torch.tensor(X_raw).float()
-        X_train = (X * mask).to(device)
-        X_raw_train = (X_raw * mask).to(device)
+        X = torch.tensor(X).float().to(device)
+        X_raw = torch.tensor(X_raw).float().to(device)
+        train_idx = data.train_idx
+        test_idx = data.test_idx
         g = g.to(device)
 
         model = GraphSCI(num_cells=X.shape[0], num_genes=X.shape[1], dataset=params.dataset, dropout=params.dropout,
                          gpu=gpu, seed=params.seed)
-        model.fit(X_train, X_raw_train, g, mask, params.le, params.la, params.ke, params.ka, params.n_epochs, params.lr,
-                  params.weight_decay)
+        model.fit(X, X_raw, g, mask, params.le, params.la, params.ke, params.ka, params.n_epochs, params.lr,
+                  params.weight_decay, train_idx=train_idx)
         model.load_model()
-        imputed_data = model.predict(X_train, X_raw_train, g, mask)
-        score = model.score(X, imputed_data, mask, metric='RMSE')
+        imputed_data = model.predict(X, X_raw, g, mask)
+        score = model.score(X_raw, imputed_data, mask, metric='RMSE', test_idx=test_idx)
         wandb.log({"RMSE": score})
         gc.collect()
         torch.cuda.empty_cache()
