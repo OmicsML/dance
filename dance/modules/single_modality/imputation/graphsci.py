@@ -525,7 +525,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             evaluation score
 
         """
-        allowd_metrics = {"RMSE", "PCC","MRE"}
+        allowd_metrics = {"RMSE", "PCC", "MRE"}
         if metric not in allowd_metrics:
             raise ValueError("scoring metric %r." % allowd_metrics)
 
@@ -544,14 +544,13 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         elif metric == 'PCC':
             # corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
             # return corr_cells
-            return np.corrcoef(true_target.cpu()[~mask[test_idx]],imputed_target.cpu()[~mask[test_idx]])[0,1]
-        elif metric =="MRE":
-            actual=true_target.cpu()[~mask[test_idx]]
-            predicted=imputed_target.cpu()[~mask[test_idx]]
+            return np.corrcoef(true_target.cpu()[~mask[test_idx]], imputed_target.cpu()[~mask[test_idx]])[0, 1]
+        elif metric == "MRE":
+            actual = true_target.cpu()[~mask[test_idx]]
+            predicted = imputed_target.cpu()[~mask[test_idx]]
             abs_error = torch.abs(predicted - actual)
             abs_actual = torch.abs(actual)
             abs_actual[abs_actual < 1e-10] = 1e-10
             relative_error = abs_error / abs_actual
             mre = torch.mean(relative_error).item()
             return mre
-
