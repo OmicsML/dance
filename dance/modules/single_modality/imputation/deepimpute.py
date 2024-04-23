@@ -424,4 +424,4 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         elif metric == 'PCC':
             # corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
             # return corr_cells
-            return np.corrcoef(true_target.cpu()[~mask],imputed_target.cpu()[~mask])
+            return np.corrcoef(true_target.cpu()[~mask], imputed_target.cpu()[~mask])
