@@ -74,9 +74,9 @@ if __name__ == '__main__':
         model.fit(X_train, X_train, mask, params.batch_size, params.lr, params.n_epochs, params.patience)
         imputed_data = model.predict(X_train, mask)
         score = model.score(X, imputed_data, mask, "RMSE")
-        pcc=model.score(X,imputed_data,mask,"PCC")
-        mre=model.score(X,imputed_data,mask,metric="MRE")
-        wandb.log({"RMSE": score,"PCC":pcc,"MRE":mre})
+        pcc = model.score(X, imputed_data, mask, "PCC")
+        mre = model.score(X, imputed_data, mask, metric="MRE")
+        wandb.log({"RMSE": score, "PCC": pcc, "MRE": mre})
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=params.sweep_id, count=params.count)  #Score can be recorded for each epoch
