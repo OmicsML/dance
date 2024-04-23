@@ -5,8 +5,8 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.deepimpute import DeepImpute
@@ -66,14 +66,14 @@ if __name__ == '__main__':
             X_raw = X_raw.toarray()
         X = torch.tensor(X).float()
         X_raw = torch.tensor(X_raw).float()
-        train_idx = data.train_idx
-        test_idx = data.test_idx
+        X_train = X * mask
+        X_raw_train = X_raw * mask
         model = DeepImpute(predictors, targets, params.dataset, params.sub_outputdim, params.hidden_dim, params.dropout,
                            params.seed, params.gpu)
 
-        model.fit(X[train_idx], X[train_idx], mask, params.batch_size, params.lr, params.n_epochs, params.patience)
-        imputed_data = model.predict(X[test_idx], mask, test_idx)
-        score = model.score(X_raw[test_idx], imputed_data, mask, "RMSE", test_idx)
+        model.fit(X_train, X_train, mask, params.batch_size, params.lr, params.n_epochs, params.patience)
+        imputed_data = model.predict(X_train, mask)
+        score = model.score(X, imputed_data, mask, "RMSE")
         wandb.log({"RMSE": score})
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(

@@ -269,6 +269,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
             train_loader = train_loaders[i]
             val_losses = []
             counter = 0
+            model_to_init = True
             for epoch in range(n_epochs):
                 model.train()
                 train_loss = 0
@@ -290,7 +291,8 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
 
                 val_losses.append(val_loss)
                 min_val = min(val_losses)
-                if val_loss == min_val:
+                if val_loss == min_val or model_to_init:  #nan problem
+                    model_to_init = False
                     self.save_model(model, optimizer, i)
                 else:
                     counter += 1

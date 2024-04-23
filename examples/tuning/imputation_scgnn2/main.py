@@ -5,8 +5,8 @@ from pathlib import Path
 from pprint import pformat
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.scgnn2 import ScGNN2
@@ -192,16 +192,14 @@ if __name__ == "__main__":
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
-        train_mask, test_mask = data.get_x(return_type="default")
-        if not isinstance(train_mask, np.ndarray):
-            x_train = data.data.X.A * train_mask
-        else:
-            x_train = data.data.X * train_mask
 
+        train_mask, test_mask = data.get_x(return_type="default")
+        x_train = data.data.X.A * train_mask
+        x_test = data.data.X.A[test_mask]
         model = ScGNN2(args, device=device)
 
         model.fit(x_train)
-        test_mse = ((data.data.X.A[test_mask] - model.predict()[test_mask])**2).mean()
+        test_mse = ((x_test - model.predict()[test_mask])**2).mean()
         wandb.log({"RMSE": np.sqrt(test_mse)})
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(

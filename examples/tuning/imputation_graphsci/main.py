@@ -4,11 +4,14 @@ import os
 import sys
 from pathlib import Path
 
+import anndata as ad
 import numpy as np
 import torch
-import wandb
 
+import dance.transforms.normalize as NormFuncs
+import wandb
 from dance import logger
+from dance.data import Data
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.graphsci import GraphSCI
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
@@ -63,6 +66,9 @@ if __name__ == '__main__':
         kwargs = {tune_mode: dict(wandb.config)}
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
+        norm_func_name = [p for p in preprocessing_pipeline.config_dict["pipeline"]
+                          if p["type"] == "normalize"][0]["target"]
+        norm_func = getattr(NormFuncs, norm_func_name)
         preprocessing_pipeline(data)
 
         X, X_raw, g, mask = data.get_x(return_type="default")
@@ -70,19 +76,22 @@ if __name__ == '__main__':
             X = X.toarray()
         if not isinstance(X_raw, np.ndarray):
             X_raw = X_raw.toarray()
-        X = torch.tensor(X).float().to(device)
-        X_raw = torch.tensor(X_raw).float().to(device)
-        train_idx = data.train_idx
-        test_idx = data.test_idx
+        X = torch.tensor(X).float()
+        X_raw = torch.tensor(X_raw).float()
+        X_train = (X * mask).to(device)
+        X_raw_train = (X_raw * mask).to(device)
         g = g.to(device)
 
         model = GraphSCI(num_cells=X.shape[0], num_genes=X.shape[1], dataset=params.dataset, dropout=params.dropout,
                          gpu=gpu, seed=params.seed)
-        model.fit(X, X_raw, g, mask, params.le, params.la, params.ke, params.ka, params.n_epochs, params.lr,
-                  params.weight_decay, train_idx=train_idx)
+        model.fit(X_train, X_raw_train, g, mask, params.le, params.la, params.ke, params.ka, params.n_epochs, params.lr,
+                  params.weight_decay)
         model.load_model()
-        imputed_data = model.predict(X, X_raw, g, mask)
-        score = model.score(X_raw, imputed_data, mask, metric='RMSE', test_idx=test_idx)
+        imputed_data = model.predict(X_train, X_raw_train, g, mask)
+        data_imputed_data = Data(ad.AnnData(X=imputed_data.detach().cpu().numpy()))
+        norm_func(data_imputed_data)
+        processed_imputed_data = torch.tensor(data_imputed_data.data.X).to(device)
+        score = model.score(X, processed_imputed_data, mask, metric='RMSE', log1p=False)
         wandb.log({"RMSE": score})
         gc.collect()
         torch.cuda.empty_cache()
