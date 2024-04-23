@@ -194,13 +194,21 @@ if __name__ == "__main__":
         preprocessing_pipeline(data)
 
         train_mask, test_mask = data.get_x(return_type="default")
-        x_train = data.data.X.A * train_mask
-        x_test = data.data.X.A[test_mask]
+        if not isinstance(data.data.X,np.ndarray):
+            x_train = data.data.X.A * train_mask
+            x_test = data.data.X.A[test_mask]
+        else:
+            x_train=data.data.X*train_mask
+            x_test=data.data.X[test_mask]
         model = ScGNN2(args, device=device)
 
         model.fit(x_train)
         test_mse = ((x_test - model.predict()[test_mask])**2).mean()
-        wandb.log({"RMSE": np.sqrt(test_mse)})
+        pcc=np.corrcoef(x_test,model.predict()[test_mask])[0,1]
+        actual=x_test
+        actual[actual<1e-10]=1e-10
+        mre=abs((actual-model.predict()[test_mask])/actual).mean()
+        wandb.log({"RMSE": np.sqrt(test_mse),"PCC":pcc,"MRE":mre})
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
@@ -209,7 +217,7 @@ if __name__ == "__main__":
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
                        root_path=file_root_path, required_funs=["CellwiseMaskData", "SetConfig"],
-                       required_indexes=[sys.maxsize - 1, sys.maxsize], metric="RMSE", ascending=True)
+                       required_indexes=[sys.maxsize - 1, sys.maxsize], metric="MRE", ascending=True)
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """
