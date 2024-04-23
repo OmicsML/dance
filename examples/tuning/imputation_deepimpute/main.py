@@ -74,7 +74,9 @@ if __name__ == '__main__':
         model.fit(X_train, X_train, mask, params.batch_size, params.lr, params.n_epochs, params.patience)
         imputed_data = model.predict(X_train, mask)
         score = model.score(X, imputed_data, mask, "RMSE")
-        wandb.log({"RMSE": score})
+        pcc=model.score(X,imputed_data,mask,"PCC")
+        mre=model.score(X,imputed_data,mask,metric="MRE")
+        wandb.log({"RMSE": score,"PCC":pcc,"MRE":mre})
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=params.sweep_id, count=params.count)  #Score can be recorded for each epoch
@@ -85,7 +87,7 @@ if __name__ == '__main__':
                        root_path=file_root_path,
                        required_funs=["SaveRaw", "UpdateRaw", "GeneHoldout", "CellwiseMaskData", "SetConfig"],
                        required_indexes=[2, 6, sys.maxsize - 2, sys.maxsize - 1,
-                                         sys.maxsize], metric="RMSE", ascending=True)
+                                         sys.maxsize], metric="MRE", ascending=True)
         if params.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """To reproduce deepimpute benchmarks, please refer to command lines belows:

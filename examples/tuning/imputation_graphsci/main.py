@@ -66,9 +66,8 @@ if __name__ == '__main__':
         kwargs = {tune_mode: dict(wandb.config)}
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
-        norm_func_name = [p for p in preprocessing_pipeline.config_dict["pipeline"]
-                          if p["type"] == "normalize"][0]["target"]
-        norm_func = getattr(NormFuncs, norm_func_name)
+        norm_func = [p for p in preprocessing_pipeline._pipeline
+                          if p.type == "normalize"][0].functional #????
         preprocessing_pipeline(data)
 
         X, X_raw, g, mask = data.get_x(return_type="default")
@@ -92,7 +91,9 @@ if __name__ == '__main__':
         norm_func(data_imputed_data)
         processed_imputed_data = torch.tensor(data_imputed_data.data.X).to(device)
         score = model.score(X, processed_imputed_data, mask, metric='RMSE', log1p=False)
-        wandb.log({"RMSE": score})
+        pcc = model.score(X, processed_imputed_data, mask, metric='PCC', log1p=False)
+        mre = model.score(X, processed_imputed_data, mask, metric='MRE', log1p=False)
+        wandb.log({"RMSE": score,"PCC":pcc,"MRE":mre})
         gc.collect()
         torch.cuda.empty_cache()
 
@@ -105,7 +106,7 @@ if __name__ == '__main__':
                        root_path=file_root_path,
                        required_funs=["SaveRaw", "UpdateRaw", "FeatureFeatureGraph", "CellwiseMaskData", "SetConfig"],
                        required_indexes=[2, 6, sys.maxsize - 2, sys.maxsize - 1,
-                                         sys.maxsize], metric="RMSE", ascending=True)
+                                         sys.maxsize], metric="MRE", ascending=True)
         if params.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """To reproduce GraphSCI benchmarks, please refer to command lines belows:
