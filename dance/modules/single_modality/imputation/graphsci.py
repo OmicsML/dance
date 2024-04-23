@@ -542,5 +542,6 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         if metric == 'RMSE':
             return np.sqrt(F.mse_loss(true_target, imputed_target).item())
         elif metric == 'PCC':
-            corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
-            return corr_cells
+            # corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
+            # return corr_cells
+            return np.corrcoef(true_target.cpu()[~mask],imputed_target.cpu()[~mask])
