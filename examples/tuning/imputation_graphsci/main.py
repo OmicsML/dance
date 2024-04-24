@@ -94,7 +94,7 @@ if __name__ == '__main__':
         score = model.score(X, processed_imputed_data, mask, metric='RMSE', log1p=False)
         pcc = model.score(X, processed_imputed_data, mask, metric='PCC', log1p=False)
         mre = model.score(X, processed_imputed_data, mask, metric='MRE', log1p=False)
-        wandb.log({"RMSE": score,"PCC":pcc,"MRE":mre})
+        wandb.log({"RMSE": score, "PCC": pcc, "MRE": mre})
         gc.collect()
         torch.cuda.empty_cache()
 
