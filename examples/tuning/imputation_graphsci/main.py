@@ -66,7 +66,7 @@ if __name__ == '__main__':
         kwargs = {tune_mode: dict(wandb.config)}
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
-        
+
         preprocessing_pipeline(data)
 
         X, X_raw, g, mask = data.get_x(return_type="default")
@@ -87,8 +87,7 @@ if __name__ == '__main__':
         model.load_model()
         imputed_data = model.predict(X_train, X_raw_train, g, mask)
         data_imputed_data = Data(ad.AnnData(X=imputed_data.detach().cpu().numpy()))
-        norm_func = [p for p in preprocessing_pipeline._pipeline
-                          if p.type == "normalize"][0].functional
+        norm_func = [p for p in preprocessing_pipeline._pipeline if p.type == "normalize"][0].functional
         norm_func(data_imputed_data)
         processed_imputed_data = torch.tensor(data_imputed_data.data.X).to(device)
         score = model.score(X, processed_imputed_data, mask, metric='RMSE', log1p=False)
