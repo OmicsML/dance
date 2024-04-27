@@ -593,3 +593,17 @@ class NormalizePlaceHolder(BaseTransform):
 
     def __call__(self, data: Data) -> Data:
         return data
+
+
+@register_preprocessor("normalize")
+class NormalizeTotalLog1P(BaseTransform):
+
+    def __init__(self, base=None, target_sum=None, max_fraction=0.05, **kwargs):
+        super().__init__(**kwargs)
+        self.normalize_total = NormalizeTotal(target_sum=target_sum, max_fraction=max_fraction)
+        self.log1p = Log1P(base=base)
+
+    def __call__(self, data: Data) -> Data:
+        self.normalize_total(data)
+        self.log1p(data)
+        return data
