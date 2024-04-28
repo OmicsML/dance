@@ -158,11 +158,11 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.aemodel = AEModel(in_feats=num_genes, dropout=dropout)
         self.model_params = list(self.aemodel.parameters()) + list(self.gnnmodel.parameters())
 
-        if torch.cuda.device_count() > 1 and gpu != -1:
-            self = nn.DataParallel(self).to("cuda")
-            print(self.device_ids)
-        else:
-            self.to(self.device)
+        # if torch.cuda.device_count() > 1 and gpu != -1:
+        #     self = nn.DataParallel(self).to("cuda")
+        #     print(self.device_ids)
+        # else:
+        self.to(self.device)
 
     @staticmethod
     def preprocessing_pipeline(min_cells: float = 0.1, threshold: float = 0.3, normalize_edges: bool = True,
