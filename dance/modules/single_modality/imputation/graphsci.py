@@ -158,11 +158,11 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.aemodel = AEModel(in_feats=num_genes, dropout=dropout)
         self.model_params = list(self.aemodel.parameters()) + list(self.gnnmodel.parameters())
 
-        if torch.cuda.device_count() > 1 and gpu != -1:
-            self = nn.DataParallel(self).to("cuda")
-            print(self.device_ids)
-        else:
-            self.to(self.device)
+        # if torch.cuda.device_count() > 1 and gpu != -1:
+        #     self = nn.DataParallel(self).to("cuda")
+        #     print(self.device_ids)
+        # else:
+        self.to(self.device)
 
     @staticmethod
     def preprocessing_pipeline(min_cells: float = 0.1, threshold: float = 0.3, normalize_edges: bool = True,
@@ -460,11 +460,10 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             log_lik - kl
 
         """
-        origin_device = batch.device
         params = [batch, adj_orig, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean, disp, pi, mask]
-        for index, param in enumerate(params):
-            if isinstance(param, torch.Tensor):
-                params[index] = params[index].cpu()
+        # for index, param in enumerate(params):
+        #     if isinstance(param, torch.Tensor):
+        #         params[index] = params[index].cpu()
         batch, adj_orig, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean, disp, pi, mask = params
         pos_weight = (adj_orig.shape[0]**2 - adj_orig.sum(axis=1)) / (adj_orig.sum(axis=1))
         norm_adj = adj_orig.shape[0] * adj_orig.shape[0] / float(
@@ -492,9 +491,9 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         kl = ka * kl_adj - ke * kl_exp
         loss = log_lik - kl
         results = [loss_adj, loss_exp, log_lik, kl, loss]
-        for index, res in enumerate(results):
-            if isinstance(res, torch.Tensor):
-                results[index] = results[index].to(origin_device)
+        # for index, res in enumerate(results):
+        #     if isinstance(res, torch.Tensor):
+        #         results[index] = results[index].to(origin_device)
         loss_adj, loss_exp, log_lik, kl, loss = results
         return loss_adj, loss_exp, log_lik, kl, loss
 
