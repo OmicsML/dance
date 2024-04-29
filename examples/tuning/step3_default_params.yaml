@@ -86,6 +86,10 @@ pipeline:
         min: 100
         max: 10000
   - type: filter.gene
+    target: FilterGenesMatch
+    params:
+      prefixes: [ERCC,MT-]
+  - type: filter.gene
     target: FilterGenesScanpyOrder
     params_to_tune:
       order:
