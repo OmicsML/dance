@@ -41,7 +41,7 @@ if __name__ == "__main__":
         model = Stagate([args.high_variable_genes] + args.hidden_dims)
 
         # Load data and perform necessary preprocessing
-        dataloader = SpatialLIBDDataset(data_id=args.sample_number,data_dir=args.data_dir)
+        dataloader = SpatialLIBDDataset(data_id=args.sample_number, data_dir=args.data_dir)
         data = dataloader.load_data(cache=args.cache)
         # Prepare preprocessing pipeline and apply it to data
         kwargs = {tune_mode: dict(wandb.config)}
