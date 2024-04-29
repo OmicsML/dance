@@ -6,8 +6,9 @@ from pathlib import Path
 import numpy as np
 
 import wandb
+from dance import logger
 from dance.datasets.spatial import SpatialLIBDDataset
-from dance.modules.spatial.spatial_domain.spagcn import SpaGCN, refine
+from dance.modules.spatial.spatial_domain.stagate import Stagate
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
 from dance.utils import set_seed
 
@@ -16,21 +17,11 @@ if __name__ == "__main__":
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--sample_number", type=str, default="151673",
                         help="12 human dorsolateral prefrontal cortex datasets for the spatial domain task.")
-    parser.add_argument("--beta", type=int, default=49, help="")
-    parser.add_argument("--alpha", type=int, default=1, help="")
-    parser.add_argument("--p", type=float, default=0.05,
-                        help="percentage of total expression contributed by neighborhoods.")
-    parser.add_argument("--l", type=float, default=0.5, help="the parameter to control percentage p.")
-    parser.add_argument("--start", type=float, default=0.01, help="starting value for searching l.")
-    parser.add_argument("--end", type=float, default=1000, help="ending value for searching l.")
-    parser.add_argument("--tol", type=float, default=5e-3, help="tolerant value for searching l.")
-    parser.add_argument("--max_run", type=int, default=200, help="max runs.")
-    parser.add_argument("--epochs", type=int, default=200, help="Number of epochs.")
-    parser.add_argument("--n_clusters", type=int, default=7, help="the number of clusters")
-    parser.add_argument("--step", type=float, default=0.1, help="")
-    parser.add_argument("--lr", type=float, default=0.05, help="learning rate")
-    parser.add_argument("--device", default="cpu", help="Computation device.")
-    parser.add_argument("--seed", type=int, default=100, help="")
+    parser.add_argument("--hidden_dims", type=list, default=[512, 32], help="hidden dimensions")
+    parser.add_argument("--rad_cutoff", type=int, default=150, help="")
+    parser.add_argument("--epochs", type=int, default=1000, help="epochs")
+    parser.add_argument("--high_variable_genes", type=int, default=3000, help="")
+    parser.add_argument("--seed", type=int, default=3, help="")
     parser.add_argument("--tune_mode", default="pipeline_params", choices=["pipeline", "params", "pipeline_params"])
     parser.add_argument("--count", type=int, default=2)
     parser.add_argument("--sweep_id", type=str, default=None)
@@ -47,31 +38,24 @@ if __name__ == "__main__":
         set_seed(args.seed)
 
         # Initialize model and get model specific preprocessing pipeline
-        model = SpaGCN(device=args.device)
+        model = Stagate([args.high_variable_genes] + args.hidden_dims)
 
         # Load data and perform necessary preprocessing
-        dataloader = SpatialLIBDDataset(data_id=args.sample_number, data_dir=args.data_dir)
-        data = dataloader.load_data()
+        dataloader = SpatialLIBDDataset(data_id=args.sample_number)
+        data = dataloader.load_data(cache=args.cache)
         # Prepare preprocessing pipeline and apply it to data
         kwargs = {tune_mode: dict(wandb.config)}
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
-        (x, adj, adj_2d), y = data.get_train_data()
+        adj, y = data.get_data(return_type="default")
+        x = data.data.X.A
+        edge_list_array = np.vstack(np.nonzero(adj))
 
         # Train and evaluate model
-        l = model.search_l(args.p, adj, start=args.start, end=args.end, tol=args.tol, max_run=args.max_run)
-        model.set_l(l)
-        res = model.search_set_res((x, adj), l=l, target_num=args.n_clusters, start=0.4, step=args.step, tol=args.tol,
-                                   lr=args.lr, epochs=args.epochs, max_run=args.max_run)
-
-        pred = model.fit_predict((x, adj), init_spa=True, init="louvain", tol=args.tol, lr=args.lr, epochs=args.epochs,
-                                 res=res)
-        score = model.default_score_func(y, pred)
-
-        refined_pred = refine(sample_id=data.data.obs_names.tolist(), pred=pred.tolist(), dis=adj_2d, shape="hexagon")
-        score_refined = model.default_score_func(y, refined_pred)
-        wandb.log({"ARI": score, "ARI (refined)": score_refined})
+        model = Stagate([x.shape[1]] + args.hidden_dims)
+        score = model.fit_score((x, edge_list_array), y, epochs=args.epochs, random_state=args.seed)
+        wandb.log({"ARI": score})
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
@@ -79,18 +63,20 @@ if __name__ == "__main__":
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
-                       root_path=file_root_path, required_funs=["SpaGCNGraph", "SpaGCNGraph2D", "SetConfig"],
-                       required_indexes=[5, 6, sys.maxsize], metric="ARI (refined)")
+                       root_path=file_root_path, required_funs=["StagateGraph", "SetConfig"],
+                       required_indexes=[5, sys.maxsize], metric="ARI")
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
-""" To reproduce SpaGCN on other samples, please refer to command lines belows:
+""" To reproduce Stagate on other samples, please refer to command lines belows:
+NOTE: since the stagate method is unstable, you have to run at least 5 times to get
+      best performance. (same with original Stagate paper)
 
 human dorsolateral prefrontal cortex sample 151673:
-$ python spagcn.py --sample_number 151673 --lr 0.1
+$ python stagate.py --sample_number 151673
 
 human dorsolateral prefrontal cortex sample 151676:
-$ python spagcn.py --sample_number 151676 --lr 0.02
+$ python stagate.py --sample_number 151676
 
 human dorsolateral prefrontal cortex sample 151507:
-$ python spagcn.py --sample_number 151507 --lr 0.009
+$ python stagate.py --sample_number 151507
 """
