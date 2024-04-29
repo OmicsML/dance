@@ -4,8 +4,8 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.stagate import Stagate
@@ -48,8 +48,9 @@ if __name__ == "__main__":
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
-        adj, y = data.get_data(return_type="default")
-        x = data.data.X.A
+        (x, adj), y = data.get_data(return_type="default")
+        if not isinstance(x, np.ndarray):
+            x = x.A
         edge_list_array = np.vstack(np.nonzero(adj))
 
         # Train and evaluate model
