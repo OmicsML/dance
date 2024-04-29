@@ -4,8 +4,8 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import wandb
 
+import wandb
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.spagcn import SpaGCN, refine
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
@@ -80,7 +80,7 @@ if __name__ == "__main__":
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
                        root_path=file_root_path, required_funs=["SpaGCNGraph", "SpaGCNGraph2D", "SetConfig"],
-                       required_indexes=[5, 6, sys.maxsize], metric="ARI (refined)")
+                       required_indexes=[4, 5, sys.maxsize], metric="ARI (refined)")
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """ To reproduce SpaGCN on other samples, please refer to command lines belows:
