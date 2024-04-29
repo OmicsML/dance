@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA, TruncatedSVD
+from sklearn.random_projection import GaussianRandomProjection
 
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
@@ -283,4 +284,25 @@ class BatchFeature(BaseTransform):
 
         batch_features = np.array(batch_features).astype(float)
         data.data["mod1"].obsm["batch_features"] = batch_features
+        return data
+
+
+@register_preprocessor("feature", "cell")  # NOTE: register any custom preprocessing function to be used for tuning
+class GaussRandProjFeature(BaseTransform):
+    """Custom preprocessing to extract cell feature via Gaussian random projection."""
+
+    _DISPLAY_ATTRS = ("n_components", "eps")
+
+    def __init__(self, n_components: int = 400, eps: float = 0.1, **kwargs):
+        super().__init__(**kwargs)
+        self.n_components = n_components
+        self.eps = eps
+
+    def __call__(self, data):
+        feat = data.get_feature(return_type="numpy")
+        grp = GaussianRandomProjection(n_components=self.n_components, eps=self.eps)
+
+        self.logger.info(f"Start generateing cell feature via Gaussian random projection (d={self.n_components}).")
+        data.data.obsm[self.out] = grp.fit_transform(feat)
+
         return data
