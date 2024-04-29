@@ -4,8 +4,8 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import wandb
 
+import wandb
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.stlearn import StKmeans, StLouvain
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
@@ -67,8 +67,9 @@ if __name__ == "__main__":
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
-                       root_path=file_root_path, required_funs=["StagateGraph", "SetConfig"],
-                       required_indexes=[5, sys.maxsize], metric="ARI")
+                       root_path=file_root_path,
+                       required_funs=["MorphologyFeatureCNN", "SMEGraph", "SMEFeature", "NeighborGraph",
+                                      "SetConfig"], required_indexes=[4, 6, 7, 8, sys.maxsize], metric="ARI")
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """ To reproduce stlearn on other samples, please refer to command lines belows:
