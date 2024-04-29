@@ -4,8 +4,8 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import wandb
 
+import wandb
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.stlearn import StKmeans, StLouvain
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         # preprocessing_pipeline = model.preprocessing_pipeline(device=args.device)
 
         # Load data and perform necessary preprocessing
-        dataloader = SpatialLIBDDataset(data_id=args.sample_number)
+        dataloader = SpatialLIBDDataset(data_id=args.sample_number, data_dir=args.data_dir)
         data = dataloader.load_data(cache=args.cache)
         # Prepare preprocessing pipeline and apply it to data
         kwargs = {tune_mode: dict(wandb.config)}
