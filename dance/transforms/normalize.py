@@ -598,6 +598,11 @@ class NormalizePlaceHolder(BaseTransform):
 
 @register_preprocessor("normalize")
 class NormalizeTotalLog1P(BaseTransform):
+    """Normalize total counts followed by log1p transformation.
+
+    See :class:`dance.transforms.normalize.NormalizeTotal` and :class:`dance.transforms.normalize.Log1P`.
+
+    """
 
     def __init__(self, base=None, target_sum=None, max_fraction=0.05, **kwargs):
         super().__init__(**kwargs)
