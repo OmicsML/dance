@@ -195,7 +195,8 @@ class ScTransform(BaseTransform):
     bw_adjust
         Bandwidth adjusting parameter.
     processes_num
-        Number of processes.
+        Number of processes. Default to the total number of available processors.
+
     Reference
     ---------
     https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1874-1
@@ -205,18 +206,18 @@ class ScTransform(BaseTransform):
     _DISPLAY_ATTRS = ("mode", "eps", "split_names", "batch_key")
 
     def __init__(
-            self,
-            split_names: Optional[Union[Literal["ALL"], List[str]]] = None,
-            batch_key: Optional[str] = None,
-            min_cells: int = 5,
-            gmean_eps: int = 1,
-            n_genes: Optional[int] = 2000,
-            n_cells: Optional[int] = None,
-            bin_size: int = 500,
-            bw_adjust: float = 3,
-            processes_num=os.cpu_count(),
-            **kwargs,
-    ):
+        self,
+        split_names: Optional[Union[Literal["ALL"], List[str]]] = None,
+        batch_key: Optional[str] = None,
+        min_cells: int = 5,
+        gmean_eps: int = 1,
+        n_genes: Optional[int] = 2000,
+        n_cells: Optional[int] = None,
+        bin_size: int = 500,
+        bw_adjust: float = 3,
+        processes_num: int = os.cpu_count(),
+        **kwargs,
+    ):  # yapf: disable
         super().__init__(**kwargs)
         self.split_names = split_names
         self.batch_key = batch_key
@@ -597,6 +598,11 @@ class NormalizePlaceHolder(BaseTransform):
 
 @register_preprocessor("normalize")
 class NormalizeTotalLog1P(BaseTransform):
+    """Normalize total counts followed by log1p transformation.
+
+    See :class:`dance.transforms.normalize.NormalizeTotal` and :class:`dance.transforms.normalize.Log1P`.
+
+    """
 
     def __init__(self, base=None, target_sum=None, max_fraction=0.05, **kwargs):
         super().__init__(**kwargs)

@@ -811,8 +811,8 @@ class ZINBLoss(nn.Module):
         scale_factor = scale_factor[:, None]
         mean = mean * scale_factor
 
-        t1 = torch.lgamma(disp.double() + eps) + torch.lgamma(x.double() + 1.0) - torch.lgamma(x.double() +
-                                                                                               disp.double() + eps)
+        t1 = (torch.lgamma(disp.double() + eps) + torch.lgamma(x.double() + 1.0) -
+              torch.lgamma(x.double() + disp.double() + eps))
         t2 = (disp + x) * torch.log(1.0 + (mean / (disp + eps))) + (x * (torch.log(disp + eps) - torch.log(mean + eps)))
         nb_final = t1 + t2
 
