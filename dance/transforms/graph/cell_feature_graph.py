@@ -70,7 +70,6 @@ class CellFeatureGraph(BaseTransform):
 
         gene_feature = data.get_feature(return_type="torch", channel=self.gene_feature_channel, mod=self.mod,
                                         channel_type="varm")
-
         cell_feature = data.get_feature(return_type="torch", channel=self.cell_feature_channel, mod=self.mod,
                                         channel_type="obsm")
         g.ndata["features"] = torch.vstack((gene_feature, cell_feature))

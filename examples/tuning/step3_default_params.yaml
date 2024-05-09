@@ -88,7 +88,7 @@ pipeline:
   - type: filter.gene
     target: FilterGenesMatch
     params:
-      prefixes: [ERCC,MT-]
+      prefixes: [ERCC, MT-]
   - type: filter.gene
     target: FilterGenesScanpyOrder
     params_to_tune:

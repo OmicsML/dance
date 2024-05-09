@@ -10,7 +10,6 @@ from pprint import pformat
 
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
-from wandb.errors import UsageError
 
 from dance import logger
 from dance.config import Config
@@ -18,7 +17,10 @@ from dance.exceptions import DevError
 from dance.registry import REGISTRY, REGISTRY_PREFIX, Registry, resolve_from_registry
 from dance.settings import CURDIR
 from dance.typing import Any, Callable, ConfigLike, Dict, FileExistHandle, List, Optional, PathLike, Tuple, Union
-from dance.utils import Color, default
+from dance.utils import Color, default, try_import
+
+DEFAULT_PIPELINE_TUNING_TOP_K = 3
+DEFAULT_PARAMETER_TUNING_FREQ_N = 10
 
 
 class Action:
@@ -365,9 +367,11 @@ class PipelinePlaner(Pipeline):
         # Register full config and tune mode
         self._config = Config(cfg)
         self._tune_mode = self.config.get(self.TUNE_MODE_KEY)
-        if self.tune_mode == "pipeline_params":
+
+        if self.tune_mode == "pipeline_params":  # NOTE: when running with pipeline_params, run pipeline first
             self._tune_mode = "pipeline"
-            logger.info("tune mode is set to pipeline_params,tune_mode will first be converted to pipeline")
+            logger.info("tune mode is set to pipeline_params, tune_mode will first be converted to pipeline")
+
         pipeline_config = self.config[self.PIPELINE_KEY]
         pipeline_length = len(pipeline_config)
         if pipeline_length < 1:
@@ -792,10 +796,7 @@ class PipelinePlaner(Pipeline):
         return {**self.wandb_config, "parameters": self.search_space()}
 
     def wandb_sweep(self) -> Tuple[str, str, str]:
-        try:
-            import wandb
-        except ModuleNotFoundError as e:
-            raise ImportError("wandb not installed. Please install wandb first: $ pip install wandb") from e
+        wandb = try_import("wandb")
 
         if "wandb" not in self.config:
             raise ValueError(f"{self.config_yaml}\nMissing wandb config.")
@@ -821,10 +822,7 @@ class PipelinePlaner(Pipeline):
         project: Optional[str] = None,
         count: Optional[int] = None,
     ) -> Tuple[str, str, str]:
-        try:
-            import wandb
-        except ModuleNotFoundError as e:
-            raise ImportError("wandb not installed. Please install wandb first: $ pip install wandb") from e
+        wandb = try_import("wandb")
 
         if sweep_id is None:
             if entity is not None or project is not None:
@@ -857,10 +855,8 @@ def save_summary_data(entity, project, sweep_id, summary_file_path, root_path):
         -----------------------------------------------------------------------------------------------------------
 
     """
-    try:
-        import wandb
-    except ModuleNotFoundError as e:
-        raise ImportError("wandb not installed. Please install wandb first: $ pip install wandb") from e
+    wandb = try_import("wandb")
+
     summary_file_path = os.path.join(root_path, summary_file_path)
     sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
     summary_data = []
@@ -993,12 +989,9 @@ def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, requir
             OmegaConf.save(config_copy, save_path)
         count = reduce(mul, [len(p["include"]) if "include" in p else 1 for p in subset])
         config_dir = os.path.relpath(os.path.dirname(save_path), os.path.dirname(os.path.join(root_path, file_path)))
-        command_str = command_str + f"python {file_path} --config_dir={config_dir}/subset_{index}_ --count={count} > {log_dir}/{index}.log 2>&1 &\n"
+        command_str = (command_str + f"python {file_path} --config_dir={config_dir}/subset_{index}_ --count={count} " +
+                       f"> {log_dir}/{index}.log 2>&1 &\n")
     return command_str, configs
-
-
-DEFAULT_PIPELINE_TUNING_TOP_K = 3
-DEFAULT_PARAMETER_TUNING_FREQ_N = 10
 
 
 def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_default_params.yaml",
@@ -1054,7 +1047,8 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
             if "step3_frozen" in p1 and p1["step3_frozen"]:
                 for p2 in pipeline:
                     if p1["type"] == p2["type"]:
-                        if "params_to_tune" in p2: del p2["params_to_tune"]
+                        if "params_to_tune" in p2:
+                            del p2["params_to_tune"]
                         if "default_params" in p1:
                             for target, d_p in p1.default_params.items():
                                 if target == p2["target"]:
@@ -1083,6 +1077,8 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
         tune_mode can only be set to params
 
     """
+    wandb = try_import("wandb")
+
     pipeline_top_k = default(step2_pipeline_planer.config.pipeline_tuning_top_k, DEFAULT_PIPELINE_TUNING_TOP_K)
     step3_k = default(step2_pipeline_planer.config.parameter_tuning_freq_n, DEFAULT_PARAMETER_TUNING_FREQ_N)
     for i in range(pipeline_top_k):
@@ -1091,10 +1087,10 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
                 f"{root_path}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml")
             entity, project, step3_sweep_id = pipeline_planer.wandb_sweep_agent(
                 partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=None,
-                count=step3_k)  #Score can be recorded for each epoch
+                count=step3_k)  # score can be recorded for each epoch
             save_summary_data(entity, project, step3_sweep_id, f"results/{tune_mode}/{i}_best_test_acc.csv",
                               root_path=root_path)
-        except UsageError:
+        except wandb.UsageError:
             logger.warning("continue")
             continue
 
