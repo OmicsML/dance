@@ -990,7 +990,7 @@ def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, requir
         count = reduce(mul, [len(p["include"]) if "include" in p else 1 for p in subset])
         config_dir = os.path.relpath(os.path.dirname(save_path), os.path.dirname(os.path.join(root_path, file_path)))
         command_str = (command_str + f"python {file_path} --config_dir={config_dir}/subset_{index}_ --count={count} " +
-                       "> {log_dir}/{index}.log 2>&1 &\n")
+                       f"> {log_dir}/{index}.log 2>&1 &\n")
     return command_str, configs
 
 
