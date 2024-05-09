@@ -10,7 +10,6 @@ from pprint import pformat
 
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
-from wandb.errors import UsageError
 
 from dance import logger
 from dance.config import Config
@@ -18,7 +17,7 @@ from dance.exceptions import DevError
 from dance.registry import REGISTRY, REGISTRY_PREFIX, Registry, resolve_from_registry
 from dance.settings import CURDIR
 from dance.typing import Any, Callable, ConfigLike, Dict, FileExistHandle, List, Optional, PathLike, Tuple, Union
-from dance.utils import Color, default
+from dance.utils import Color, default, try_import
 
 DEFAULT_PIPELINE_TUNING_TOP_K = 3
 DEFAULT_PARAMETER_TUNING_FREQ_N = 10
@@ -797,10 +796,7 @@ class PipelinePlaner(Pipeline):
         return {**self.wandb_config, "parameters": self.search_space()}
 
     def wandb_sweep(self) -> Tuple[str, str, str]:
-        try:
-            import wandb
-        except ModuleNotFoundError as e:
-            raise ImportError("wandb not installed. Please install wandb first: $ pip install wandb") from e
+        wandb = try_import("wandb")
 
         if "wandb" not in self.config:
             raise ValueError(f"{self.config_yaml}\nMissing wandb config.")
@@ -826,10 +822,7 @@ class PipelinePlaner(Pipeline):
         project: Optional[str] = None,
         count: Optional[int] = None,
     ) -> Tuple[str, str, str]:
-        try:
-            import wandb
-        except ModuleNotFoundError as e:
-            raise ImportError("wandb not installed. Please install wandb first: $ pip install wandb") from e
+        wandb = try_import("wandb")
 
         if sweep_id is None:
             if entity is not None or project is not None:
@@ -862,10 +855,8 @@ def save_summary_data(entity, project, sweep_id, summary_file_path, root_path):
         -----------------------------------------------------------------------------------------------------------
 
     """
-    try:
-        import wandb
-    except ModuleNotFoundError as e:
-        raise ImportError("wandb not installed. Please install wandb first: $ pip install wandb") from e
+    wandb = try_import("wandb")
+
     summary_file_path = os.path.join(root_path, summary_file_path)
     sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
     summary_data = []
@@ -1086,6 +1077,8 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
         tune_mode can only be set to params
 
     """
+    wandb = try_import("wandb")
+
     pipeline_top_k = default(step2_pipeline_planer.config.pipeline_tuning_top_k, DEFAULT_PIPELINE_TUNING_TOP_K)
     step3_k = default(step2_pipeline_planer.config.parameter_tuning_freq_n, DEFAULT_PARAMETER_TUNING_FREQ_N)
     for i in range(pipeline_top_k):
@@ -1097,7 +1090,7 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
                 count=step3_k)  # score can be recorded for each epoch
             save_summary_data(entity, project, step3_sweep_id, f"results/{tune_mode}/{i}_best_test_acc.csv",
                               root_path=root_path)
-        except UsageError:
+        except wandb.UsageError:
             logger.warning("continue")
             continue
 
