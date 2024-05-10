@@ -263,7 +263,7 @@ class SimpleGCDEC(nn.Module):
                 adata = sc.AnnData(features.detach().numpy())
             else:
                 adata = sc.AnnData(X)
-            sc.pp.neighbors(adata, n_neighbors=n_neighbors)
+            sc.pp.neighbors(adata, n_neighbors=n_neighbors,use_rep="X")
             # sc.tl.louvain(adata,resolution=res)
             sc.tl.leiden(adata, resolution=res, key_added="louvain")
 
