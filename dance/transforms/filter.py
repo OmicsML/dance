@@ -55,9 +55,9 @@ class FilterScanpy(BaseTransform):
 
     def __init__(
         self,
-        min_counts: Optional[int] = None,
+        min_counts: Optional[Union[float, int]] = None,
         min_genes_or_cells: Optional[Union[float, int]] = None,
-        max_counts: Optional[int] = None,
+        max_counts: Optional[Union[float, int]] = None,
         max_genes_or_cells: Optional[Union[float, int]] = None,
         split_name: Optional[str] = None,
         channel: Optional[str] = None,
@@ -131,6 +131,19 @@ class FilterScanpy(BaseTransform):
             self.logger.info(f"Subsetting {self._FILTER_TARGET} ({~subset_ind.sum():,} removed) due to {self}")
             subset_func(subset_ind)
 
+    def prepCounts(self, x):
+        if (isinstance(self.min_counts, float) and 0 < self.min_counts < 1) or (isinstance(self.max_counts, float)
+                                                                                and 0 < self.max_counts < 1):
+            if self._FILTER_TARGET == "genes":
+                n_counts = np.sum(x, axis=0)
+            elif self._FILTER_TARGET == "cells":
+                n_counts = np.sum(x, axis=1)
+            if isinstance(self.min_counts, float) and 0 < self.min_counts < 1:
+                min_counts = np.percentile(n_counts, min_counts)
+            else:
+                max_counts = np.percentile(n_counts, max_counts)
+            return min_counts, max_counts
+
 
 @register_preprocessor("filter", "cell")
 class FilterCellsScanpy(FilterScanpy):
@@ -164,9 +177,9 @@ class FilterCellsScanpy(FilterScanpy):
 
     def __init__(
         self,
-        min_counts: Optional[int] = None,
+        min_counts: Optional[Union[float, int]] = None,
         min_genes: Optional[Union[float, int]] = None,
-        max_counts: Optional[int] = None,
+        max_counts: Optional[Union[float, int]] = None,
         max_genes: Optional[Union[float, int]] = None,
         split_name: Optional[str] = None,
         channel: Optional[str] = None,
@@ -217,9 +230,9 @@ class FilterGenesScanpy(FilterScanpy):
 
     def __init__(
         self,
-        min_counts: Optional[int] = None,
+        min_counts: Optional[Union[float, int]] = None,
         min_cells: Optional[Union[float, int]] = None,
-        max_counts: Optional[int] = None,
+        max_counts: Optional[Union[float, int]] = None,
         max_cells: Optional[Union[float, int]] = None,
         split_name: Optional[str] = None,
         channel: Optional[str] = None,
