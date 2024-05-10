@@ -133,13 +133,13 @@ pipeline:
             #   max: 5000
       min_counts:
         min: 3
-        max: 100
+        max: 500
       min_cells:
         min: 0.0
-        max: 0.05
+        max: 0.1
       max_counts:
-        min: 10000
-        max: 100000
+        min: 0.9
+        max: 1.0
       max_cells:
         min: 0.95
         max: 1.0
