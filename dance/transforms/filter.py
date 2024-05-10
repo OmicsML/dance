@@ -570,7 +570,9 @@ class FilterGenesTopK(FilterGenes):
     def _get_preserve_mask(self, gene_summary):
         total_num_genes = gene_summary.size
         if self.num_genes >= total_num_genes:
-            raise ValueError(f"{self.num_genes=!r} > total number of genes: {total_num_genes}")
+            # raise ValueError(f"{self.num_genes=!r} > total number of genes: {total_num_genes}")
+            self.logger.warning(f"{self.num_genes=!r} > total number of genes: {total_num_genes}")
+            self.num_genes = total_num_genes
         sorted_idx = gene_summary.argsort()
         selected_idx = sorted_idx[-self.num_genes:] if self.top else sorted_idx[:self.num_genes]
         mask = np.zeros(total_num_genes, dtype=bool)
@@ -714,6 +716,9 @@ class FilterGenesRegression(BaseTransform):
         func_dict = {"enclasc": self._filter_enclasc, "seurat3": self._filter_seurat3, "scmap": self._filter_scmap}
         if (filter_func := func_dict.get(self.method)) is None:
             raise ValueError(f"Unknown method {self.method}, supported options are: {list(func_dict)}.")
+        if self.num_genes >= feat.shape[1]:
+            self.logger.warning(f"{self.num_genes=!r} > total number of genes: {feat.shape[1]}")
+            self.num_genes = feat.shape[1]
         # data.data.obsm[self.out] = filter_func(feat, self.num_genes)
         gene_names = data.data.var_names[filter_func(feat, self.num_genes)]
         data.data._inplace_subset_var(gene_names)

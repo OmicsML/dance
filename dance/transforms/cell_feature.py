@@ -139,6 +139,11 @@ class CellPCA(BaseTransform):
 
     def __call__(self, data):
         feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
+        if self.n_components > min(feat.shape):
+            self.logger.warning(
+                f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='full'"
+            )
+            self.n_components = min(feat.shape)
         pca = PCA(n_components=self.n_components)
         cell_feat = pca.fit_transform(feat)
         self.logger.info(f"Generating cell PCA features {feat.shape} (k={pca.n_components_})")
@@ -180,6 +185,11 @@ class CellSVD(BaseTransform):
             svd.fit_transform(feat)
             explained_variance = svd.explained_variance_ratio_.cumsum()
             self.n_components = (explained_variance < self.n_components).sum() + 1
+        if self.n_components > min(feat.shape):
+            self.logger.warning(
+                f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='full'"
+            )
+            self.n_components = min(feat.shape)
         svd = TruncatedSVD(n_components=self.n_components)
 
         cell_feat = svd.fit_transform(feat)
