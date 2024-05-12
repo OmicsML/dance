@@ -12,7 +12,7 @@ opencv-python==4.9.0.80
 openpyxl==3.1.2
 pandas==2.2.2
 # pandas==1.5.3  # scib 1.1.4 requires pandas<2
-pyro-ppl==1.8.6
+pyro-ppl==1.9.0
 requests==2.31.0
 scanpy==1.9.8
 scib==1.1.5
