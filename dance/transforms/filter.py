@@ -1087,6 +1087,12 @@ class HighlyVariableGenesRawCount(AnnDataTransform):
                          **kwargs)
         self.logger.info("Expects count data")
 
+    def __call__(self, data):
+        adata = data.data
+        if adata.X.shape[1] == 0:
+            raise ValueError("Gene dimension is 0")
+        return super().__call__(data)
+
 
 @register_preprocessor("filter", "gene")
 class HighlyVariableGenesLogarithmizedByTopGenes(AnnDataTransform):
