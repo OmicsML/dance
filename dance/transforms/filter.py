@@ -1085,7 +1085,13 @@ class HighlyVariableGenesRawCount(AnnDataTransform):
         super().__init__(sc.pp.highly_variable_genes, layer=layer, n_top_genes=n_top_genes, batch_key=batch_key,
                          check_values=check_values, span=span, subset=subset, inplace=inplace, flavor="seurat_v3",
                          **kwargs)
+
+    def __call__(self, data):
+        adata = data.data
+        if adata.X.shape[1] == 0:
+            raise ValueError("Gene dimension is 0")  #Prevent kernel crash
         self.logger.info("Expects count data")
+        return super().__call__(data)
 
 
 @register_preprocessor("filter", "gene")
