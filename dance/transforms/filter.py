@@ -1093,12 +1093,6 @@ class HighlyVariableGenesRawCount(AnnDataTransform):
             raise ValueError("Gene dimension is 0")  #Prevent kernel crash
         return super().__call__(data)
 
-    def __call__(self, data):
-        adata = data.data
-        if adata.X.shape[1] == 0:
-            raise ValueError("Gene dimension is 0")
-        return super().__call__(data)
-
 
 @register_preprocessor("filter", "gene")
 class HighlyVariableGenesLogarithmizedByTopGenes(AnnDataTransform):
