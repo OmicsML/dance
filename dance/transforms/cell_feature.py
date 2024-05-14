@@ -46,6 +46,11 @@ class WeightedFeaturePCA(BaseTransform):
             self.logger.info(f"Normalizing feature before PCA decomposition with mode={self.feat_norm_mode} "
                              f"and axis={self.feat_norm_axis}")
             feat = normalize(feat, mode=self.feat_norm_mode, axis=self.feat_norm_axis)
+        if self.n_components > min(feat.shape):
+            self.logger.warning(
+                f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='full'"
+            )
+            self.n_components = min(feat.shape)
         gene_pca = PCA(n_components=self.n_components)
 
         gene_feat = gene_pca.fit_transform(feat.T)  # decompose into gene features
@@ -98,6 +103,11 @@ class WeightedFeatureSVD(BaseTransform):
             svd.fit_transform(feat)
             explained_variance = svd.explained_variance_ratio_.cumsum()
             self.n_components = (explained_variance < self.n_components).sum() + 1
+        if self.n_components > min(feat.shape):
+            self.logger.warning(
+                f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='full'"
+            )
+            self.n_components = min(feat.shape)
         if self.feat_norm_mode is not None:
             self.logger.info(f"Normalizing feature before PCA decomposition with mode={self.feat_norm_mode} "
                              f"and axis={self.feat_norm_axis}")
