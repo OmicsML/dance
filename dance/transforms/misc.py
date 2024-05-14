@@ -120,7 +120,8 @@ class SaveRaw(BaseTransform):
 @register_preprocessor("misc")
 class UpdateRaw(BaseTransform):
     """Update raw data.
-    Some data may select genes again after normalizing. 
+
+    Some data may select genes again after normalizing.
     At this time, the original raw_data needs to be modified to match the filtered data dimensions.
     See :meth:`anndata.AnnData.raw` for more information.
 
