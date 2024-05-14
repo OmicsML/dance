@@ -252,8 +252,8 @@ pipeline:
       out: feature.cell
     params_to_tune:
       n_components:
-        min: 0.8
-        max: 0.95
+        min: 100
+        max: 1000
       feat_norm_mode:
         values: [null, normalize, standardize, minmax, l2]
   - type: feature.cell
@@ -262,8 +262,8 @@ pipeline:
       out: feature.cell
     params_to_tune:
       n_components:
-        min: 0.8
-        max: 0.95
+        min: 100
+        max: 1000
       feat_norm_mode:
         values: [null, normalize, standardize, minmax, l2]
   - type: feature.cell
