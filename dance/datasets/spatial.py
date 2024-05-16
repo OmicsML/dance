@@ -47,11 +47,12 @@ class SpatialLIBDDataset(BaseDataset):
     }
     AVAILABLE_DATA = sorted(URL_DICT)
 
-    def __init__(self, root=".", full_download=False, data_id="151673", data_dir="data/spatial"):
+    def __init__(self, root=".", full_download=False, data_id="151673", data_dir="data/spatial", sample_file=None):
         super().__init__(root, full_download)
 
         self.data_id = data_id
         self.data_dir = data_dir + "/{}".format(data_id)
+        self.sample_file = sample_file
 
     def download_all(self):
         logger.info(f"All data includes {len(self.URL_DICT)} datasets: {list(self.URL_DICT)}")
@@ -147,7 +148,11 @@ class SpatialLIBDDataset(BaseDataset):
         adata.obsm["spatial"] = xy.set_index(adata.obs_names)
         adata.obsm["spatial_pixel"] = xy_pixel.set_index(adata.obs_names)
         adata.uns["image"] = img
-
+        if self.sample_file is not None:
+            sample_file = osp.join(self.data_dir, self.sample_file)
+            with open(sample_file) as file:
+                sample_index = [int(line.strip()) for line in file]
+            adata = adata[sample_index]
         data = Data(adata, train_size="all")
         return data
 
