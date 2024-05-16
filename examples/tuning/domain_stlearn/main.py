@@ -4,8 +4,8 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import wandb
 
+import wandb
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.stlearn import StKmeans, StLouvain
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
@@ -29,6 +29,7 @@ if __name__ == "__main__":
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
     parser.add_argument("--data_dir", type=str, default='../temp_data', help='test directory')
+    parser.add_argument("--sample_file", type=str, default=None)
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
     args = parser.parse_args()
     file_root_path = Path(args.root_path, args.sample_number).resolve()
@@ -48,7 +49,8 @@ if __name__ == "__main__":
         # preprocessing_pipeline = model.preprocessing_pipeline(device=args.device)
 
         # Load data and perform necessary preprocessing
-        dataloader = SpatialLIBDDataset(data_id=args.sample_number, data_dir=args.data_dir)
+        dataloader = SpatialLIBDDataset(data_id=args.sample_number, data_dir=args.data_dir,
+                                        sample_file=args.sample_file)
         data = dataloader.load_data(cache=args.cache)
         # Prepare preprocessing pipeline and apply it to data
         kwargs = {tune_mode: dict(wandb.config)}
