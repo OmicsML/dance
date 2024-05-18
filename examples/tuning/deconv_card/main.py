@@ -5,8 +5,8 @@ from pathlib import Path
 from pprint import pprint
 
 import numpy as np
-import wandb
 
+import wandb
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.card import Card
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
@@ -63,7 +63,8 @@ if __name__ == "__main__":
                        conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
                        root_path=file_root_path,
                        required_funs=["CellTopicProfile", "FilterGenesCommon", "FilterGenesMarker",
-                                      "SetConfig"], required_indexes=[0, 2, 3, sys.maxsize], metric="MSE")
+                                      "SetConfig"], required_indexes=[0, 2, 3,
+                                                                      sys.maxsize], metric="MSE", ascending=True)
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """To reproduce CARD benchmarks, please refer to command lines belows:
