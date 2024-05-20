@@ -240,7 +240,7 @@ class FeatureCellPlaceHolder(BaseTransform):
         cell_feat is more commonly used, I did not do this."""
         feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
         cell_feat = feat
-        gene_feat = feat.T @ feat
+        gene_feat = feat.T
         data.data.obsm[self.out] = cell_feat
         data.data.varm[
             self.
