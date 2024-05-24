@@ -1,11 +1,12 @@
 import argparse
+import gc
 import os
 import sys
 from pathlib import Path
 
 import numpy as np
-import wandb
 
+import wandb
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.spagcn import SpaGCN, refine
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
@@ -37,6 +38,8 @@ if __name__ == "__main__":
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
     parser.add_argument("--data_dir", type=str, default='../temp_data', help='test directory')
+    parser.add_argument("--sample_file", type=str, default=None)
+    parser.add_argument('--additional_sweep_ids', action='append', type=str, help='get prior runs')
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
     args = parser.parse_args()
     file_root_path = Path(args.root_path, args.sample_number).resolve()
@@ -50,7 +53,8 @@ if __name__ == "__main__":
         model = SpaGCN(device=args.device)
 
         # Load data and perform necessary preprocessing
-        dataloader = SpatialLIBDDataset(data_id=args.sample_number, data_dir=args.data_dir)
+        dataloader = SpatialLIBDDataset(data_id=args.sample_number, data_dir=args.data_dir,
+                                        sample_file=args.sample_file)
         data = dataloader.load_data()
         # Prepare preprocessing pipeline and apply it to data
         kwargs = {tune_mode: dict(wandb.config)}
@@ -72,10 +76,12 @@ if __name__ == "__main__":
         refined_pred = refine(sample_id=data.data.obs_names.tolist(), pred=pred.tolist(), dis=adj_2d, shape="hexagon")
         score_refined = model.default_score_func(y, refined_pred)
         wandb.log({"ARI": score, "ARI (refined)": score_refined})
+        gc.collect()
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
-    save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
+    save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path,
+                      additional_sweep_ids=args.additional_sweep_ids)
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
