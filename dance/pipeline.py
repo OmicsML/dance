@@ -839,7 +839,7 @@ class PipelinePlaner(Pipeline):
         return entity, project, sweep_id
 
 
-def save_summary_data(entity, project, sweep_id, summary_file_path, root_path):
+def save_summary_data(entity, project, sweep_id, summary_file_path, root_path, additional_sweep_ids=None):
     """Download sweep summary data from wandb and save to file.
 
     The returned dataframe includes running time, results and corresponding hyperparameters, etc.
@@ -857,15 +857,18 @@ def save_summary_data(entity, project, sweep_id, summary_file_path, root_path):
     """
     wandb = try_import("wandb")
 
-    summary_file_path = os.path.join(root_path, summary_file_path)
-    sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
     summary_data = []
 
-    for run in sweep.runs:
-        result = dict(run.summary._json_dict).copy()
-        result.update(run.config)
-        result.update({"id": run.id})
-        summary_data.append(flatten_dict(result))  # get result and config
+    summary_file_path = os.path.join(root_path, summary_file_path)
+    additional_sweep_ids = (additional_sweep_ids if additional_sweep_ids is not None else [])
+    additional_sweep_ids.append(sweep_id)
+    for sweep_id in additional_sweep_ids:
+        sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
+        for run in sweep.runs:
+            result = dict(run.summary._json_dict).copy()
+            result.update(run.config)
+            result.update({"id": run.id})
+            summary_data.append(flatten_dict(result))  # get result and config
     ans = pd.DataFrame(summary_data).set_index(["id"])
     ans.sort_index(axis=1, inplace=True)
 
