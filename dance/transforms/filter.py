@@ -411,12 +411,10 @@ class FilterGenes(BaseTransform, ABC):
         x = data.get_feature(return_type="numpy", channel=self.channel, channel_type=self.channel_type)
         if self.add_n_counts:
             self.logger.warning(f"n_counts will be added to the var of data")
-            n_counts = np.sum(x, axis=0)
-            data.data.var["n_counts"] = n_counts
+            data.data.var["n_counts"] = np.sum(x, axis=0)
         if self.add_n_cells:
             self.logger.warning(f"n_cells will be added to the var of data")
-            n_cells = np.sum(x > 0, axis=0)
-            data.data.var["n_cells"] = n_cells
+            data.data.var["n_cells"] = np.sum(x > 0, axis=0)
         # Compute gene summary stats for filtering
         if self.mode == "sum":
             gene_summary = np.array(x.sum(0)).ravel()
@@ -480,9 +478,9 @@ class FilterGenesPercentile(FilterGenes):
         Note that these genes will still be used in the summary stats computation, and thus will still contribute to the
         threshold percentile. If not set, then no genes will be excluded from the filtering process.
     add_n_counts
-        Whether to add n_counts
+         Whether to add ``n_counts``, the total counts for each gene.
     add_n_cells
-        Whether to add n_cells
+        Whether to add ``n_cells``, the number of cells expressed for each gene.
 
     """
 
@@ -544,9 +542,9 @@ class FilterGenesTopK(FilterGenes):
         Note that these genes will still be used in the summary stats computation, and thus will still contribute to the
         threshold percentile. If not set, then no genes will be excluded from the filtering process.
     add_n_counts
-        Whether to add n_counts
+        Whether to add ``n_counts``, the total counts for each gene.
     add_n_cells
-        Whether to add n_cells
+         Whether to add ``n_cells``, the number of cells expressed for each gene.
 
     """
 
@@ -561,8 +559,8 @@ class FilterGenesTopK(FilterGenes):
         channel: Optional[str] = None,
         channel_type: Optional[str] = "X",
         whitelist_indicators: Optional[Union[str, List[str]]] = None,
-        add_n_counts=False,
-        add_n_cells=False,
+        add_n_counts=True,
+        add_n_cells=True,
         **kwargs,
     ):
         super().__init__(
@@ -989,9 +987,9 @@ class FilterGenesScanpyOrder(BaseTransform):
     channel_type
         Channel type to be used for filtering.
     add_n_counts
-        Whether to add n_counts
+        Whether to add ``n_counts``, the total counts for each gene.
     add_n_cells
-        Whether to add n_cells
+        Whether to add ``n_cells``, the number of cells expressed for each gene.
 
     """
 
@@ -1324,9 +1322,9 @@ class FilterCellsScanpyOrder(BaseTransform):
     channel_type
         Channel type to be used for filtering.
     add_n_counts
-        Whether to add n_counts
+        Whether to add ``n_counts``, the total counts for each cell.
     add_n_genes
-        Whether to add n_genes
+        Whether to add ``n_genes``, the number of genes expressed for each cell.
 
     """
 
