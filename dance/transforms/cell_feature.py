@@ -235,9 +235,6 @@ class FeatureCellPlaceHolder(BaseTransform):
         )
 
     def __call__(self, data):
-        """If we follow WeightedFeaturePCA, then gene_feat should be the transpose of
-        feat, and cell_feat is the product of feat and gene_feat, but considering that
-        cell_feat is more commonly used, I did not do this."""
         feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
         cell_feat = feat
         gene_feat = feat.T
