@@ -115,18 +115,14 @@ class FilterScanpy(BaseTransform):
             self.logger.warning(f"{self.key_n_counts} will be added to the data")
             if self._FILTER_TARGET == "genes":
                 if self.key_n_counts is not None:
-                    n_counts = np.sum(x, axis=0)
-                    data.data.var[self.key_n_counts] = n_counts
+                    data.data.var[self.key_n_counts] = np.sum(x, axis=0)
                 if self.key_n_genes_or_cells is not None:
-                    n_cells = np.sum(x > 0, axis=0)
-                    data.data.var[self.key_n_genes_or_cells] = n_cells
+                    data.data.var[self.key_n_genes_or_cells] = np.sum(x > 0, axis=0)
             else:
                 if self.key_n_counts is not None:
-                    n_counts = np.sum(x, axis=1)
-                    data.data.obs[self.key_n_counts] = n_counts
+                    data.data.obs[self.key_n_counts] = np.sum(x, axis=1)
                 if self.key_n_genes_or_cells is not None:
-                    n_genes = np.sum(x > 0, axis=1)
-                    data.data.obs[self.key_n_genes_or_cells] = n_genes
+                    data.data.obs[self.key_n_genes_or_cells] = np.sum(x > 0, axis=1)
 
         if not subset_ind.all():
             subset_func = getattr(data.data, self._subsetting_func_name)
