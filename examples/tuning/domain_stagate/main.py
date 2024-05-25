@@ -1,11 +1,12 @@
 import argparse
+import gc
 import os
 import sys
 from pathlib import Path
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.stagate import Stagate
@@ -28,6 +29,7 @@ if __name__ == "__main__":
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
     parser.add_argument("--data_dir", type=str, default='../temp_data', help='test directory')
+    parser.add_argument("--sample_file", type=str, default=None)
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
     args = parser.parse_args()
     file_root_path = Path(args.root_path, args.sample_number).resolve()
@@ -41,7 +43,8 @@ if __name__ == "__main__":
         model = Stagate([args.high_variable_genes] + args.hidden_dims)
 
         # Load data and perform necessary preprocessing
-        dataloader = SpatialLIBDDataset(data_id=args.sample_number, data_dir=args.data_dir)
+        dataloader = SpatialLIBDDataset(data_id=args.sample_number, data_dir=args.data_dir,
+                                        sample_file=args.sample_file)
         data = dataloader.load_data(cache=args.cache)
         # Prepare preprocessing pipeline and apply it to data
         kwargs = {tune_mode: dict(wandb.config)}
@@ -57,6 +60,7 @@ if __name__ == "__main__":
         model = Stagate([x.shape[1]] + args.hidden_dims)
         score = model.fit_score((x, edge_list_array), y, epochs=args.epochs, random_state=args.seed)
         wandb.log({"ARI": score})
+        gc.collect()
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
