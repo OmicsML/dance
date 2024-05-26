@@ -1092,31 +1092,29 @@ class HighlyVariableGenesRawCount(AnnDataTransform):
         adata = data.data
         if adata.X.shape[1] == 0:
             raise ValueError("Gene dimension is 0")  #Prevent kernel crash
-        elif not self.is_integer_sample(data.X):
-            raise ValueError("Expects raw count")
         return super().__call__(data)
 
-    def is_integer_sample(self, arr, sample_ratio=0.01):
-        """Check if the data is an integer."""
-        if isinstance(arr, np.ndarray):
-            # numpy array
-            positive_indices = np.where(arr > 0)
-            data = arr[positive_indices]
-        elif isinstance(arr, (csr_matrix, csc_matrix)):
-            nonzero_indices = arr.nonzero()
-            data = arr[nonzero_indices].data
-        else:
-            raise TypeError(f"Input must be either a numpy array or a csr_matrix,should not be {type(arr)}")
+    # def is_integer_sample(self, arr, sample_ratio=0.01):
+    #     """Check if the data is an integer."""
+    #     if isinstance(arr, np.ndarray):
+    #         # numpy array
+    #         positive_indices = np.where(arr > 0)
+    #         data = arr[positive_indices]
+    #     elif isinstance(arr, (csr_matrix, csc_matrix)):
+    #         nonzero_indices = arr.nonzero()
+    #         data = arr[nonzero_indices].data
+    #     else:
+    #         raise TypeError(f"Input must be either a numpy array or a csr_matrix,should not be {type(arr)}")
 
-        sample_size = int(len(data) * sample_ratio)
+    #     sample_size = int(len(data) * sample_ratio)
 
-        if sample_size == 0:
-            is_integer = np.all(np.equal(np.mod(data, 1), 0))
-        else:
-            sample_indices = np.random.choice(len(data), size=sample_size, replace=False)
-            sample = data[sample_indices]
-            is_integer = np.all(np.equal(np.mod(sample, 1), 0))
-        return is_integer
+    #     if sample_size == 0:
+    #         is_integer = np.all(np.equal(np.mod(data, 1), 0))
+    #     else:
+    #         sample_indices = np.random.choice(len(data), size=sample_size, replace=False)
+    #         sample = data[sample_indices]
+    #         is_integer = np.all(np.equal(np.mod(sample, 1), 0))
+    #     return is_integer
 
 
 @register_preprocessor("filter", "gene")
