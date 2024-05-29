@@ -105,8 +105,8 @@ class FilterScanpy(BaseTransform):
         basis = total_cells if self._FILTER_TARGET == "genes" else total_features
         other_name = "cells" if self._FILTER_TARGET == "genes" else "genes"
         opts = {
-            "min_counts": min_counts,
-            "max_counts": max_counts,
+            "min_counts": self.prepCounts(x),
+            "max_counts": self.prepCounts(x),
             f"min_{other_name}": get_count(self.min_genes_or_cells, basis),
             f"max_{other_name}": get_count(self.max_genes_or_cells, basis),
         }
@@ -992,9 +992,9 @@ class FilterGenesScanpyOrder(BaseTransform):
     def __init__(
         self,
         order: Optional[List[str]] = None,
-        min_counts: Optional[int] = None,
+        min_counts: Optional[Union[float, int]] = None,
         min_cells: Optional[Union[float, int]] = None,
-        max_counts: Optional[int] = None,
+        max_counts: Optional[Union[float, int]] = None,
         max_cells: Optional[Union[float, int]] = None,
         split_name: Optional[str] = None,
         channel: Optional[str] = None,
@@ -1322,8 +1322,8 @@ class FilterCellsScanpyOrder(BaseTransform):
 
     """
 
-    def __init__(self, order: Optional[List[str]] = None, min_counts: Optional[int] = None,
-                 min_genes: Optional[Union[float, int]] = None, max_counts: Optional[int] = None,
+    def __init__(self, order: Optional[List[str]] = None, min_counts: Optional[Union[float, int]] = None,
+                 min_genes: Optional[Union[float, int]] = None, max_counts: Optional[Union[float, int]] = None,
                  max_genes: Optional[Union[float, int]] = None, split_name: Optional[str] = None,
                  channel: Optional[str] = None, channel_type: Optional[str] = "X", add_n_counts=True, add_n_genes=True,
                  **kwargs):
