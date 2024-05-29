@@ -98,15 +98,14 @@ class FilterScanpy(BaseTransform):
                              channel_type=self.channel_type)
         total_cells, total_features = x.shape
 
-        min_counts = self.min_counts
-        max_counts = self.max_counts
+        min_counts, max_counts = self.prepCounts(x)
 
         # Determine whether we are dealing with cells or genes
         basis = total_cells if self._FILTER_TARGET == "genes" else total_features
         other_name = "cells" if self._FILTER_TARGET == "genes" else "genes"
         opts = {
-            "min_counts": self.prepCounts(x),
-            "max_counts": self.prepCounts(x),
+            "min_counts": min_counts,
+            "max_counts": max_counts,
             f"min_{other_name}": get_count(self.min_genes_or_cells, basis),
             f"max_{other_name}": get_count(self.max_genes_or_cells, basis),
         }
@@ -132,15 +131,19 @@ class FilterScanpy(BaseTransform):
     def prepCounts(self, x):
         if (isinstance(self.min_counts, float) and 0 < self.min_counts < 1) or (isinstance(self.max_counts, float)
                                                                                 and 0 < self.max_counts < 1):
+            min_counts = None
+            max_counts = None
             if self._FILTER_TARGET == "genes":
                 n_counts = np.sum(x, axis=0)
             elif self._FILTER_TARGET == "cells":
                 n_counts = np.sum(x, axis=1)
             if isinstance(self.min_counts, float) and 0 <= self.min_counts <= 1:
-                min_counts = np.percentile(n_counts, min_counts)
+                min_counts = np.percentile(n_counts, self.min_counts)
             else:
-                max_counts = np.percentile(n_counts, max_counts)
+                max_counts = np.percentile(n_counts, self.max_counts)
             return min_counts, max_counts
+        else:
+            return self.min_counts, self.max_counts
 
 
 @register_preprocessor("filter", "cell")
