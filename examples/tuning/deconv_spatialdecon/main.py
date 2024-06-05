@@ -1,10 +1,11 @@
 import argparse
 import os
+import sys
 from pathlib import Path
 from pprint import pprint
-import sys
-import wandb
+
 import numpy as np
+import wandb
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.spatialdecon import SpatialDecon
@@ -33,6 +34,8 @@ pprint(vars(args))
 file_root_path = Path(args.root_path, args.dataset).resolve()
 pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
 scores = []
+
+
 def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
     wandb.init(settings=wandb.Settings(start_method='thread'))
     set_seed(args.seed)
@@ -53,16 +56,16 @@ def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer)
     spaDecon = SpatialDecon(ct_profile, ct_select=cell_types, bias=args.bias, device=args.device)
     score = spaDecon.fit_score(x, y, lr=args.lr, max_iter=args.max_iter, print_period=100)
     wandb.log({"MSE": score})
-entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
-    evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
+
+
+entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(evaluate_pipeline, sweep_id=args.sweep_id,
+                                                              count=args.count)  #Score can be recorded for each epoch
 save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
 if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
     get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
-                    conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
-                    root_path=file_root_path, ascending=True,
-                    required_funs=["CellTopicProfile",
-                                    "SetConfig"], required_indexes=[sys.maxsize - 1,
-                                                                    sys.maxsize], metric="MSE")
+                   conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
+                   root_path=file_root_path, ascending=True, required_funs=["CellTopicProfile", "SetConfig"],
+                   required_indexes=[sys.maxsize - 1, sys.maxsize], metric="MSE")
     if args.tune_mode == "pipeline_params":
         run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """To reproduce SpatialDecon benchmarks, please refer to command lines belows:
