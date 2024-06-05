@@ -1,12 +1,13 @@
 import argparse
+import os
 import pprint
 import sys
 from pathlib import Path
 from typing import get_args
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.singlecellnet import SingleCellNet
@@ -49,6 +50,7 @@ if __name__ == "__main__":
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
+    os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
 
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
