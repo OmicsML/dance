@@ -1090,7 +1090,7 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
     # Skip some of the already run step3 because in pandas, when you sort columns with exactly the same values, the results are not random. 
         # Instead, pandas preserves the order of the original data. So we can skip it without causing any impact.
     for i in range(pipeline_top_k):
-        if i<step3_start_k:
+        if i < step3_start_k:
             continue
         try:
             pipeline_planer = PipelinePlaner.from_config_file(
@@ -1103,7 +1103,6 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
         except wandb.UsageError:
             logger.warning("continue")
             continue
-
 
 
 # def get_params(preprocessing_pipeline:Pipeline,type,key,name):

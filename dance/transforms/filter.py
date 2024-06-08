@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import scipy.sparse as sp
-from scipy.sparse import csc_matrix, csr_matrix
 from scipy.stats import rankdata
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import MinMaxScaler, PolynomialFeatures
@@ -65,6 +64,7 @@ class FilterScanpy(BaseTransform):
         channel_type: Optional[str] = "X",
         key_n_counts: Optional[str] = None,
         key_n_genes_or_cells: Optional[str] = None,
+        inplace=True,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -78,6 +78,7 @@ class FilterScanpy(BaseTransform):
         self.channel = channel
         self.channel_type = channel_type
         self.key_n_genes_or_cells = key_n_genes_or_cells
+        self.inplace = inplace
         if self._FILTER_TARGET is None:
             raise NotImplementedError("Use FilterCellsScanpy or FilterGenesScanpy instead")
         elif self._FILTER_TARGET == "cells":
@@ -126,7 +127,13 @@ class FilterScanpy(BaseTransform):
         if not subset_ind.all():
             subset_func = getattr(data.data, self._subsetting_func_name)
             self.logger.info(f"Subsetting {self._FILTER_TARGET} ({~subset_ind.sum():,} removed) due to {self}")
-            subset_func(subset_ind)
+            if self.inplace:
+                subset_func(subset_ind)
+            else:
+                if self._FILTER_TARGET == "genes":
+                    data.data.obsm[self.out] = x[:, subset_ind]
+                else:
+                    data.data.varm[self.out] = x[:, subset_ind].T
 
     def prepCounts(self, x):
         if (isinstance(self.min_counts, float) and 0 < self.min_counts < 1) or (isinstance(self.max_counts, float)
@@ -169,9 +176,11 @@ class FilterCellsScanpy(FilterScanpy):
     channel_type
         Channel type to be used for filtering.
     key_n_counts
-        The location to add n_counts. If it is None, it will not be added.
+        The location to add n_counts(the total counts for each cell). If it is None, it will not be added.
     key_n_genes
-        The location to add n_genes. If it is None, it will not be added.
+        The location to add n_genes(the number of genes expressed for each cell). If it is None, it will not be added.
+    inplace
+        If inplace is True, the original data is replaced with the filtered data. If inplace is False, the filtered data is stored in varm
 
     """
 
@@ -189,6 +198,7 @@ class FilterCellsScanpy(FilterScanpy):
         channel_type: Optional[str] = "X",
         key_n_counts: Optional[str] = None,
         key_n_genes: Optional[str] = None,
+        inplace=True,
         **kwargs,
     ):
         super().__init__(
@@ -201,6 +211,7 @@ class FilterCellsScanpy(FilterScanpy):
             channel_type=channel_type,
             key_n_counts=key_n_counts,
             key_n_genes_or_cells=key_n_genes,
+            inplace=inplace,
             **kwargs,
         )
 
@@ -226,9 +237,11 @@ class FilterGenesScanpy(FilterScanpy):
     channel_type
         Channel type to be used for filtering.
     key_n_counts
-        The location to add n_counts. If it is None, it will not be added.
+        The location to add n_counts(the total counts for each gene). If it is None, it will not be added.
     key_n_cells
-        The location to add n_cells. If it is None, it will not be added.
+        The location to add n_cells(the number of cells expressed for each gene). If it is None, it will not be added.
+    inplace
+        If inplace is True, the original data is replaced with the filtered data. If inplace is False, the filtered data is stored in obsm
 
     """
 
@@ -246,12 +259,13 @@ class FilterGenesScanpy(FilterScanpy):
         channel_type: Optional[str] = "X",
         key_n_counts: Optional[str] = None,
         key_n_cells: Optional[str] = None,
+        inplace=True,
         **kwargs,
     ):
         super().__init__(min_counts=min_counts, min_genes_or_cells=min_cells, max_counts=max_counts,
                          max_genes_or_cells=max_cells, split_name=split_name, channel=channel,
                          channel_type=channel_type, key_n_counts=key_n_counts, key_n_genes_or_cells=key_n_cells,
-                         **kwargs)
+                         inplace=inplace, **kwargs)
 
 
 @register_preprocessor("filter", "gene")
@@ -385,6 +399,7 @@ class FilterGenes(BaseTransform, ABC):
         whitelist_indicators: Optional[Union[str, List[str]]] = None,
         add_n_counts=True,
         add_n_cells=True,
+        inplace=True,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -401,6 +416,7 @@ class FilterGenes(BaseTransform, ABC):
         self.whitelist_indicators = whitelist_indicators
         self.add_n_counts = add_n_counts
         self.add_n_cells = add_n_cells
+        self.inplace = inplace
 
     def _get_preserve_mask(self, gene_summary: np.ndarray) -> np.ndarray:
         """Select gene to be preserved and return as a mask."""
@@ -449,7 +465,10 @@ class FilterGenes(BaseTransform, ABC):
 
         # Update data
         self.logger.info(f"{data.shape[1] - len(selected_genes):,} genes removed")
-        data.data._inplace_subset_var(selected_genes)
+        if self.inplace:
+            data.data._inplace_subset_var(selected_genes)
+        else:
+            data.data.obsm[self.out] = data.data[:, selected_genes].X
 
 
 @register_preprocessor("filter", "gene")
@@ -480,6 +499,8 @@ class FilterGenesPercentile(FilterGenes):
          Whether to add ``n_counts``, the total counts for each gene.
     add_n_cells
         Whether to add ``n_cells``, the number of cells expressed for each gene.
+    inplace
+        If inplace is True, the original data is replaced with the filtered data. If inplace is False, the filtered data is stored in obsm
 
     """
 
@@ -496,6 +517,7 @@ class FilterGenesPercentile(FilterGenes):
         whitelist_indicators: Optional[Union[str, List[str]]] = None,
         add_n_counts=True,
         add_n_cells=True,
+        inplace=True,
         **kwargs,
     ):
         super().__init__(
@@ -505,6 +527,7 @@ class FilterGenesPercentile(FilterGenes):
             whitelist_indicators=whitelist_indicators,
             add_n_counts=add_n_counts,
             add_n_cells=add_n_cells,
+            inplace=inplace,
             **kwargs,
         )
         self.min_val = min_val
@@ -544,6 +567,8 @@ class FilterGenesTopK(FilterGenes):
         Whether to add ``n_counts``, the total counts for each gene.
     add_n_cells
          Whether to add ``n_cells``, the number of cells expressed for each gene.
+    inplace
+        If inplace is True, the original data is replaced with the filtered data. If inplace is False, the filtered data is stored in obsm
 
     """
 
@@ -558,8 +583,9 @@ class FilterGenesTopK(FilterGenes):
         channel: Optional[str] = None,
         channel_type: Optional[str] = "X",
         whitelist_indicators: Optional[Union[str, List[str]]] = None,
-        add_n_counts=True,
-        add_n_cells=True,
+        add_n_counts=False,
+        add_n_cells=False,
+        inplace=True,
         **kwargs,
     ):
         super().__init__(
@@ -569,6 +595,7 @@ class FilterGenesTopK(FilterGenes):
             whitelist_indicators=whitelist_indicators,
             add_n_counts=add_n_counts,
             add_n_cells=add_n_cells,
+            inplace=inplace,
             **kwargs,
         )
         self.num_genes = num_genes
@@ -691,6 +718,8 @@ class FilterGenesRegression(BaseTransform):
         ``"scmap"``.
     num_genes
         Number of genes to select.
+    inplace
+        If inplace is True, the original data is replaced with the filtered data. If inplace is False, the filtered data is stored in obsm
 
     Note
     ----
@@ -704,7 +733,7 @@ class FilterGenesRegression(BaseTransform):
     _DISPLAY_ATTRS = ("num_genes", )
 
     def __init__(self, method: str = "enclasc", num_genes: int = 1000, *, channel: Optional[str] = None,
-                 mod: Optional[str] = None, skip_count_check: bool = False, **kwargs):
+                 mod: Optional[str] = None, skip_count_check: bool = False, inplace=True, **kwargs):
         super().__init__(**kwargs)
 
         self.num_genes = num_genes
@@ -712,6 +741,7 @@ class FilterGenesRegression(BaseTransform):
         self.mod = mod
         self.method = method
         self.skip_count_check = skip_count_check
+        self.inplace = inplace
 
     def __call__(self, data):
         feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
@@ -728,7 +758,10 @@ class FilterGenesRegression(BaseTransform):
             self.num_genes = feat.shape[1]
         # data.data.obsm[self.out] = filter_func(feat, self.num_genes)
         gene_names = data.data.var_names[filter_func(feat, self.num_genes)]
-        data.data._inplace_subset_var(gene_names)
+        if self.inplace:
+            data.data._inplace_subset_var(gene_names)
+        else:
+            data.data.obsm[self.out] = data.data[:, gene_names].X
         return data
 
     def _filter_enclasc(self, feat: np.ndarray, num_genes: int = 2000, logger: Logger = default_logger,
@@ -989,6 +1022,8 @@ class FilterGenesScanpyOrder(BaseTransform):
         Whether to add ``n_counts``, the total counts for each gene.
     add_n_cells
         Whether to add ``n_cells``, the number of cells expressed for each gene.
+    inplace
+        If inplace is True, the original data is replaced with the filtered data. If inplace is False, the filtered data is stored in obsm
 
     """
 
@@ -1004,6 +1039,7 @@ class FilterGenesScanpyOrder(BaseTransform):
         channel_type: Optional[str] = "X",
         add_n_counts=True,
         add_n_cells=True,
+        inplace=True,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -1035,6 +1071,7 @@ class FilterGenesScanpyOrder(BaseTransform):
                     channel_type=channel_type,
                     key_n_counts=key_n_counts,
                     key_n_cells=key_n_cells,
+                    inplace=inplace,
                     **kwargs,
                 )
             else:
@@ -1174,13 +1211,14 @@ class FilterGenesPlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process."""
 
     def __init__(self, split_name: Optional[str] = None, channel: Optional[str] = None,
-                 channel_type: Optional[str] = "X", add_n_counts=True, add_n_cells=True, **kwargs):
+                 channel_type: Optional[str] = "X", add_n_counts=True, add_n_cells=True, inplace=True, **kwargs):
         super().__init__(**kwargs)
         self.split_name = split_name
         self.channel = channel
         self.channel_type = channel_type
         self.add_n_counts = add_n_counts
         self.add_n_cells = add_n_cells
+        self.inplace = inplace
 
     def __call__(self, data: Data) -> Data:
         x = data.get_feature(return_type="numpy", split_name=self.split_name, channel=self.channel,
@@ -1193,6 +1231,8 @@ class FilterGenesPlaceHolder(BaseTransform):
         if self.add_n_cells:
             self.logger.warning(f"n_cells will be added to the var of data")
             data.data.var["n_cells"] = n_cells
+        if not self.inplace:
+            data.data.obsm[self.out] = x
         return data
 
 
@@ -1269,13 +1309,14 @@ class FilterCellsPlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process."""
 
     def __init__(self, split_name: Optional[str] = None, channel: Optional[str] = None,
-                 channel_type: Optional[str] = "X", add_n_counts=True, add_n_genes=True, **kwargs):
+                 channel_type: Optional[str] = "X", add_n_counts=True, add_n_genes=True, inplace=True, **kwargs):
         super().__init__(**kwargs)
         self.split_name = split_name
         self.channel = channel
         self.channel_type = channel_type
         self.add_n_counts = add_n_counts
         self.add_n_genes = add_n_genes
+        self.inplace = inplace
 
     def __call__(self, data: Data) -> Data:
         x = data.get_feature(return_type="numpy", split_name=self.split_name, channel=self.channel,
@@ -1288,7 +1329,8 @@ class FilterCellsPlaceHolder(BaseTransform):
         if self.add_n_genes:
             self.logger.warning(f"n_genes will be added to the obs of data")
             data.data.obs["n_genes"] = n_genes
-
+        if not self.inplace:
+            data.data.varm[self.out] = x.T
         return data
 
 
@@ -1322,6 +1364,8 @@ class FilterCellsScanpyOrder(BaseTransform):
         Whether to add ``n_counts``, the total counts for each cell.
     add_n_genes
         Whether to add ``n_genes``, the number of genes expressed for each cell.
+    inplace
+        If inplace is True, the original data is replaced with the filtered data. If inplace is False, the filtered data is stored in varm
 
     """
 
@@ -1329,7 +1373,7 @@ class FilterCellsScanpyOrder(BaseTransform):
                  min_genes: Optional[Union[float, int]] = None, max_counts: Optional[Union[float, int]] = None,
                  max_genes: Optional[Union[float, int]] = None, split_name: Optional[str] = None,
                  channel: Optional[str] = None, channel_type: Optional[str] = "X", add_n_counts=True, add_n_genes=True,
-                 **kwargs):
+                 inplace=True, **kwargs):
         super().__init__(**kwargs)
         self.filter_cells_order = default(order, ["min_counts", "min_genes", "max_counts", "max_genes"])
         self.logger.info(f"Filter cells order: {self.filter_cells_order}")
@@ -1351,7 +1395,7 @@ class FilterCellsScanpyOrder(BaseTransform):
                 self.cellScanpyOrderDict[key] = FilterCellsScanpy(**{key: cellParameterDict[key]},
                                                                   split_name=split_name, channel=channel,
                                                                   channel_type=channel_type, key_n_counts=key_n_counts,
-                                                                  key_n_genes=key_n_genes, **kwargs)
+                                                                  key_n_genes=key_n_genes, inplace=inplace, **kwargs)
             else:
                 self.logger.warning(f"{key} not in order,It makes no sense to set {key}")
 
