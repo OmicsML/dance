@@ -1085,6 +1085,8 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
     pipeline_top_k = default(step2_pipeline_planer.config.pipeline_tuning_top_k, DEFAULT_PIPELINE_TUNING_TOP_K)
     step3_k = default(step2_pipeline_planer.config.parameter_tuning_freq_n, DEFAULT_PARAMETER_TUNING_FREQ_N)
     step3_start_k=default(step2_pipeline_planer.config.step3_start_k, 0)
+    step3_sweep_ids=step2_pipeline_planer.config.step3_sweep_ids
+    step3_sweep_ids=[None] * len(pipeline_top_k) if step3_sweep_ids is None else (step3_sweep_ids + [None] * (pipeline_top_k - len(step3_sweep_ids)))
     # Skip some of the already run step3 because in pandas, when you sort columns with exactly the same values, the results are not random. 
         # Instead, pandas preserves the order of the original data. So we can skip it without causing any impact.
     for i in range(pipeline_top_k):
@@ -1094,7 +1096,7 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
             pipeline_planer = PipelinePlaner.from_config_file(
                 f"{root_path}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml")
             entity, project, step3_sweep_id = pipeline_planer.wandb_sweep_agent(
-                partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=None,
+                partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=step3_sweep_ids[i],
                 count=step3_k)  # score can be recorded for each epoch
             save_summary_data(entity, project, step3_sweep_id, f"results/{tune_mode}/{i}_best_test_acc.csv",
                               root_path=root_path)
