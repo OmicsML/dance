@@ -1099,7 +1099,7 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
             pipeline_planer = PipelinePlaner.from_config_file(
                 f"{root_path}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml")
             entity, project, step3_sweep_id = pipeline_planer.wandb_sweep_agent(
-                partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=step3_sweep_ids[i],
+                partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=step3_sweep_ids[i - step3_start_k],
                 count=step3_k)  # score can be recorded for each epoch
             save_summary_data(entity, project, step3_sweep_id, f"results/{tune_mode}/{i}_best_test_acc.csv",
                               root_path=root_path)
