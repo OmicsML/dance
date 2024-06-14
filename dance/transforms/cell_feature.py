@@ -31,7 +31,7 @@ class WeightedFeaturePCA(BaseTransform):
 
     _DISPLAY_ATTRS = ("n_components", "split_name", "feat_norm_mode", "feat_norm_axis")
 
-    def __init__(self, n_components: Union[float, int] = 0.9, split_name: Optional[str] = None,
+    def __init__(self, n_components: Union[float, int] = 400, split_name: Optional[str] = None,
                  feat_norm_mode: Optional[str] = None, feat_norm_axis: int = 0, **kwargs):
         super().__init__(**kwargs)
 
@@ -86,7 +86,7 @@ class WeightedFeatureSVD(BaseTransform):
 
     _DISPLAY_ATTRS = ("n_components", "split_name", "feat_norm_mode", "feat_norm_axis")
 
-    def __init__(self, n_components: Union[float, int] = 0.9, split_name: Optional[str] = None,
+    def __init__(self, n_components: Union[float, int] = 400, split_name: Optional[str] = None,
                  feat_norm_mode: Optional[str] = None, feat_norm_axis: int = 0, **kwargs):
         super().__init__(**kwargs)
 
@@ -139,7 +139,7 @@ class CellPCA(BaseTransform):
 
     _DISPLAY_ATTRS = ("n_components", )
 
-    def __init__(self, n_components: Union[float, int] = 0.9, *, channel: Optional[str] = None,
+    def __init__(self, n_components: Union[float, int] = 400, *, channel: Optional[str] = None,
                  mod: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
 
@@ -179,7 +179,7 @@ class CellSVD(BaseTransform):
 
     _DISPLAY_ATTRS = ("n_components", )
 
-    def __init__(self, n_components: Union[float, int] = 0.9, *, channel: Optional[str] = None,
+    def __init__(self, n_components: Union[float, int] = 400, *, channel: Optional[str] = None,
                  mod: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
 
