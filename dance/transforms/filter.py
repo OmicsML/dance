@@ -55,13 +55,16 @@ class FilterScanpy(BaseTransform):
 
     def __init__(
         self,
-        min_counts: Optional[int] = None,
+        min_counts: Optional[Union[float, int]] = None,
         min_genes_or_cells: Optional[Union[float, int]] = None,
-        max_counts: Optional[int] = None,
+        max_counts: Optional[Union[float, int]] = None,
         max_genes_or_cells: Optional[Union[float, int]] = None,
         split_name: Optional[str] = None,
         channel: Optional[str] = None,
         channel_type: Optional[str] = "X",
+        key_n_counts: Optional[str] = None,
+        key_n_genes_or_cells: Optional[str] = None,
+        inplace=True,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -70,11 +73,12 @@ class FilterScanpy(BaseTransform):
         self.min_genes_or_cells = min_genes_or_cells
         self.max_counts = max_counts
         self.max_genes_or_cells = max_genes_or_cells
-
+        self.key_n_counts = key_n_counts
         self.split_name = split_name
         self.channel = channel
         self.channel_type = channel_type
-
+        self.key_n_genes_or_cells = key_n_genes_or_cells
+        self.inplace = inplace
         if self._FILTER_TARGET is None:
             raise NotImplementedError("Use FilterCellsScanpy or FilterGenesScanpy instead")
         elif self._FILTER_TARGET == "cells":
@@ -91,15 +95,14 @@ class FilterScanpy(BaseTransform):
             raise ValueError(f"Unknown filter target {self._FILTER_TARGET!r}")
 
     def __call__(self, data):
-        x = data.get_feature(return_type="default", split_name=self.split_name, channel=self.channel,
+        x = data.get_feature(return_type="numpy", split_name=self.split_name, channel=self.channel,
                              channel_type=self.channel_type)
         total_cells, total_features = x.shape
 
-        min_counts = self.min_counts
-        max_counts = self.max_counts
+        min_counts, max_counts = self.prepCounts(x)
 
         # Determine whether we are dealing with cells or genes
-        basis = total_cells if self._FILTER_TARGET == "cells" else total_features
+        basis = total_cells if self._FILTER_TARGET == "genes" else total_features
         other_name = "cells" if self._FILTER_TARGET == "genes" else "genes"
         opts = {
             "min_counts": min_counts,
@@ -108,11 +111,46 @@ class FilterScanpy(BaseTransform):
             f"max_{other_name}": get_count(self.max_genes_or_cells, basis),
         }
         subset_ind, _ = self._filter_func(x, inplace=False, **opts)
+        if self.key_n_counts is not None:
+            self.logger.warning(f"{self.key_n_counts} will be added to the data")
+            if self._FILTER_TARGET == "genes":
+                if self.key_n_counts is not None:
+                    data.data.var[self.key_n_counts] = np.sum(x, axis=0)
+                if self.key_n_genes_or_cells is not None:
+                    data.data.var[self.key_n_genes_or_cells] = np.sum(x > 0, axis=0)
+            else:
+                if self.key_n_counts is not None:
+                    data.data.obs[self.key_n_counts] = np.sum(x, axis=1)
+                if self.key_n_genes_or_cells is not None:
+                    data.data.obs[self.key_n_genes_or_cells] = np.sum(x > 0, axis=1)
 
         if not subset_ind.all():
             subset_func = getattr(data.data, self._subsetting_func_name)
             self.logger.info(f"Subsetting {self._FILTER_TARGET} ({~subset_ind.sum():,} removed) due to {self}")
-            subset_func(subset_ind)
+            if self.inplace:
+                subset_func(subset_ind)
+            else:
+                if self._FILTER_TARGET == "genes":
+                    data.data.obsm[self.out] = x[:, subset_ind]
+                else:
+                    data.data.varm[self.out] = x[:, subset_ind].T
+
+    def prepCounts(self, x):
+        if (isinstance(self.min_counts, float) and 0 < self.min_counts < 1) or (isinstance(self.max_counts, float)
+                                                                                and 0 < self.max_counts < 1):
+            min_counts = None
+            max_counts = None
+            if self._FILTER_TARGET == "genes":
+                n_counts = np.sum(x, axis=0)
+            elif self._FILTER_TARGET == "cells":
+                n_counts = np.sum(x, axis=1)
+            if isinstance(self.min_counts, float) and 0 <= self.min_counts <= 1:
+                min_counts = np.percentile(n_counts, self.min_counts)
+            else:
+                max_counts = np.percentile(n_counts, self.max_counts)
+            return min_counts, max_counts
+        else:
+            return self.min_counts, self.max_counts
 
 
 @register_preprocessor("filter", "cell")
@@ -137,6 +175,12 @@ class FilterCellsScanpy(FilterScanpy):
         Channel to be used for filtering.
     channel_type
         Channel type to be used for filtering.
+    key_n_counts
+        The location to add n_counts(the total counts for each cell). If it is None, it will not be added.
+    key_n_genes
+        The location to add n_genes(the number of genes expressed for each cell). If it is None, it will not be added.
+    inplace
+        If inplace is True, the original data is replaced with the filtered data. If inplace is False, the filtered data is stored in varm
 
     """
 
@@ -145,13 +189,16 @@ class FilterCellsScanpy(FilterScanpy):
 
     def __init__(
         self,
-        min_counts: Optional[int] = None,
+        min_counts: Optional[Union[float, int]] = None,
         min_genes: Optional[Union[float, int]] = None,
-        max_counts: Optional[int] = None,
+        max_counts: Optional[Union[float, int]] = None,
         max_genes: Optional[Union[float, int]] = None,
         split_name: Optional[str] = None,
         channel: Optional[str] = None,
         channel_type: Optional[str] = "X",
+        key_n_counts: Optional[str] = None,
+        key_n_genes: Optional[str] = None,
+        inplace=True,
         **kwargs,
     ):
         super().__init__(
@@ -162,6 +209,9 @@ class FilterCellsScanpy(FilterScanpy):
             split_name=split_name,
             channel=channel,
             channel_type=channel_type,
+            key_n_counts=key_n_counts,
+            key_n_genes_or_cells=key_n_genes,
+            inplace=inplace,
             **kwargs,
         )
 
@@ -186,6 +236,12 @@ class FilterGenesScanpy(FilterScanpy):
         Channel to be used for filtering.
     channel_type
         Channel type to be used for filtering.
+    key_n_counts
+        The location to add n_counts(the total counts for each gene). If it is None, it will not be added.
+    key_n_cells
+        The location to add n_cells(the number of cells expressed for each gene). If it is None, it will not be added.
+    inplace
+        If inplace is True, the original data is replaced with the filtered data. If inplace is False, the filtered data is stored in obsm
 
     """
 
@@ -194,25 +250,22 @@ class FilterGenesScanpy(FilterScanpy):
 
     def __init__(
         self,
-        min_counts: Optional[int] = None,
+        min_counts: Optional[Union[float, int]] = None,
         min_cells: Optional[Union[float, int]] = None,
-        max_counts: Optional[int] = None,
+        max_counts: Optional[Union[float, int]] = None,
         max_cells: Optional[Union[float, int]] = None,
         split_name: Optional[str] = None,
         channel: Optional[str] = None,
         channel_type: Optional[str] = "X",
+        key_n_counts: Optional[str] = None,
+        key_n_cells: Optional[str] = None,
+        inplace=True,
         **kwargs,
     ):
-        super().__init__(
-            min_counts=min_counts,
-            min_genes_or_cells=min_cells,
-            max_counts=max_counts,
-            max_genes_or_cells=max_cells,
-            split_name=split_name,
-            channel=channel,
-            channel_type=channel_type,
-            **kwargs,
-        )
+        super().__init__(min_counts=min_counts, min_genes_or_cells=min_cells, max_counts=max_counts,
+                         max_genes_or_cells=max_cells, split_name=split_name, channel=channel,
+                         channel_type=channel_type, key_n_counts=key_n_counts, key_n_genes_or_cells=key_n_cells,
+                         inplace=inplace, **kwargs)
 
 
 @register_preprocessor("filter", "gene")
@@ -344,6 +397,9 @@ class FilterGenes(BaseTransform, ABC):
         channel: Optional[str] = None,
         channel_type: Optional[str] = None,
         whitelist_indicators: Optional[Union[str, List[str]]] = None,
+        add_n_counts=True,
+        add_n_cells=True,
+        inplace=True,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -358,14 +414,22 @@ class FilterGenes(BaseTransform, ABC):
         self.channel = channel
         self.channel_type = channel_type
         self.whitelist_indicators = whitelist_indicators
+        self.add_n_counts = add_n_counts
+        self.add_n_cells = add_n_cells
+        self.inplace = inplace
 
     def _get_preserve_mask(self, gene_summary: np.ndarray) -> np.ndarray:
         """Select gene to be preserved and return as a mask."""
         ...
 
     def __call__(self, data):
-        x = data.get_feature(return_type="default", channel=self.channel, channel_type=self.channel_type)
-
+        x = data.get_feature(return_type="numpy", channel=self.channel, channel_type=self.channel_type)
+        if self.add_n_counts:
+            self.logger.warning(f"n_counts will be added to the var of data")
+            data.data.var["n_counts"] = np.sum(x, axis=0)
+        if self.add_n_cells:
+            self.logger.warning(f"n_cells will be added to the var of data")
+            data.data.var["n_cells"] = np.sum(x > 0, axis=0)
         # Compute gene summary stats for filtering
         if self.mode == "sum":
             gene_summary = np.array(x.sum(0)).ravel()
@@ -401,7 +465,10 @@ class FilterGenes(BaseTransform, ABC):
 
         # Update data
         self.logger.info(f"{data.shape[1] - len(selected_genes):,} genes removed")
-        data.data._inplace_subset_var(selected_genes)
+        if self.inplace:
+            data.data._inplace_subset_var(selected_genes)
+        else:
+            data.data.obsm[self.out] = data.data[:, selected_genes].X
 
 
 @register_preprocessor("filter", "gene")
@@ -428,6 +495,12 @@ class FilterGenesPercentile(FilterGenes):
         A list of (or a single) :obj:`.var` columns that indicates the genes to be excluded from the filtering process.
         Note that these genes will still be used in the summary stats computation, and thus will still contribute to the
         threshold percentile. If not set, then no genes will be excluded from the filtering process.
+    add_n_counts
+         Whether to add ``n_counts``, the total counts for each gene.
+    add_n_cells
+        Whether to add ``n_cells``, the number of cells expressed for each gene.
+    inplace
+        If inplace is True, the original data is replaced with the filtered data. If inplace is False, the filtered data is stored in obsm
 
     """
 
@@ -442,6 +515,9 @@ class FilterGenesPercentile(FilterGenes):
         channel: Optional[str] = None,
         channel_type: Optional[str] = None,
         whitelist_indicators: Optional[Union[str, List[str]]] = None,
+        add_n_counts=True,
+        add_n_cells=True,
+        inplace=True,
         **kwargs,
     ):
         super().__init__(
@@ -449,6 +525,9 @@ class FilterGenesPercentile(FilterGenes):
             channel=channel,
             channel_type=channel_type,
             whitelist_indicators=whitelist_indicators,
+            add_n_counts=add_n_counts,
+            add_n_cells=add_n_cells,
+            inplace=inplace,
             **kwargs,
         )
         self.min_val = min_val
@@ -484,6 +563,12 @@ class FilterGenesTopK(FilterGenes):
         A list of (or a single) :obj:`.var` columns that indicates the genes to be excluded from the filtering process.
         Note that these genes will still be used in the summary stats computation, and thus will still contribute to the
         threshold percentile. If not set, then no genes will be excluded from the filtering process.
+    add_n_counts
+        Whether to add ``n_counts``, the total counts for each gene.
+    add_n_cells
+         Whether to add ``n_cells``, the number of cells expressed for each gene.
+    inplace
+        If inplace is True, the original data is replaced with the filtered data. If inplace is False, the filtered data is stored in obsm
 
     """
 
@@ -498,6 +583,9 @@ class FilterGenesTopK(FilterGenes):
         channel: Optional[str] = None,
         channel_type: Optional[str] = "X",
         whitelist_indicators: Optional[Union[str, List[str]]] = None,
+        add_n_counts=False,
+        add_n_cells=False,
+        inplace=True,
         **kwargs,
     ):
         super().__init__(
@@ -505,6 +593,9 @@ class FilterGenesTopK(FilterGenes):
             channel=channel,
             channel_type=channel_type,
             whitelist_indicators=whitelist_indicators,
+            add_n_counts=add_n_counts,
+            add_n_cells=add_n_cells,
+            inplace=inplace,
             **kwargs,
         )
         self.num_genes = num_genes
@@ -513,7 +604,9 @@ class FilterGenesTopK(FilterGenes):
     def _get_preserve_mask(self, gene_summary):
         total_num_genes = gene_summary.size
         if self.num_genes >= total_num_genes:
-            raise ValueError(f"{self.num_genes=!r} > total number of genes: {total_num_genes}")
+            # raise ValueError(f"{self.num_genes=!r} > total number of genes: {total_num_genes}")
+            self.logger.warning(f"{self.num_genes=!r} > total number of genes: {total_num_genes}")
+            self.num_genes = total_num_genes
         sorted_idx = gene_summary.argsort()
         selected_idx = sorted_idx[-self.num_genes:] if self.top else sorted_idx[:self.num_genes]
         mask = np.zeros(total_num_genes, dtype=bool)
@@ -625,6 +718,8 @@ class FilterGenesRegression(BaseTransform):
         ``"scmap"``.
     num_genes
         Number of genes to select.
+    inplace
+        If inplace is True, the original data is replaced with the filtered data. If inplace is False, the filtered data is stored in obsm
 
     Note
     ----
@@ -638,7 +733,7 @@ class FilterGenesRegression(BaseTransform):
     _DISPLAY_ATTRS = ("num_genes", )
 
     def __init__(self, method: str = "enclasc", num_genes: int = 1000, *, channel: Optional[str] = None,
-                 mod: Optional[str] = None, skip_count_check: bool = False, **kwargs):
+                 mod: Optional[str] = None, skip_count_check: bool = False, inplace=True, **kwargs):
         super().__init__(**kwargs)
 
         self.num_genes = num_genes
@@ -646,6 +741,7 @@ class FilterGenesRegression(BaseTransform):
         self.mod = mod
         self.method = method
         self.skip_count_check = skip_count_check
+        self.inplace = inplace
 
     def __call__(self, data):
         feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
@@ -657,7 +753,15 @@ class FilterGenesRegression(BaseTransform):
         func_dict = {"enclasc": self._filter_enclasc, "seurat3": self._filter_seurat3, "scmap": self._filter_scmap}
         if (filter_func := func_dict.get(self.method)) is None:
             raise ValueError(f"Unknown method {self.method}, supported options are: {list(func_dict)}.")
-        data.data.obsm[self.out] = filter_func(feat)
+        if self.num_genes >= feat.shape[1]:
+            self.logger.warning(f"{self.num_genes=!r} > total number of genes: {feat.shape[1]}")
+            self.num_genes = feat.shape[1]
+        # data.data.obsm[self.out] = filter_func(feat, self.num_genes)
+        gene_names = data.data.var_names[filter_func(feat, self.num_genes)]
+        if self.inplace:
+            data.data._inplace_subset_var(gene_names)
+        else:
+            data.data.obsm[self.out] = data.data[:, gene_names].X
         return data
 
     def _filter_enclasc(self, feat: np.ndarray, num_genes: int = 2000, logger: Logger = default_logger,
@@ -674,10 +778,10 @@ class FilterGenesRegression(BaseTransform):
         x2 = drop_feat[select_index].reshape(-1, 1)
         y = np.log(feat_mean + 1)[select_index].reshape(-1, 1)
 
-        y_pred = LinearRegression().fit(x2, y).predict(x2)
+        y_pred = LinearRegression(n_jobs=8).fit(x2, y).predict(x2)
         scores[select_index] = (2 * y - y_pred - x1).ravel()
         feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
-        return feat[:, feat_index]
+        return feat_index
 
     def _filter_seurat3(self, feat: np.ndarray, num_genes: int = 2000, logger: Logger = default_logger,
                         no_check: bool = False) -> np.ndarray:
@@ -690,7 +794,7 @@ class FilterGenesRegression(BaseTransform):
         y_pred = LinearRegression().fit(x, feat_var_log).predict(x)
         scores = (feat_var_log - y_pred).ravel()
         feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
-        return feat[:, feat_index]
+        return feat_index
 
     def _filter_scmap(self, feat: np.ndarray, num_genes: int = 2000, logger: Logger = default_logger,
                       no_check: bool = False) -> np.ndarray:
@@ -706,10 +810,10 @@ class FilterGenesRegression(BaseTransform):
         x = np.log(feat_mean[select_index] + 1).reshape(-1, 1) * np.log(2.7) / np.log(2)
         y = np.log(drop_feat[select_index] * 100).reshape(-1, 1) * np.log(2.7) / np.log(2)
 
-        y_pred = LinearRegression().fit(x, y).y_pred(x)
+        y_pred = LinearRegression().fit(x, y).predict(x)
         scores[select_index] = (y - y_pred).ravel()
         feat_index = np.argpartition(scores, -num_genes)[-num_genes:]
-        return feat[:, feat_index]
+        return feat_index
 
 
 @register_preprocessor("filter", "gene")
@@ -914,19 +1018,28 @@ class FilterGenesScanpyOrder(BaseTransform):
         Channel to be used for filtering.
     channel_type
         Channel type to be used for filtering.
+    add_n_counts
+        Whether to add ``n_counts``, the total counts for each gene.
+    add_n_cells
+        Whether to add ``n_cells``, the number of cells expressed for each gene.
+    inplace
+        If inplace is True, the original data is replaced with the filtered data. If inplace is False, the filtered data is stored in obsm
 
     """
 
     def __init__(
         self,
         order: Optional[List[str]] = None,
-        min_counts: Optional[int] = None,
+        min_counts: Optional[Union[float, int]] = None,
         min_cells: Optional[Union[float, int]] = None,
-        max_counts: Optional[int] = None,
+        max_counts: Optional[Union[float, int]] = None,
         max_cells: Optional[Union[float, int]] = None,
         split_name: Optional[str] = None,
         channel: Optional[str] = None,
         channel_type: Optional[str] = "X",
+        add_n_counts=True,
+        add_n_cells=True,
+        inplace=True,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -941,16 +1054,24 @@ class FilterGenesScanpyOrder(BaseTransform):
             "max_counts": max_counts,
             "max_cells": max_cells
         }
+        self.add_n_counts = add_n_counts
+        self.add_n_cells = add_n_cells
         if not set(self.filter_genes_order).issubset(set(geneParameterDict.keys())):
             raise KeyError(f"An order should be in {geneParameterDict.keys()}")
         self.geneScanpyOrderDict = {}
         for key in geneParameterDict.keys():
             if key in self.filter_genes_order:
+                if key in self.filter_genes_order:
+                    key_n_counts = ("n_counts" if self.add_n_counts else None)
+                    key_n_cells = ("n_cells" if self.add_n_cells else None)
                 self.geneScanpyOrderDict[key] = FilterGenesScanpy(
                     **{key: geneParameterDict[key]},
                     split_name=split_name,
                     channel=channel,
                     channel_type=channel_type,
+                    key_n_counts=key_n_counts,
+                    key_n_cells=key_n_cells,
+                    inplace=inplace,
                     **kwargs,
                 )
             else:
@@ -1005,6 +1126,35 @@ class HighlyVariableGenesRawCount(AnnDataTransform):
         super().__init__(sc.pp.highly_variable_genes, layer=layer, n_top_genes=n_top_genes, batch_key=batch_key,
                          check_values=check_values, span=span, subset=subset, inplace=inplace, flavor="seurat_v3",
                          **kwargs)
+        self.logger.info("Expects count data")
+
+    def __call__(self, data):
+        adata = data.data
+        if adata.X.shape[1] == 0:
+            raise ValueError("Gene dimension is 0")  #Prevent kernel crash
+        return super().__call__(data)
+
+    # def is_integer_sample(self, arr, sample_ratio=0.01):
+    #     """Check if the data is an integer."""
+    #     if isinstance(arr, np.ndarray):
+    #         # numpy array
+    #         positive_indices = np.where(arr > 0)
+    #         data = arr[positive_indices]
+    #     elif isinstance(arr, (csr_matrix, csc_matrix)):
+    #         nonzero_indices = arr.nonzero()
+    #         data = arr[nonzero_indices].data
+    #     else:
+    #         raise TypeError(f"Input must be either a numpy array or a csr_matrix,should not be {type(arr)}")
+
+    #     sample_size = int(len(data) * sample_ratio)
+
+    #     if sample_size == 0:
+    #         is_integer = np.all(np.equal(np.mod(data, 1), 0))
+    #     else:
+    #         sample_indices = np.random.choice(len(data), size=sample_size, replace=False)
+    #         sample = data[sample_indices]
+    #         is_integer = np.all(np.equal(np.mod(sample, 1), 0))
+    #     return is_integer
 
 
 @register_preprocessor("filter", "gene")
@@ -1052,12 +1202,43 @@ class HighlyVariableGenesLogarithmizedByTopGenes(AnnDataTransform):
                  batch_key: Optional[str] = None, **kwargs):
         super().__init__(sc.pp.highly_variable_genes, layer=layer, n_top_genes=n_top_genes, n_bins=n_bins,
                          flavor=flavor, subset=subset, inplace=inplace, batch_key=batch_key, **kwargs)
+        self.logger.info("Expects logarithmized data")
 
 
 @register_preprocessor("filter", "gene")
 @deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
 class FilterGenesPlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process."""
+
+    def __init__(self, split_name: Optional[str] = None, channel: Optional[str] = None,
+                 channel_type: Optional[str] = "X", add_n_counts=True, add_n_cells=True, inplace=True, **kwargs):
+        super().__init__(**kwargs)
+        self.split_name = split_name
+        self.channel = channel
+        self.channel_type = channel_type
+        self.add_n_counts = add_n_counts
+        self.add_n_cells = add_n_cells
+        self.inplace = inplace
+
+    def __call__(self, data: Data) -> Data:
+        x = data.get_feature(return_type="numpy", split_name=self.split_name, channel=self.channel,
+                             channel_type=self.channel_type)
+        n_counts = np.sum(x, axis=0)
+        n_cells = np.sum(x > 0, axis=0)
+        if self.add_n_counts:
+            self.logger.warning(f"n_counts will be added to the var of data")
+            data.data.var["n_counts"] = n_counts
+        if self.add_n_cells:
+            self.logger.warning(f"n_cells will be added to the var of data")
+            data.data.var["n_cells"] = n_cells
+        if not self.inplace:
+            data.data.obsm[self.out] = x
+        return data
+
+
+@register_preprocessor("filter", "gene")
+@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+class FilterGenesNumberPlaceHolder(BaseTransform):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -1119,6 +1300,38 @@ class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
         super().__init__(sc.pp.highly_variable_genes, layer=layer, min_disp=min_disp, max_disp=max_disp,
                          min_mean=min_mean, max_mean=max_mean, n_bins=n_bins, flavor=flavor, subset=subset,
                          inplace=inplace, batch_key=batch_key, **kwargs)
+        self.logger.info("Expects logarithmized data")
+
+
+@register_preprocessor("filter", "cell")
+@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+class FilterCellsPlaceHolder(BaseTransform):
+    """Used as a placeholder to skip the process."""
+
+    def __init__(self, split_name: Optional[str] = None, channel: Optional[str] = None,
+                 channel_type: Optional[str] = "X", add_n_counts=True, add_n_genes=True, inplace=True, **kwargs):
+        super().__init__(**kwargs)
+        self.split_name = split_name
+        self.channel = channel
+        self.channel_type = channel_type
+        self.add_n_counts = add_n_counts
+        self.add_n_genes = add_n_genes
+        self.inplace = inplace
+
+    def __call__(self, data: Data) -> Data:
+        x = data.get_feature(return_type="numpy", split_name=self.split_name, channel=self.channel,
+                             channel_type=self.channel_type)
+        n_counts = np.sum(x, axis=1)
+        n_genes = np.sum(x > 0, axis=1)
+        if self.add_n_counts:
+            self.logger.warning(f"n_counts will be added to the obs of data")
+            data.data.obs["n_counts"] = n_counts
+        if self.add_n_genes:
+            self.logger.warning(f"n_genes will be added to the obs of data")
+            data.data.obs["n_genes"] = n_genes
+        if not self.inplace:
+            data.data.varm[self.out] = x.T
+        return data
 
 
 @register_preprocessor("filter", "cell")
@@ -1147,21 +1360,20 @@ class FilterCellsScanpyOrder(BaseTransform):
         Channel to be used for filtering.
     channel_type
         Channel type to be used for filtering.
+    add_n_counts
+        Whether to add ``n_counts``, the total counts for each cell.
+    add_n_genes
+        Whether to add ``n_genes``, the number of genes expressed for each cell.
+    inplace
+        If inplace is True, the original data is replaced with the filtered data. If inplace is False, the filtered data is stored in varm
 
     """
 
-    def __init__(
-        self,
-        order: Optional[List[str]] = None,
-        min_counts: Optional[int] = None,
-        min_genes: Optional[Union[float, int]] = None,
-        max_counts: Optional[int] = None,
-        max_genes: Optional[Union[float, int]] = None,
-        split_name: Optional[str] = None,
-        channel: Optional[str] = None,
-        channel_type: Optional[str] = "X",
-        **kwargs,
-    ):
+    def __init__(self, order: Optional[List[str]] = None, min_counts: Optional[Union[float, int]] = None,
+                 min_genes: Optional[Union[float, int]] = None, max_counts: Optional[Union[float, int]] = None,
+                 max_genes: Optional[Union[float, int]] = None, split_name: Optional[str] = None,
+                 channel: Optional[str] = None, channel_type: Optional[str] = "X", add_n_counts=True, add_n_genes=True,
+                 inplace=True, **kwargs):
         super().__init__(**kwargs)
         self.filter_cells_order = default(order, ["min_counts", "min_genes", "max_counts", "max_genes"])
         self.logger.info(f"Filter cells order: {self.filter_cells_order}")
@@ -1171,22 +1383,23 @@ class FilterCellsScanpyOrder(BaseTransform):
             "max_counts": max_counts,
             "max_genes": max_genes
         }
+        self.add_n_counts = add_n_counts
+        self.add_n_genes = add_n_genes
         if not set(self.filter_cells_order).issubset(set(cellParameterDict.keys())):
             raise KeyError(f"An order should be in {cellParameterDict.keys()}")
         self.cellScanpyOrderDict = {}
         for key in cellParameterDict.keys():
             if key in self.filter_cells_order:
-                self.cellScanpyOrderDict[key] = FilterCellsScanpy(
-                    **{key: cellParameterDict[key]},
-                    split_name=split_name,
-                    channel=channel,
-                    channel_type=channel_type,
-                    **kwargs,
-                )
+                key_n_counts = ("n_counts" if self.add_n_counts else None)
+                key_n_genes = ("n_genes" if self.add_n_genes else None)
+                self.cellScanpyOrderDict[key] = FilterCellsScanpy(**{key: cellParameterDict[key]},
+                                                                  split_name=split_name, channel=channel,
+                                                                  channel_type=channel_type, key_n_counts=key_n_counts,
+                                                                  key_n_genes=key_n_genes, inplace=inplace, **kwargs)
             else:
                 self.logger.warning(f"{key} not in order,It makes no sense to set {key}")
 
     def __call__(self, data: Data):
         for parameter in self.filter_cells_order:
-            geneScanpyOrder = self.cellScanpyOrderDict[parameter]
-            geneScanpyOrder(data)
+            cellScanpyOrder = self.cellScanpyOrderDict[parameter]
+            cellScanpyOrder(data)

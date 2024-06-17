@@ -118,6 +118,29 @@ class SaveRaw(BaseTransform):
 
 
 @register_preprocessor("misc")
+class UpdateRaw(BaseTransform):
+    """Update raw data.
+
+    Some data may select genes again after normalizing.
+    At this time, the original raw_data needs to be modified to match the filtered data dimensions.
+    See :meth:`anndata.AnnData.raw` for more information.
+
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __call__(self, data):
+        if data.data.raw is None:
+            raise AttributeError(f"Raw data attribute doesn't exist \n{data}"
+                                 f"If you wish to update raw, save raw first.")
+        else:
+            selected_genes = data.data.var_names
+            self.logger.warning("RawData will change.")
+            data.data.raw = data.data.raw[:, selected_genes].to_adata()
+
+
+@register_preprocessor("misc")
 class RemoveSplit(BaseTransform):
     """Remove a particular split from the data."""
 

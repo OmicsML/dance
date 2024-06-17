@@ -4,7 +4,7 @@ import torch
 from networkx.algorithms import bipartite
 from scipy import sparse
 from sklearn.cluster import KMeans
-from sklearn.metrics import adjusted_rand_score, mean_squared_error
+from sklearn.metrics import adjusted_rand_score, mean_absolute_percentage_error, mean_squared_error
 from sklearn.metrics.cluster import normalized_mutual_info_score
 
 from dance import logger
@@ -78,6 +78,18 @@ def mse(true: Union[torch.Tensor, np.ndarray], pred: Union[torch.Tensor, np.ndar
 
     """
     return mean_squared_error(true, pred)
+
+
+@register_metric_func()
+@torch_to_numpy
+def mape(true: Union[torch.Tensor, np.ndarray], pred: Union[torch.Tensor, np.ndarray]) -> float:
+    """Mean absolute percentage error score.
+
+    See
+    :func: `sklearn.metrics.mean_absolute_percentage_error`
+
+    """
+    return mean_absolute_percentage_error(true, pred)
 
 
 def get_bipartite_matching_adjacency_matrix_mk3(raw_logits, threshold_quantile=0.995, copy=False):

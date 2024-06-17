@@ -157,6 +157,11 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         self.gnnmodel = GNNModel(in_feats=num_cells, out_feats=num_genes, dropout=dropout)
         self.aemodel = AEModel(in_feats=num_genes, dropout=dropout)
         self.model_params = list(self.aemodel.parameters()) + list(self.gnnmodel.parameters())
+
+        # if torch.cuda.device_count() > 1 and gpu != -1:
+        #     self = nn.DataParallel(self).to("cuda")
+        #     print(self.device_ids)
+        # else:
         self.to(self.device)
 
     @staticmethod
@@ -272,7 +277,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
                 min_valid_loss = self.valid_loss
                 self.save_model()
             print(f"[Epoch%d], train_loss %.6f, adj_loss %.6f, express_loss %.6f, kl_loss %.6f, valid_loss %.6f" \
-                  % (epoch, self.train_loss, self.loss_adj, self.loss_exp, abs(self.kl), self.valid_loss))
+                % (epoch, self.train_loss, self.loss_adj, self.loss_exp, abs(self.kl), self.valid_loss))
 
     def train(self, train_data, train_data_raw, graph, train_mask, valid_mask, le=1, la=1, ke=1, ka=1):
         """Train function, gets loss and performs optimization step.
@@ -455,21 +460,25 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             log_lik - kl
 
         """
-
+        params = [batch, adj_orig, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean, disp, pi, mask]
+        # for index, param in enumerate(params):
+        #     if isinstance(param, torch.Tensor):
+        #         params[index] = params[index].cpu()
+        batch, adj_orig, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean, disp, pi, mask = params
         pos_weight = (adj_orig.shape[0]**2 - adj_orig.sum(axis=1)) / (adj_orig.sum(axis=1))
         norm_adj = adj_orig.shape[0] * adj_orig.shape[0] / float(
             (adj_orig.shape[0] * adj_orig.shape[0] - adj_orig.sum()) * 2)
         loss_adj = la * norm_adj * torch.mean(F.cross_entropy(z_adj, adj_orig, pos_weight))
 
         eps = 1e-10
-        mean = mean * torch.reshape(self.size_factors, (-1, 1))
+        mean = mean * (torch.reshape(self.size_factors, (-1, 1)).cpu())
         disp = torch.clamp(disp, max=1e6)
         t1 = torch.lgamma(disp + eps) + torch.lgamma(batch + 1) - torch.lgamma(batch + disp + eps)
         t2 = (disp + batch) * torch.log(1.0 + (mean / (disp + eps))) + (batch *
                                                                         (torch.log(disp + eps) - torch.log(mean + eps)))
         nb_loss = t1 + t2
         nb_loss = torch.where(torch.isnan(nb_loss),
-                              torch.zeros([nb_loss.shape[0], nb_loss.shape[1]]).to(self.device) + np.inf, nb_loss)
+                              torch.zeros([nb_loss.shape[0], nb_loss.shape[1]]).to(nb_loss.device) + np.inf, nb_loss)
         zero_nb = torch.pow(disp / (disp + mean + eps), disp)
         zero_case = -torch.log(pi + ((1 - pi) * zero_nb) + eps)
         loss_exp = torch.where(torch.lt(batch, 1e-8), zero_case, nb_loss)
@@ -481,6 +490,11 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         kl_exp = 0.5 / batch.shape[1] * torch.mean(F.mse_loss(z_exp, batch, reduction="none")[mask])
         kl = ka * kl_adj - ke * kl_exp
         loss = log_lik - kl
+        results = [loss_adj, loss_exp, log_lik, kl, loss]
+        # for index, res in enumerate(results):
+        #     if isinstance(res, torch.Tensor):
+        #         results[index] = results[index].to(origin_device)
+        loss_adj, loss_exp, log_lik, kl, loss = results
         return loss_adj, loss_exp, log_lik, kl, loss
 
     def load_model(self):
@@ -510,7 +524,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             evaluation score
 
         """
-        allowd_metrics = {"RMSE", "PCC"}
+        allowd_metrics = {"RMSE", "PCC", "MRE"}
         if metric not in allowd_metrics:
             raise ValueError("scoring metric %r." % allowd_metrics)
 
@@ -527,5 +541,15 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         if metric == 'RMSE':
             return np.sqrt(F.mse_loss(true_target, imputed_target).item())
         elif metric == 'PCC':
-            corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
-            return corr_cells
+            # corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
+            # return corr_cells
+            return np.corrcoef(true_target.cpu()[~mask[test_idx]], imputed_target.cpu()[~mask[test_idx]])[0, 1]
+        elif metric == "MRE":
+            actual = true_target.cpu()[~mask[test_idx]]
+            predicted = imputed_target.cpu()[~mask[test_idx]]
+            abs_error = torch.abs(predicted - actual)
+            abs_actual = torch.abs(actual)
+            abs_actual[abs_actual < 1e-10] = 1e-10
+            relative_error = abs_error / abs_actual
+            mre = torch.mean(relative_error).item()
+            return mre

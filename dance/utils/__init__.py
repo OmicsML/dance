@@ -1,5 +1,6 @@
 # TODO: move these to utils.misc, __init__ should only be used for importing
 import hashlib
+import importlib
 import os
 import random
 import warnings
@@ -11,7 +12,7 @@ import torch
 from torch.utils.data import Dataset
 
 from dance import logger
-from dance.typing import Any, FileExistHandle, PathLike
+from dance.typing import Any, FileExistHandle, Optional, PathLike
 
 
 def get_device(device: str) -> str:
@@ -104,3 +105,11 @@ def file_check(path: PathLike, exist_handle: FileExistHandle = "none"):
     elif exist_handle != "none":
         raise ValueError(f"Unknwon file exist handling: {exist_handle!r}, "
                          f"supported options are: {get_args(FileExistHandle)}")
+
+
+def try_import(module_name: str, install_name: Optional[str] = None):
+    install_name = default(install_name, module_name)
+    try:
+        return importlib.import_module(module_name)
+    except ModuleNotFoundError as e:
+        raise ImportError(f"{module_name} not installed. Please install first: $ pip install {install_name}") from e

@@ -23,13 +23,13 @@ from typing import (
 
 import numpy as np
 from anndata import AnnData
-from omegaconf import DictConfig, DictKeyType, Node
+from omegaconf import DictConfig, DictKeyType, ListConfig, Node
 from torch import Tensor
 
 if TYPE_CHECKING:  # https://peps.python.org/pep-0563/#forward-references
     from dance.config import Config
 
-ConfigLike = Union[Dict[DictKeyType, Node], DictConfig, "Config"]
+ConfigLike = Union[Dict[DictKeyType, Node], DictConfig, ListConfig, "Config"]
 PathLike = Union[str, bytes, os.PathLike]
 
 CellIdxType = Union[int, str]

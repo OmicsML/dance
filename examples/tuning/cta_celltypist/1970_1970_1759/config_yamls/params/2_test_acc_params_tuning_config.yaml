@@ -1,0 +1,65 @@
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: normalize
+    target: ScTransform
+    params_to_tune:
+      min_cells:
+        min: 1
+        max: 10
+      gmean_eps:
+        min: 1
+        max: 10
+      n_genes:
+        min: 1000
+        max: 3000
+      n_cells:
+        values:
+          - null
+          - 1
+          - 10
+          - 100
+      bin_size:
+        min: 300
+        max: 800
+      bw_adjust:
+        min: 1.0
+        max: 5.0
+    params:
+      processes_num: 8
+  - type: filter.gene
+    target: FilterGenesPercentile
+    params_to_tune:
+      min_val:
+        min: 1
+        max: 10
+      max_val:
+        min: 95
+        max: 99
+      mode:
+        values:
+          - sum
+          - var
+          - cv
+          - rv
+  - type: feature.cell
+    target: CellSVD
+    params:
+      out: feature.cell
+    params_to_tune:
+      n_components:
+        min: 100
+        max: 1000
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        feature_channel: feature.cell
+        label_channel: cell_type
+wandb:
+  entity: danceteam
+  project: dance-dev
+  method: bayes
+  metric:
+    name: acc
+    goal: maximize

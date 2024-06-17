@@ -116,7 +116,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         self.dropout = dropout
         self.hidden_dim = hidden_dim
         self.prj_path = Path().resolve()
-        self.save_path = self.prj_path / "deepimpute"
+        self.save_path = self.prj_path / f"{dataset}_deepimpute"
         if not self.save_path.exists():
             self.save_path.mkdir(parents=True)
         self.device = torch.device(f'cuda:{gpu}' if gpu != -1 and torch.cuda.is_available() else 'cpu')
@@ -269,6 +269,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
             train_loader = train_loaders[i]
             val_losses = []
             counter = 0
+            model_to_init = True
             for epoch in range(n_epochs):
                 model.train()
                 train_loss = 0
@@ -290,7 +291,8 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
 
                 val_losses.append(val_loss)
                 min_val = min(val_losses)
-                if val_loss == min_val:
+                if val_loss == min_val or model_to_init:  #nan problem
+                    model_to_init = False
                     self.save_model(model, optimizer, i)
                 else:
                     counter += 1
@@ -405,7 +407,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
             evaluation score
 
         """
-        allowd_metrics = {"RMSE", "PCC"}
+        allowd_metrics = {"RMSE", "PCC", "MRE"}
         if metric not in allowd_metrics:
             raise ValueError("scoring metric %r." % allowd_metrics)
 
@@ -420,5 +422,15 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         if metric == 'RMSE':
             return np.sqrt(F.mse_loss(true_target, imputed_target).item())
         elif metric == 'PCC':
-            corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
-            return corr_cells
+            # corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
+            # return corr_cells
+            return np.corrcoef(true_target.cpu()[~mask[test_idx]], imputed_target.cpu()[~mask[test_idx]])[0, 1]
+        elif metric == "MRE":
+            actual = true_target.cpu()[~mask[test_idx]]
+            predicted = imputed_target.cpu()[~mask[test_idx]]
+            abs_error = torch.abs(predicted - actual)
+            abs_actual = torch.abs(actual)
+            abs_actual[abs_actual < 1e-10] = 1e-10
+            relative_error = abs_error / abs_actual
+            mre = torch.mean(relative_error).item()
+            return mre

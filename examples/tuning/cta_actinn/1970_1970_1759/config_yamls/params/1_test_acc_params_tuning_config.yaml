@@ -1,0 +1,46 @@
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: normalize
+    target: NormalizeTotal
+    params_to_tune:
+      target_sum:
+        values:
+          - null
+          - 1000.0
+          - 10000.0
+          - 100000.0
+          - 1000000.0
+      max_fraction:
+        values:
+          - 0.01
+          - 0.05
+          - 0.5
+          - 0.7
+          - 1.0
+  - type: filter.gene
+    target: HighlyVariableGenesRawCount
+    params_to_tune:
+      n_top_genes:
+        min: 100
+        max: 2000
+      span:
+        min: 0.1
+        max: 0.6
+  - type: feature.cell
+    target: FeatureCellPlaceHolder
+    params:
+      out: feature.cell
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        feature_channel: feature.cell
+        label_channel: cell_type
+wandb:
+  entity: danceteam
+  project: dance-dev
+  method: bayes
+  metric:
+    name: acc
+    goal: maximize

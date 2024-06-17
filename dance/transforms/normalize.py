@@ -194,6 +194,8 @@ class ScTransform(BaseTransform):
         Number of genes a single bin contain.
     bw_adjust
         Bandwidth adjusting parameter.
+    processes_num
+        Number of processes. Default to the total number of available processors.
 
     Reference
     ---------
@@ -213,8 +215,9 @@ class ScTransform(BaseTransform):
         n_cells: Optional[int] = None,
         bin_size: int = 500,
         bw_adjust: float = 3,
+        processes_num: int = os.cpu_count(),
         **kwargs,
-    ):
+    ):  # yapf: disable
         super().__init__(**kwargs)
         self.split_names = split_names
         self.batch_key = batch_key
@@ -224,6 +227,7 @@ class ScTransform(BaseTransform):
         self.n_cells = n_cells
         self.bin_size = bin_size
         self.bw_adjust = bw_adjust
+        self.processes_num = processes_num
 
     def _get_idx_dict(self, data) -> List[Dict[str, List[int]]]:
         # TODO: refactor out this function; reduce ropied code.
@@ -320,7 +324,8 @@ class ScTransform(BaseTransform):
             mm = np.vstack((np.ones(data_step1.shape[0]), data_step1['log_umi'].values.flatten())).T
 
             pc_chunksize = umi_bin.shape[1] // os.cpu_count() + 1
-            pool = Pool(os.cpu_count(), _parallel_init, [genes_bin_regress, umi_bin, gn, mm, ps])
+
+            pool = Pool(self.processes_num, _parallel_init, [genes_bin_regress, umi_bin, gn, mm, ps])
             try:
                 pool.map(_parallel_wrapper, range(umi_bin.shape[1]), chunksize=pc_chunksize)
             finally:
@@ -389,7 +394,6 @@ class ScTransform(BaseTransform):
 
         for c in model_pars.columns:
             selected_data.var[c + '_step1_sct'] = model_pars[c]
-        print(selected_data)
 
         z = pd.Series(index=gn, data=np.zeros(gn.size, dtype='int'))
         z[gn[genes_step1]] = 1
@@ -589,4 +593,23 @@ class NormalizePlaceHolder(BaseTransform):
         super().__init__(**kwargs)
 
     def __call__(self, data: Data) -> Data:
+        return data
+
+
+@register_preprocessor("normalize")
+class NormalizeTotalLog1P(BaseTransform):
+    """Normalize total counts followed by log1p transformation.
+
+    See :class:`dance.transforms.normalize.NormalizeTotal` and :class:`dance.transforms.normalize.Log1P`.
+
+    """
+
+    def __init__(self, base=None, target_sum=None, max_fraction=0.05, **kwargs):
+        super().__init__(**kwargs)
+        self.normalize_total = NormalizeTotal(target_sum=target_sum, max_fraction=max_fraction)
+        self.log1p = Log1P(base=base)
+
+    def __call__(self, data: Data) -> Data:
+        self.normalize_total(data)
+        self.log1p(data)
         return data

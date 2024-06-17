@@ -24,7 +24,7 @@ class SpatialLIBDDataset(BaseDataset):
 
     _DISPLAY_ATTRS = ("data_id", )
     URL_DICT = {
-        "151510": "https://www.dropbox.com/sh/41h9brsk6my546x/AADa18mkJge-KQRTndRelTpMa?dl=0",
+        "151510": "https://www.dropbox.com/sh/41h9brsk6my546x/AADa18mkJge-KQRTndRelTpMa?dl=1",
         "151507": "https://www.dropbox.com/sh/m3554vfrdzbwv2c/AACGsFNVKx8rjBgvF7Pcm2L7a?dl=1",
         "151508": "https://www.dropbox.com/sh/tm47u3fre8692zt/AAAJJf8-za_Lpw614ft096qqa?dl=1",
         "151509": "https://www.dropbox.com/sh/hihr7906vyirjet/AACslV5mKIkF2CF5QqE1LE6ya?dl=1",
@@ -47,11 +47,12 @@ class SpatialLIBDDataset(BaseDataset):
     }
     AVAILABLE_DATA = sorted(URL_DICT)
 
-    def __init__(self, root=".", full_download=False, data_id="151673", data_dir="data/spatial"):
+    def __init__(self, root=".", full_download=False, data_id="151673", data_dir="data/spatial", sample_file=None):
         super().__init__(root, full_download)
 
         self.data_id = data_id
         self.data_dir = data_dir + "/{}".format(data_id)
+        self.sample_file = sample_file
 
     def download_all(self):
         logger.info(f"All data includes {len(self.URL_DICT)} datasets: {list(self.URL_DICT)}")
@@ -147,7 +148,11 @@ class SpatialLIBDDataset(BaseDataset):
         adata.obsm["spatial"] = xy.set_index(adata.obs_names)
         adata.obsm["spatial_pixel"] = xy_pixel.set_index(adata.obs_names)
         adata.uns["image"] = img
-
+        if self.sample_file is not None:
+            sample_file = osp.join(self.data_dir, self.sample_file)
+            with open(sample_file) as file:
+                sample_index = [int(line.strip()) for line in file]
+            adata = adata[sample_index]
         data = Data(adata, train_size="all")
         return data
 

@@ -2,10 +2,10 @@ import importlib
 import inspect
 import itertools
 import os
+import sys
 from copy import deepcopy
-from functools import reduce
+from functools import partial, reduce
 from operator import mul
-from pathlib import Path
 from pprint import pformat
 
 import pandas as pd
@@ -17,7 +17,10 @@ from dance.exceptions import DevError
 from dance.registry import REGISTRY, REGISTRY_PREFIX, Registry, resolve_from_registry
 from dance.settings import CURDIR
 from dance.typing import Any, Callable, ConfigLike, Dict, FileExistHandle, List, Optional, PathLike, Tuple, Union
-from dance.utils import Color, default
+from dance.utils import Color, default, try_import
+
+DEFAULT_PIPELINE_TUNING_TOP_K = 3
+DEFAULT_PARAMETER_TUNING_FREQ_N = 10
 
 
 class Action:
@@ -28,6 +31,7 @@ class Action:
     TARGET_KEY = "target"
     SCOPE_KEY = "scope"
     PARAMS_KEY = "params"
+    SKIP_FLAG = "_skip_"
 
     def __init__(
         self,
@@ -85,6 +89,16 @@ class Action:
     @property
     def params(self) -> Dict[str, Any]:
         return self._params
+
+    @property
+    def skip(self) -> bool:
+        """Return ``True`` if target is set to the skip flag.
+
+        This setting affect the pipeline object. When target is set to skip flag, then
+        this action will be skiped in the pipeline enumeration.
+
+        """
+        return self.target == self.SKIP_FLAG
 
     def _get_target(self):
         if self.scope.startswith(REGISTRY_PREFIX):
@@ -193,7 +207,8 @@ class Pipeline(Action):
         return self.config.to_yaml()
 
     def __iter__(self):
-        yield from self._pipeline
+        """Iterate over pipeline elements except for the skipped ones."""
+        yield from (p for p in self._pipeline if not p.skip)
 
     def __getitem__(self, idx: int) -> Action:
         return self._pipeline[idx]
@@ -254,6 +269,7 @@ class PipelinePlaner(Pipeline):
     DEFAULT_PARAMS_KEY = "default_params"
     PELEM_INCLUDE_KEY = "include"
     PELEM_EXCLUDE_KEY = "exclude"
+    PELEM_SKIP_KEY = "skippable"
     WANDB_KEY = "wandb"
     VALID_TUNE_MODES = ("pipeline", "params")
 
@@ -279,6 +295,10 @@ class PipelinePlaner(Pipeline):
         return getattr(self, "_candidate_pipelines", None)
 
     @property
+    def candidate_names(self) -> Optional[List[str]]:
+        return getattr(self, "_candidate_names", None)
+
+    @property
     def candidate_params(self) -> Optional[List[Dict[str, Any]]]:
         return getattr(self, "_candidate_params", None)
 
@@ -295,7 +315,7 @@ class PipelinePlaner(Pipeline):
 
         # Use fixed target if available
         if pelem_config.get(self.TARGET_KEY) is not None:
-            return None
+            return None, None
 
         # Disallow setting includes and excludes at the same time
         if all(pelem_config.get(i) is not None for i in (self.PELEM_INCLUDE_KEY, self.PELEM_EXCLUDE_KEY)):
@@ -327,7 +347,12 @@ class PipelinePlaner(Pipeline):
                              f"{self.config[self.PIPELINE_KEY][idx]}\n"
                              f"All available targets under the scope {scope!r}: {candidates}")
 
-        return sorted(filtered_candidates)
+        # Set skip option
+        if pelem_config.get(self.PELEM_SKIP_KEY, False):
+            logger.debug("Skip flag set, adding skip option.")
+            filtered_candidates.add(self.SKIP_FLAG)
+
+        return sorted(filtered_candidates), self[idx].type
 
     @Pipeline.config.setter
     def config(self, cfg: ConfigLike):
@@ -342,6 +367,10 @@ class PipelinePlaner(Pipeline):
         # Register full config and tune mode
         self._config = Config(cfg)
         self._tune_mode = self.config.get(self.TUNE_MODE_KEY)
+
+        if self.tune_mode == "pipeline_params":  # NOTE: when running with pipeline_params, run pipeline first
+            self._tune_mode = "pipeline"
+            logger.info("tune mode is set to pipeline_params, tune_mode will first be converted to pipeline")
 
         pipeline_config = self.config[self.PIPELINE_KEY]
         pipeline_length = len(pipeline_config)
@@ -369,12 +398,12 @@ class PipelinePlaner(Pipeline):
 
         # Set up candidate plans and default params
         self._default_params = [None] * pipeline_length
-
+        self._candidate_names = [None] * pipeline_length
         if self.tune_mode == "pipeline":
             self._candidate_pipelines = [None] * pipeline_length
             for i in range(pipeline_length):
                 self._default_params[i] = pipeline_config[i].get(self.DEFAULT_PARAMS_KEY)
-                self._candidate_pipelines[i] = self._resolve_pelem_plan(i)
+                self._candidate_pipelines[i], self._candidate_names[i] = self._resolve_pelem_plan(i)
 
         elif self.tune_mode == "params":
             self._candidate_params = [None] * pipeline_length
@@ -390,6 +419,7 @@ class PipelinePlaner(Pipeline):
                 # Set tuning params
                 if val := pipeline_config[i].get(self.TUNING_PARAMS_KEY):
                     self._candidate_params[i] = OmegaConf.to_container(val)
+                    self._candidate_names[i] = self[i].target
 
             # Make sure targets are set
             missed_target_idx = [
@@ -421,7 +451,7 @@ class PipelinePlaner(Pipeline):
             pipeline_dict = pipeline
             pipeline = [None] * pipeline_length
             for i, j in pipeline_dict.items():
-                idx = int(i.split(f"{Pipeline.PIPELINE_KEY}.", 1)[1])
+                idx = int(i.split(f"{Pipeline.PIPELINE_KEY}.", 1)[1].split(".", 1)[0])
                 logger.debug(f"Setting pipeline element {idx} to {j}")
                 pipeline[idx] = j
 
@@ -450,7 +480,7 @@ class PipelinePlaner(Pipeline):
             params_dict = params
             params = [None] * pipeline_length
             for i, j in params_dict.items():
-                idx, key = i.split(f"{Pipeline.PARAMS_KEY}.", 1)[1].split(".", 1)
+                idx, _, key = i.split(f"{Pipeline.PARAMS_KEY}.", 1)[1].split(".", 2)
                 idx = int(idx)
                 logger.debug(f"Setting {key!r} for pipeline element {idx} to {j}")
 
@@ -514,6 +544,7 @@ class PipelinePlaner(Pipeline):
         self,
         *,
         pipeline: Optional[Union[Dict[str, Any], List[str]]] = None,
+        pipeline_params: Optional[Union[Dict[str, Any], List[str]]] = None,
         params: Optional[Union[Dict[str, Any], List[Optional[Dict[str, Any]]]]] = None,
         validate: bool = True,
         strict_params_check: bool = False,
@@ -524,10 +555,16 @@ class PipelinePlaner(Pipeline):
 
         """
         # Pre-checks
-        if pipeline is None and params is None:
-            raise ValueError("At least one of 'pipeline' or 'params' must be specified.")
-        elif pipeline is None and self.tune_mode == "pipeline":
-            raise ValueError("'pipeline' must be specified as tune mode is set to pipeline")
+        if pipeline is None and params is None and pipeline_params is None:
+            raise ValueError("At least one of 'pipeline' or 'params' or 'pipeline_params' must be specified.")
+        elif self.tune_mode == "pipeline":
+            if pipeline is None and pipeline_params is None:
+                raise ValueError("'pipeline' or 'pipeline_params' must be specified as tune mode is set to pipeline")
+            elif pipeline_params is not None and pipeline is not None:
+                raise ValueError("Only one of 'pipeline_params' and 'pipeline' can exist")
+            elif pipeline_params is not None and pipeline is None:
+                logger.info("The content in pipeline_params will be converted to pipeline")
+                pipeline = pipeline_params
         elif params is None and self.tune_mode == "params":
             raise ValueError("'params' must be specified as tune mode is set to params")
 
@@ -569,6 +606,7 @@ class PipelinePlaner(Pipeline):
         *,
         pipeline: Optional[List[str]] = None,
         params: Optional[List[Optional[Dict[str, Any]]]] = None,
+        pipeline_params: Optional[List[str]] = None,
         **kwargs,
     ) -> Pipeline:
         """Generate pipeline based on specified pipeline and params settings.
@@ -630,7 +668,7 @@ class PipelinePlaner(Pipeline):
             }
 
         """
-        config = self.generate_config(pipeline=pipeline, params=params)
+        config = self.generate_config(pipeline=pipeline, params=params, pipeline_params=pipeline_params)
         return Pipeline(config, **kwargs)
 
     def search_space(self) -> Dict[str, Any]:
@@ -651,6 +689,7 @@ class PipelinePlaner(Pipeline):
                     "pipeline": [
                         {
                             "type": "filter.gene",
+                            "skippable": True,
                         },
                         {
                             "type": "feature.cell",
@@ -682,6 +721,7 @@ class PipelinePlaner(Pipeline):
                         "WeightedFeaturePCA",
                         "CellPCA",
                         "CellSVD",
+                        "_skip_",  # <- skip flag for skipping this step
                     ],
                 },
             }
@@ -735,19 +775,19 @@ class PipelinePlaner(Pipeline):
 
     def _pipeline_search_space(self) -> Dict[str, str]:
         search_space = {
-            f"{self.PIPELINE_KEY}.{i}": {
+            f"{self.PIPELINE_KEY}.{i}.{n}": {
                 "values": j
             }
-            for i, j in enumerate(self.candidate_pipelines) if j is not None
+            for i, (j, n) in enumerate(zip(self.candidate_pipelines, self.candidate_names)) if j is not None
         }
         return search_space
 
     def _params_search_space(self) -> Dict[str, Dict[str, Optional[Union[str, float]]]]:
         search_space = {}
-        for i, param_dict in enumerate(self.candidate_params):
+        for i, (param_dict, n) in enumerate(zip(self.candidate_params, self.candidate_names)):
             if param_dict is not None:
                 for key, val in param_dict.items():
-                    search_space[f"{self.PARAMS_KEY}.{i}.{key}"] = val
+                    search_space[f"{self.PARAMS_KEY}.{i}.{n}.{key}"] = val
         return search_space
 
     def wandb_sweep_config(self) -> Dict[str, Any]:
@@ -756,10 +796,7 @@ class PipelinePlaner(Pipeline):
         return {**self.wandb_config, "parameters": self.search_space()}
 
     def wandb_sweep(self) -> Tuple[str, str, str]:
-        try:
-            import wandb
-        except ModuleNotFoundError as e:
-            raise ImportError("wandb not installed. Please install wandb first: $ pip install wandb") from e
+        wandb = try_import("wandb")
 
         if "wandb" not in self.config:
             raise ValueError(f"{self.config_yaml}\nMissing wandb config.")
@@ -785,10 +822,7 @@ class PipelinePlaner(Pipeline):
         project: Optional[str] = None,
         count: Optional[int] = None,
     ) -> Tuple[str, str, str]:
-        try:
-            import wandb
-        except ModuleNotFoundError as e:
-            raise ImportError("wandb not installed. Please install wandb first: $ pip install wandb") from e
+        wandb = try_import("wandb")
 
         if sweep_id is None:
             if entity is not None or project is not None:
@@ -805,7 +839,7 @@ class PipelinePlaner(Pipeline):
         return entity, project, sweep_id
 
 
-def save_summary_data(entity, project, sweep_id, summary_file_path):
+def save_summary_data(entity, project, sweep_id, summary_file_path, root_path, additional_sweep_ids=None):
     """Download sweep summary data from wandb and save to file.
 
     The returned dataframe includes running time, results and corresponding hyperparameters, etc.
@@ -821,22 +855,25 @@ def save_summary_data(entity, project, sweep_id, summary_file_path):
         -----------------------------------------------------------------------------------------------------------
 
     """
-    try:
-        import wandb
-    except ModuleNotFoundError as e:
-        raise ImportError("wandb not installed. Please install wandb first: $ pip install wandb") from e
+    wandb = try_import("wandb")
 
-    sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
     summary_data = []
 
-    for run in sweep.runs:
-        result = dict(run.summary._json_dict).copy()
-        result.update(run.config)
-        result.update({"id": run.id})
-        summary_data.append(flatten_dict(result))  # get result and config
+    summary_file_path = os.path.join(root_path, summary_file_path)
+    additional_sweep_ids = (additional_sweep_ids if additional_sweep_ids is not None else [])
+    additional_sweep_ids.append(sweep_id)
+    for sweep_id in additional_sweep_ids:
+        sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
+        for run in sweep.runs:
+            result = dict(run.summary._json_dict).copy()
+            result.update(run.config)
+            result.update({"id": run.id})
+            summary_data.append(flatten_dict(result))  # get result and config
     ans = pd.DataFrame(summary_data).set_index(["id"])
+    ans.sort_index(axis=1, inplace=True)
 
     if summary_file_path is not None:
+        os.makedirs(os.path.dirname(summary_file_path), exist_ok=True)
         ans.to_csv(summary_file_path)  # save file
 
     return ans
@@ -955,14 +992,15 @@ def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, requir
             OmegaConf.save(config_copy, save_path)
         count = reduce(mul, [len(p["include"]) if "include" in p else 1 for p in subset])
         config_dir = os.path.relpath(os.path.dirname(save_path), os.path.dirname(os.path.join(root_path, file_path)))
-        command_str = command_str + f"python {file_path} --config_dir={config_dir}/subset_{index}_ --count={count} > {log_dir}/{index}.log 2>&1 &\n"
+        command_str = (command_str + f"python {file_path} --config_dir={config_dir}/subset_{index}_ --count={count} " +
+                       f"> {log_dir}/{index}.log 2>&1 &\n")
     return command_str, configs
 
 
-def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/",
-                   conf_load_path="examples/tuning/cta_svm/cell_type_annotation_default_params.yaml",
-                   result_load_path="examples/tuning/cta_svm/results/pipeline/best_test_acc.csv", metric="test_acc",
-                   ascending=False, top_k=3, required_funs=["SetConfig"], required_indexes=[-1], root_path=None):
+def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_default_params.yaml",
+                   result_load_path="results/pipeline/best_test_acc.csv", metric="test_acc", ascending=False,
+                   step2_pipeline_planer=None, required_funs=["SetConfig"], required_indexes=[sys.maxsize],
+                   root_path=None):
     """Generate the configuration file of step 3 based on the results of step 2.
 
     Parameters
@@ -989,23 +1027,90 @@ def get_step3_yaml(conf_save_path="examples/tuning/cta_svm/config_yamls/params/"
     """
     root_path = default(root_path, CURDIR)
     conf_save_path = os.path.join(root_path, conf_save_path)
-    conf_load_path = os.path.join(root_path, conf_load_path)
+    # conf_load_path = os.path.join(root_path, conf_load_path)
     result_load_path = os.path.join(root_path, result_load_path)
     conf = OmegaConf.load(conf_load_path)
-    result = pd.read_csv(result_load_path).sort_values(by=metric, ascending=ascending).head(top_k)
+    pipeline_top_k = default(step2_pipeline_planer.config.pipeline_tuning_top_k, DEFAULT_PIPELINE_TUNING_TOP_K)
+    result = pd.read_csv(result_load_path).sort_values(by=metric, ascending=ascending).head(pipeline_top_k)
     columns = sorted([col for col in result.columns if col.startswith("pipeline")])
     pipeline_names = result.loc[:, columns].values
     count = 0
     for row in pipeline_names:
         pipeline = []
         row = [i for i in row]
-        for i, f in zip(required_indexes, required_funs):
-            row.insert(i, f)
         for x in row:
             for k in conf.pipeline:
                 if k["target"] == x:
                     pipeline.append(k)
+        for i, f in zip(required_indexes, required_funs):
+            for k in step2_pipeline_planer.config.pipeline:
+                if "target" in k and k["target"] == f:
+                    pipeline.insert(i, k)
+        for p1 in step2_pipeline_planer.config.pipeline:
+            if "step3_frozen" in p1 and p1["step3_frozen"]:
+                for p2 in pipeline:
+                    if p1["type"] == p2["type"]:
+                        if "params_to_tune" in p2:
+                            del p2["params_to_tune"]
+                        if "default_params" in p1:
+                            for target, d_p in p1.default_params.items():
+                                if target == p2["target"]:
+                                    p2["params"] = d_p
         temp_conf = conf.copy()
         temp_conf.pipeline = pipeline
-        count += 1
+        temp_conf.wandb = step2_pipeline_planer.config.wandb
+        temp_conf.wandb.method = "bayes"
+        os.makedirs(os.path.dirname(conf_save_path), exist_ok=True)
         OmegaConf.save(temp_conf, f"{conf_save_path}/{count}_test_acc_params_tuning_config.yaml")
+        count += 1
+
+
+def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlaner, tune_mode="params"):
+    """Run step 3 by default.
+
+    Parameters
+    ----------
+    root_path
+        root path of all paths, defaults to the directory where the script is called.
+    evaluate_pipeline
+        Evaluation function
+    step2_pipeline_planer
+        Pipeline_planer of step2
+    tune_mode
+        tune_mode can only be set to params
+
+    """
+    wandb = try_import("wandb")
+
+    pipeline_top_k = default(step2_pipeline_planer.config.pipeline_tuning_top_k, DEFAULT_PIPELINE_TUNING_TOP_K)
+    step3_k = default(step2_pipeline_planer.config.parameter_tuning_freq_n, DEFAULT_PARAMETER_TUNING_FREQ_N)
+    # Skip some of the already run step3 because in pandas, when you sort columns with exactly the same values, the results are not random.
+    # Instead, pandas preserves the order of the original data. So we can skip it without causing any impact.
+    step3_start_k = default(step2_pipeline_planer.config.step3_start_k, 0)
+    #Some sweep_ids of step3 that have already been run
+    step3_sweep_ids = step2_pipeline_planer.config.step3_sweep_ids
+    step3_sweep_ids = [None] * (pipeline_top_k - step3_start_k) if step3_sweep_ids is None else (
+        step3_sweep_ids + [None] * (pipeline_top_k - step3_start_k - len(step3_sweep_ids)))
+
+    for i in range(pipeline_top_k):
+        if i < step3_start_k:
+            continue
+        try:
+            pipeline_planer = PipelinePlaner.from_config_file(
+                f"{root_path}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml")
+            entity, project, step3_sweep_id = pipeline_planer.wandb_sweep_agent(
+                partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=step3_sweep_ids[i - step3_start_k],
+                count=step3_k)  # score can be recorded for each epoch
+            save_summary_data(entity, project, step3_sweep_id, f"results/{tune_mode}/{i}_best_test_acc.csv",
+                              root_path=root_path)
+        except wandb.UsageError:
+            logger.warning("continue")
+            continue
+
+
+# def get_params(preprocessing_pipeline:Pipeline,type,key,name):
+#     ans=[]
+#     pips=list(filter(lambda p: p.type==type, preprocessing_pipeline.config.pipeline))
+#     for p in pips:
+#         ans.append(p[key][name])
+#     return ans
