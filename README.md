@@ -63,11 +63,14 @@ If you find our work useful in your research, please consider citing our DANCE p
 ```
 
 ```bibtex
-@article{molho2022deep,
+@article{molho2024deep,
   title={Deep learning in single-cell analysis},
   author={Molho, Dylan and Ding, Jiayuan and Tang, Wenzhuo and Li, Zhaoheng and Wen, Hongzhi and Wang, Yixin and Venegas, Julian and Jin, Wei and Liu, Renming and Su, Runze and others},
   journal={ACM Transactions on Intelligent Systems and Technology},
-  year={2022},
+  volume={15},
+  number={3},
+  pages={1--62},
+  year={2024},
   publisher={ACM New York, NY}
 }
 ```
