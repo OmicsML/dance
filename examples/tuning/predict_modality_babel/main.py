@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pandas as pd
 import torch
-
 import wandb
+
 from dance import logger
 from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.babel import BabelWrapper
