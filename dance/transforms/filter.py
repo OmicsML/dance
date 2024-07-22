@@ -145,9 +145,9 @@ class FilterScanpy(BaseTransform):
             elif self._FILTER_TARGET == "cells":
                 n_counts = np.sum(x, axis=1)
             if isinstance(self.min_counts, float) and 0 <= self.min_counts <= 1:
-                min_counts = np.percentile(n_counts, self.min_counts)
+                min_counts = np.percentile(n_counts, self.min_counts*100)
             else:
-                max_counts = np.percentile(n_counts, self.max_counts)
+                max_counts = np.percentile(n_counts, self.max_counts*100)
             return min_counts, max_counts
         else:
             return self.min_counts, self.max_counts
