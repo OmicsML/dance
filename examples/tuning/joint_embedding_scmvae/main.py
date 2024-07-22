@@ -8,9 +8,9 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.utils.data as data_utils
+import wandb
 from sklearn import preprocessing
 
-import wandb
 from dance import logger
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.scmvae import scMVAE
