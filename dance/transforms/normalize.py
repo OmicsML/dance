@@ -5,6 +5,7 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import scanpy as sc
+import scipy
 import scipy.sparse as sp
 import statsmodels.discrete.discrete_model
 import statsmodels.nonparametric.kernel_regression
@@ -18,9 +19,11 @@ from dance.transforms.interface import AnnDataTransform
 from dance.typing import Dict, Iterable, List, Literal, LogLevel, NormMode, Number, Optional, Union
 from dance.utils.matrix import normalize
 from dance.utils.status import deprecated
+from dance.utils.wrappers import add_mod_and_transform
 
 
 @register_preprocessor("normalize")
+@add_mod_and_transform
 class ScaleFeature(BaseTransform):
     """Scale the feature matrix in the AnnData object.
 
@@ -169,6 +172,37 @@ class ScTransformR(BaseTransform):
 
 
 @register_preprocessor("normalize")
+@add_mod_and_transform
+class tfidfTransform(BaseTransform):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.idf = None
+        self.fitted = False
+
+    def fit(self, X):
+        self.idf = X.shape[0] / X.sum(axis=0)
+        self.fitted = True
+
+    def transform(self, X):
+        if not self.fitted:
+            raise RuntimeError('Transformer was not fitted on any data')
+        if scipy.sparse.issparse(X):
+            tf = X.multiply(1 / X.sum(axis=1))
+            return tf.multiply(self.idf)
+        else:
+            tf = X / X.sum(axis=1, keepdims=True)
+            return tf * self.idf
+
+    def __call__(self, data):
+        X = data.data.X
+        self.fit(X)
+        data.data.X = self.transform(X)
+        return data
+
+
+@register_preprocessor("normalize")
+@add_mod_and_transform
 class ScTransform(BaseTransform):
     """ScTransform normalization and variance stabiliation.
 
@@ -399,7 +433,8 @@ class ScTransform(BaseTransform):
         z[gn[genes_step1]] = 1
 
         w = pd.Series(index=gn, data=np.zeros(gn.size, dtype='int'))
-        w[gn] = genes_log_gmean
+        # w[gn] = genes_log_gmean
+        w[gn] = genes_log_gmean.astype(int)  #need to think
         selected_data.var['genes_step1_sct'] = z
         selected_data.var['log10_gmean_sct'] = w
 
@@ -453,6 +488,8 @@ def _parallel_init(igenes_bin_regress, iumi_bin, ign, imm, ips):
 def _parallel_wrapper(j):
     name = gn[genes_bin_regress[j]]
     y = umi_bin[:, j].A.flatten()
+    y[np.isinf(y) | np.isnan(y)] = 0
+    mm[np.isinf(mm) | np.isnan(mm)] = 0
     pr = statsmodels.discrete.discrete_model.Poisson(y, mm)
     res = pr.fit(disp=False)
     mu = res.predict()
@@ -490,6 +527,7 @@ def theta_ml(y, mu):
 
 
 @register_preprocessor("normalize")
+@add_mod_and_transform
 class Log1P(AnnDataTransform):
     """Logarithmize the data matrix.
 
@@ -527,6 +565,7 @@ class Log1P(AnnDataTransform):
 
 
 @register_preprocessor("normalize")
+@add_mod_and_transform
 class NormalizeTotal(AnnDataTransform):
     """Normalize counts per cell.
 
@@ -583,9 +622,15 @@ class NormalizeTotal(AnnDataTransform):
         if max_fraction == 1.0:
             self.logger.info("max_fraction set to 1.0, this is equivalent to setting exclude_highly_expressed=False.")
 
+    def __call__(self, data):
+        if scipy.sparse.issparse(data.data.X):
+            data.data.X = np.array(data.data.X.todense())
+        return super().__call__(data)
+
 
 @register_preprocessor("normalize")
-@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+@add_mod_and_transform
+# @deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
 class NormalizePlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process."""
 
@@ -597,6 +642,7 @@ class NormalizePlaceHolder(BaseTransform):
 
 
 @register_preprocessor("normalize")
+@add_mod_and_transform
 class NormalizeTotalLog1P(BaseTransform):
     """Normalize total counts followed by log1p transformation.
 
