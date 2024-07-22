@@ -35,8 +35,8 @@ class DSTGraph(BaseTransform):
     _DISPLAY_ATTRS = ("k_filter", "num_cc", "ref_split", "inf_split")
 
     def __init__(self, k_filter=200, num_cc=30, *, ref_split: str = "train", inf_split: str = "test",
-                 channels: Sequence[Union[str , None]] = (None, None), channel_types: Sequence[Union[str , None]] = ("obsm", "obsm"),
-                 **kwargs):
+                 channels: Sequence[Union[str, None]] = (None, None),
+                 channel_types: Sequence[Union[str, None]] = ("obsm", "obsm"), **kwargs):
         super().__init__(**kwargs)
 
         self.k_filter = k_filter
