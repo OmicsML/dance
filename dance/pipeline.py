@@ -1089,6 +1089,7 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
     step3_start_k=step2_pipeline_planer.config.step3_start_k if "step3_start_k" in step2_pipeline_planer.config else 0
     #Some sweep_ids of step3 that have already been run
     step3_sweep_ids = step2_pipeline_planer.config.step3_sweep_ids if "step3_sweep_ids" in step2_pipeline_planer.config else None
+    step3_sweep_ids = step2_pipeline_planer.config.step3_sweep_ids if "step3_sweep_ids" in step2_pipeline_planer.config else None
     step3_sweep_ids = [None] * (pipeline_top_k - step3_start_k) if step3_sweep_ids is None else (
         step3_sweep_ids + [None] * (pipeline_top_k - step3_start_k - len(step3_sweep_ids)))
 
