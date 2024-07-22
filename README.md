@@ -50,21 +50,28 @@ controls, as well as setting up the `dev` environments.
 If you find our work useful in your research, please consider citing our DANCE package or survey paper:
 
 ```bibtex
-@article{ding2022dance,
-  title={DANCE: A Deep Learning Library and Benchmark for Single-Cell Analysis},
-  author={Ding, Jiayuan and Wen, Hongzhi and Tang, Wenzhuo and Liu, Renming and Li, Zhaoheng and Venegas, Julian and Su, Runze and Molho, Dylan and Jin, Wei and Zuo, Wangyang and others},
-  journal={bioRxiv},
-  year={2022},
-  publisher={Cold Spring Harbor Laboratory}
+@article{ding2024dance,
+  title={DANCE: A deep learning library and benchmark platform for single-cell analysis},
+  author={Ding, Jiayuan and Liu, Renming and Wen, Hongzhi and Tang, Wenzhuo and Li, Zhaoheng and Venegas, Julian and Su, Runze and Molho, Dylan and Jin, Wei and Wang, Yixin and others},
+  journal={Genome Biology},
+  volume={25},
+  number={1},
+  pages={1--28},
+  year={2024},
+  publisher={BioMed Central}
 }
 ```
 
 ```bibtex
-@article{molho2022deep,
-  title={Deep Learning in Single-Cell Analysis},
-  author={Molho, Dylan and Ding, Jiayuan and Li, Zhaoheng and Wen, Hongzhi and Tang, Wenzhuo and Wang, Yixin and Venegas, Julian and Jin, Wei and Liu, Renming and Su, Runze and others},
-  journal={arXiv preprint arXiv:2210.12385},
-  year={2022}
+@article{molho2024deep,
+  title={Deep learning in single-cell analysis},
+  author={Molho, Dylan and Ding, Jiayuan and Tang, Wenzhuo and Li, Zhaoheng and Wen, Hongzhi and Wang, Yixin and Venegas, Julian and Jin, Wei and Liu, Renming and Su, Runze and others},
+  journal={ACM Transactions on Intelligent Systems and Technology},
+  volume={15},
+  number={3},
+  pages={1--62},
+  year={2024},
+  publisher={ACM New York, NY}
 }
 ```
 
