@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Sequence, Union
 
 import networkx as nx
 import numpy as np
@@ -35,7 +35,7 @@ class DSTGraph(BaseTransform):
     _DISPLAY_ATTRS = ("k_filter", "num_cc", "ref_split", "inf_split")
 
     def __init__(self, k_filter=200, num_cc=30, *, ref_split: str = "train", inf_split: str = "test",
-                 channels: Sequence[str | None] = (None, None), channel_types: Sequence[str | None] = ("obsm", "obsm"),
+                 channels: Sequence[Union[str , None]] = (None, None), channel_types: Sequence[Union[str , None]] = ("obsm", "obsm"),
                  **kwargs):
         super().__init__(**kwargs)
 
