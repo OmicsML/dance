@@ -114,6 +114,7 @@ if __name__ == "__main__":
         #                 feature_channel_type=["layers", "layers", None, None, "obsm", "obsm"],
         #                 feature_channel=["counts", "counts", None, None, "size_factors",
         #                                 "size_factors"], label_channel="labels")
+        #TODO 感觉layers中的counts才是raw
         (x_train, y_train, x_train_raw, y_train_raw, x_train_size,
         y_train_size), train_labels = data.get_train_data(return_type="torch")
         (x_test, y_test, x_test_raw, y_test_raw, x_test_size,
