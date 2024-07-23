@@ -77,8 +77,12 @@ if __name__ == "__main__":
         le = preprocessing.LabelEncoder()
         labels = le.fit_transform(data.mod["test_sol"].obs["cell_type"])
         data.mod["mod1"].obsm["labels"] = labels
-        data.set_config(feature_mod=["mod1", "mod2"], label_mod="mod1", feature_channel_type=["obsm", "obsm"],
-                        feature_channel=["feature.cell", "feature.cell"], label_channel="labels")
+
+        # Prepare preprocessing pipeline and apply it to data
+        kwargs = {tune_mode: dict(wandb.config)}
+        preprocessing_pipeline = pipeline_planer.generate(**kwargs)
+        print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
+        preprocessing_pipeline(data)
 
         (x_train, y_train), _ = data.get_train_data(return_type="torch")
         (x_test, y_test), labels = data.get_test_data(return_type="torch")
@@ -105,7 +109,7 @@ if __name__ == "__main__":
 
         x_test = torch.cat([x_train, x_test])
         y_test = torch.cat([y_train, y_test])
-        labels = torch.from_numpy(le.fit_transform(data.mod["test_sol"].obs["cell_type"]))
+        labels = torch.from_numpy(le.fit_transform(data.mod["test_sol"].obs["cell_type"]))  #这里大概会有问题
         model = scMVAE(
             encoder_1=[Nfeature1, 1024, 128, 128],
             hidden_1=128,
