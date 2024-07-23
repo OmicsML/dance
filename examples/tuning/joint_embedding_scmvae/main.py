@@ -77,8 +77,8 @@ if __name__ == "__main__":
         le = preprocessing.LabelEncoder()
         labels = le.fit_transform(data.mod["test_sol"].obs["cell_type"])
         data.mod["mod1"].obsm["labels"] = labels
-        data.set_config(feature_mod=["mod1", "mod2"], label_mod="mod1", feature_channel_type=["layers", "layers"],
-                        feature_channel=["counts", "counts"], label_channel="labels")
+        data.set_config(feature_mod=["mod1", "mod2"], label_mod="mod1", feature_channel_type=["obsm", "obsm"],
+                        feature_channel=["feature.cell", "feature.cell"], label_channel="labels")
 
         (x_train, y_train), _ = data.get_train_data(return_type="torch")
         (x_test, y_test), labels = data.get_test_data(return_type="torch")
