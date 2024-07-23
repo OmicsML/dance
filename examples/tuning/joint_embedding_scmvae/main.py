@@ -109,7 +109,7 @@ if __name__ == "__main__":
 
         x_test = torch.cat([x_train, x_test])
         y_test = torch.cat([y_train, y_test])
-        labels = torch.from_numpy(le.fit_transform(data.mod["test_sol"].obs["cell_type"]))  #这里大概会有问题
+        labels = torch.from_numpy(le.fit_transform(data.mod["test_sol"].obs["cell_type"]))  #这里大概会有问题，很可能就是降维的问题
         model = scMVAE(
             encoder_1=[Nfeature1, 1024, 128, 128],
             hidden_1=128,
