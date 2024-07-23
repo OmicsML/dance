@@ -19,7 +19,7 @@ from dance.utils import set_seed
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2",
-                        choices=["openproblems_bmmc_cite_phase2", "openproblems_bmmc_multiome_phase2"])
+                        choices=["GSE140203_BRAIN_atac2gex","openproblems_bmmc_cite_phase2", "openproblems_bmmc_multiome_phase2"])
     parser.add_argument("-d", "--data_folder", default="./data/joint_embedding")
     parser.add_argument("-pre", "--pretrained_folder", default="./data/joint_embedding/pretrained")
     parser.add_argument("-csv", "--csv_path", default="decoupled_lsi.csv")
@@ -57,12 +57,12 @@ if __name__ == "__main__":
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
         set_seed(args.seed)
-        dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess="aux", normalize=True)
+        dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder)
         data = dataset.load_data()
         train_size = len(data.get_split_idx("train"))
 
-        data = CellFeatureBipartiteGraph(cell_feature_channel="X_pca", mod="mod1")(data)
-        data = CellFeatureBipartiteGraph(cell_feature_channel="X_pca", mod="mod2")(data)
+        data = CellFeatureBipartiteGraph(cell_feature_channel="feature.cell", mod="mod1")(data)
+        data = CellFeatureBipartiteGraph(cell_feature_channel="feature.cell", mod="mod2")(data)
         # data.set_config(
         #     feature_mod=["mod1", "mod2"],
         #     label_mod=["mod1", "mod1", "mod1", "mod1", "mod1"],
