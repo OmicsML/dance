@@ -11,8 +11,9 @@ import wandb
 
 from dance import logger
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
-from dance.modules.multi_modality.joint_embedding.jae import JAEWrapper
+from dance.modules.multi_modality.joint_embedding.scmogcn import ScMoGCNWrapper
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
+from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph
 from dance.utils import set_seed
 
 if __name__ == "__main__":
@@ -22,10 +23,12 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--data_folder", default="./data/joint_embedding")
     parser.add_argument("-pre", "--pretrained_folder", default="./data/joint_embedding/pretrained")
     parser.add_argument("-csv", "--csv_path", default="decoupled_lsi.csv")
+    parser.add_argument("-l", "--layers", default=3, type=int, choices=[3, 4, 5, 6, 7])
+    parser.add_argument("-dis", "--disable_propagation", default=0, type=int, choices=[0, 1, 2])
     parser.add_argument("-seed", "--seed", default=1, type=int)
     parser.add_argument("-cpu", "--cpus", default=1, type=int)
     parser.add_argument("-device", "--device", default="cuda")
-    parser.add_argument("-bs", "--batch_size", default=128, type=int)
+    parser.add_argument("-bs", "--batch_size", default=512, type=int)
     parser.add_argument("-nm", "--normalize", default=1, type=int, choices=[0, 1])
     parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
 
@@ -54,38 +57,42 @@ if __name__ == "__main__":
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
         set_seed(args.seed)
-        dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder)
+        dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess="aux", normalize=True)
         data = dataset.load_data()
-        # Prepare preprocessing pipeline and apply it to data
-        kwargs = {tune_mode: dict(wandb.config)}
-        preprocessing_pipeline = pipeline_planer.generate(**kwargs)
-        print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
-        preprocessing_pipeline(data)
+        train_size = len(data.get_split_idx("train"))
 
-        (X_mod1_train, X_mod2_train), (cell_type, batch_label, phase_label, S_score,
-                                       G2M_score) = data.get_train_data(return_type="torch")
-        (X_mod1_test, X_mod2_test), (cell_type_test, _, _, _, _) = data.get_test_data(return_type="torch")
-        X_train = torch.cat([X_mod1_train, X_mod2_train], dim=1)
+        data = CellFeatureBipartiteGraph(cell_feature_channel="X_pca", mod="mod1")(data)
+        data = CellFeatureBipartiteGraph(cell_feature_channel="X_pca", mod="mod2")(data)
+        # data.set_config(
+        #     feature_mod=["mod1", "mod2"],
+        #     label_mod=["mod1", "mod1", "mod1", "mod1", "mod1"],
+        #     feature_channel=["X_pca", "X_pca"],
+        #     label_channel=["cell_type", "batch_label", "phase_labels", "S_scores", "G2M_scores"],
+        # )
+        (x_mod1, x_mod2), (cell_type, batch_label, phase_label, S_score, G2M_score) = data.get_data(return_type="torch")
         phase_score = torch.cat([S_score[:, None], G2M_score[:, None]], 1)
-        X_test = torch.cat([X_mod1_test, X_mod2_test], dim=1)
-        X_test = torch.cat([X_train, X_test]).float().to(device)
-        test_id = np.arange(X_test.shape[0])
-        labels = torch.cat([cell_type, cell_type_test]).numpy()
+        test_id = np.arange(x_mod1.shape[0])
+        labels = cell_type.numpy()
         adata_sol = data.data['test_sol']  # [data._split_idx_dict['test']]
+        model = ScMoGCNWrapper(args, num_celL_types=int(cell_type.max() + 1), num_batches=int(batch_label.max() + 1),
+                               num_phases=phase_score.shape[1], num_features=x_mod1.shape[1] + x_mod2.shape[1])
+        model.fit(
+            g_mod1=data.data["mod1"].uns["g"],
+            g_mod2=data.data["mod2"].uns["g"],
+            train_size=train_size,
+            cell_type=cell_type,
+            batch_label=batch_label,
+            phase_score=phase_score,
+        )
 
-        model = JAEWrapper(args, num_celL_types=int(cell_type.max() + 1), num_batches=int(batch_label.max() + 1),
-                           num_phases=phase_score.shape[1], num_features=X_train.shape[1])
-        model.fit(X_train, cell_type, batch_label, phase_score, max_epochs=50)
-
-        embeds = model.predict(X_test, test_id).cpu().numpy()
-        print(embeds)
-
-        score = model.score(X_test, test_id, labels, metric="clustering")
-        score.update(model.score(X_test, test_id, labels, adata_sol=adata_sol, metric="openproblems"))
+        embeds = model.predict(test_id).cpu().numpy()
+        score = model.score(test_id, labels, metric="clustering")
+        score.update(model.score(test_id, labels, adata_sol=adata_sol, metric="openproblems"))
         score.update({
             'subtask': args.subtask,
-            'method': 'jae',
+            'method': 'scmogcn',
         })
+
         score["ARI"] = score["dance_ari"]
         del score["dance_ari"]
         wandb.log(score)
@@ -103,12 +110,12 @@ if __name__ == "__main__":
                                       "SetConfig"], required_indexes=[2, 11, 14, sys.maxsize], metric="ARI")
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
-"""To reproduce JAE on other samples, please refer to command lines belows:
+"""To reproduce scMoGCN on other samples, please refer to command lines belows:
 
 GEX-ADT:
-$ python jae.py --subtask openproblems_bmmc_cite_phase2 --device cuda
+$ python scmogcn.py --subtask openproblems_bmmc_cite_phase2 --device cuda
 
 GEX-ATAC:
-$ python jae.py --subtask openproblems_bmmc_multiome_phase2 --device cuda
+$ python scmogcn.py --subtask openproblems_bmmc_multiome_phase2 --device cuda
 
 """
