@@ -11,10 +11,10 @@ import pandas as pd
 import scipy
 import torch
 import torch.utils.data as data_utils
-import wandb
 from sklearn import preprocessing
 
 import dance.utils.metrics as metrics
+import wandb
 from dance import logger
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.dcca import DCCA
@@ -159,12 +159,12 @@ if __name__ == "__main__":
         adata = adata[adata_sol.obs_names]
         adata_sol.obsm['X_emb'] = adata.X
         score = metrics.labeled_clustering_evaluate(adata, adata_sol)
-        # score.update(metrics.integration_openproblems_evaluate(adata_sol))
-        score.update({
-            # 'seed': args.seed + k,
-            'subtask': args.subtask,
-            'method': 'dcca',
-        })
+        score.update(metrics.integration_openproblems_evaluate(adata_sol))
+        # score.update({
+        #     'seed': args.seed + k,
+        #     'subtask': args.subtask,
+        #     'method': 'dcca',
+        # })
 
         # if res is not None:
         #     res = res.append(score, ignore_index=True)
@@ -172,7 +172,9 @@ if __name__ == "__main__":
         #     for s in score:
         #         score[s] = [score[s]]
         #     res = pd.DataFrame(score)
-        wandb.log({"ARI":score["dance_ari"]})
+        score["ARI"]=score["dance_ari"]
+        del score["dance_ari"]
+        wandb.log(score)
         wandb.finish()
         torch.cuda.empty_cache()
         #主要是报错时没有执行这些命令导致的，我感觉
