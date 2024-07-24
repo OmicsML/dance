@@ -104,7 +104,7 @@ if __name__ == "__main__":
 
         embeds = model.predict(test_id).cpu().numpy()
         score = model.score(test_id, labels, metric="clustering")
-        score.update(model.score(test_id, labels, adata_sol=adata_sol, metric="openproblems"))
+        # score.update(model.score(test_id, labels, adata_sol=adata_sol, metric="openproblems"))
         score.update({
             'subtask': args.subtask,
             'method': 'scmogcn',
