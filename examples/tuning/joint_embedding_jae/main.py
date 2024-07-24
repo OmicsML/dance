@@ -62,7 +62,7 @@ if __name__ == "__main__":
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
-
+        logger.warning(data)
         (X_mod1_train, X_mod2_train), (cell_type, batch_label, phase_label, S_score,
                                        G2M_score) = data.get_train_data(return_type="torch")
         (X_mod1_test, X_mod2_test), (cell_type_test, _, _, _, _) = data.get_test_data(return_type="torch")
