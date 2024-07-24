@@ -17,8 +17,9 @@ from dance.utils import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2",
-                        choices=["openproblems_bmmc_cite_phase2", "openproblems_bmmc_multiome_phase2"])
+    parser.add_argument(
+        "-t", "--subtask", default="openproblems_bmmc_cite_phase2",
+        choices=["GSE140203_BRAIN_atac2gex", "openproblems_bmmc_cite_phase2", "openproblems_bmmc_multiome_phase2"])
     parser.add_argument("-d", "--data_folder", default="./data/joint_embedding")
     parser.add_argument("-pre", "--pretrained_folder", default="./data/joint_embedding/pretrained")
     parser.add_argument("-csv", "--csv_path", default="decoupled_lsi.csv")
@@ -28,6 +29,7 @@ if __name__ == "__main__":
     parser.add_argument("-bs", "--batch_size", default=128, type=int)
     parser.add_argument("-nm", "--normalize", default=1, type=int, choices=[0, 1])
     parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
+    parser.add_argument("--preprocess", type=str, default=None)
 
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--tune_mode", default="pipeline_params", choices=["pipeline", "params", "pipeline_params"])
@@ -54,14 +56,23 @@ if __name__ == "__main__":
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
         set_seed(args.seed)
-        dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder)
+        dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess=args.preprocess)
         data = dataset.load_data()
+
         # Prepare preprocessing pipeline and apply it to data
         kwargs = {tune_mode: dict(wandb.config)}
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
-
+        if args.preprocess != "aux":
+            cell_type_labels = data.data['test_sol'].obs["cell_type"].to_numpy()
+            cell_type_labels_unique = list(np.unique(cell_type_labels))
+            c_labels = np.array([cell_type_labels_unique.index(item) for item in cell_type_labels])
+            data.data['mod1'].obsm["cell_type"] = c_labels
+            data.data["mod1"].obsm["S_scores"] = np.zeros(data.data['mod1'].shape[0])
+            data.data["mod1"].obsm["G2M_scores"] = np.zeros(data.data['mod1'].shape[0])
+            data.data["mod1"].obsm["batch_label"] = np.zeros(data.data['mod1'].shape[0])
+            data.data["mod1"].obsm["phase_labels"] = np.zeros(data.data['mod1'].shape[0])
         (X_mod1_train, X_mod2_train), (cell_type, batch_label, phase_label, S_score,
                                        G2M_score) = data.get_train_data(return_type="torch")
         (X_mod1_test, X_mod2_test), (cell_type_test, _, _, _, _) = data.get_test_data(return_type="torch")
