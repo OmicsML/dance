@@ -1,4 +1,5 @@
 import argparse
+import gc
 import os
 import pprint
 import sys
@@ -7,8 +8,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.jae import JAEWrapper
@@ -56,52 +57,66 @@ if __name__ == "__main__":
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
         set_seed(args.seed)
-        dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess=args.preprocess)
-        data = dataset.load_data()
 
-        # Prepare preprocessing pipeline and apply it to data
-        kwargs = {tune_mode: dict(wandb.config)}
-        preprocessing_pipeline = pipeline_planer.generate(**kwargs)
-        print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
-        preprocessing_pipeline(data)
-        if args.preprocess != "aux":
-            cell_type_labels = data.data['test_sol'].obs["cell_type"].to_numpy()
-            cell_type_labels_unique = list(np.unique(cell_type_labels))
-            c_labels = np.array([cell_type_labels_unique.index(item) for item in cell_type_labels])
-            data.data['mod1'].obsm["cell_type"] = c_labels
-            data.data["mod1"].obsm["S_scores"] = np.zeros(data.data['mod1'].shape[0])
-            data.data["mod1"].obsm["G2M_scores"] = np.zeros(data.data['mod1'].shape[0])
-            data.data["mod1"].obsm["batch_label"] = np.zeros(data.data['mod1'].shape[0])
-            data.data["mod1"].obsm["phase_labels"] = np.zeros(data.data['mod1'].shape[0])
-        (X_mod1_train, X_mod2_train), (cell_type, batch_label, phase_label, S_score,
-                                       G2M_score) = data.get_train_data(return_type="torch")
-        (X_mod1_test, X_mod2_test), (cell_type_test, _, _, _, _) = data.get_test_data(return_type="torch")
-        X_train = torch.cat([X_mod1_train, X_mod2_train], dim=1)
-        phase_score = torch.cat([S_score[:, None], G2M_score[:, None]], 1)
-        X_test = torch.cat([X_mod1_test, X_mod2_test], dim=1)
-        X_test = torch.cat([X_train, X_test]).float().to(device)
-        test_id = np.arange(X_test.shape[0])
-        labels = torch.cat([cell_type, cell_type_test]).numpy()
-        adata_sol = data.data['test_sol']  # [data._split_idx_dict['test']]
+        try:
+            dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess=args.preprocess)
+            data = dataset.load_data()
+            # Prepare preprocessing pipeline and apply it to data
+            kwargs = {tune_mode: dict(wandb.config)}
+            preprocessing_pipeline = pipeline_planer.generate(**kwargs)
+            print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
+            preprocessing_pipeline(data)
+            if args.preprocess != "aux":
+                cell_type_labels = data.data['test_sol'].obs["cell_type"].to_numpy()
+                cell_type_labels_unique = list(np.unique(cell_type_labels))
+                c_labels = np.array([cell_type_labels_unique.index(item) for item in cell_type_labels])
+                data.data['mod1'].obsm["cell_type"] = c_labels
+                data.data["mod1"].obsm["S_scores"] = np.zeros(data.data['mod1'].shape[0])
+                data.data["mod1"].obsm["G2M_scores"] = np.zeros(data.data['mod1'].shape[0])
+                data.data["mod1"].obsm["batch_label"] = np.zeros(data.data['mod1'].shape[0])
+                data.data["mod1"].obsm["phase_labels"] = np.zeros(data.data['mod1'].shape[0])
+            (X_mod1_train, X_mod2_train), (cell_type, batch_label, phase_label, S_score,
+                                           G2M_score) = data.get_train_data(return_type="torch")
+            (X_mod1_test, X_mod2_test), (cell_type_test, _, _, _, _) = data.get_test_data(return_type="torch")
+            X_train = torch.cat([X_mod1_train, X_mod2_train], dim=1)
+            phase_score = torch.cat([S_score[:, None], G2M_score[:, None]], 1)
+            X_test = torch.cat([X_mod1_test, X_mod2_test], dim=1)
+            X_test = torch.cat([X_train, X_test]).float().to(device)
+            test_id = np.arange(X_test.shape[0])
+            labels = torch.cat([cell_type, cell_type_test]).numpy()
+            adata_sol = data.data['test_sol']  # [data._split_idx_dict['test']]
 
-        model = JAEWrapper(args, num_celL_types=int(cell_type.max() + 1), num_batches=int(batch_label.max() + 1),
-                           num_phases=phase_score.shape[1], num_features=X_train.shape[1])
-        model.fit(X_train, cell_type, batch_label, phase_score, max_epochs=50)
+            model = JAEWrapper(args, num_celL_types=int(cell_type.max() + 1), num_batches=int(batch_label.max() + 1),
+                               num_phases=phase_score.shape[1], num_features=X_train.shape[1])
+            model.fit(X_train, cell_type, batch_label, phase_score, max_epochs=50)
 
-        embeds = model.predict(X_test, test_id).cpu().numpy()
-        print(embeds)
+            embeds = model.predict(X_test, test_id).cpu().numpy()
+            print(embeds)
 
-        score = model.score(X_test, test_id, labels, metric="clustering")
-        # score.update(model.score(X_test, test_id, labels, adata_sol=adata_sol, metric="openproblems"))
-        score.update({
-            'subtask': args.subtask,
-            'method': 'jae',
-        })
-        score["ARI"] = score["dance_ari"]
-        del score["dance_ari"]
-        wandb.log(score)
-        wandb.finish()
-        torch.cuda.empty_cache()
+            score = model.score(X_test, test_id, labels, metric="clustering")
+            # score.update(model.score(X_test, test_id, labels, adata_sol=adata_sol, metric="openproblems"))
+            score.update({
+                'subtask': args.subtask,
+                'method': 'jae',
+            })
+            score["ARI"] = score["dance_ari"]
+            del score["dance_ari"]
+            wandb.log(score)
+            wandb.finish()
+        finally:
+            # del data,model,adata_sol,adata,embeds,emb1, emb2,total_loader,total,test_loader,test,train_loader,train,Nfeature2,Nfeature1
+            # del x_train, y_train, x_train_raw, y_train_raw, x_train_size,y_train_size,train_labels,x_test, y_test, x_test_raw, y_test_raw, x_test_size,y_test_size, test_labels
+            # del labels,le,dataset,score
+            # variables_to_delete=["data","model","adata_sol","adata","embeds","emb1", "emb2","total_loader","total,test_loader","test,train_loader","train","Nfeature2","Nfeature1","x_train", "y_train", "x_train_raw", "y_train_raw", "x_train_size","y_train_size","train_labels","x_test", "y_test"," x_test_raw", y_test_raw, x_test_size,y_test_size, test_labels,labels,le,dataset,score]
+            locals_keys = list(locals().keys())
+            for var in locals_keys:
+                try:
+                    exec(f"del {var}")
+                    logger.info(f"Deleted '{var}'")
+                except NameError:
+                    logger.info(f"Variable '{var}' does not exist, continuing...")
+            torch.cuda.empty_cache()
+            gc.collect()
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
