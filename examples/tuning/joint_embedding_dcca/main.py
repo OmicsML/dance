@@ -3,6 +3,7 @@ import gc
 import os
 import pprint
 import sys
+from copy import deepcopy
 from pathlib import Path
 
 import anndata as ad
@@ -11,10 +12,10 @@ import pandas as pd
 import scipy
 import torch
 import torch.utils.data as data_utils
-import wandb
 from sklearn import preprocessing
 
 import dance.utils.metrics as metrics
+import wandb
 from dance import logger
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.dcca import DCCA
@@ -94,95 +95,106 @@ if __name__ == "__main__":
         #                      layer_e_2=[Nfeature2, 1500, 128], hidden1_2=128, Zdim_2=4, layer_d_2=[4], hidden2_2=4, args=args,
         #                      Type_1="NB", Type_2="Bernoulli", ground_truth1=torch.cat([train_labels, test_labels]), cycle=1,
         #                      attention_loss="Eucli")  # yapf: disable
-        dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding")
-        data = dataset.load_data()
+        try:
+            dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding")
+            data = dataset.load_data()
+            # Prepare preprocessing pipeline and apply it to data
+            kwargs = {tune_mode: dict(wandb.config)}
+            preprocessing_pipeline = pipeline_planer.generate(**kwargs)
+            print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
+            preprocessing_pipeline(data)
+            le = preprocessing.LabelEncoder()
+            labels = le.fit_transform(data.mod["test_sol"].obs["cell_type"])
+            data.mod["mod2"].obsm["size_factors"] = np.sum(data.mod["mod2"].X.todense() if scipy.sparse.issparse(data.mod["mod2"].X) else data.mod["mod2"].X, 1) / 100
+            # data.mod["mod1"].obsm["size_factors"] = data.mod["mod1"].obs["size_factors"]
+            data.mod["mod1"].obsm["size_factors"] = np.sum(data.mod["mod1"].X.todense() if scipy.sparse.issparse(data.mod["mod1"].X) else data.mod["mod1"].X, 1) / 100
+            data.mod["mod1"].obsm["labels"] = labels
 
-        # Prepare preprocessing pipeline and apply it to data
-        kwargs = {tune_mode: dict(wandb.config)}
-        preprocessing_pipeline = pipeline_planer.generate(**kwargs)
-        print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
-        preprocessing_pipeline(data)
+            # data.set_config(feature_mod=["mod1", "mod2", "mod1", "mod2", "mod1", "mod2"], label_mod="mod1",
+            #                 feature_channel_type=["layers", "layers", None, None, "obsm", "obsm"],
+            #                 feature_channel=["counts", "counts", None, None, "size_factors",
+            #                                 "size_factors"], label_channel="labels")
+            #TODO 感觉layers中的counts才是raw
+            #TODO 的确感觉layers中的counts才是raw，不知道反过来影响大不大
+            (x_train, y_train, x_train_raw, y_train_raw, x_train_size,
+            y_train_size), train_labels = data.get_train_data(return_type="torch")
+            (x_test, y_test, x_test_raw, y_test_raw, x_test_size,
+            y_test_size), test_labels = data.get_test_data(return_type="torch")
 
-        le = preprocessing.LabelEncoder()
-        labels = le.fit_transform(data.mod["test_sol"].obs["cell_type"])
-        data.mod["mod2"].obsm["size_factors"] = np.sum(data.mod["mod2"].X.todense() if scipy.sparse.issparse(data.mod["mod2"].X) else data.mod["mod2"].X, 1) / 100
-        # data.mod["mod1"].obsm["size_factors"] = data.mod["mod1"].obs["size_factors"]
-        data.mod["mod1"].obsm["size_factors"] = np.sum(data.mod["mod1"].X.todense() if scipy.sparse.issparse(data.mod["mod1"].X) else data.mod["mod1"].X, 1) / 100
-        data.mod["mod1"].obsm["labels"] = labels
+            Nfeature1 = x_train.shape[1]
+            Nfeature2 = y_train.shape[1]
 
-        # data.set_config(feature_mod=["mod1", "mod2", "mod1", "mod2", "mod1", "mod2"], label_mod="mod1",
-        #                 feature_channel_type=["layers", "layers", None, None, "obsm", "obsm"],
-        #                 feature_channel=["counts", "counts", None, None, "size_factors",
-        #                                 "size_factors"], label_channel="labels")
-        #TODO 感觉layers中的counts才是raw
-        (x_train, y_train, x_train_raw, y_train_raw, x_train_size,
-        y_train_size), train_labels = data.get_train_data(return_type="torch")
-        (x_test, y_test, x_test_raw, y_test_raw, x_test_size,
-        y_test_size), test_labels = data.get_test_data(return_type="torch")
+            device = torch.device(args.device)
+            train = data_utils.TensorDataset(x_train.float(), x_train_raw, x_train_size.float(), y_train.float(), y_train_raw,
+                                            y_train_size.float())
 
-        Nfeature1 = x_train.shape[1]
-        Nfeature2 = y_train.shape[1]
+            train_loader = data_utils.DataLoader(train, batch_size=args.batch_size, shuffle=True)
 
-        device = torch.device(args.device)
-        train = data_utils.TensorDataset(x_train.float(), x_train_raw, x_train_size.float(), y_train.float(), y_train_raw,
-                                        y_train_size.float())
+            test = data_utils.TensorDataset(x_test.float(), x_test_raw, x_test_size.float(), y_test.float(), y_test_raw,
+                                            y_test_size.float())
 
-        train_loader = data_utils.DataLoader(train, batch_size=args.batch_size, shuffle=True)
+            test_loader = data_utils.DataLoader(test, batch_size=args.batch_size, shuffle=False)
 
-        test = data_utils.TensorDataset(x_test.float(), x_test_raw, x_test_size.float(), y_test.float(), y_test_raw,
-                                        y_test_size.float())
+            total = data_utils.TensorDataset(
+                torch.cat([x_train, x_test]).float(), torch.cat([x_train_raw, x_test_raw]),
+                torch.cat([x_train_size, x_test_size]).float(),
+                torch.cat([y_train, y_test]).float(), torch.cat([y_train_raw, y_test_raw]),
+                torch.cat([y_train_size, y_test_size]).float())
 
-        test_loader = data_utils.DataLoader(test, batch_size=args.batch_size, shuffle=False)
+            total_loader = data_utils.DataLoader(total, batch_size=args.batch_size, shuffle=False)
+            model = DCCA(layer_e_1=[Nfeature1, 128], hidden1_1=128, Zdim_1=50, layer_d_1=[50, 128], hidden2_1=128,
+                        layer_e_2=[Nfeature2, 1500, 128], hidden1_2=128, Zdim_2=50, layer_d_2=[50], hidden2_2=50,
+                        args=args, ground_truth1=torch.cat([train_labels, test_labels]), Type_1="NB", Type_2="Bernoulli",
+                        cycle=1, attention_loss="Eucli").to(device)
+            model.to(device)
+            model.fit(train_loader, test_loader, total_loader, "RNA")
 
-        total = data_utils.TensorDataset(
-            torch.cat([x_train, x_test]).float(), torch.cat([x_train_raw, x_test_raw]),
-            torch.cat([x_train_size, x_test_size]).float(),
-            torch.cat([y_train, y_test]).float(), torch.cat([y_train_raw, y_test_raw]),
-            torch.cat([y_train_size, y_test_size]).float())
+            emb1, emb2 = model.predict(total_loader)
+            embeds = np.concatenate([emb1, emb2], 1)
+            print(embeds)
 
-        total_loader = data_utils.DataLoader(total, batch_size=args.batch_size, shuffle=False)
-        model = DCCA(layer_e_1=[Nfeature1, 128], hidden1_1=128, Zdim_1=50, layer_d_1=[50, 128], hidden2_1=128,
-                     layer_e_2=[Nfeature2, 1500, 128], hidden1_2=128, Zdim_2=50, layer_d_2=[50], hidden2_2=50,
-                     args=args, ground_truth1=torch.cat([train_labels, test_labels]), Type_1="NB", Type_2="Bernoulli",
-                     cycle=1, attention_loss="Eucli").to(device)
-        model.to(device)
-        model.fit(train_loader, test_loader, total_loader, "RNA")
+            adata = ad.AnnData(
+                X=embeds,
+                obs=data.mod["mod1"].obs,
+            )
+            adata_sol = data.mod["test_sol"]
+            adata = adata[adata_sol.obs_names]
+            adata_sol.obsm['X_emb'] = adata.X
+            score = metrics.labeled_clustering_evaluate(adata, adata_sol)
+            # score.update(metrics.integration_openproblems_evaluate(adata_sol))
+            # score.update({
+            #     'seed': args.seed + k,
+            #     'subtask': args.subtask,
+            #     'method': 'dcca',
+            # })
 
-        emb1, emb2 = model.predict(total_loader)
-        embeds = np.concatenate([emb1, emb2], 1)
-        print(embeds)
-
-        adata = ad.AnnData(
-            X=embeds,
-            obs=data.mod["mod1"].obs,
-        )
-        adata_sol = data.mod["test_sol"]
-        adata = adata[adata_sol.obs_names]
-        adata_sol.obsm['X_emb'] = adata.X
-        score = metrics.labeled_clustering_evaluate(adata, adata_sol)
-        # score.update(metrics.integration_openproblems_evaluate(adata_sol))
-        # score.update({
-        #     'seed': args.seed + k,
-        #     'subtask': args.subtask,
-        #     'method': 'dcca',
-        # })
-
-        # if res is not None:
-        #     res = res.append(score, ignore_index=True)
-        # else:
-        #     for s in score:
-        #         score[s] = [score[s]]
-        #     res = pd.DataFrame(score)
-        score["ARI"]=score["dance_ari"]
-        del score["dance_ari"]
-        wandb.log(score)
-        wandb.finish()
-        torch.cuda.empty_cache()
+            # if res is not None:
+            #     res = res.append(score, ignore_index=True)
+            # else:
+            #     for s in score:
+            #         score[s] = [score[s]]
+            #     res = pd.DataFrame(score)
+            score["ARI"]=score["dance_ari"]
+            del score["dance_ari"]
+            wandb.log(score.copy())
+            wandb.finish()
+        finally:
+            # del data,model,adata_sol,adata,embeds,emb1, emb2,total_loader,total,test_loader,test,train_loader,train,Nfeature2,Nfeature1
+            # del x_train, y_train, x_train_raw, y_train_raw, x_train_size,y_train_size,train_labels,x_test, y_test, x_test_raw, y_test_raw, x_test_size,y_test_size, test_labels
+            # del labels,le,dataset,score
+            # variables_to_delete=["data","model","adata_sol","adata","embeds","emb1", "emb2","total_loader","total,test_loader","test,train_loader","train","Nfeature2","Nfeature1","x_train", "y_train", "x_train_raw", "y_train_raw", "x_train_size","y_train_size","train_labels","x_test", "y_test"," x_test_raw", y_test_raw, x_test_size,y_test_size, test_labels,labels,le,dataset,score]
+            locals_keys=list(locals().keys())
+            for var in locals_keys:
+                try:
+                    exec(f"del {var}")
+                    logger.info(f"Deleted '{var}'")
+                except NameError:
+                    logger.info(f"Variable '{var}' does not exist, continuing...")
+            torch.cuda.empty_cache()
+            gc.collect()
         #主要是报错时没有执行这些命令导致的，我感觉
-        del data,model,adata_sol,adata,embeds,emb1, emb2,total_loader,total,test_loader,test,train_loader,train,Nfeature2,Nfeature1
-        del x_train, y_train, x_train_raw, y_train_raw, x_train_size,y_train_size,train_labels,x_test, y_test, x_test_raw, y_test_raw, x_test_size,y_test_size, test_labels
-        del labels,le,dataset,score
-        gc.collect()
+
+
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
