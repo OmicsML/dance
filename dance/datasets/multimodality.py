@@ -575,7 +575,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
 
     def _raw_to_dance(self, raw_data):
         mod1, mod2, meta1, meta2, test_sol = self._maybe_preprocess(raw_data)
-        self.to_array([mod1, mod2, meta1, meta2, test_sol])
+        # self.to_array([mod1, mod2, meta1, meta2, test_sol])
 
         assert all(mod2.obs_names == mod1.obs_names), "Modalities not aligned"
         mdata = md.MuData({"mod1": mod1, "mod2": mod2, "meta1": meta1, "meta2": meta2, "test_sol": test_sol})
@@ -755,7 +755,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
             if mod1.shape[1] > self.selection_threshold:
                 sc.pp.highly_variable_genes(mod1, layer="counts", flavor="seurat_v3",
                                             n_top_genes=self.selection_threshold, span=self.span)
-                mod1 = mod1[:, mod1.var["highly_variable"]]
+                mod1 = mod1[:, mod1.var["highly_variable"]]  # Equivalent to subset=True and _inplace_subset_var
             if mod2.shape[1] > self.selection_threshold:
                 sc.pp.highly_variable_genes(mod2, layer="counts", flavor="seurat_v3",
                                             n_top_genes=self.selection_threshold, span=self.span)
