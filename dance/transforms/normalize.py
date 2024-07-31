@@ -189,7 +189,7 @@ class tfidfTransform(BaseTransform):
             raise RuntimeError('Transformer was not fitted on any data')
         if scipy.sparse.issparse(X):
             tf = X.multiply(1 / X.sum(axis=1))
-            return tf.multiply(self.idf)
+            return tf.multiply(self.idf).tocsr()
         else:
             tf = X / X.sum(axis=1, keepdims=True)
             return tf * self.idf
