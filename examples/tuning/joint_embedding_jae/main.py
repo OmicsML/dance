@@ -8,8 +8,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.jae import JAEWrapper
@@ -19,8 +19,10 @@ from dance.utils import set_seed
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-t", "--subtask", default="openproblems_bmmc_cite_phase2",
-        choices=["GSE140203_BRAIN_atac2gex", "openproblems_bmmc_cite_phase2", "openproblems_bmmc_multiome_phase2"])
+        "-t", "--subtask", default="openproblems_bmmc_cite_phase2", choices=[
+            "GSE140203_BRAIN_atac2gex", "GSE140203_SKIN_atac2gex", "openproblems_bmmc_cite_phase2",
+            "openproblems_bmmc_multiome_phase2"
+        ])
     parser.add_argument("-d", "--data_folder", default="./data/joint_embedding")
     parser.add_argument("-pre", "--pretrained_folder", default="./data/joint_embedding/pretrained")
     parser.add_argument("-csv", "--csv_path", default="decoupled_lsi.csv")
@@ -57,12 +59,19 @@ if __name__ == "__main__":
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
         set_seed(args.seed)
-
+        wandb_config = wandb.config
+        if "run_kwargs" in pipeline_planer.config:
+            if any(d == dict(wandb.config["run_kwargs"]) for d in pipeline_planer.config.run_kwargs):
+                wandb_config = wandb_config["run_kwargs"]
+            else:
+                wandb.log({"skip": 1})
+                wandb.finish()
+                return
         try:
             dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess=args.preprocess)
             data = dataset.load_data()
             # Prepare preprocessing pipeline and apply it to data
-            kwargs = {tune_mode: dict(wandb.config)}
+            kwargs = {tune_mode: dict(wandb_config)}
             preprocessing_pipeline = pipeline_planer.generate(**kwargs)
             print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
             preprocessing_pipeline(data)
@@ -113,6 +122,7 @@ if __name__ == "__main__":
                 try:
                     exec(f"del {var}")
                     logger.info(f"Deleted '{var}'")
+
                 except NameError:
                     logger.info(f"Variable '{var}' does not exist, continuing...")
             torch.cuda.empty_cache()
