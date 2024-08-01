@@ -8,9 +8,11 @@ from dance.transforms.base import BaseTransform
 from dance.typing import Optional, Union
 from dance.utils.matrix import normalize
 from dance.utils.status import deprecated
+from dance.utils.wrappers import add_mod_and_transform
 
 
 @register_preprocessor("feature", "cell")
+@add_mod_and_transform
 class WeightedFeaturePCA(BaseTransform):
     """Compute the weighted gene PCA as cell features.
 
@@ -66,6 +68,7 @@ class WeightedFeaturePCA(BaseTransform):
 
 
 @register_preprocessor("feature", "cell")
+@add_mod_and_transform
 class WeightedFeatureSVD(BaseTransform):
     """Compute the weighted gene SVD as cell features.
 
@@ -127,6 +130,7 @@ class WeightedFeatureSVD(BaseTransform):
 
 
 @register_preprocessor("feature", "cell")
+@add_mod_and_transform
 class CellPCA(BaseTransform):
     """Reduce cell feature matrix with PCA.
 
@@ -145,10 +149,9 @@ class CellPCA(BaseTransform):
 
         self.n_components = n_components
         self.channel = channel
-        self.mod = mod
 
     def __call__(self, data):
-        feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
+        feat = data.get_feature(return_type="numpy", channel=self.channel)
         if self.n_components > min(feat.shape):
             self.logger.warning(
                 f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='full'"
@@ -167,6 +170,7 @@ class CellPCA(BaseTransform):
 
 
 @register_preprocessor("feature", "cell")
+@add_mod_and_transform
 class CellSVD(BaseTransform):
     """Reduce cell feature matrix with SVD.
 
@@ -185,10 +189,9 @@ class CellSVD(BaseTransform):
 
         self.n_components = n_components
         self.channel = channel
-        self.mod = mod
 
     def __call__(self, data):
-        feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
+        feat = data.get_feature(return_type="numpy", channel=self.channel)
         if isinstance(self.n_components, float):
             n_components = min(feat.shape) - 1
             svd = TruncatedSVD(n_components=n_components)
@@ -215,7 +218,8 @@ class CellSVD(BaseTransform):
 
 
 @register_preprocessor("feature", "cell")
-@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+@add_mod_and_transform
+# @deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
 class FeatureCellPlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process.
 
@@ -229,13 +233,12 @@ class FeatureCellPlaceHolder(BaseTransform):
     def __init__(self, n_components: int = 400, *, channel: Optional[str] = None, mod: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
         self.channel = channel
-        self.mod = mod
         self.logger.info(
             "n_components in FeatureCellPlaceHolder is used to make the parameters consistent and will not have any actual effect."
         )
 
     def __call__(self, data):
-        feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
+        feat = data.get_feature(return_type="numpy", channel=self.channel)
         cell_feat = feat
         gene_feat = feat.T
         data.data.obsm[self.out] = cell_feat
@@ -305,6 +308,7 @@ class BatchFeature(BaseTransform):
 
 
 @register_preprocessor("feature", "cell")  # NOTE: register any custom preprocessing function to be used for tuning
+@add_mod_and_transform
 class GaussRandProjFeature(BaseTransform):
     """Custom preprocessing to extract cell feature via Gaussian random projection."""
 

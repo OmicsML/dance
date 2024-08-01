@@ -71,7 +71,8 @@ if __name__ == "__main__":
     le = preprocessing.LabelEncoder()
     labels = le.fit_transform(data.mod["test_sol"].obs["cell_type"])
     data.mod["mod2"].obsm["size_factors"] = np.sum(data.mod["mod2"].X.todense(), 1) / 100
-    data.mod["mod1"].obsm["size_factors"] = data.mod["mod1"].obs["size_factors"]
+    # data.mod["mod1"].obsm["size_factors"] = data.mod["mod1"].obs["size_factors"]
+    data.mod["mod1"].obsm["size_factors"] = np.sum(data.mod["mod1"].X.todense(), 1) / 100
     data.mod["mod1"].obsm["labels"] = labels
 
     data.set_config(feature_mod=["mod1", "mod2", "mod1", "mod2", "mod1", "mod2"], label_mod="mod1",

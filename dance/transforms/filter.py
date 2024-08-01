@@ -3,6 +3,7 @@ from abc import ABC
 from typing import get_args
 
 import anndata as ad
+import mudata as md
 import numpy as np
 import pandas as pd
 import scanpy as sc
@@ -20,6 +21,7 @@ from dance.transforms.interface import AnnDataTransform
 from dance.typing import Dict, GeneSummaryMode, List, Literal, Logger, Optional, Tuple, Union
 from dance.utils import default
 from dance.utils.status import deprecated
+from dance.utils.wrappers import add_mod_and_transform
 
 
 def get_count(count_or_ratio: Optional[Union[float, int]], total: int) -> Optional[int]:
@@ -48,6 +50,7 @@ def get_count(count_or_ratio: Optional[Union[float, int]], total: int) -> Option
 
 
 @register_preprocessor("filter")
+@add_mod_and_transform
 class FilterScanpy(BaseTransform):
     """Scanpy filtering transformation with additional options."""
 
@@ -145,9 +148,9 @@ class FilterScanpy(BaseTransform):
             elif self._FILTER_TARGET == "cells":
                 n_counts = np.sum(x, axis=1)
             if isinstance(self.min_counts, float) and 0 <= self.min_counts <= 1:
-                min_counts = np.percentile(n_counts, self.min_counts)
+                min_counts = np.percentile(n_counts, self.min_counts * 100)
             else:
-                max_counts = np.percentile(n_counts, self.max_counts)
+                max_counts = np.percentile(n_counts, self.max_counts * 100)
             return min_counts, max_counts
         else:
             return self.min_counts, self.max_counts
@@ -266,6 +269,31 @@ class FilterGenesScanpy(FilterScanpy):
                          max_genes_or_cells=max_cells, split_name=split_name, channel=channel,
                          channel_type=channel_type, key_n_counts=key_n_counts, key_n_genes_or_cells=key_n_cells,
                          inplace=inplace, **kwargs)
+
+
+@register_preprocessor("filter", "cell")
+@add_mod_and_transform
+class FilterCellsCommonMod(BaseTransform):
+
+    def __init__(self, mod1: str, mod2: str, sol: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.mod1 = mod1
+        self.mod2 = mod2
+        self.sol = sol
+
+    def __call__(self, data: Data):
+        md_data = data.data
+        data_mod1 = md_data.mod[self.mod1]
+        data_mod2 = md_data.mod[self.mod2]
+        common_cells = list(set(data_mod1.obs.index) & set(data_mod2.obs.index))
+        data_mod1 = data_mod1[common_cells, :]
+        data_mod2 = data_mod2[common_cells, :]
+        data.data.mod[self.mod1] = data_mod1
+        data.data.mod[self.mod2] = data_mod2
+        if self.sol is not None:
+            test_sol = md_data.mod[self.sol]
+            test_sol = test_sol[common_cells, :]
+            data.data.mod[self.sol] = test_sol
 
 
 @register_preprocessor("filter", "gene")
@@ -472,6 +500,7 @@ class FilterGenes(BaseTransform, ABC):
 
 
 @register_preprocessor("filter", "gene")
+@add_mod_and_transform
 class FilterGenesPercentile(FilterGenes):
     """Filter genes based on percentiles of the summarized gene expressions.
 
@@ -540,6 +569,7 @@ class FilterGenesPercentile(FilterGenes):
 
 
 @register_preprocessor("filter", "gene")
+@add_mod_and_transform
 class FilterGenesTopK(FilterGenes):
     """Select top/bottom genes based on the  summarized gene expressions.
 
@@ -708,6 +738,7 @@ class FilterGenesMarker(BaseTransform):
 
 
 @register_preprocessor("filter", "gene")
+@add_mod_and_transform
 class FilterGenesRegression(BaseTransform):
     """Select genes based on regression.
 
@@ -733,18 +764,19 @@ class FilterGenesRegression(BaseTransform):
     _DISPLAY_ATTRS = ("num_genes", )
 
     def __init__(self, method: str = "enclasc", num_genes: int = 1000, *, channel: Optional[str] = None,
-                 mod: Optional[str] = None, skip_count_check: bool = False, inplace=True, **kwargs):
+                 channel_type: Optional[str] = None, mod: Optional[str] = None, skip_count_check: bool = False,
+                 inplace=True, **kwargs):
         super().__init__(**kwargs)
 
         self.num_genes = num_genes
         self.channel = channel
-        self.mod = mod
         self.method = method
         self.skip_count_check = skip_count_check
         self.inplace = inplace
+        self.channel_type = channel_type
 
     def __call__(self, data):
-        feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
+        feat = data.get_feature(return_type="numpy", channel=self.channel, channel_type=self.channel_type)
 
         if not self.skip_count_check and np.mod(feat, 1).sum():
             warnings.warn("Expecting count data as input, but the input feature matrix does not appear to be count."
@@ -995,6 +1027,7 @@ def gini_func(x, weights=None):
 
 
 @register_preprocessor("filter", "gene")
+@add_mod_and_transform
 class FilterGenesScanpyOrder(BaseTransform):
     """Scanpy filtering gene transformation with additional options.
 
@@ -1084,6 +1117,7 @@ class FilterGenesScanpyOrder(BaseTransform):
 
 
 @register_preprocessor("filter", "gene")
+@add_mod_and_transform
 class HighlyVariableGenesRawCount(AnnDataTransform):
     """Filter for highly variable genes using raw count matrix.
 
@@ -1120,9 +1154,10 @@ class HighlyVariableGenesRawCount(AnnDataTransform):
 
     """
 
-    def __init__(self, layer: Optional[str] = None, n_top_genes: Optional[int] = 1000, span: Optional[float] = 0.3,
-                 subset: bool = True, inplace: bool = True, batch_key: Optional[str] = None, check_values: bool = True,
-                 **kwargs):
+    def __init__(self, channel: Optional[str] = None, channel_type: Optional[str] = None,
+                 n_top_genes: Optional[int] = 1000, span: Optional[float] = 0.3, subset: bool = True,
+                 inplace: bool = True, batch_key: Optional[str] = None, check_values: bool = True, **kwargs):
+        layer = channel if channel_type == "layers" else None
         super().__init__(sc.pp.highly_variable_genes, layer=layer, n_top_genes=n_top_genes, batch_key=batch_key,
                          check_values=check_values, span=span, subset=subset, inplace=inplace, flavor="seurat_v3",
                          **kwargs)
@@ -1158,6 +1193,7 @@ class HighlyVariableGenesRawCount(AnnDataTransform):
 
 
 @register_preprocessor("filter", "gene")
+@add_mod_and_transform
 class HighlyVariableGenesLogarithmizedByTopGenes(AnnDataTransform):
     """Filter for highly variable genes based on top genes.
 
@@ -1197,16 +1233,19 @@ class HighlyVariableGenesLogarithmizedByTopGenes(AnnDataTransform):
 
     """
 
-    def __init__(self, layer: Optional[str] = None, n_top_genes: Optional[int] = 1000, n_bins: int = 20,
-                 flavor: Literal["seurat", "cell_ranger"] = "seurat", subset: bool = True, inplace: bool = True,
-                 batch_key: Optional[str] = None, **kwargs):
+    def __init__(self, channel: Optional[str] = None, channel_type: Optional[str] = None,
+                 n_top_genes: Optional[int] = 1000, n_bins: int = 20, flavor: Literal["seurat",
+                                                                                      "cell_ranger"] = "seurat",
+                 subset: bool = True, inplace: bool = True, batch_key: Optional[str] = None, **kwargs):
+        layer = channel if channel_type == "layers" else None
         super().__init__(sc.pp.highly_variable_genes, layer=layer, n_top_genes=n_top_genes, n_bins=n_bins,
                          flavor=flavor, subset=subset, inplace=inplace, batch_key=batch_key, **kwargs)
         self.logger.info("Expects logarithmized data")
 
 
 @register_preprocessor("filter", "gene")
-@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+@add_mod_and_transform
+# @deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
 class FilterGenesPlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process."""
 
@@ -1237,10 +1276,11 @@ class FilterGenesPlaceHolder(BaseTransform):
 
 
 @register_preprocessor("filter", "gene")
-@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+@add_mod_and_transform
+# @deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
 class FilterGenesNumberPlaceHolder(BaseTransform):
 
-    def __init__(self, **kwargs):
+    def __init__(self, channel=None, channel_type=None, **kwargs):
         super().__init__(**kwargs)
 
     def __call__(self, data: Data) -> Data:
@@ -1248,6 +1288,7 @@ class FilterGenesNumberPlaceHolder(BaseTransform):
 
 
 @register_preprocessor("filter", "gene")
+@add_mod_and_transform
 class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
     """Filter for highly variable genes based on mean and dispersion.
 
@@ -1293,10 +1334,12 @@ class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
 
     """
 
-    def __init__(self, layer: Optional[str] = None, min_disp: Optional[float] = 0.5, max_disp: Optional[float] = np.inf,
+    def __init__(self, channel: Optional[str] = None, channel_type: Optional[str] = None,
+                 min_disp: Optional[float] = 0.5, max_disp: Optional[float] = np.inf,
                  min_mean: Optional[float] = 0.0125, max_mean: Optional[float] = 3, n_bins: int = 20,
                  flavor: Literal["seurat", "cell_ranger"] = "seurat", subset: bool = True, inplace: bool = True,
                  batch_key: Optional[str] = None, **kwargs):
+        layer = channel if channel_type == "layers" else None
         super().__init__(sc.pp.highly_variable_genes, layer=layer, min_disp=min_disp, max_disp=max_disp,
                          min_mean=min_mean, max_mean=max_mean, n_bins=n_bins, flavor=flavor, subset=subset,
                          inplace=inplace, batch_key=batch_key, **kwargs)
@@ -1304,7 +1347,8 @@ class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
 
 
 @register_preprocessor("filter", "cell")
-@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+@add_mod_and_transform
+# @deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
 class FilterCellsPlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process."""
 
@@ -1335,6 +1379,7 @@ class FilterCellsPlaceHolder(BaseTransform):
 
 
 @register_preprocessor("filter", "cell")
+@add_mod_and_transform
 class FilterCellsScanpyOrder(BaseTransform):
     """Scanpy filtering cell transformation with additional options.
 
