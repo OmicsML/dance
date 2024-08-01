@@ -8,6 +8,7 @@ from functools import partial, reduce
 from operator import mul
 from pprint import pformat
 
+import omegaconf
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
@@ -793,6 +794,14 @@ class PipelinePlaner(Pipeline):
     def wandb_sweep_config(self) -> Dict[str, Any]:
         if self.wandb_config is None:
             raise ValueError("wandb config not specified in the raw config.")
+        if "run_kwargs" in self.config:
+            return {
+                **self.wandb_config, "parameters": {
+                    "run_kwargs": {
+                        "values": omegaconf.OmegaConf.to_object(self.config.run_kwargs)
+                    }
+                }
+            }
         return {**self.wandb_config, "parameters": self.search_space()}
 
     def wandb_sweep(self) -> Tuple[str, str, str]:
@@ -807,7 +816,7 @@ class PipelinePlaner(Pipeline):
                              f"'entity' and 'project': {wandb_entity=!r}, {wandb_project=!r}")
 
         sweep_config = self.wandb_sweep_config()
-        logger.info(f"Sweep config:\n{pformat(sweep_config)}")
+        # logger.info(f"Sweep config:\n{pformat(sweep_config)}")
         wandb_sweep_id = wandb.sweep(sweep=sweep_config, entity=wandb_entity, project=wandb_project)
         logger.info(Color("blue")(f"\n\n\t[*] Sweep ID: {wandb_sweep_id}\n"))
 
