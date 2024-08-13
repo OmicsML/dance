@@ -1041,7 +1041,9 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
     conf = OmegaConf.load(conf_load_path)
     pipeline_top_k = default(step2_pipeline_planer.config.pipeline_tuning_top_k, DEFAULT_PIPELINE_TUNING_TOP_K)
     result = pd.read_csv(result_load_path).sort_values(by=metric, ascending=ascending).head(pipeline_top_k)
-    columns = sorted([col for col in result.columns if col.startswith("pipeline")])
+    columns = sorted(
+        [col for col in result.columns if (col.startswith("pipeline") or col.startswith("run_kwargs_pipeline"))],
+        key=lambda x: float(x.split('.')[1]))
     pipeline_names = result.loc[:, columns].values
     count = 0
     for row in pipeline_names:
@@ -1050,11 +1052,12 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
         for x in row:
             for k in conf.pipeline:
                 if k["target"] == x:
-                    pipeline.append(k)
+                    pipeline.append(deepcopy(k))
         for i, f in zip(required_indexes, required_funs):
             for k in step2_pipeline_planer.config.pipeline:
                 if "target" in k and k["target"] == f:
-                    pipeline.insert(i, k)
+                    pipeline.insert(i, deepcopy(k))
+                    break
         for p1 in step2_pipeline_planer.config.pipeline:
             if "step3_frozen" in p1 and p1["step3_frozen"]:
                 for p2 in pipeline:
@@ -1065,12 +1068,16 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
                             for target, d_p in p1.default_params.items():
                                 if target == p2["target"]:
                                     p2["params"] = d_p
-        for p1, p2 in zip(step2_pipeline_planer.config.pipeline, pipeline):  #need order
+        #顺序不对，参考_sanitize_pipeline进行修改 TODO
+        step2_pipeline = step2_pipeline_planer.config.pipeline
+        # step2_pipeline=sorted(step2_pipeline_planer.config.pipeline,key=lambda x: float(x.split('.')[1]))
+        for p1, p2 in zip(step2_pipeline, pipeline):  #need order
             if "params" in p1:
-                for key, value in p1.params.items():
-                    if "params" not in p2:
-                        p2.params = {}
-                    p2.params[key] = value
+                p2.params = p1.params
+                # for key, value in p1.params.items():
+                #     if "params" not in p2:
+                #         p2.params = {}
+                #     p2.params[key] = value
         temp_conf = conf.copy()
         temp_conf.pipeline = pipeline
         temp_conf.wandb = step2_pipeline_planer.config.wandb
