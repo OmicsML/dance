@@ -38,8 +38,6 @@ pipeline:
         min: 1.0
         max: 10.0
   - type: normalize
-    target: tfidfTransform
-  - type: normalize
     target: NormalizeTotal
     params_to_tune:
       target_sum:
