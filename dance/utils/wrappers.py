@@ -122,6 +122,3 @@ def add_mod_and_transform(cls):
 
 def transform_mod_to_anndata(mod_data: mudata.MuData, mod_key: str):
     return mod_data.mod[mod_key]
-
-
-
