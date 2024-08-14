@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from sklearn.decomposition import PCA, TruncatedSVD,SparsePCA
+from sklearn.decomposition import PCA, SparsePCA, TruncatedSVD
 from sklearn.random_projection import GaussianRandomProjection
 
 from dance.registry import register_preprocessor
@@ -167,6 +167,7 @@ class CellPCA(BaseTransform):
         data.data.obsm[self.out] = cell_feat
 
         return data
+
 
 @register_preprocessor("feature", "cell")
 @add_mod_and_transform
