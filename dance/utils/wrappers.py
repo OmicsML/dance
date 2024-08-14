@@ -124,14 +124,4 @@ def transform_mod_to_anndata(mod_data: mudata.MuData, mod_key: str):
     return mod_data.mod[mod_key]
 
 
-# 使用装饰器
-@add_mod_and_transform
-class MyClass:
 
-    def __init__(self, x, **kwargs):
-        self.x = x
-        print("-------")
-        print(**kwargs)
-
-    def __call__(self, data):
-        return data
