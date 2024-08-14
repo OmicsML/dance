@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from sklearn.decomposition import PCA, TruncatedSVD
+from sklearn.decomposition import PCA, TruncatedSVD,SparsePCA
 from sklearn.random_projection import GaussianRandomProjection
 
 from dance.registry import register_preprocessor
@@ -164,6 +164,44 @@ class CellPCA(BaseTransform):
         self.logger.info(f"Top 10 explained variances: {evr[:10]}")
         self.logger.info(f"Total explained variance: {evr.sum():.2%}")
 
+        data.data.obsm[self.out] = cell_feat
+
+        return data
+
+@register_preprocessor("feature", "cell")
+@add_mod_and_transform
+class SparsePCA(BaseTransform):
+    """Reduce cell feature matrix with SparsePCA.
+
+    Parameters
+    ----------
+    n_components
+        Number of SparsePCA components to use.
+
+    """
+
+    _DISPLAY_ATTRS = ("n_components", )
+
+    def __init__(self, n_components: Union[float, int] = 400, *, channel: Optional[str] = None,
+                 mod: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+
+        self.n_components = n_components
+        self.channel = channel
+
+    def __call__(self, data):
+        feat = data.get_feature(return_type="numpy", channel=self.channel)
+        # if self.n_components > min(feat.shape):
+        #     self.logger.warning(
+        #         f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='full'"
+        #     )
+        #     self.n_components = min(feat.shape)
+        pca = SparsePCA(n_components=self.n_components)
+        cell_feat = pca.fit_transform(feat)
+        self.logger.info(f"Generating cell SparsePCA features {feat.shape} (k={pca.n_components_})")
+        # evr = pca.explained_variance_ratio_
+        # self.logger.info(f"Top 10 explained variances: {evr[:10]}")
+        # self.logger.info(f"Total explained variance: {evr.sum():.2%}")
         data.data.obsm[self.out] = cell_feat
 
         return data
