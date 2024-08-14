@@ -251,6 +251,14 @@ pipeline:
         min: 100
         max: 1000
   - type: feature.cell
+    target: SparsePCA
+    params:
+      out: feature.cell
+    params_to_tune:
+      n_components:
+        min: 100
+        max: 1000
+  - type: feature.cell
     target: WeightedFeaturePCA
     params:
       out: feature.cell
