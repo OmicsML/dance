@@ -48,7 +48,8 @@ if __name__ == "__main__":
     file_root_path = Path(
         args.root_path, "_".join([
             "-".join([str(num) for num in dataset])
-            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset] if (dataset is not None and dataset !=[])
+            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
+            if (dataset is not None and dataset != [])
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
@@ -69,7 +70,7 @@ if __name__ == "__main__":
         # Load data and perform necessary preprocessing
         data = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
                                          valid_dataset=args.valid_dataset, data_dir="./temp_data", tissue=args.tissue,
-                                         species=args.species,filetype=args.filetype).load_data()
+                                         species=args.species, filetype=args.filetype).load_data()
 
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
