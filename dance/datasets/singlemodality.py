@@ -53,7 +53,7 @@ class CellTypeAnnotationDataset(BaseDataset):
 
     def __init__(self, full_download=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
                  valid_dataset=None, train_dir="train", test_dir="test", valid_dir="valid", map_path="map",
-                 data_dir="./", train_as_valid=False, val_size=0.2, test_size=None, filetype: str = "csv"):
+                 data_dir="./", train_as_valid=False, val_size=0.2, test_size=0.2, filetype: str = "csv"):
         super().__init__(data_dir, full_download)
 
         self.data_dir = data_dir
@@ -177,7 +177,7 @@ class CellTypeAnnotationDataset(BaseDataset):
         species = self.species
         tissue = self.tissue
         valid_feat = None
-        if self.test_dataset is None:
+        if self.test_dataset is None or self.test_dataset==[]:
             return self._load_raw_data_single_h5ad()
         if self.valid_dataset is not None:
             train_dataset_ids = self.train_dataset
