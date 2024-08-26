@@ -177,7 +177,7 @@ class CellTypeAnnotationDataset(BaseDataset):
         species = self.species
         tissue = self.tissue
         valid_feat = None
-        if self.test_dataset is None or self.test_dataset==[]:
+        if self.test_dataset is None or self.test_dataset == []:
             return self._load_raw_data_single_h5ad()
         if self.valid_dataset is not None:
             train_dataset_ids = self.train_dataset
