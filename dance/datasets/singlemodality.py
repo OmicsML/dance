@@ -53,7 +53,7 @@ class CellTypeAnnotationDataset(BaseDataset):
 
     def __init__(self, full_download=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
                  valid_dataset=None, train_dir="train", test_dir="test", valid_dir="valid", map_path="map",
-                 data_dir="./", train_as_valid=False, val_size=0.2,test_size=None,filetype: str = "csv"):
+                 data_dir="./", train_as_valid=False, val_size=0.2, test_size=None, filetype: str = "csv"):
         super().__init__(data_dir, full_download)
 
         self.data_dir = data_dir
@@ -73,8 +73,9 @@ class CellTypeAnnotationDataset(BaseDataset):
             self.valid_dataset = train_dataset
             self.train2valid()
         self.val_size = val_size
-        self.test_size=test_size
-        self.filetype=filetype
+        self.test_size = test_size
+        self.filetype = filetype
+
     def train2valid(self):
         logger.info("Copy train_dataset and use it as valid_dataset")
         temp_ava_data = self.available_data.copy()
@@ -112,8 +113,8 @@ class CellTypeAnnotationDataset(BaseDataset):
 
     def get_all_filenames(self, feat_suffix: str = "data", label_suffix: str = "celltype"):
         filenames = []
-        for id in self.train_dataset + (self.test_dataset if self.test_dataset is not None else []) + (self.valid_dataset
-                                                            if self.valid_dataset is not None else []):
+        for id in self.train_dataset + (self.test_dataset if self.test_dataset is not None else
+                                        []) + (self.valid_dataset if self.valid_dataset is not None else []):
             filenames.append(f"{self.species}_{self.tissue}{id}_{feat_suffix}.{self.filetype}")
             filenames.append(f"{self.species}_{self.tissue}{id}_{label_suffix}.{self.filetype}")
         return filenames
@@ -273,19 +274,20 @@ class CellTypeAnnotationDataset(BaseDataset):
 
             return adata, labels, idx_to_label, train_size, 0
 
-    def _load_raw_data_single_h5ad(self, ct_col: str = "cell_type") -> Tuple[ad.AnnData, List[Set[str]], List[str], int]:
+    def _load_raw_data_single_h5ad(self,
+                                   ct_col: str = "cell_type") -> Tuple[ad.AnnData, List[Set[str]], List[str], int]:
         species = self.species
         tissue = self.tissue
         valid_feat = None
         data_dir = self.data_dir
         train_dir = osp.join(data_dir, self.train_dir)
-        data_path=osp.join(train_dir, species, f"{species}_{tissue}{self.train_dataset[0]}_data.h5ad")
-        adata=sc.read_h5ad(data_path)
+        data_path = osp.join(train_dir, species, f"{species}_{tissue}{self.train_dataset[0]}_data.h5ad")
+        adata = sc.read_h5ad(data_path)
         map_path = osp.join(data_dir, self.map_path, self.species)
         X_train_temp, X_test = train_test_split(adata, test_size=0.2)
         X_train, X_val = train_test_split(X_train_temp, test_size=0.25)
-        train_feat,valid_feat,test_feat=X_train.X,X_val.X,X_test.X
-        train_label,valid_label,test_label=X_train.obs,X_val.obs,X_test.obs
+        train_feat, valid_feat, test_feat = X_train.X, X_val.X, X_test.X
+        train_label, valid_label, test_label = X_train.obs, X_val.obs, X_test.obs
         if valid_feat is not None:
             # Combine features (only use features that are present in the training data)
             train_size = train_feat.shape[0]
