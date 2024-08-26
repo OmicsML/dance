@@ -53,7 +53,7 @@ class CellTypeAnnotationDataset(BaseDataset):
 
     def __init__(self, full_download=False, train_dataset=None, test_dataset=None, species=None, tissue=None,
                  valid_dataset=None, train_dir="train", test_dir="test", valid_dir="valid", map_path="map",
-                 data_dir="./", train_as_valid=False, val_size=0.2):
+                 data_dir="./", train_as_valid=False, val_size=0.2,test_size=None,filetype: str = "csv"):
         super().__init__(data_dir, full_download)
 
         self.data_dir = data_dir
@@ -73,7 +73,8 @@ class CellTypeAnnotationDataset(BaseDataset):
             self.valid_dataset = train_dataset
             self.train2valid()
         self.val_size = val_size
-
+        self.test_size=test_size
+        self.filetype=filetype
     def train2valid(self):
         logger.info("Copy train_dataset and use it as valid_dataset")
         temp_ava_data = self.available_data.copy()
@@ -109,12 +110,12 @@ class CellTypeAnnotationDataset(BaseDataset):
                 pass
             os.rename(download_path, move_path)
 
-    def get_all_filenames(self, filetype: str = "csv", feat_suffix: str = "data", label_suffix: str = "celltype"):
+    def get_all_filenames(self, feat_suffix: str = "data", label_suffix: str = "celltype"):
         filenames = []
-        for id in self.train_dataset + self.test_dataset + (self.valid_dataset
+        for id in self.train_dataset + (self.test_dataset if self.test_dataset is not None else []) + (self.valid_dataset
                                                             if self.valid_dataset is not None else []):
-            filenames.append(f"{self.species}_{self.tissue}{id}_{feat_suffix}.{filetype}")
-            filenames.append(f"{self.species}_{self.tissue}{id}_{label_suffix}.{filetype}")
+            filenames.append(f"{self.species}_{self.tissue}{id}_{feat_suffix}.{self.filetype}")
+            filenames.append(f"{self.species}_{self.tissue}{id}_{label_suffix}.{self.filetype}")
         return filenames
 
     def download(self, download_map=True):
@@ -175,6 +176,8 @@ class CellTypeAnnotationDataset(BaseDataset):
         species = self.species
         tissue = self.tissue
         valid_feat = None
+        if self.test_dataset is None:
+            return self._load_raw_data_single_h5ad()
         if self.valid_dataset is not None:
             train_dataset_ids = self.train_dataset
             test_dataset_ids = self.test_dataset
@@ -251,6 +254,71 @@ class CellTypeAnnotationDataset(BaseDataset):
             adata = ad.AnnData(feat_df, dtype=np.float32)
 
             # Convert cell type labels and map test cell type names to train
+            cell_types = set(train_label[ct_col].unique())
+            idx_to_label = sorted(cell_types)
+            cell_type_mappings: Dict[str, Set[str]] = self.get_map_dict(map_path, tissue)
+            train_labels, test_labels = train_label[ct_col].tolist(), []
+            for i in test_label[ct_col]:
+                test_labels.append(i if i in cell_types else cell_type_mappings.get(i))
+            labels: List[Set[str]] = train_labels + test_labels
+
+            logger.debug("Mapped test cell-types:")
+            for i, j, k in zip(test_label.index, test_label[ct_col], test_labels):
+                logger.debug(f"{i}:{j}\t-> {k}")
+
+            logger.info(f"Loaded expression data: {adata}")
+            logger.info(f"Number of training samples: {train_feat.shape[0]:,}")
+            logger.info(f"Number of testing samples: {test_feat.shape[0]:,}")
+            logger.info(f"Cell-types (n={len(idx_to_label)}):\n{pprint.pformat(idx_to_label)}")
+
+            return adata, labels, idx_to_label, train_size, 0
+
+    def _load_raw_data_single_h5ad(self, ct_col: str = "cell_type") -> Tuple[ad.AnnData, List[Set[str]], List[str], int]:
+        species = self.species
+        tissue = self.tissue
+        valid_feat = None
+        data_dir = self.data_dir
+        train_dir = osp.join(data_dir, self.train_dir)
+        data_path=osp.join(train_dir, species, f"{species}_{tissue}{self.train_dataset[0]}_data.h5ad")
+        adata=sc.read_h5ad(data_path)
+        map_path = osp.join(data_dir, self.map_path, self.species)
+        X_train_temp, X_test = train_test_split(adata, test_size=0.2)
+        X_train, X_val = train_test_split(X_train_temp, test_size=0.25)
+        train_feat,valid_feat,test_feat=X_train.X,X_val.X,X_test.X
+        train_label,valid_label,test_label=X_train.obs,X_val.obs,X_test.obs
+        if valid_feat is not None:
+            # Combine features (only use features that are present in the training data)
+            train_size = train_feat.shape[0]
+            valid_size = valid_feat.shape[0]
+            # Convert cell type labels and map test cell type names to train
+            cell_types = set(train_label[ct_col].unique())
+            idx_to_label = sorted(cell_types)
+            cell_type_mappings: Dict[str, Set[str]] = self.get_map_dict(map_path, tissue)
+            train_labels, valid_labels, test_labels = train_label[ct_col].tolist(), [], []
+            for i in valid_label[ct_col]:
+                valid_labels.append(i if i in cell_types else cell_type_mappings.get(i))
+            for i in test_label[ct_col]:
+                test_labels.append(i if i in cell_types else cell_type_mappings.get(i))
+            labels: List[Set[str]] = train_labels + valid_labels + test_labels
+
+            logger.debug("Mapped valid cell-types:")
+            for i, j, k in zip(valid_label.index, valid_label[ct_col], valid_labels):
+                logger.debug(f"{i}:{j}\t-> {k}")
+
+            logger.debug("Mapped test cell-types:")
+            for i, j, k in zip(test_label.index, test_label[ct_col], test_labels):
+                logger.debug(f"{i}:{j}\t-> {k}")
+
+            logger.info(f"Loaded expression data: {adata}")
+            logger.info(f"Number of training samples: {train_feat.shape[0]:,}")
+            logger.info(f"Number of valid samples: {valid_feat.shape[0]:,}")
+            logger.info(f"Number of testing samples: {test_feat.shape[0]:,}")
+            logger.info(f"Cell-types (n={len(idx_to_label)}):\n{pprint.pformat(idx_to_label)}")
+
+            return adata, labels, idx_to_label, train_size, valid_size
+        else:
+            # Combine features (only use features that are present in the training data)
+            train_size = train_feat.shape[0]
             cell_types = set(train_label[ct_col].unique())
             idx_to_label = sorted(cell_types)
             cell_type_mappings: Dict[str, Set[str]] = self.get_map_dict(map_path, tissue)
