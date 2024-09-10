@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import get_args
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.singlecellnet import SingleCellNet
@@ -28,10 +28,9 @@ if __name__ == "__main__":
     parser.add_argument("--num_trees", type=int, default=1000)
     parser.add_argument("--species", default="mouse", type=str)
     parser.add_argument("--stratify", type=bool, default=True)
-    parser.add_argument("--test_dataset", type=int, nargs="+", default=[1759],
-                        help="List testing training dataset ids.")
+    parser.add_argument("--test_dataset", nargs="+", default=[], help="List testing training dataset ids.")
     parser.add_argument("--tissue", default="Spleen", type=str)
-    parser.add_argument("--train_dataset", type=int, nargs="+", default=[1970], help="List of training dataset ids.")
+    parser.add_argument("--train_dataset", nargs="+", default=[1970], help="List of training dataset ids.")
     parser.add_argument("--valid_dataset", nargs="+", default=None, help="List of valid dataset ids.")
     parser.add_argument("--seed", type=int, default=10)
 
@@ -40,13 +39,15 @@ if __name__ == "__main__":
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
+    parser.add_argument("--filetype", default="csv")
     args = parser.parse_args()
     logger.setLevel(args.log_level)
     logger.info(f"{pprint.pformat(vars(args))}")
     file_root_path = Path(
         args.root_path, "_".join([
             "-".join([str(num) for num in dataset])
-            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset] if dataset is not None
+            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
+            if (dataset is not None and dataset != [])
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
@@ -62,7 +63,7 @@ if __name__ == "__main__":
         # Load data and perform necessary preprocessing
         data = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
                                          species=args.species, tissue=args.tissue, valid_dataset=args.valid_dataset,
-                                         data_dir="../temp_data").load_data(cache=args.cache)
+                                         data_dir="../temp_data", filetype=args.filetype).load_data(cache=args.cache)
         kwargs = {tune_mode: dict(wandb.config)}
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")

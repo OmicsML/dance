@@ -12,10 +12,10 @@ import pandas as pd
 import scipy
 import torch
 import torch.utils.data as data_utils
-import wandb
 from sklearn import preprocessing
 
 import dance.utils.metrics as metrics
+import wandb
 from dance import logger
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.dcca import DCCA
@@ -95,11 +95,19 @@ if __name__ == "__main__":
         #                      layer_e_2=[Nfeature2, 1500, 128], hidden1_2=128, Zdim_2=4, layer_d_2=[4], hidden2_2=4, args=args,
         #                      Type_1="NB", Type_2="Bernoulli", ground_truth1=torch.cat([train_labels, test_labels]), cycle=1,
         #                      attention_loss="Eucli")  # yapf: disable
+        wandb_config = wandb.config
+        if "run_kwargs" in pipeline_planer.config:
+            if any(d == dict(wandb.config["run_kwargs"]) for d in pipeline_planer.config.run_kwargs):
+                wandb_config = wandb_config["run_kwargs"]
+            else:
+                wandb.log({"skip": 1})
+                wandb.finish()
+                return
         try:
             dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding")
             data = dataset.load_data()
             # Prepare preprocessing pipeline and apply it to data
-            kwargs = {tune_mode: dict(wandb.config)}
+            kwargs = {tune_mode: dict(wandb_config)}
             preprocessing_pipeline = pipeline_planer.generate(**kwargs)
             print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
             preprocessing_pipeline(data)
@@ -120,7 +128,8 @@ if __name__ == "__main__":
             y_train_size), train_labels = data.get_train_data(return_type="torch")
             (x_test, y_test, x_test_raw, y_test_raw, x_test_size,
             y_test_size), test_labels = data.get_test_data(return_type="torch")
-
+            train_idx=data.get_split_idx("train")
+            test_idx=data.get_split_idx("test")
             Nfeature1 = x_train.shape[1]
             Nfeature2 = y_train.shape[1]
 

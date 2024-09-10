@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import get_args
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
 
     logger.setLevel(args.log_level)
-    logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
+    logger.info(f"Running ACTINN with the following parameters:\n{pprint.pformat(vars(args))}")
 
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
