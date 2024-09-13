@@ -49,7 +49,7 @@ class SCNFeature(BaseTransform):
         # sc.pp.scale(adata, max_value=10)
         # Filtering shouldn't be here
         norm_exp_df = adata.to_df()
-        cell_type_df = cell_type_df.loc[adata.obs_names]  # not necessary, but kept here in case we subsample cells
+        # cell_type_df = cell_type_df.loc[adata.obs_names]  # not necessary, but kept here in case we subsample cells
 
         # Get differentially expressed genes and gene pairs
         cell_type_array = cell_type_df.columns.values[cell_type_df.values.argmax(1)]
