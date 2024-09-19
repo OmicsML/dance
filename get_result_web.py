@@ -7,8 +7,8 @@ from tqdm import tqdm
 
 from dance.utils import try_import
 
-# os.environ["http_proxy"]="http://121.250.209.147:7890"
-# os.environ["https_proxy"]="http://121.250.209.147:7890"
+os.environ["http_proxy"] = "http://121.250.209.147:7890"
+os.environ["https_proxy"] = "http://121.250.209.147:7890"
 wandb = try_import("wandb")
 entity = "xzy11632"
 project = "dance-dev"
@@ -55,13 +55,16 @@ def check_identical_strings(string_list):
     #     if s != first_string:
     #         raise ValueError(f"发现不同的字符串: '{first_string}' 和 '{s}'")
     # return first_string
-def get_sweep_url(step_csv: pd.DataFrame):
+def get_sweep_url(step_csv: pd.DataFrame, single=True):
     ids = step_csv["id"]
     sweep_urls = []
-    for run_id in tqdm(ids, leave=False):
+    for run_id in tqdm(reversed(ids),
+                       leave=False):  #The reversal of order is related to additional_sweep_ids.append(sweep_id)
         api = wandb.Api()
         run = api.run(f"/{entity}/{project}/runs/{run_id}")
         sweep_urls.append(run.sweep.url)
+        if single:
+            break
     sweep_url = check_identical_strings(sweep_urls)
     return sweep_url
 
@@ -74,7 +77,11 @@ def write_ans():
             step2_url = get_sweep_url(pd.read_csv(f"{file_path}/pipeline/best_test_acc.csv"))
             step3_urls = []
             for i in range(3):
-                step3_urls.append(get_sweep_url(pd.read_csv(f"{file_path}/params/{i}_best_test_acc.csv")))
+                file_csv = f"{file_path}/params/{i}_best_test_acc.csv"
+                if not os.path.exists(file_csv):
+                    print(f"文件 {file_csv} 不存在，跳过。")
+                    continue
+                step3_urls.append(get_sweep_url(pd.read_csv(file_csv)))
             step3_str = ",".join(step3_urls)
             step_str = f"step2:{step2_url}|step3:{step3_str}"
             ans.append({"Dataset_id": dataset_id, method_folder: step_str})
