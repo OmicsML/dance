@@ -369,7 +369,7 @@ class scMVAE(nn.Module):
 
         if X1 is not None:
             if self.log_variational:
-                X1_ = torch.log(torch.clamp(X1_,min=1e-7)+ 1)
+                X1_ = torch.log(torch.clamp(X1_, min=1e-7) + 1)
 
             mean_l, logvar_l, library = self.X1_encoder_l(X1_)
 
@@ -381,7 +381,7 @@ class scMVAE(nn.Module):
             if self.Type == 'ZINB':
                 if self.log_variational:
                     # X2_ = torch.log(X2_ + 1)
-                    X2_ = torch.log(torch.clamp(X2_,min=1e-7)+ 1)
+                    X2_ = torch.log(torch.clamp(X2_, min=1e-7) + 1)
                     mean_l2, logvar_l2, library2 = self.X2_encoder_l(X2_)
 
         means, logvar = self._encode_modalities(X1_, X2_)

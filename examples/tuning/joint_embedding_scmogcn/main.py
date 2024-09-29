@@ -20,8 +20,10 @@ from dance.utils import set_seed
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-t", "--subtask", default="openproblems_bmmc_cite_phase2",
-        choices=["GSE140203_BRAIN_atac2gex", "openproblems_bmmc_cite_phase2", "openproblems_bmmc_multiome_phase2","GSE140203_SKIN_atac2gex","openproblems_2022_multi_atac2gex"])
+        "-t", "--subtask", default="openproblems_bmmc_cite_phase2", choices=[
+            "GSE140203_BRAIN_atac2gex", "openproblems_bmmc_cite_phase2", "openproblems_bmmc_multiome_phase2",
+            "GSE140203_SKIN_atac2gex", "openproblems_2022_multi_atac2gex"
+        ])
     parser.add_argument("-d", "--data_folder", default="./data/joint_embedding")
     parser.add_argument("-pre", "--pretrained_folder", default="./data/joint_embedding/pretrained")
     parser.add_argument("-csv", "--csv_path", default="decoupled_lsi.csv")
@@ -56,8 +58,9 @@ if __name__ == "__main__":
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
-    os.environ["CUDA_LAUNCH_BLOCKING"]="1"
+    os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
     os.environ["WANDB_AGENT_DISABLE_FLAPPING"] = "True"
+
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
         set_seed(args.seed)
@@ -78,14 +81,14 @@ if __name__ == "__main__":
             print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
             preprocessing_pipeline(data)
             # train_idx=list(set(data.mod["meta1"].obs_names) & set(data.mod["mod1"].obs_names))
-            train_name=[item for item in data.mod["mod1"].obs_names if item in data.mod["meta1"].obs_names]
-            train_idx= [data.mod["mod1"].obs_names.get_loc(name) for name in train_name]
-            test_idx=list(set([i for i in range(data.mod["mod1"].shape[0])]).difference(set(train_idx)))
-            
+            train_name = [item for item in data.mod["mod1"].obs_names if item in data.mod["meta1"].obs_names]
+            train_idx = [data.mod["mod1"].obs_names.get_loc(name) for name in train_name]
+            test_idx = list({i for i in range(data.mod["mod1"].shape[0])}.difference(set(train_idx)))
+
             # train_size=data.mod["meta1"].shape[0]
             # test_size=data.mod["mod1"].shape[0]-train_size
-            data.set_split_idx("train",train_idx)
-            data.set_split_idx("test",test_idx)
+            data.set_split_idx("train", train_idx)
+            data.set_split_idx("test", test_idx)
             if args.preprocess != "aux":
                 cell_type_labels = data.data['test_sol'].obs["cell_type"].to_numpy()
                 cell_type_labels_unique = list(np.unique(cell_type_labels))
@@ -106,13 +109,15 @@ if __name__ == "__main__":
             #     feature_channel=["X_pca", "X_pca"],
             #     label_channel=["cell_type", "batch_label", "phase_labels", "S_scores", "G2M_scores"],
             # )
-            (x_mod1, x_mod2), (cell_type, batch_label, phase_label, S_score, G2M_score) = data.get_data(return_type="torch")
+            (x_mod1, x_mod2), (cell_type, batch_label, phase_label, S_score,
+                               G2M_score) = data.get_data(return_type="torch")
             phase_score = torch.cat([S_score[:, None], G2M_score[:, None]], 1)
             test_id = np.arange(x_mod1.shape[0])
             labels = cell_type.numpy()
             adata_sol = data.data['test_sol']  # [data._split_idx_dict['test']]
-            model = ScMoGCNWrapper(args, num_celL_types=int(cell_type.max() + 1), num_batches=int(batch_label.max() + 1),
-                                num_phases=phase_score.shape[1], num_features=x_mod1.shape[1] + x_mod2.shape[1])
+            model = ScMoGCNWrapper(args, num_celL_types=int(cell_type.max() + 1),
+                                   num_batches=int(batch_label.max() + 1), num_phases=phase_score.shape[1],
+                                   num_features=x_mod1.shape[1] + x_mod2.shape[1])
             model.fit(
                 g_mod1=data.data["mod1"].uns["g"],
                 g_mod2=data.data["mod2"].uns["g"],
@@ -139,7 +144,7 @@ if __name__ == "__main__":
             # del x_train, y_train, x_train_raw, y_train_raw, x_train_size,y_train_size,train_labels,x_test, y_test, x_test_raw, y_test_raw, x_test_size,y_test_size, test_labels
             # del labels,le,dataset,score
             # variables_to_delete=["data","model","adata_sol","adata","embeds","emb1", "emb2","total_loader","total,test_loader","test,train_loader","train","Nfeature2","Nfeature1","x_train", "y_train", "x_train_raw", "y_train_raw", "x_train_size","y_train_size","train_labels","x_test", "y_test"," x_test_raw", y_test_raw, x_test_size,y_test_size, test_labels,labels,le,dataset,score]
-            locals_keys=list(locals().keys())
+            locals_keys = list(locals().keys())
             for var in locals_keys:
                 try:
                     exec(f"del {var}")
