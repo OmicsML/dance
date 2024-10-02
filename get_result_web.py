@@ -13,13 +13,12 @@ wandb = try_import("wandb")
 entity = "xzy11632"
 project = "dance-dev"
 collect_datasets = {
-    "cta_actinn": [
-        "84230ea4-998d-4aa8-8456-81dd54ce23af", "d3566d6a-a455-4a15-980f-45eb29114cab",
-        "4c4cd77c-8fee-4836-9145-16562a8782fe", "ae29ebd0-1973-40a4-a6af-d15a5f77a80f",
-        "bc260987-8ee5-4b6e-8773-72805166b3f7", "bc2a7b3d-f04e-477e-96c9-9d5367d5425c",
-        "d9b4bc69-ed90-4f5f-99b2-61b0681ba436"
-    ],
     "cta_celltypist": [
+        "84230ea4-998d-4aa8-8456-81dd54ce23af",
+        "d3566d6a-a455-4a15-980f-45eb29114cab",
+    ],
+    "cta_scdeepsort": [
+        "84230ea4-998d-4aa8-8456-81dd54ce23af", "d3566d6a-a455-4a15-980f-45eb29114cab",
         "4c4cd77c-8fee-4836-9145-16562a8782fe", "ae29ebd0-1973-40a4-a6af-d15a5f77a80f",
         "bc260987-8ee5-4b6e-8773-72805166b3f7", "bc2a7b3d-f04e-477e-96c9-9d5367d5425c",
         "d9b4bc69-ed90-4f5f-99b2-61b0681ba436", "01209dce-3575-4bed-b1df-129f57fbc031",
@@ -27,14 +26,11 @@ collect_datasets = {
         "2adb1f8a-a6b1-4909-8ee8-484814e2d4bf", "3faad104-2ab8-4434-816d-474d8d2641db"
     ],
     "cta_singlecellnet": [
-        "4c4cd77c-8fee-4836-9145-16562a8782fe", "ae29ebd0-1973-40a4-a6af-d15a5f77a80f",
-        "bc260987-8ee5-4b6e-8773-72805166b3f7", "bc2a7b3d-f04e-477e-96c9-9d5367d5425c",
-        "d9b4bc69-ed90-4f5f-99b2-61b0681ba436", "01209dce-3575-4bed-b1df-129f57fbc031",
-        "055ca631-6ffb-40de-815e-b931e10718c0", "2a498ace-872a-4935-984b-1afa70fd9886",
-        "2adb1f8a-a6b1-4909-8ee8-484814e2d4bf", "3faad104-2ab8-4434-816d-474d8d2641db"
+        "84230ea4-998d-4aa8-8456-81dd54ce23af",
+        "d3566d6a-a455-4a15-980f-45eb29114cab",
     ]
 }
-file_root = "/home/zyxing/dance/examples/tuning"
+file_root = "/egr/research-dselab/dingjia5/zhongyu/dance/examples/tuning"
 
 
 def check_identical_strings(string_list):
@@ -58,7 +54,8 @@ def check_identical_strings(string_list):
 def get_sweep_url(step_csv: pd.DataFrame):
     ids = step_csv["id"]
     sweep_urls = []
-    for run_id in tqdm(ids, leave=False):
+    for run_id in tqdm(reversed(ids),
+                       leave=False):  #The reversal of order is related to additional_sweep_ids.append(sweep_id)
         api = wandb.Api()
         run = api.run(f"/{entity}/{project}/runs/{run_id}")
         sweep_urls.append(run.sweep.url)
