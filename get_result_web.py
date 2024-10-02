@@ -78,7 +78,11 @@ def write_ans():
             step2_url = get_sweep_url(pd.read_csv(f"{file_path}/pipeline/best_test_acc.csv"))
             step3_urls = []
             for i in range(3):
-                step3_urls.append(get_sweep_url(pd.read_csv(f"{file_path}/params/{i}_best_test_acc.csv")))
+                file_csv = f"{file_path}/params/{i}_best_test_acc.csv"
+                if not os.path.exists(file_csv):
+                    print(f"文件 {file_csv} 不存在，跳过。")
+                    continue
+                step3_urls.append(get_sweep_url(pd.read_csv(file_csv)))
             step3_str = ",".join(step3_urls)
             step_str = f"step2:{step2_url}|step3:{step3_str}"
             ans.append({"Dataset_id": dataset_id, method_folder: step_str})
