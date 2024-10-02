@@ -8,6 +8,7 @@ from functools import partial, reduce
 from operator import mul
 from pprint import pformat
 
+import omegaconf
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
@@ -793,6 +794,14 @@ class PipelinePlaner(Pipeline):
     def wandb_sweep_config(self) -> Dict[str, Any]:
         if self.wandb_config is None:
             raise ValueError("wandb config not specified in the raw config.")
+        if "run_kwargs" in self.config:
+            return {
+                **self.wandb_config, "parameters": {
+                    "run_kwargs": {
+                        "values": omegaconf.OmegaConf.to_object(self.config.run_kwargs)
+                    }
+                }
+            }
         return {**self.wandb_config, "parameters": self.search_space()}
 
     def wandb_sweep(self) -> Tuple[str, str, str]:
@@ -807,7 +816,7 @@ class PipelinePlaner(Pipeline):
                              f"'entity' and 'project': {wandb_entity=!r}, {wandb_project=!r}")
 
         sweep_config = self.wandb_sweep_config()
-        logger.info(f"Sweep config:\n{pformat(sweep_config)}")
+        # logger.info(f"Sweep config:\n{pformat(sweep_config)}")
         wandb_sweep_id = wandb.sweep(sweep=sweep_config, entity=wandb_entity, project=wandb_project)
         logger.info(Color("blue")(f"\n\n\t[*] Sweep ID: {wandb_sweep_id}\n"))
 
@@ -1032,7 +1041,9 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
     conf = OmegaConf.load(conf_load_path)
     pipeline_top_k = default(step2_pipeline_planer.config.pipeline_tuning_top_k, DEFAULT_PIPELINE_TUNING_TOP_K)
     result = pd.read_csv(result_load_path).sort_values(by=metric, ascending=ascending).head(pipeline_top_k)
-    columns = sorted([col for col in result.columns if col.startswith("pipeline")])
+    columns = sorted(
+        [col for col in result.columns if (col.startswith("pipeline") or col.startswith("run_kwargs_pipeline"))],
+        key=lambda x: float(x.split('.')[1]))
     pipeline_names = result.loc[:, columns].values
     count = 0
     for row in pipeline_names:
@@ -1041,11 +1052,12 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
         for x in row:
             for k in conf.pipeline:
                 if k["target"] == x:
-                    pipeline.append(k)
+                    pipeline.append(deepcopy(k))
         for i, f in zip(required_indexes, required_funs):
             for k in step2_pipeline_planer.config.pipeline:
                 if "target" in k and k["target"] == f:
-                    pipeline.insert(i, k)
+                    pipeline.insert(i, deepcopy(k))
+                    break
         for p1 in step2_pipeline_planer.config.pipeline:
             if "step3_frozen" in p1 and p1["step3_frozen"]:
                 for p2 in pipeline:
@@ -1056,6 +1068,16 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
                             for target, d_p in p1.default_params.items():
                                 if target == p2["target"]:
                                     p2["params"] = d_p
+        #顺序不对，参考_sanitize_pipeline进行修改 TODO
+        step2_pipeline = step2_pipeline_planer.config.pipeline
+        # step2_pipeline=sorted(step2_pipeline_planer.config.pipeline,key=lambda x: float(x.split('.')[1]))
+        for p1, p2 in zip(step2_pipeline, pipeline):  #need order
+            if "params" in p1:
+                p2.params = p1.params
+                # for key, value in p1.params.items():
+                #     if "params" not in p2:
+                #         p2.params = {}
+                #     p2.params[key] = value
         temp_conf = conf.copy()
         temp_conf.pipeline = pipeline
         temp_conf.wandb = step2_pipeline_planer.config.wandb
@@ -1086,9 +1108,9 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
     step3_k = default(step2_pipeline_planer.config.parameter_tuning_freq_n, DEFAULT_PARAMETER_TUNING_FREQ_N)
     # Skip some of the already run step3 because in pandas, when you sort columns with exactly the same values, the results are not random.
     # Instead, pandas preserves the order of the original data. So we can skip it without causing any impact.
-    step3_start_k = default(step2_pipeline_planer.config.step3_start_k, 0)
+    step3_start_k = step2_pipeline_planer.config.step3_start_k if "step3_start_k" in step2_pipeline_planer.config else 0
     #Some sweep_ids of step3 that have already been run
-    step3_sweep_ids = step2_pipeline_planer.config.step3_sweep_ids
+    step3_sweep_ids = step2_pipeline_planer.config.step3_sweep_ids if "step3_sweep_ids" in step2_pipeline_planer.config else None
     step3_sweep_ids = [None] * (pipeline_top_k - step3_start_k) if step3_sweep_ids is None else (
         step3_sweep_ids + [None] * (pipeline_top_k - step3_start_k - len(step3_sweep_ids)))
 

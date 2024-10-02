@@ -55,6 +55,8 @@ pipeline:
       max_fraction:
         values: [0.01, 0.05, 0.5, 0.7, 1.0]
   - type: normalize
+    target: tfidfTransform
+  - type: normalize
     target: NormalizePlaceHolder
   - type: filter.gene
     target: FilterGenesPercentile
@@ -217,19 +219,21 @@ pipeline:
           - [max_genes, max_counts, min_counts, min_genes]
           - [max_genes, max_counts, min_genes, min_counts]
       min_counts:
-        min: 3
-        max: 1000
+        min: 0.0 # Change occurs when joint embedding
+        max: 0.05
       min_genes:
         min: 0.0
         max: 0.05
       max_counts:
-        min: 10000
-        max: 100000
+        min: 0.95
+        max: 1.0
       max_genes:
         min: 0.95
         max: 1.0
   - type: filter.cell
     target: FilterCellsPlaceHolder
+  - type: filter.cell
+    target: FilterCellsCommonMod
   - type: feature.cell
     target: CellPCA
     params:
@@ -240,6 +244,14 @@ pipeline:
         max: 1000
   - type: feature.cell
     target: CellSVD
+    params:
+      out: feature.cell
+    params_to_tune:
+      n_components:
+        min: 100
+        max: 1000
+  - type: feature.cell
+    target: SparsePCA
     params:
       out: feature.cell
     params_to_tune:

@@ -11,6 +11,7 @@ Chunman Zuo, Hao Dai, Luonan Chen. Deep cross-omics cycle attention model for jo
 import collections
 import math
 import os
+import sys
 import time
 import warnings
 from collections import OrderedDict
@@ -385,7 +386,7 @@ class VAE(nn.Module):
 
         train_loss_list = []
         reco_epoch_test = 0
-        test_like_max = 100000
+        test_like_max = sys.maxsize
         flag_break = 0
 
         patience_epoch = 0
@@ -394,7 +395,7 @@ class VAE(nn.Module):
         model_pre.eval()
 
         start = time.time()
-
+        best_dict = None
         for epoch in range(1, args.max_epoch + 1):
 
             self.train()
@@ -636,7 +637,7 @@ class VAE(nn.Module):
                     break
 
         duration = time.time() - start
-        self.load_state_dict(best_dict)
+        self.load_state_dict(best_dict if best_dict is not None else self.state_dict())
 
         print('Finish training, total time is: ' + str(duration) + 's')
         self.eval()
