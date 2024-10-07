@@ -78,7 +78,7 @@ def write_ans():
             step3_urls = []
             for i in range(3):
                 file_csv = f"{file_path}/params/{i}_best_test_acc.csv"
-                if not os.path.exists(file_csv):
+                if not os.path.exists(file_csv):  #no parameter
                     print(f"文件 {file_csv} 不存在，跳过。")
                     continue
                 step3_urls.append(get_sweep_url(pd.read_csv(file_csv)))
