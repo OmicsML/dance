@@ -116,7 +116,7 @@ class ScMoGCNWrapper:
             Bipartite expression feature graph for modality 1.
         g_mod2 : dgl.DGLGraph
             Bipartite expression feature graph for modality 2.
-        train_size : int
+        train_size : int or array_like
             Number of training samples.
         labels : torch.Tensor
             Labels for training samples.
