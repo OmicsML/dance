@@ -3,6 +3,7 @@ import os
 
 import numpy as np
 import pandas as pd
+from natsort import os_sort_key
 from omegaconf import OmegaConf
 from sympy import im
 from tqdm import tqdm
@@ -142,11 +143,22 @@ def get_best_yaml(step_name, best_run, file_path):
     return OmegaConf.to_yaml(conf["pipeline"])
 
 
+def check_exist(file_path):
+    file_path = f"{file_path}/results/params/"
+    if os.path.exists(file_path) and os.path.isdir(file_path):
+        file_num = len(os.listdir(file_path))
+        return file_num > 1
+    else:
+        return False
+
+
 def write_ans():
     ans = []
     for method_folder in tqdm(collect_datasets):
         for dataset_id in collect_datasets[method_folder]:
             file_path = f"{file_root}/{method_folder}/{dataset_id}"
+            if not check_exist(file_path):
+                continue
             step2_url = get_sweep_url(pd.read_csv(f"{file_path}/results/pipeline/best_test_acc.csv"))
             step3_urls = []
             for i in range(3):
