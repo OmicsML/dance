@@ -11,8 +11,7 @@ from tqdm import tqdm
 from dance.utils import try_import
 
 # get yaml of best method
-os.environ["http_proxy"] = "http://121.250.209.147:7890"
-os.environ["https_proxy"] = "http://121.250.209.147:7890"
+
 wandb = try_import("wandb")
 entity = "xzy11632"
 project = "dance-dev"
