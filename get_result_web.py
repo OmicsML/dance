@@ -13,26 +13,26 @@ wandb = try_import("wandb")
 entity = "xzy11632"
 project = "dance-dev"
 collect_datasets = {
-    "cta_actinn": [
-        "471647b3-04fe-4c76-8372-3264feb950e8", "8a554710-08bc-4005-87cd-da9675bdc2e7",
-        "eeacb0c1-2217-4cf6-b8ce-1f0fedf1b569", "01209dce-3575-4bed-b1df-129f57fbc031",
-        "055ca631-6ffb-40de-815e-b931e10718c0", "2a498ace-872a-4935-984b-1afa70fd9886",
-        "2adb1f8a-a6b1-4909-8ee8-484814e2d4bf", "3faad104-2ab8-4434-816d-474d8d2641db"
-    ],
-    "cta_celltypist": [
-        "471647b3-04fe-4c76-8372-3264feb950e8",
-        "8a554710-08bc-4005-87cd-da9675bdc2e7",
-        "eeacb0c1-2217-4cf6-b8ce-1f0fedf1b569",
-    ],
-    "cta_scdeepsort": [
-        "471647b3-04fe-4c76-8372-3264feb950e8",
-        "8a554710-08bc-4005-87cd-da9675bdc2e7",
-        "eeacb0c1-2217-4cf6-b8ce-1f0fedf1b569",
-    ],
+    # "cta_actinn": [
+    #     "471647b3-04fe-4c76-8372-3264feb950e8", "8a554710-08bc-4005-87cd-da9675bdc2e7",
+    #     "eeacb0c1-2217-4cf6-b8ce-1f0fedf1b569", "01209dce-3575-4bed-b1df-129f57fbc031",
+    #     "055ca631-6ffb-40de-815e-b931e10718c0", "2a498ace-872a-4935-984b-1afa70fd9886",
+    #     "2adb1f8a-a6b1-4909-8ee8-484814e2d4bf", "3faad104-2ab8-4434-816d-474d8d2641db"
+    # ],
+    # "cta_celltypist": [
+    #     "471647b3-04fe-4c76-8372-3264feb950e8",
+    #     "8a554710-08bc-4005-87cd-da9675bdc2e7",
+    #     "eeacb0c1-2217-4cf6-b8ce-1f0fedf1b569",
+    # ],
+    # "cta_scdeepsort": [
+    #     "471647b3-04fe-4c76-8372-3264feb950e8",
+    #     "8a554710-08bc-4005-87cd-da9675bdc2e7",
+    #     "eeacb0c1-2217-4cf6-b8ce-1f0fedf1b569",
+    # ],
     "cta_singlecellnet": [
-        "471647b3-04fe-4c76-8372-3264feb950e8",
-        "8a554710-08bc-4005-87cd-da9675bdc2e7",
-        "eeacb0c1-2217-4cf6-b8ce-1f0fedf1b569",
+        "c7775e88-49bf-4ba2-a03b-93f00447c958", "456e8b9b-f872-488b-871d-94534090a865",
+        "738942eb-ac72-44ff-a64b-8943b5ecd8d9", "a5d95a42-0137-496f-8a60-101e17f263c8",
+        "71be997d-ff75-41b9-8a9f-1288c865f921"
     ]
 }
 file_root = "/home/zyxing/dance/examples/tuning"
@@ -87,7 +87,7 @@ def write_ans():
             step_str = f"step2:{step2_url}|step3:{step3_str}"
             ans.append({"Dataset_id": dataset_id, method_folder: step_str})
     with open('temp_ans.json', 'w') as f:
-        json.dump(ans, f)
+        json.dump(ans, f, indent=4)
 
 
 write_ans()
