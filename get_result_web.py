@@ -104,7 +104,7 @@ def get_best_method(urls, metric_col="test_acc"):
         elif all_best_run.summary[metric_col] > best_run.summary[metric_col] and goal == "minimize":
             all_best_run = best_run
             all_best_step_name = step_name
-    return all_best_step_name, all_best_run
+    return all_best_step_name, all_best_run, all_best_run.summary[metric_col]
 
 
 def get_best_yaml(step_name, best_run, file_path):
@@ -169,9 +169,14 @@ def write_ans():
                 step3_urls.append(get_sweep_url(pd.read_csv(file_csv)))
             step3_str = ",".join(step3_urls)
             step_str = f"step2:{step2_url}|step3:{step3_str}"
-            step_name, best_run = get_best_method([step2_url] + step3_urls)
+            step_name, best_run, best_res = get_best_method([step2_url] + step3_urls)
             best_yaml = get_best_yaml(step_name, best_run, file_path)
-            ans.append({"Dataset_id": dataset_id, method_folder: step_str, "best_yaml": best_yaml})
+            ans.append({
+                "Dataset_id": dataset_id,
+                method_folder: step_str,
+                f"{method_folder}_best_yaml": best_yaml,
+                f"{method_folder}_best_res": best_res
+            })
     # with open('temp_ans.json', 'w') as f:
     #     json.dump(ans, f,indent=4)
     pd.DataFrame(ans).to_csv("temp_ans.csv")
