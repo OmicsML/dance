@@ -1,3 +1,5 @@
+import argparse
+
 import pandas as pd
 
 atlas_datasets = [
@@ -80,7 +82,10 @@ def get_ans(query_dataset, method):
 
 
 ans_all = {}
-methods = ["cta_actinn", "cta_scdeepsort"]
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument("--methods", default=["cta_actinn", "cta_scdeepsort"], nargs="+")
+args = parser.parse_args()
+methods = args.methods
 if __name__ == "__main__":
     for query_dataset in query_datasets:
         ans = []
