@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -15,9 +16,10 @@ from dance.utils import try_import
 wandb = try_import("wandb")
 entity = "xzy11632"
 project = "dance-dev"
-with open("dataset_server.json") as f:
+file_root = str(Path(__file__).resolve().parent)
+with open(f"{file_root}/dataset_server.json") as f:
     collect_datasets = json.load(f)
-file_root = "/home/zyxing/dance/examples/tuning"
+file_root = "./tuning"
 
 
 def check_identical_strings(string_list):
@@ -181,4 +183,5 @@ def write_ans():
     pd.DataFrame(ans).to_csv("temp_ans.csv")
 
 
-write_ans()
+if __name__ == "__main__":
+    write_ans()
