@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 
 import pandas as pd
 
@@ -20,6 +21,8 @@ import ast
 from get_result_web import get_sweep_url, spilt_web
 
 from dance.utils import try_import
+
+file_root = str(Path(__file__).resolve().parent.parent)
 
 
 def find_unique_matching_row(df, config_col, input_dict_list):
@@ -70,7 +73,7 @@ query_datasets = [
 
 
 def get_ans(query_dataset, method):
-    data = pd.read_csv(f"/home/zyxing/dance/examples/tuning/{method}/{query_dataset}/results/atlas/best_test_acc.csv")
+    data = pd.read_csv(f"{file_root}/tuning/{method}/{query_dataset}/results/atlas/best_test_acc.csv")
     sweep_url = get_sweep_url(data)
     _, _, sweep_id = spilt_web(sweep_url)
     sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
