@@ -1,5 +1,6 @@
 import argparse
 import gc
+import gc
 import os
 import pprint
 import sys
@@ -83,7 +84,21 @@ if __name__ == "__main__":
         try:
             dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding")
             data = dataset.load_data()
+        wandb_config = wandb.config
+        if "run_kwargs" in pipeline_planer.config:
+            if any(d == dict(wandb.config["run_kwargs"]) for d in pipeline_planer.config.run_kwargs):
+                wandb_config = wandb_config["run_kwargs"]
+            else:
+                wandb.log({"skip": 1})
+                wandb.finish()
+                return
+        try:
+            dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding")
+            data = dataset.load_data()
 
+            le = preprocessing.LabelEncoder()
+            labels = le.fit_transform(data.mod["test_sol"].obs["cell_type"])
+            data.mod["mod1"].obsm["labels"] = labels
             le = preprocessing.LabelEncoder()
             labels = le.fit_transform(data.mod["test_sol"].obs["cell_type"])
             data.mod["mod1"].obsm["labels"] = labels
@@ -122,9 +137,41 @@ if __name__ == "__main__":
                                             lib_var2[test_idx], y_test)
 
             total = data_utils.TensorDataset(torch.cat([x_train, x_test]), torch.cat([y_train, y_test]))
+            total = data_utils.TensorDataset(torch.cat([x_train, x_test]), torch.cat([y_train, y_test]))
 
             total_loader = data_utils.DataLoader(total, batch_size=args.batch_size, shuffle=False)
+            total_loader = data_utils.DataLoader(total, batch_size=args.batch_size, shuffle=False)
 
+            x_test = torch.cat([x_train, x_test])
+            y_test = torch.cat([y_train, y_test])
+            labels = torch.from_numpy(le.fit_transform(data.mod["test_sol"].obs["cell_type"]))  #这里大概会有问题，很可能就是降维的问题
+            model = scMVAE(
+                encoder_1=[Nfeature1, 1024, 128, 128],
+                hidden_1=128,
+                Z_DIMS=22,
+                decoder_share=[22, 128, 256],
+                share_hidden=128,
+                decoder_1=[128, 128, 1024],
+                hidden_2=1024,
+                encoder_l=[Nfeature1, 128],
+                hidden3=128,
+                encoder_2=[Nfeature2, 1024, 128, 128],
+                hidden_4=128,
+                encoder_l1=[Nfeature2, 128],
+                hidden3_1=128,
+                decoder_2=[128, 128, 1024],
+                hidden_5=1024,
+                drop_rate=0.1,
+                log_variational=True,
+                Type="ZINB",
+                device=device,
+                n_centroids=22,
+                penality="GMM",
+                model=1,
+            )
+            model.to(device)
+            model.init_gmm_params(total_loader)
+            model.fit(args, train, valid, args.final_rate, args.scale_factor, device)
             x_test = torch.cat([x_train, x_test])
             y_test = torch.cat([y_train, y_test])
             labels = torch.from_numpy(le.fit_transform(data.mod["test_sol"].obs["cell_type"]))  #这里大概会有问题，很可能就是降维的问题

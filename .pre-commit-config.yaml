@@ -32,13 +32,13 @@ repos:
         name: Sort imports
         args: [--line-width, "120", --profile, black]
 
-  - repo: https://github.com/PyCQA/docformatter
-    rev: v1.7.5
-    hooks:
-      - id: docformatter
-        name: Format docstring
-        additional_dependencies: [tomli]
-        args: [--config, pyproject.toml]
+  # - repo: https://github.com/PyCQA/docformatter
+  #   rev: v1.7.5
+  #   hooks:
+  #     - id: docformatter
+  #       name: Format docstring
+  #       additional_dependencies: [tomli]
+  #       args: [--config, pyproject.toml]
 
   - repo: https://github.com/executablebooks/mdformat
     rev: 0.7.17
