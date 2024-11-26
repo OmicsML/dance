@@ -1,4 +1,5 @@
 import argparse
+import gc
 import os
 import pprint
 import sys
@@ -71,81 +72,107 @@ if __name__ == "__main__":
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
         set_seed(args.seed)
-        dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding")
-        data = dataset.load_data()
+        wandb_config = wandb.config
+        if "run_kwargs" in pipeline_planer.config:
+            if any(d == dict(wandb.config["run_kwargs"]) for d in pipeline_planer.config.run_kwargs):
+                wandb_config = wandb_config["run_kwargs"]
+            else:
+                wandb.log({"skip": 1})
+                wandb.finish()
+                return
+        try:
+            dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding")
+            data = dataset.load_data()
 
-        le = preprocessing.LabelEncoder()
-        labels = le.fit_transform(data.mod["test_sol"].obs["cell_type"])
-        data.mod["mod1"].obsm["labels"] = labels
+            le = preprocessing.LabelEncoder()
+            labels = le.fit_transform(data.mod["test_sol"].obs["cell_type"])
+            data.mod["mod1"].obsm["labels"] = labels
 
-        # Prepare preprocessing pipeline and apply it to data
-        kwargs = {tune_mode: dict(wandb.config)}
-        preprocessing_pipeline = pipeline_planer.generate(**kwargs)
-        print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
-        preprocessing_pipeline(data)
+            # Prepare preprocessing pipeline and apply it to data
+            kwargs = {tune_mode: dict(wandb_config)}
+            preprocessing_pipeline = pipeline_planer.generate(**kwargs)
+            print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
+            preprocessing_pipeline(data)
+            train_name=[item for item in data.mod["mod1"].obs_names if item in data.mod["meta1"].obs_names]
+            train_idx= [data.mod["mod1"].obs_names.get_loc(name) for name in train_name]
+            test_idx=list(set([i for i in range(data.mod["mod1"].shape[0])]).difference(set(train_idx)))
+            
+            # train_size=data.mod["meta1"].shape[0]
+            # test_size=data.mod["mod1"].shape[0]-train_size
+            data.set_split_idx("train",train_idx)
+            data.set_split_idx("test",test_idx)
+            (x_train, y_train,x_train_raw,y_train_raw),_ = data.get_train_data(return_type="torch")
+            (x_test, y_test,x_test_raw,y_test_raw), labels = data.get_test_data(return_type="torch")
+            # x_train,y_train,x_test,y_test,labels=torch.nan_to_num(x_train),torch.nan_to_num(y_train),torch.nan_to_num(x_test),torch.nan_to_num(y_test),torch.nan_to_num(labels)
+            lib_mean1, lib_var1 = calculate_log_library_size(np.concatenate([x_train_raw.numpy(), x_test_raw.numpy()]))
+            lib_mean2, lib_var2 = calculate_log_library_size(np.concatenate([y_train_raw.numpy(), y_test_raw.numpy()]))
+            lib_mean1 = torch.from_numpy(lib_mean1)
+            lib_var1 = torch.from_numpy(lib_var1)
+            lib_mean2 = torch.from_numpy(lib_mean2)
+            lib_var2 = torch.from_numpy(lib_var2)
 
-        (x_train, y_train), _ = data.get_train_data(return_type="torch")
-        (x_test, y_test), labels = data.get_test_data(return_type="torch")
+            Nfeature1 = x_train.shape[1]
+            Nfeature2 = y_train.shape[1]
+            # train_size = len(data.get_split_idx("train"))
+            # train_size=x_train.shape[0]
+            train = data_utils.TensorDataset(x_train, lib_mean1[train_idx], lib_var1[train_idx], lib_mean2[train_idx],
+                                            lib_var2[train_idx], y_train)
 
-        lib_mean1, lib_var1 = calculate_log_library_size(np.concatenate([x_train.numpy(), x_test.numpy()]))
-        lib_mean2, lib_var2 = calculate_log_library_size(np.concatenate([y_train.numpy(), y_test.numpy()]))
-        lib_mean1 = torch.from_numpy(lib_mean1)
-        lib_var1 = torch.from_numpy(lib_var1)
-        lib_mean2 = torch.from_numpy(lib_mean2)
-        lib_var2 = torch.from_numpy(lib_var2)
+            valid = data_utils.TensorDataset(x_test, lib_mean1[test_idx], lib_var1[test_idx], lib_mean2[test_idx],
+                                            lib_var2[test_idx], y_test)
 
-        Nfeature1 = x_train.shape[1]
-        Nfeature2 = y_train.shape[1]
-        train_size = len(data.get_split_idx("train"))
-        train = data_utils.TensorDataset(x_train, lib_mean1[:train_size], lib_var1[:train_size], lib_mean2[:train_size],
-                                         lib_var2[:train_size], y_train)
+            total = data_utils.TensorDataset(torch.cat([x_train, x_test]), torch.cat([y_train, y_test]))
 
-        valid = data_utils.TensorDataset(x_test, lib_mean1[train_size:], lib_var1[train_size:], lib_mean2[train_size:],
-                                         lib_var2[train_size:], y_test)
+            total_loader = data_utils.DataLoader(total, batch_size=args.batch_size, shuffle=False)
 
-        total = data_utils.TensorDataset(torch.cat([x_train, x_test]), torch.cat([y_train, y_test]))
+            x_test = torch.cat([x_train, x_test])
+            y_test = torch.cat([y_train, y_test])
+            labels = torch.from_numpy(le.fit_transform(data.mod["test_sol"].obs["cell_type"]))  #这里大概会有问题，很可能就是降维的问题
+            model = scMVAE(
+                encoder_1=[Nfeature1, 1024, 128, 128],
+                hidden_1=128,
+                Z_DIMS=22,
+                decoder_share=[22, 128, 256],
+                share_hidden=128,
+                decoder_1=[128, 128, 1024],
+                hidden_2=1024,
+                encoder_l=[Nfeature1, 128],
+                hidden3=128,
+                encoder_2=[Nfeature2, 1024, 128, 128],
+                hidden_4=128,
+                encoder_l1=[Nfeature2, 128],
+                hidden3_1=128,
+                decoder_2=[128, 128, 1024],
+                hidden_5=1024,
+                drop_rate=0.1,
+                log_variational=True,
+                Type="ZINB",
+                device=device,
+                n_centroids=22,
+                penality="GMM",
+                model=1,
+            )
+            model.to(device)
+            model.init_gmm_params(total_loader)
+            model.fit(args, train, valid, args.final_rate, args.scale_factor, device)
 
-        total_loader = data_utils.DataLoader(total, batch_size=args.batch_size, shuffle=False)
-
-        x_test = torch.cat([x_train, x_test])
-        y_test = torch.cat([y_train, y_test])
-        labels = torch.from_numpy(le.fit_transform(data.mod["test_sol"].obs["cell_type"]))  #这里大概会有问题，很可能就是降维的问题
-        model = scMVAE(
-            encoder_1=[Nfeature1, 1024, 128, 128],
-            hidden_1=128,
-            Z_DIMS=22,
-            decoder_share=[22, 128, 256],
-            share_hidden=128,
-            decoder_1=[128, 128, 1024],
-            hidden_2=1024,
-            encoder_l=[Nfeature1, 128],
-            hidden3=128,
-            encoder_2=[Nfeature2, 1024, 128, 128],
-            hidden_4=128,
-            encoder_l1=[Nfeature2, 128],
-            hidden3_1=128,
-            decoder_2=[128, 128, 1024],
-            hidden_5=1024,
-            drop_rate=0.1,
-            log_variational=True,
-            Type="ZINB",
-            device=device,
-            n_centroids=22,
-            penality="GMM",
-            model=1,
-        )
-        model.to(device)
-        model.init_gmm_params(total_loader)
-        model.fit(args, train, valid, args.final_rate, args.scale_factor, device)
-
-        # embeds = model.predict(x_test, y_test).cpu().numpy()
-        score = model.score(x_test, y_test, labels)
-        score.update(model.score(x_test, y_test, labels, adata_sol=data.data['test_sol'], metric="openproblems"))
-        score["ARI"] = score["dance_ari"]
-        del score["dance_ari"]
-        wandb.log(score)
-        wandb.finish()
-        torch.cuda.empty_cache()
+            # embeds = model.predict(x_test, y_test).cpu().numpy()
+            score = model.score(x_test, y_test, labels)
+            # score.update(model.score(x_test, y_test, labels, adata_sol=data.data['test_sol'], metric="openproblems"))
+            score["ARI"] = score["dance_ari"]
+            del score["dance_ari"]
+            wandb.log(score)
+            wandb.finish()
+        finally:
+            locals_keys=list(locals().keys())
+            for var in locals_keys:
+                try:
+                    exec(f"del {var}")
+                    logger.info(f"Deleted '{var}'")
+                except NameError:
+                    logger.info(f"Variable '{var}' does not exist, continuing...")
+            torch.cuda.empty_cache()
+            gc.collect()
         # score.update({
         #     'seed': args.seed + k,
         #     'subtask': args.subtask,
