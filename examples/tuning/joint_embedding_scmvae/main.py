@@ -1,6 +1,5 @@
 import argparse
 import gc
-import gc
 import os
 import pprint
 import sys
@@ -111,7 +110,7 @@ if __name__ == "__main__":
             train_name=[item for item in data.mod["mod1"].obs_names if item in data.mod["meta1"].obs_names]
             train_idx= [data.mod["mod1"].obs_names.get_loc(name) for name in train_name]
             test_idx=list(set([i for i in range(data.mod["mod1"].shape[0])]).difference(set(train_idx)))
-            
+
             # train_size=data.mod["meta1"].shape[0]
             # test_size=data.mod["mod1"].shape[0]-train_size
             data.set_split_idx("train",train_idx)
