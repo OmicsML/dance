@@ -14,7 +14,6 @@ from dance.utils import try_import
 # get yaml of best method
 
 
-
 def check_identical_strings(string_list):
     if not string_list:
         raise ValueError("列表为空")
@@ -148,8 +147,8 @@ def check_exist(file_path):
 
 def write_ans(tissue):
     ans = []
-    collect_datasets=all_datasets[tissue]
-    
+    collect_datasets = all_datasets[tissue]
+
     for method_folder in tqdm(collect_datasets):
         for dataset_id in collect_datasets[method_folder]:
             file_path = f"{file_root}/{method_folder}/{dataset_id}"
@@ -186,6 +185,6 @@ if __name__ == "__main__":
     with open(f"{file_root}/dataset_server.json") as f:
         all_datasets = json.load(f)
     file_root = "./tuning"
-    tissues=["heart"]
+    tissues = ["heart"]
     for tissue in tissues:
         write_ans(tissue)
