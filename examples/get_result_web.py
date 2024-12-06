@@ -13,14 +13,6 @@ from dance.utils import try_import
 
 # get yaml of best method
 
-wandb = try_import("wandb")
-entity = "xzy11632"
-project = "dance-dev"
-file_root = str(Path(__file__).resolve().parent)
-with open(f"{file_root}/dataset_server.json") as f:
-    collect_datasets = json.load(f)
-file_root = "./tuning"
-
 
 def check_identical_strings(string_list):
     if not string_list:
@@ -156,8 +148,10 @@ def check_exist(file_path):
         return False
 
 
-def write_ans():
+def write_ans(tissue):
     ans = []
+    collect_datasets = all_datasets[tissue]
+
     for method_folder in tqdm(collect_datasets):
         for dataset_id in collect_datasets[method_folder]:
             file_path = f"{file_root}/{method_folder}/{dataset_id}"
@@ -183,8 +177,17 @@ def write_ans():
             })
     # with open('temp_ans.json', 'w') as f:
     #     json.dump(ans, f,indent=4)
-    pd.DataFrame(ans).to_csv("temp_ans.csv")
+    pd.DataFrame(ans).to_csv(f"{tissue}_ans.csv")
 
 
 if __name__ == "__main__":
-    write_ans()
+    wandb = try_import("wandb")
+    entity = "xzy11632"
+    project = "dance-dev"
+    file_root = str(Path(__file__).resolve().parent)
+    with open(f"{file_root}/dataset_server.json") as f:
+        all_datasets = json.load(f)
+    file_root = "./tuning"
+    tissues = ["heart"]
+    for tissue in tissues:
+        write_ans(tissue)
