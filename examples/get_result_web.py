@@ -65,9 +65,12 @@ def spilt_web(url: str):
     if match:
         entity = match.group(1)
         project = match.group(2)
-        sweep_id = match.group(3)
-
-        return entity, project, sweep_id
+        pattern = r'/sweeps/([^/?]+)'  # 正则表达式模式
+        match = re.search(pattern, url)
+        if match:
+            sweep_id = match.group(1)
+            return entity, project, sweep_id
+        return None
     else:
         print(url)
         print("No match found")
