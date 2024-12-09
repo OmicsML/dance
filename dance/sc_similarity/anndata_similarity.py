@@ -193,8 +193,8 @@ class AnnDataSimilarity:
                     gene_counts = np.array(data.X.sum(axis=0)).flatten()
                 else:
                     gene_counts = data.X.sum(axis=0)
-            data.var["n_counts"]=gene_counts
-            data.var["n_counts"]=data.var["n_counts"].astype(float)
+            data.var["n_counts"] = gene_counts
+            data.var["n_counts"] = data.var["n_counts"].astype(float)
             con_sim["var_n_counts_mean"] = np.mean(data.var["n_counts"])
             con_sim["var_n_counts_var"] = np.var(data.var["n_counts"])
             data.uns["con_sim"] = con_sim
