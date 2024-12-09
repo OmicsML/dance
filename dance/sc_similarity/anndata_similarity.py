@@ -9,6 +9,7 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import scanpy as sc
+import scipy
 import yaml
 from omegaconf import OmegaConf
 from scipy.spatial.distance import jaccard
@@ -187,6 +188,13 @@ class AnnDataSimilarity:
             con_sim["gene_num"] = len(data.var)
             con_sim["n_counts_mean"] = np.mean(data.obs["n_counts"])
             con_sim["n_counts_var"] = np.var(data.obs["n_counts"])
+            if "n_counts" not in data.var.columns:
+                if scipy.sparse.issparse(data.X):
+                    gene_counts = np.array(data.X.sum(axis=0)).flatten()
+                else:
+                    gene_counts = data.X.sum(axis=0)
+            data.var["n_counts"]=gene_counts
+            data.var["n_counts"]=data.var["n_counts"].astype(float)
             con_sim["var_n_counts_mean"] = np.mean(data.var["n_counts"])
             con_sim["var_n_counts_var"] = np.var(data.var["n_counts"])
             data.uns["con_sim"] = con_sim
