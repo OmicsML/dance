@@ -65,7 +65,8 @@ if __name__ == "__main__":
     args.lr2 = 0.005
     args.flr2 = 0.0005
 
-    dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding", preprocess="feature_selection",span=args.span)
+    dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding", preprocess="feature_selection",
+                                        span=args.span)
     data = dataset.load_data()
 
     le = preprocessing.LabelEncoder()
