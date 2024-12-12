@@ -32,11 +32,12 @@ def parameter_setting():
     parser.add_argument("--epoch_per_test", "-ept", type=int, default=1,
                         help="Epoch per test, must smaller than max iteration.")
     parser.add_argument("--max_ARI", "-ma", type=int, default=-200, help="initial ARI")
-    parser.add_argument("-t", "--subtask", default="GSE140203_SKIN_atac2gex")
+    parser.add_argument("-t", "--subtask", default="openproblems_2022_multi_atac2gex")
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("--final_rate", type=float, default=1e-4)
     parser.add_argument("--scale_factor", type=float, default=4)
     parser.add_argument("--span", type=float, default=0.3)
+    parser.add_argument("--selection_threshold", type=int, default=3000)
     return parser
 
 
@@ -47,7 +48,7 @@ if __name__ == "__main__":
     assert args.max_iteration > args.epoch_per_test
 
     dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding", preprocess="feature_selection",
-                                        span=args.span)
+                                        span=args.span, selection_threshold=args.selection_threshold)
     data = dataset.load_data()
 
     le = preprocessing.LabelEncoder()
