@@ -46,7 +46,7 @@ def parameter_setting():
     parser.add_argument("--epoch_per_test", "-ept", type=int, default=5, help="Epoch per test")
     parser.add_argument("--max_ARI", "-ma", type=int, default=-200, help="initial ARI")
     parser.add_argument("-t", "--subtask", default="openproblems_2022_multi_atac2gex")
-    parser.add_argument("-device", "--device", default="cuda")
+    parser.add_argument("-device", "--device", default="cuda:5")
     parser.add_argument("--final_rate", type=float, default=1e-4)
     parser.add_argument("--scale_factor", type=float, default=4)
     parser.add_argument("--span", type=float, default=0.3)
@@ -65,7 +65,8 @@ if __name__ == "__main__":
     args.lr2 = 0.005
     args.flr2 = 0.0005
 
-    dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding", preprocess="feature_selection",span=args.span)
+    dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding", preprocess="feature_selection",
+                                        span=args.span)
     data = dataset.load_data()
 
     le = preprocessing.LabelEncoder()
