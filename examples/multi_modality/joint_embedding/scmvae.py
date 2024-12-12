@@ -46,7 +46,8 @@ if __name__ == "__main__":
     set_seed(args.seed)
     assert args.max_iteration > args.epoch_per_test
 
-    dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding", preprocess="feature_selection",span=args.span)
+    dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding", preprocess="feature_selection",
+                                        span=args.span)
     data = dataset.load_data()
 
     le = preprocessing.LabelEncoder()

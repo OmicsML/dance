@@ -11,8 +11,11 @@ from dance.utils import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--subtask", default="GSE140203_SKIN_atac2gex",
-                        choices=["openproblems_bmmc_cite_phase2", "openproblems_bmmc_multiome_phase2","GSE140203_BRAIN_atac2gex","GSE140203_SKIN_atac2gex"])
+    parser.add_argument(
+        "-t", "--subtask", default="GSE140203_SKIN_atac2gex", choices=[
+            "openproblems_bmmc_cite_phase2", "openproblems_bmmc_multiome_phase2", "GSE140203_BRAIN_atac2gex",
+            "GSE140203_SKIN_atac2gex"
+        ])
     parser.add_argument("-d", "--data_folder", default="./data/joint_embedding")
     parser.add_argument("-pre", "--pretrained_folder", default="./data/joint_embedding/pretrained")
     parser.add_argument("-csv", "--csv_path", default="decoupled_lsi.csv")
@@ -25,7 +28,7 @@ if __name__ == "__main__":
     parser.add_argument("-nm", "--normalize", default=1, type=int, choices=[0, 1])
     parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("--span", type=float, default=0.3)
-    
+
     args = parser.parse_args()
 
     device = args.device
@@ -34,7 +37,8 @@ if __name__ == "__main__":
     rndseed = args.seed
     set_seed(rndseed)
 
-    dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess="pca", normalize=True,span=args.span)
+    dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess="pca", normalize=True,
+                                        span=args.span)
     data = dataset.load_data()
     train_size = len(data.get_split_idx("train"))
 
