@@ -50,6 +50,7 @@ def parameter_setting():
     parser.add_argument("--final_rate", type=float, default=1e-4)
     parser.add_argument("--scale_factor", type=float, default=4)
     parser.add_argument("--span", type=float, default=0.3)
+    parser.add_argument("--selection_threshold", type=int, default=3000)
     return parser
 
 
@@ -66,7 +67,7 @@ if __name__ == "__main__":
     args.flr2 = 0.0005
 
     dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding", preprocess="feature_selection",
-                                        span=args.span)
+                                        span=args.span,selection_threshold=args.selection_threshold)
     data = dataset.load_data()
 
     le = preprocessing.LabelEncoder()
