@@ -33,7 +33,7 @@ def parameter_setting():
                         help="Epoch per test, must smaller than max iteration.")
     parser.add_argument("--max_ARI", "-ma", type=int, default=-200, help="initial ARI")
     parser.add_argument("-t", "--subtask", default="openproblems_2022_multi_atac2gex")
-    parser.add_argument("-device", "--device", default="cuda")
+    parser.add_argument("-device", "--device", default="cuda:4")
     parser.add_argument("--final_rate", type=float, default=1e-4)
     parser.add_argument("--scale_factor", type=float, default=4)
     parser.add_argument("--span", type=float, default=0.3)
