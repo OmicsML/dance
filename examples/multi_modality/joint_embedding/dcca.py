@@ -45,11 +45,12 @@ def parameter_setting():
     parser.add_argument("--anneal_epoch", "-ae", type=int, default=200, help="Anneal epoch")
     parser.add_argument("--epoch_per_test", "-ept", type=int, default=5, help="Epoch per test")
     parser.add_argument("--max_ARI", "-ma", type=int, default=-200, help="initial ARI")
-    parser.add_argument("-t", "--subtask", default="GSE140203_BRAIN_atac2gex")
-    parser.add_argument("-device", "--device", default="cuda:4")
+    parser.add_argument("-t", "--subtask", default="openproblems_2022_multi_atac2gex")
+    parser.add_argument("-device", "--device", default="cuda:5")
     parser.add_argument("--final_rate", type=float, default=1e-4)
     parser.add_argument("--scale_factor", type=float, default=4)
-
+    parser.add_argument("--span", type=float, default=0.3)
+    parser.add_argument("--selection_threshold", type=int, default=3000)
     return parser
 
 
@@ -65,7 +66,8 @@ if __name__ == "__main__":
     args.lr2 = 0.005
     args.flr2 = 0.0005
 
-    dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding", preprocess="feature_selection")
+    dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding", preprocess="feature_selection",
+                                        span=args.span, selection_threshold=args.selection_threshold)
     data = dataset.load_data()
 
     le = preprocessing.LabelEncoder()
@@ -132,7 +134,7 @@ if __name__ == "__main__":
         adata = adata[adata_sol.obs_names]
         adata_sol.obsm['X_emb'] = adata.X
         score = metrics.labeled_clustering_evaluate(adata, adata_sol)
-        score.update(metrics.integration_openproblems_evaluate(adata_sol))
+        # score.update(metrics.integration_openproblems_evaluate(adata_sol))
         score.update({
             'seed': args.seed + k,
             'subtask': args.subtask,
