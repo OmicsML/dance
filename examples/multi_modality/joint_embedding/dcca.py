@@ -45,8 +45,8 @@ def parameter_setting():
     parser.add_argument("--anneal_epoch", "-ae", type=int, default=200, help="Anneal epoch")
     parser.add_argument("--epoch_per_test", "-ept", type=int, default=5, help="Epoch per test")
     parser.add_argument("--max_ARI", "-ma", type=int, default=-200, help="initial ARI")
-    parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2")
-    parser.add_argument("-device", "--device", default="cuda")
+    parser.add_argument("-t", "--subtask", default="GSE140203_BRAIN_atac2gex")
+    parser.add_argument("-device", "--device", default="cuda:4")
     parser.add_argument("--final_rate", type=float, default=1e-4)
     parser.add_argument("--scale_factor", type=float, default=4)
 
