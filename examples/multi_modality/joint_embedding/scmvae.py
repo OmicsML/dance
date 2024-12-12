@@ -32,11 +32,11 @@ def parameter_setting():
     parser.add_argument("--epoch_per_test", "-ept", type=int, default=1,
                         help="Epoch per test, must smaller than max iteration.")
     parser.add_argument("--max_ARI", "-ma", type=int, default=-200, help="initial ARI")
-    parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2")
+    parser.add_argument("-t", "--subtask", default="GSE140203_SKIN_atac2gex")
     parser.add_argument("-device", "--device", default="cuda")
     parser.add_argument("--final_rate", type=float, default=1e-4)
     parser.add_argument("--scale_factor", type=float, default=4)
-
+    parser.add_argument("--span", type=float, default=0.3)
     return parser
 
 
@@ -46,7 +46,8 @@ if __name__ == "__main__":
     set_seed(args.seed)
     assert args.max_iteration > args.epoch_per_test
 
-    dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding", preprocess="feature_selection")
+    dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding", preprocess="feature_selection",
+                                        span=args.span)
     data = dataset.load_data()
 
     le = preprocessing.LabelEncoder()
@@ -121,7 +122,7 @@ if __name__ == "__main__":
         embeds = model.predict(x_test, y_test).cpu().numpy()
         print(embeds.shape)
         score = model.score(x_test, y_test, labels)
-        score.update(model.score(x_test, y_test, labels, adata_sol=data.data['test_sol'], metric="openproblems"))
+        # score.update(model.score(x_test, y_test, labels, adata_sol=data.data['test_sol'], metric="openproblems"))
         score.update({
             'seed': args.seed + k,
             'subtask': args.subtask,
