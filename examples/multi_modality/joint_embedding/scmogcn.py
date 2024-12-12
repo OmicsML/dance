@@ -11,8 +11,8 @@ from dance.utils import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--subtask", default="openproblems_bmmc_cite_phase2",
-                        choices=["openproblems_bmmc_cite_phase2", "openproblems_bmmc_multiome_phase2"])
+    parser.add_argument("-t", "--subtask", default="GSE140203_SKIN_atac2gex",
+                        choices=["openproblems_bmmc_cite_phase2", "openproblems_bmmc_multiome_phase2","GSE140203_BRAIN_atac2gex","GSE140203_SKIN_atac2gex"])
     parser.add_argument("-d", "--data_folder", default="./data/joint_embedding")
     parser.add_argument("-pre", "--pretrained_folder", default="./data/joint_embedding/pretrained")
     parser.add_argument("-csv", "--csv_path", default="decoupled_lsi.csv")
@@ -24,7 +24,8 @@ if __name__ == "__main__":
     parser.add_argument("-bs", "--batch_size", default=512, type=int)
     parser.add_argument("-nm", "--normalize", default=1, type=int, choices=[0, 1])
     parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
-
+    parser.add_argument("--span", type=float, default=0.3)
+    
     args = parser.parse_args()
 
     device = args.device
@@ -33,7 +34,7 @@ if __name__ == "__main__":
     rndseed = args.seed
     set_seed(rndseed)
 
-    dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess="aux", normalize=True)
+    dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess="pca", normalize=True,span=args.span)
     data = dataset.load_data()
     train_size = len(data.get_split_idx("train"))
 
@@ -45,6 +46,15 @@ if __name__ == "__main__":
         feature_channel=["X_pca", "X_pca"],
         label_channel=["cell_type", "batch_label", "phase_labels", "S_scores", "G2M_scores"],
     )
+    if True:
+        cell_type_labels = data.data['test_sol'].obs["cell_type"].to_numpy()
+        cell_type_labels_unique = list(np.unique(cell_type_labels))
+        c_labels = np.array([cell_type_labels_unique.index(item) for item in cell_type_labels])
+        data.data['mod1'].obsm["cell_type"] = c_labels
+        data.data["mod1"].obsm["S_scores"] = np.zeros(data.data['mod1'].shape[0])
+        data.data["mod1"].obsm["G2M_scores"] = np.zeros(data.data['mod1'].shape[0])
+        data.data["mod1"].obsm["batch_label"] = np.zeros(data.data['mod1'].shape[0])
+        data.data["mod1"].obsm["phase_labels"] = np.zeros(data.data['mod1'].shape[0])
     (x_mod1, x_mod2), (cell_type, batch_label, phase_label, S_score, G2M_score) = data.get_data(return_type="torch")
     phase_score = torch.cat([S_score[:, None], G2M_score[:, None]], 1)
     test_id = np.arange(x_mod1.shape[0])
@@ -68,7 +78,7 @@ if __name__ == "__main__":
         embeds = model.predict(test_id).cpu().numpy()
         print(embeds)
         score = model.score(test_id, labels, metric="clustering")
-        score.update(model.score(test_id, labels, adata_sol=adata_sol, metric="openproblems"))
+        # score.update(model.score(test_id, labels, adata_sol=adata_sol, metric="openproblems"))
         score.update({
             'seed': args.seed + k,
             'subtask': args.subtask,
