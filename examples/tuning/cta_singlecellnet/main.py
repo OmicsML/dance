@@ -6,12 +6,12 @@ from pathlib import Path
 from typing import get_args
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.singlecellnet import SingleCellNet
-from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
+from dance.pipeline import Pipeline, PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
 from dance.typing import LogLevel
 from dance.utils import set_seed
 
@@ -56,7 +56,15 @@ if __name__ == "__main__":
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
         set_seed(args.seed)
+        if "run_kwargs" in pipeline_planer.config and tune_mode == "params":
+            wandb_config = dict(wandb.config)
+            config = {'pipeline': wandb_config["run_kwargs"], "type": "preprocessor"}
+            preprocessing_pipeline = Pipeline(config)
 
+        else:
+            # Prepare preprocessing pipeline and apply it to data
+            kwargs = {tune_mode: dict(wandb.config)}
+            preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         # Initialize model and get model specific preprocessing pipeline
         model = SingleCellNet(num_trees=args.num_trees)
 
@@ -64,8 +72,8 @@ if __name__ == "__main__":
         data = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
                                          species=args.species, tissue=args.tissue, valid_dataset=args.valid_dataset,
                                          data_dir="../temp_data", filetype=args.filetype).load_data(cache=args.cache)
-        kwargs = {tune_mode: dict(wandb.config)}
-        preprocessing_pipeline = pipeline_planer.generate(**kwargs)
+        # kwargs = {tune_mode: dict(wandb.config)}
+        # preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
 
