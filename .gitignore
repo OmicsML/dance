@@ -14,3 +14,14 @@ temp_data
 *.egg*
 __pycache__
 build/
+
+#ignore example result
+examples/tuning/**/*.log
+examples/tuning/**/*.yaml
+examples/tuning/**/*.csv
+examples/tuning/**/*.h5ad
+examples/tuning/**/*.sh
+examples/tuning/**/*.h5
+examples/tuning/**/*.tar.gz
+examples/tuning/**/*.tif
+examples/tuning/**/*.txt
