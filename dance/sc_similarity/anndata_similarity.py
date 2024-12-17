@@ -55,13 +55,12 @@ class AnnDataSimilarity:
         self.common_genes = common_hvg
 
     def preprocess(self):
-        """Preprocess the data, including log normalization and normalization to probability distribution."""
+        """Preprocess the data, including log normalization and normalization to
+        probability distribution."""
         self.filter_gene()
 
     def sample_cells(self, random_state):
-        """
-        Randomly sample cells from each dataset if sample_size is specified.
-        """
+        """Randomly sample cells from each dataset if sample_size is specified."""
         np.random.seed(random_state)
         if self.sample_size is None:
             self.sample_size = min(self.adata1.n_obs, self.adata2.n_obs)  #need to think
@@ -77,9 +76,7 @@ class AnnDataSimilarity:
             self.sampled_adata2 = self.adata2.copy()
 
     def normalize_data(self):  # I am not sure
-        """
-        Normalize the data by total counts per cell and log-transform.
-        """
+        """Normalize the data by total counts per cell and log-transform."""
         sc.pp.normalize_total(self.adata1, target_sum=1e4)
         sc.pp.log1p(self.adata1)
         sc.pp.normalize_total(self.adata2, target_sum=1e4)
@@ -98,18 +95,16 @@ class AnnDataSimilarity:
         self.Y = np.nan_to_num(prob_adata2).toarray()
 
     def cosine_sim_sampled(self) -> pd.DataFrame:
-        """
-        Computes the average cosine similarity between all pairs of cells from the two datasets.
-        """
+        """Computes the average cosine similarity between all pairs of cells from the
+        two datasets."""
         # Compute cosine similarity matrix
         sim_matrix = cosine_similarity(self.sampled_adata1.X, self.sampled_adata2.X)
         # Return the average similarity
         return sim_matrix.mean()
 
     def pearson_corr_sampled(self) -> pd.DataFrame:
-        """
-        Computes the average Pearson correlation coefficient between all pairs of cells from the two datasets.
-        """
+        """Computes the average Pearson correlation coefficient between all pairs of
+        cells from the two datasets."""
         # Compute Pearson correlation matrix
         corr_matrix = np.corrcoef(self.sampled_adata1.X.toarray(),
                                   self.sampled_adata2.X.toarray())[:self.sampled_adata1.n_obs,
@@ -118,9 +113,8 @@ class AnnDataSimilarity:
         return np.nanmean(corr_matrix)
 
     def jaccard_sim_sampled(self, threshold: float = 0.5) -> pd.DataFrame:
-        """
-        Computes the average Jaccard similarity between all pairs of binarized cells from the two datasets.
-        """
+        """Computes the average Jaccard similarity between all pairs of binarized cells
+        from the two datasets."""
         # Binarize the data
         binary_adata1 = (self.sampled_adata1.X > threshold).astype(int)
         binary_adata2 = (self.sampled_adata2.X > threshold).astype(int)
@@ -131,9 +125,8 @@ class AnnDataSimilarity:
         return similarity_matrix.mean()
 
     def js_divergence_sampled(self) -> float:
-        """
-        Computes the average Jensen-Shannon divergence between all pairs of cells from the two datasets.
-        """
+        """Computes the average Jensen-Shannon divergence between all pairs of cells
+        from the two datasets."""
         # Normalize the data to probability distributions
         prob_adata1 = self.sampled_adata1.X / self.sampled_adata1.X.sum(axis=1)
         prob_adata2 = self.sampled_adata2.X / self.sampled_adata2.X.sum(axis=1)
@@ -195,9 +188,8 @@ class AnnDataSimilarity:
         raise NotImplementedError("data company")
 
     def wasserstein_dist(self) -> float:
-        """
-        Computes the average Wasserstein distance between all pairs of cells from the two datasets.
-        """
+        """Computes the average Wasserstein distance between all pairs of cells from the
+        two datasets."""
         X = self.X
         Y = self.Y
         a = np.ones((X.shape[0], )) / X.shape[0]
