@@ -24,7 +24,6 @@ def check_identical_strings(string_list):
 
     return string_list[0]
 
-
     # if not string_list:
     #     raise ValueError("The list is empty")
     # first_string = string_list[0]
