@@ -28,7 +28,7 @@ if __name__ == "__main__":
     parser.add_argument("-nm", "--normalize", default=1, type=int, choices=[0, 1])
     parser.add_argument("--runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("--span", type=float, default=0.3)
-
+    parser.add_argument("--preprocess", default="aux")
     args = parser.parse_args()
 
     device = args.device
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     rndseed = args.seed
     set_seed(rndseed)
 
-    dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess="pca", normalize=True,
+    dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess=args.preprocess, normalize=True,
                                         span=args.span)
     data = dataset.load_data()
     train_size = len(data.get_split_idx("train"))
@@ -50,7 +50,7 @@ if __name__ == "__main__":
         feature_channel=["X_pca", "X_pca"],
         label_channel=["cell_type", "batch_label", "phase_labels", "S_scores", "G2M_scores"],
     )
-    if True:
+    if args.preprocess != "aux":
         cell_type_labels = data.data['test_sol'].obs["cell_type"].to_numpy()
         cell_type_labels_unique = list(np.unique(cell_type_labels))
         c_labels = np.array([cell_type_labels_unique.index(item) for item in cell_type_labels])
