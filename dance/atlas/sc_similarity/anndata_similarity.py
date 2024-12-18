@@ -20,6 +20,15 @@ from sklearn.metrics.pairwise import cosine_similarity, rbf_kernel
 
 # Suppress scipy warnings for constant input in Pearson correlation
 warnings.filterwarnings("ignore", message="An input array is constant")
+from dance.datasets.singlemodality import CellTypeAnnotationDataset
+
+
+def get_anndata(tissue: str = "Blood", species: str = "human", filetype: str = "h5ad", train_dataset=[],
+                test_dataset=[], valid_dataset=[], data_dir="../temp_data"):
+    data = CellTypeAnnotationDataset(train_dataset=train_dataset, test_dataset=test_dataset,
+                                     valid_dataset=valid_dataset, data_dir=data_dir, tissue=tissue, species=species,
+                                     filetype=filetype).load_data()
+    return data.data
 
 
 class AnnDataSimilarity:
@@ -283,7 +292,7 @@ class AnnDataSimilarity:
 
         def get_dataset_info(data: ad.AnnData):
             con_sim = {}
-            con_sim["nnz_mean"] = np.mean(data.obs["nnz"])  #sample 10000之后这里是应该更新的
+            con_sim["nnz_mean"] = np.mean(data.obs["nnz"])
             con_sim["nnz_var"] = np.var(data.obs["nnz"])
             nnz_values = data.X[data.X.nonzero()]
             con_sim["nnz_counts_mean"] = np.mean(nnz_values)
@@ -503,7 +512,7 @@ def fix_yaml_string(original_str):
             continue
         if not item.strip().startswith('- type:'):
             print(item)
-            print("警告: 某个项未以 '- type:' 开头，跳过此项.")
+            print("Warning: An item does not start with '- type:', skipping this item.")
             continue
         item_dict = extract_type_target_params(item)
         config_list.append(item_dict)

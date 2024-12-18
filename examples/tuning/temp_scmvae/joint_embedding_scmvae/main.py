@@ -73,15 +73,14 @@ if __name__ == "__main__":
         wandb.init(settings=wandb.Settings(start_method='thread'))
         set_seed(args.seed)
         wandb_config = wandb.config
+        if "run_kwargs" in pipeline_planer.config:
+            if any(d == dict(wandb.config["run_kwargs"]) for d in pipeline_planer.config.run_kwargs):
+                wandb_config = wandb_config["run_kwargs"]
+            else:
+                wandb.log({"skip": 1})
+                wandb.finish()
+                return
         try:
-            wandb_config = wandb.config
-            if "run_kwargs" in pipeline_planer.config:
-                if any(d == dict(wandb.config["run_kwargs"]) for d in pipeline_planer.config.run_kwargs):
-                    wandb_config = wandb_config["run_kwargs"]
-                else:
-                    wandb.log({"skip": 1})
-                    wandb.finish()
-                    return
             dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding")
             data = dataset.load_data()
 
@@ -94,23 +93,19 @@ if __name__ == "__main__":
             preprocessing_pipeline = pipeline_planer.generate(**kwargs)
             print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
             preprocessing_pipeline(data)
-            # train_name=[item for item in data.mod["mod1"].obs_names if item in data.mod["meta1"].obs_names]
-            # train_idx= [data.mod["mod1"].obs_names.get_loc(name) for name in train_name]
-            # test_idx=list(set([i for i in range(data.mod["mod1"].shape[0])]).difference(set(train_idx)))
-            # data.set_split_idx("train",train_idx)
-            # data.set_split_idx("test",test_idx)
+            train_name = [item for item in data.mod["mod1"].obs_names if item in data.mod["meta1"].obs_names]
+            train_idx = [data.mod["mod1"].obs_names.get_loc(name) for name in train_name]
+            test_idx = list({i for i in range(data.mod["mod1"].shape[0])}.difference(set(train_idx)))
 
+            # train_size=data.mod["meta1"].shape[0]
+            # test_size=data.mod["mod1"].shape[0]-train_size
+            data.set_split_idx("train", train_idx)
+            data.set_split_idx("test", test_idx)
             (x_train, y_train, x_train_raw, y_train_raw), _ = data.get_train_data(return_type="torch")
             (x_test, y_test, x_test_raw, y_test_raw), labels = data.get_test_data(return_type="torch")
-
-            train_size = len(x_train)
-            test_size = len(x_test)
-            train_idx = np.arange(train_size)
-            test_idx = np.arange(test_size) + train_size
-
             # x_train,y_train,x_test,y_test,labels=torch.nan_to_num(x_train),torch.nan_to_num(y_train),torch.nan_to_num(x_test),torch.nan_to_num(y_test),torch.nan_to_num(labels)
-            lib_mean1, lib_var1 = calculate_log_library_size(np.concatenate([x_train.numpy(), x_test.numpy()]))
-            lib_mean2, lib_var2 = calculate_log_library_size(np.concatenate([y_train.numpy(), y_test.numpy()]))
+            lib_mean1, lib_var1 = calculate_log_library_size(np.concatenate([x_train_raw.numpy(), x_test_raw.numpy()]))
+            lib_mean2, lib_var2 = calculate_log_library_size(np.concatenate([y_train_raw.numpy(), y_test_raw.numpy()]))
             lib_mean1 = torch.from_numpy(lib_mean1)
             lib_var1 = torch.from_numpy(lib_var1)
             lib_mean2 = torch.from_numpy(lib_mean2)
@@ -118,8 +113,8 @@ if __name__ == "__main__":
 
             Nfeature1 = x_train.shape[1]
             Nfeature2 = y_train.shape[1]
-
-            temp = lib_mean1[train_idx]
+            # train_size = len(data.get_split_idx("train"))
+            # train_size=x_train.shape[0]
             train = data_utils.TensorDataset(x_train, lib_mean1[train_idx], lib_var1[train_idx], lib_mean2[train_idx],
                                              lib_var2[train_idx], y_train)
 
@@ -127,9 +122,7 @@ if __name__ == "__main__":
                                              lib_var2[test_idx], y_test)
 
             total = data_utils.TensorDataset(torch.cat([x_train, x_test]), torch.cat([y_train, y_test]))
-            total = data_utils.TensorDataset(torch.cat([x_train, x_test]), torch.cat([y_train, y_test]))
 
-            total_loader = data_utils.DataLoader(total, batch_size=args.batch_size, shuffle=False)
             total_loader = data_utils.DataLoader(total, batch_size=args.batch_size, shuffle=False)
 
             x_test = torch.cat([x_train, x_test])
@@ -162,6 +155,7 @@ if __name__ == "__main__":
             model.to(device)
             model.init_gmm_params(total_loader)
             model.fit(args, train, valid, args.final_rate, args.scale_factor, device)
+
             # embeds = model.predict(x_test, y_test).cpu().numpy()
             score = model.score(x_test, y_test, labels)
             # score.update(model.score(x_test, y_test, labels, adata_sol=data.data['test_sol'], metric="openproblems"))

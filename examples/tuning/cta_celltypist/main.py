@@ -42,6 +42,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     logger.setLevel(args.log_level)
     logger.info(f"Running Celltypist with the following parameters:\n{pprint.pformat(vars(args))}")
+    os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
+    # os.environ["WANDB_AGENT_DISABLE_FLAPPING"]="true"
     file_root_path = Path(
         args.root_path, "_".join([
             "-".join([str(num) for num in dataset])
@@ -51,7 +53,6 @@ if __name__ == "__main__":
     logger.info(f"\n files is saved in {file_root_path}")
     MAINDIR = Path(__file__).resolve().parent
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
-    os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
 
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))

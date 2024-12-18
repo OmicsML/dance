@@ -1068,7 +1068,7 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
                             for target, d_p in p1.default_params.items():
                                 if target == p2["target"]:
                                     p2["params"] = d_p
-        #顺序不对，参考_sanitize_pipeline进行修改 TODO
+        #The order is wrong, refer to _sanitize_pipeline for modification TODO use test to check
         step2_pipeline = step2_pipeline_planer.config.pipeline
         # step2_pipeline=sorted(step2_pipeline_planer.config.pipeline,key=lambda x: float(x.split('.')[1]))
         for p1, p2 in zip(step2_pipeline, pipeline):  #need order
