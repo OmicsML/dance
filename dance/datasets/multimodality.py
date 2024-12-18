@@ -575,7 +575,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
 
     def _raw_to_dance(self, raw_data):
         mod1, mod2, meta1, meta2, test_sol = self._maybe_preprocess(raw_data)
-        self.to_array([mod1, mod2, meta1, meta2, test_sol])
+        self._to_csr([mod1, mod2, meta1, meta2, test_sol])
 
         assert all(mod2.obs_names == mod1.obs_names), "Modalities not aligned"
         mdata = md.MuData({"mod1": mod1, "mod2": mod2, "meta1": meta1, "meta2": meta2, "test_sol": test_sol})
@@ -585,7 +585,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
 
         return data
 
-    def to_array(self, datas):
+    def _to_csr(self, datas):
         for data in datas:
             if scipy.sparse.issparse(data.X):
                 if not isinstance(data.X, scipy.sparse.csr_matrix):
