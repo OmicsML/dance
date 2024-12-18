@@ -95,6 +95,8 @@ import functools
 
 
 def add_mod_and_transform(cls):
+    """A decorator that modifies a class to add functionality for working with specific
+    modalities (`mod`) in a `mudata` object."""
     original_init = cls.__init__
     original_call = cls.__call__
     cls.add_mod_and_transform = "add_mod_and_transform"
