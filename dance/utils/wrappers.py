@@ -107,6 +107,16 @@ def add_mod_and_transform(cls):
 
     @functools.wraps(original_call)
     def new_call(self, data: Data, *args, **kwargs):
+        """
+        Parameters
+        ----------
+        data : Data
+            The input data object containing the `mudata` with multiple modalities.
+        Returns
+        -------
+        Any
+            The result of the original_call method.
+        """
         if hasattr(self, 'mod') and self.mod is not None:
             md_data = data.data
             ad_data = Data(data=transform_mod_to_anndata(md_data, self.mod))
