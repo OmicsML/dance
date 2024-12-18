@@ -50,7 +50,7 @@ def get_additional_sweep(sweep_id):
     #last run command
     run = next((t_run for t_run in sweep.runs if t_run.state == "finished"), None)
     additional_sweep_ids = [sweep_id]
-    if run is None:  #check summary data num,note aznph5wt,数量可能不一致。
+    if run is None:  # check summary data count, note aznph5wt, quantities may be inconsistent
         return additional_sweep_ids
     run_id = run.id
     web_abs = requests.get(f"https://api.wandb.ai/files/{run.entity}/{run.project}/{run_id}/wandb-metadata.json")
@@ -73,7 +73,7 @@ def summary_pattern(step2_origin_data, metric_name, ascending, alpha=0.05, vis=F
         if pd.isna(min_metric):
             return {
                 "error":
-                f"All {metric_name} values ​​are NaN and the minimum cannot be calculated. Please check your data."
+                f"All {metric_name} values are NaN and the minimum cannot be calculated. Please check your data."
             }
         step2_data[metric_name] = step2_data[metric_name].fillna(0)  #if ascending=False
     else:
@@ -81,7 +81,7 @@ def summary_pattern(step2_origin_data, metric_name, ascending, alpha=0.05, vis=F
         if pd.isna(max_metric):
             return {
                 "error":
-                f"All {metric_name} values ​​are NaN and the maximum cannot be calculated. Please check your data."
+                f"All {metric_name} values are NaN and the maximum cannot be calculated. Please check your data."
             }
         print(f"\nmax {metric_name}:{max_metric}")
         buffer_percentage = 0.2  # 20%
