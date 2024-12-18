@@ -169,7 +169,7 @@ class AlignMod(BaseTransform):
     def __call__(self, data: Data) -> Data:
         mod1, mod2, meta1, meta2, test_sol = data.data.mod.values()
         meta1 = meta1[:, mod1.var.index]
-        meta2 = meta2[:, mod2.var.index]  
+        meta2 = meta2[:, mod2.var.index]
         test_sol = test_sol[:, mod1.var.index]
         data.data.mod["meta1"] = meta1
         data.data.mod["meta2"] = meta2
