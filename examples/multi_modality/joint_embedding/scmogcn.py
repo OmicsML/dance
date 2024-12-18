@@ -12,9 +12,9 @@ from dance.utils import set_seed
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-t", "--subtask", default="GSE140203_SKIN_atac2gex", choices=[
+        "-t", "--subtask", default="openproblems_2022_multi_atac2gex", choices=[
             "openproblems_bmmc_cite_phase2", "openproblems_bmmc_multiome_phase2", "GSE140203_BRAIN_atac2gex",
-            "GSE140203_SKIN_atac2gex"
+            "GSE140203_SKIN_atac2gex", "openproblems_2022_multi_atac2gex"
         ])
     parser.add_argument("-d", "--data_folder", default="./data/joint_embedding")
     parser.add_argument("-pre", "--pretrained_folder", default="./data/joint_embedding/pretrained")
