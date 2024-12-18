@@ -274,6 +274,20 @@ class FilterGenesScanpy(FilterScanpy):
 @register_preprocessor("filter", "cell")
 @add_mod_and_transform
 class FilterCellsCommonMod(BaseTransform):
+    """Initialize the FilterCellsCommonMod class.
+
+    Parameters
+    ----------
+    mod1 : str
+        Name of the first modality in the single-cell dataset.
+    mod2 : str
+        Name of the second modality in the single-cell dataset.
+    sol : Optional[str], default=None
+        Name of the optional solution dataset containing cell labels or annotations.
+    **kwargs : dict
+        Additional keyword arguments passed to the base transformation class.
+
+    """
 
     def __init__(self, mod1: str, mod2: str, sol: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)

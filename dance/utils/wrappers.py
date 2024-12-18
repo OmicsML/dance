@@ -95,6 +95,8 @@ import functools
 
 
 def add_mod_and_transform(cls):
+    """A decorator that modifies a class to add functionality for working with specific
+    modalities (`mod`) in a `mudata` object."""
     original_init = cls.__init__
     original_call = cls.__call__
     cls.add_mod_and_transform = "add_mod_and_transform"
@@ -107,6 +109,16 @@ def add_mod_and_transform(cls):
 
     @functools.wraps(original_call)
     def new_call(self, data: Data, *args, **kwargs):
+        """
+        Parameters
+        ----------
+        data : Data
+            The input data object containing the `mudata` with multiple modalities.
+        Returns
+        -------
+        Any
+            The result of the original_call method.
+        """
         if hasattr(self, 'mod') and self.mod is not None:
             md_data = data.data
             ad_data = Data(data=transform_mod_to_anndata(md_data, self.mod))
