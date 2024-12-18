@@ -157,7 +157,7 @@ class FilterScanpy(BaseTransform):
 
 
 @register_preprocessor("filter", "cell")
-class FilterCellsScanpy(FilterScanpy):
+class FilterCellsScanpy(FilterScanpy):  
     """Scanpy filtering cell transformation with additional options.
 
     Allow passing gene counts as ratio
