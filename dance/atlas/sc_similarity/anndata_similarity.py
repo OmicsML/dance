@@ -1,5 +1,4 @@
 # anndata_similarity.py
-# TODO translate notes
 import re
 import warnings
 from typing import Callable, Dict, List, Optional
