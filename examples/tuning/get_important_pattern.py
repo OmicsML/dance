@@ -136,11 +136,14 @@ def list_files(directories, file_name="best_test_acc.csv", alpha=0.8, vis=False)
 
 
 if __name__ == "__main__":
-    directories = []
-    for path in Path('/home/zyxing/dance/examples/tuning').iterdir():
-        if path.is_dir():
-            if str(path.name).startswith("cluster"):
-                directories.append(path)
-    list_files(directories)
+    # directories = []
+    # for path in Path('/home/zyxing/dance/examples/tuning').iterdir():
+    #     if path.is_dir():
+    #         if str(path.name).startswith("cluster"):
+    #             directories.append(path)
+    # list_files(directories)
 
-    # print(summary_pattern("/home/zyxing/dance/examples/tuning/cta_scdeepsort/328_138/results/pipeline/best_test_acc.csv",alpha=0.3,vis=True))
+    print(
+        summary_pattern(
+            "/home/zyxing/dance/examples/tuning/cta_actinn/1013-1247-598-732-767-768-770-784-845-864_315-340-376-381-390-404-437-490-551-559/results/pipeline/best_test_acc.csv",
+            alpha=0.3, vis=True))

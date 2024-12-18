@@ -8,8 +8,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.jae import JAEWrapper
@@ -21,7 +21,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-t", "--subtask", default="openproblems_bmmc_cite_phase2", choices=[
             "GSE140203_BRAIN_atac2gex", "GSE140203_SKIN_atac2gex", "openproblems_bmmc_cite_phase2",
-            "openproblems_bmmc_multiome_phase2"
+            "openproblems_bmmc_multiome_phase2", "openproblems_2022_multi_atac2gex"
         ])
     parser.add_argument("-d", "--data_folder", default="./data/joint_embedding")
     parser.add_argument("-pre", "--pretrained_folder", default="./data/joint_embedding/pretrained")
@@ -136,7 +136,8 @@ if __name__ == "__main__":
                        conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
                        root_path=file_root_path,
                        required_funs=["AlignMod", "FilterCellsCommonMod", "FilterCellsCommonMod",
-                                      "SetConfig"], required_indexes=[2, 11, 14, sys.maxsize], metric="ARI")
+                                      "SetConfig"], required_indexes=[2, 11, 14, sys.maxsize],
+                       metric="ARI")  # need to delete required_funs and required_indexes
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """To reproduce JAE on other samples, please refer to command lines belows:
