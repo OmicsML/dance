@@ -8,6 +8,7 @@ from copy import deepcopy
 from itertools import combinations
 from os import X_OK
 from pathlib import Path
+from venv import logger
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,9 +29,9 @@ from sklearn.preprocessing import OneHotEncoder
 from typing_extensions import deprecated
 
 
-#TODO need to sync all files or get sweep,not file
+#use get_important_pattern_sweep.py
 #asceding need to think
-#负向的pattern，换一下顺序就可以吧
+#Negative pattern, just need to change the order
 def get_important_pattern(test_accs, ascending, vis=True, alpha=0.05, title=""):
 
     if vis:
@@ -76,10 +77,6 @@ def get_important_pattern(test_accs, ascending, vis=True, alpha=0.05, title=""):
         if vis:
             print("No significant differences found between the groups.")
         return []
-
-
-def replace_nan_in_2d(lst):  #nan应该是个极差的值而不是直接删掉
-    return [[np.nan if item == 'NaN' else item for item in sublist] for sublist in lst]
 
 
 def are_all_elements_same_direct(list_2d):
@@ -130,6 +127,10 @@ def get_significant_top_n_zscore(data, n=3, threshold=1.0, ascending=False):
 
 
 def get_test_acc_and_names(step2_data, metric_name):
+
+    def replace_nan_in_2d(lst):  #nan should be an extreme value rather than being directly deleted
+        return [[np.nan if item == 'NaN' else item for item in sublist] for sublist in lst]
+
     columns = sorted([col for col in step2_data.columns if col.startswith("pipeline")])
     test_accs = []
     test_acc_names = []
@@ -154,7 +155,7 @@ def get_com_all(step2_data, metric_name, ascending, vis=True, alpha=0.05):
     ans_all = []
     test_accs, test_acc_names = get_test_acc_and_names(step2_data, metric_name)
     final_ranks = get_important_pattern(test_accs, ascending, alpha=alpha, title="all_pattern", vis=vis)
-    if len(final_ranks) > 0:  #TODO maybe need to think ascending
+    if len(final_ranks) > 0:
         max_rank = max(final_ranks)
         max_rank_count = final_ranks.count(max_rank)
         if max_rank_count < len(final_ranks) / 2:
@@ -179,7 +180,7 @@ def get_forest_model_pattern(step2_data, metric_name):
     X = step2_data.loc[:, columns]
     y = step2_data.loc[:, metric_name]
     preprocessor = ColumnTransformer(transformers=[('onehot', OneHotEncoder(drop='first'),
-                                                    columns)  # drop='first'防止虚拟变量陷阱
+                                                    columns)  # drop='first' to prevent dummy variable trap
                                                    ])
     pipeline = Pipeline(steps=[('preprocessor', preprocessor),
                                ('regressor',
@@ -201,23 +202,26 @@ def get_forest_model_pattern(step2_data, metric_name):
         scoring='neg_mean_squared_error',
         n_jobs=-1,
         verbose=1,
-        refit=True  # 确保在所有数据上重新训练最佳模型
+        refit=True  # Ensure the best model is retrained on all data
     )
     grid_search.fit(X, y)
     best_pipeline = grid_search.best_estimator_
     model = best_pipeline.named_steps['regressor']
-    X_preprocessed = best_pipeline.named_steps['preprocessor'].transform(
-        X)  #TODO best_pipeline.named_steps['preprocessor'].get_feature_names_out(columns)是否和X_preprocessed一定是对应的？
-    explainer = shapiq.TreeExplainer(model=model, index="k-SII", max_order=3)  #思考为什么没有负值，因为是绝对值相加，可能是为了正负值不会相互抵消
+    X_preprocessed = best_pipeline.named_steps['preprocessor'].transform(X)
+    feature_names = best_pipeline.named_steps['preprocessor'].get_feature_names_out(columns)
+    logger.info(f"X_preprocessed.columns={X_preprocessed.columns}")
+    logger.info(f"feature_names={feature_names}")
+    explainer = shapiq.TreeExplainer(
+        model=model, index="k-SII", max_order=3
+    )  # Consider why there are no negative values, possibly to prevent cancellation of positive and negative values
     list_of_interaction_values = explainer.explain_X(X_preprocessed.toarray(), n_jobs=96, random_state=42)
     plt.cla()
-    ax = shapiq.plot.bar_plot(list_of_interaction_values,
-                              feature_names=best_pipeline.named_steps['preprocessor'].get_feature_names_out(columns),
-                              max_display=None, show=False, need_abbreviate=False)
+    ax = shapiq.plot.bar_plot(list_of_interaction_values, feature_names=feature_names, max_display=None, show=False,
+                              need_abbreviate=False)
     ax.yaxis.get_major_locator().MAXTICKS = 1000000
     plt.show()
     rects = ax.containers[0]
-    yticklabels = ax.get_yticklabels()  #label和rect是否重合需要验证
+    yticklabels = ax.get_yticklabels()  # Need to verify if labels and rectangles overlap
     shap_ans = {}
     for rect, label in zip(rects, yticklabels):
         xy = rect.get_xy()
@@ -229,7 +233,7 @@ def get_forest_model_pattern(step2_data, metric_name):
             raise RuntimeError("Features should not be repeated")
         shap_ans[k] = v
 
-    ans = get_significant_items(shap_ans)  #检查一下是不是真的pattern，好像结果不太好，再检验一下
+    ans = get_significant_items(shap_ans)  # Check if it's really a pattern, the results seem not good, need to verify
     preprocessed_df = pd.DataFrame(X_preprocessed.toarray(), index=X.index,
                                    columns=best_pipeline.named_steps['preprocessor'].get_feature_names_out(columns))
     preprocessed_df[metric_name] = step2_data[metric_name]
