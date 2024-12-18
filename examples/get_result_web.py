@@ -16,22 +16,24 @@ from dance.utils import try_import
 
 def check_identical_strings(string_list):
     if not string_list:
-        raise ValueError("列表为空")
+        raise ValueError("The list is empty")
 
     arr = np.array(string_list)
     if not np.all(arr == arr[0]):
-        raise ValueError("发现不同的字符串")
+        raise ValueError("Different strings found")
 
     return string_list[0]
 
 
     # if not string_list:
-    #     raise ValueError("列表为空")
+    #     raise ValueError("The list is empty")
     # first_string = string_list[0]
     # for s in string_list[1:]:
     #     if s != first_string:
-    #         raise ValueError(f"发现不同的字符串: '{first_string}' 和 '{s}'")
+    #         raise ValueError(f"Different strings found: '{first_string}' and '{s}'")
     # return first_string
+
+
 def get_sweep_url(step_csv: pd.DataFrame, single=True):
     ids = step_csv["id"]
     sweep_urls = []
@@ -57,7 +59,7 @@ def spilt_web(url: str):
     if match:
         entity = match.group(1)
         project = match.group(2)
-        pattern = r'/sweeps/([^/?]+)'  # 正则表达式模式
+        pattern = r'/sweeps/([^/?]+)'  # Regular expression pattern
         match = re.search(pattern, url)
         if match:
             sweep_id = match.group(1)
@@ -161,8 +163,8 @@ def write_ans(tissue):
             step3_urls = []
             for i in range(3):
                 file_csv = f"{file_path}/results/params/{i}_best_test_acc.csv"
-                if not os.path.exists(file_csv):  #no parameter
-                    print(f"文件 {file_csv} 不存在，跳过。")
+                if not os.path.exists(file_csv):  # no parameter
+                    print(f"File {file_csv} does not exist, skipping.")
                     continue
                 step3_urls.append(get_sweep_url(pd.read_csv(file_csv)))
             step3_str = ",".join(step3_urls)
