@@ -13,8 +13,7 @@ if __name__ == "__main__":
     args.add_argument("--filedir", type=str)
     args.add_argument("--tissues", type=str, nargs="+")
     args.add_argument("--access_token", type=str)
-    args.add_argument("--dropbox_dest_path", type=str,
-                      default="/preprocessing_benchmarking/cell_type_annotation/TEMP_Tran_5_Datasets/human")
+    args.add_argument("--dropbox_dest_path", type=str)
     args = args.parse_args()
     MAINDIR = pathlib.Path(args.maindir)
     FILEDIR = pathlib.Path(args.filedir)
