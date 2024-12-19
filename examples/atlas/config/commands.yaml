@@ -1,0 +1,2 @@
+cta_actinn:
+    command:"python main.py --species {species} --tissue {tissue} --train_dataset {dataset_id}  --filetype {filetype} --count {count} --device {device} > {dataset_id}/out.log 2>&1 &"
