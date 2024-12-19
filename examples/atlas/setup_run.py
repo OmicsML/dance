@@ -3,9 +3,11 @@ import os
 import shutil
 import sys
 
+import pandas as pd
 import yaml
 
 from dance.settings import DANCEDIR
+from dance.utils import logger
 
 
 def load_commands(config_path):
@@ -14,34 +16,37 @@ def load_commands(config_path):
 
 
 def load_run_configs(run_config_path):
-    with open(run_config_path, encoding='utf-8') as f:
-        return yaml.safe_load(f)
+    return pd.read_csv(run_config_path)
 
 
 def main():
     parser = argparse.ArgumentParser(description='Setup run parameters')
-    parser.add_argument('--config', type=str, default="config/run_config.yaml", help='Run configuration YAML file')
+    parser.add_argument('--config', type=str, default="config/run_config.csv", help='Run configuration CSV file')
 
     args = parser.parse_args()
 
-    run_configs = load_run_configs(args.config)
+    run_configs_df = load_run_configs(args.config)
 
-    commands_config = load_commands("commands.yaml")
+    commands_config = load_commands("config/commands.yaml")
 
-    for run in run_configs.get("runs", []):
-        algorithm_name = run.get('algorithm_name')
-        dataset_id = run.get('dataset_id')
-        species = run.get('species')
-        tissue = run.get('tissue')
-        filetype = run.get('filetype')
-        count = run.get('count')
-        device = run.get('device')
+    for _, run in run_configs_df.iterrows():
+        algorithm_name = run['algorithm_name']
+        dataset_id = run['dataset_id']
+        species = run['species']
+        tissue = run['tissue']
+        filetype = run['filetype']
+        count = run['count']
+        device = run['device']
 
         # Define paths
         template_path = os.path.join("config/atlas_template_yamls",
                                      f"{algorithm_name}/pipeline_params_tuning_config.yaml")
         config_dir = f"{DANCEDIR}/examples/tuning/{algorithm_name}/{dataset_id}"
-        os.makedirs(config_dir, exist_ok=True)
+        try:
+            os.makedirs(config_dir, exist_ok=False)
+        except FileExistsError:
+            logger.warning(f"Error: Directory {config_dir} already exists. Please remove it before running again.")
+            continue
         config_filename = f"pipeline_params_tuning_config.yaml"
         config_path = os.path.join(config_dir, config_filename)
 

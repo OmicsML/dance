@@ -1,8 +1,0 @@
-runs:
-  - algorithm_name: cta_actinn
-    dataset_id: "0bc7235a-ae5a-479d-a487-510435377e55"
-    species: human
-    tissue: Brain
-    filetype: h5ad
-    count: 800
-    device: cuda:0
