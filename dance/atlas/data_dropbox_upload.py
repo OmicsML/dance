@@ -12,6 +12,23 @@ from dance.utils import logger
 
 
 def upload_file_to_dropbox(dropbox_path, access_token, local_path):
+    """Upload a local file to Dropbox.
+
+    Parameters
+    ----------
+    dropbox_path : str
+        Destination path in Dropbox
+    access_token : str
+        Dropbox API access token
+    local_path : str or pathlib.Path
+        Path to local file to upload
+
+    Returns
+    -------
+    None
+        Returns None if upload fails
+
+    """
     dbx = dropbox.Dropbox(access_token)
 
     # Verify access token
@@ -29,6 +46,18 @@ def upload_file_to_dropbox(dropbox_path, access_token, local_path):
 
 
 def file_upload(dbx: dropbox.Dropbox, local_path: pathlib.Path, remote_path: str):
+    """Upload large files to Dropbox using chunked upload.
+
+    Parameters
+    ----------
+    dbx : dropbox.Dropbox
+        Authenticated Dropbox client
+    local_path : pathlib.Path
+        Path to local file
+    remote_path : str
+        Destination path in Dropbox
+
+    """
     CHUNKSIZE = 100 * 1024 * 1024
     upload_session_start_result = dbx.files_upload_session_start(b'')
     cursor = dropbox.files.UploadSessionCursor(session_id=upload_session_start_result.session_id, offset=0)
@@ -86,10 +115,35 @@ def get_link(data_fname, local_path, ACCESS_TOKEN, DROPBOX_DEST_PATH):
 
 
 def get_ans(data: sc.AnnData, tissue: str, dataset_id: str, local_path, ACCESS_TOKEN, DROPBOX_DEST_PATH):
+    """Generate metadata dictionary for dataset and upload to Dropbox.
+
+    Parameters
+    ----------
+    data : sc.AnnData
+        Annotated data matrix
+    tissue : str
+        Tissue type
+    dataset_id : str
+        Unique identifier for dataset
+    local_path : str or pathlib.Path
+        Path to local data file
+    ACCESS_TOKEN : str
+        Dropbox API access token
+    DROPBOX_DEST_PATH : str
+        Base path in Dropbox for uploads
+
+    Returns
+    -------
+    dict
+        Metadata dictionary containing dataset information and Dropbox URLs
+
+    """
     # keys=["species","tissue","dataset","split","celltype_fname","celltype_url","data_fname","data_url"]
+    # Create metadata dictionary with dataset info
     ans = {}
     ans["species"] = "human"
     ans["tissue"] = tissue.capitalize()
+    # Store number of observations (cells) in dataset
     ans["dataset"] = data.n_obs
     ans["split"] = "train"
     ans["celltype_fname"] = ""
