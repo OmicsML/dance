@@ -24,6 +24,25 @@ if __name__ == "__main__":
     DROPBOX_DEST_PATH = args.dropbox_dest_path  # Destination path on Dropbox
 
     def get_data(dataset_id, in_atlas=False, large=False):
+        """Load h5ad dataset from local path.
+
+        Parameters
+        ----------
+        dataset_id : str
+            Identifier for the dataset
+        in_atlas : bool
+            Whether dataset is from atlas (True) or query (False)
+        large : bool
+            Whether dataset is large (>10000 cells) requiring sampling
+
+        Returns
+        -------
+        AnnData
+            Loaded single cell data
+        Path
+            Local path to the data file
+
+        """
         if large:
             if in_atlas:
                 local_path = MAINDIR / f"sampled-10000/{tissue}/{dataset_id}.h5ad"
