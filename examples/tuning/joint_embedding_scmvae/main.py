@@ -9,9 +9,9 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.utils.data as data_utils
-import wandb
 from sklearn import preprocessing
 
+import wandb
 from dance import logger
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.scmvae import scMVAE
@@ -134,7 +134,8 @@ if __name__ == "__main__":
 
             x_test = torch.cat([x_train, x_test])
             y_test = torch.cat([y_train, y_test])
-            labels = torch.from_numpy(le.fit_transform(data.mod["test_sol"].obs["cell_type"]))  #这里大概会有问题，很可能就是降维的问题
+            labels = torch.from_numpy(le.fit_transform(data.mod["test_sol"].obs["cell_type"])
+                                      )  # This might be problematic, likely due to dimensionality reduction issues
             model = scMVAE(
                 encoder_1=[Nfeature1, 1024, 128, 128],
                 hidden_1=128,
