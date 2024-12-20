@@ -1,0 +1,112 @@
+import re
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from dance.utils import try_import
+
+sys.path.append("..")
+import json
+from collections import defaultdict
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+from get_result_web import spilt_web
+
+wandb = try_import("wandb")
+entity = "xzy11632"
+project = "dance-dev"
+query_datasets = [
+    "c7775e88-49bf-4ba2-a03b-93f00447c958", "456e8b9b-f872-488b-871d-94534090a865",
+    "738942eb-ac72-44ff-a64b-8943b5ecd8d9", "a5d95a42-0137-496f-8a60-101e17f263c8",
+    "71be997d-ff75-41b9-8a9f-1288c865f921"
+]
+file_root = Path(__file__).resolve().parent
+ground_truth_conf = pd.read_excel(file_root / "Cell Type Annotation Atlas.xlsx", sheet_name="blood", index_col=0)
+methods = ["cta_actinn", "cta_celltypist", "cta_scdeepsort", "cta_singlecellnet"]
+feature_name = "spectral"
+
+
+def get_accs(sweep):
+    ans = []
+    for run in sweep.runs:
+        if "test_acc" in run.summary:
+            ans.append(run.summary["test_acc"])
+    return ans
+
+
+def get_runs(sweep_record):
+    step_links = {}
+    pattern = r'(step\d+):((?:https?://[^|,]+(?:,)?)+)'
+    matches = re.finditer(pattern, sweep_record)
+    for match in matches:
+        step = match.group(1)  # e.g., 'step2'
+        links_str = match.group(2)  # e.g., 'https://...y31tzbnv'
+        links = links_str.split(',')
+        step_links[step] = links
+    ans = []
+    for step, links in step_links.items():
+        for sweep_url in links:
+            _, _, sweep_id = spilt_web(sweep_url)
+        sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
+        ans += get_accs(sweep)
+    return ans
+
+
+def get_atlas_ans(query_dataset, method):
+    data = pd.read_excel("Blood_similarity.xlsx", sheet_name=query_dataset[:4], index_col=0)
+    weight1 = 1.0
+    weight2 = 0.0
+    weighted_sum = data.loc[feature_name, :] * weight1 + data.loc["metadata_sim", :] * weight2
+    atlas_dataset_res = weighted_sum.idxmax()
+    max_value = weighted_sum.max()
+    return data.loc[:, atlas_dataset_res][method]
+
+
+def vis(data, target_value, title, ax):
+    # sns.boxplot(data=data, color='skyblue',ax=ax)
+    # if target_value is not np.nan:
+    #     ax.axhline(y=target_value, color='red', linestyle='--', linewidth=2, label=f'atlas_value = {target_value}')
+    #     ax.text(0, target_value + (max(data)-min(data))*0.01, f'{target_value}', color='red', ha='center',size=16)
+
+    data = np.array(data)
+    data_df = pd.DataFrame({'test_acc': data})
+    sns.violinplot(y='test_acc', data=data_df, inner=None, color='skyblue', ax=ax)
+    median = np.median(data)
+    ax.axhline(median, color='gray', linestyle='--', label=f'Median: {median:.1f}')
+    if not np.isnan(target_value):
+        percentile = (np.sum(data < float(target_value)) / len(data)) * 100
+        ax.scatter(0, float(target_value), color='red', s=100, zorder=5,
+                   label=f'Specific Value: {target_value}\n({percentile:.1f} percentile)')
+    ax.set_title(str(title))
+    ax.set_ylabel('test_acc')
+    ax.title.set_size(16)
+    ax.yaxis.label.set_size(14)
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    ax.legend()
+
+
+if __name__ == "__main__":
+    # ans_all=defaultdict(dict)
+    # for query_dataset in query_datasets:
+    #     for method in methods:
+    #         sweep_record=ground_truth_conf.loc[query_dataset,method]
+    #         ans_all[query_dataset][method]=get_runs(sweep_record)
+    # with open("runs.json","w") as f:
+    #     json.dump(ans_all,f)
+
+    with open("runs.json") as f:
+        runs = json.load(f)
+    plt.style.use("default")
+
+    for query_dataset in query_datasets:
+        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+        axes = axes.flatten()
+        for i, method in enumerate(methods):
+            vis(runs[query_dataset][method], get_atlas_ans(query_dataset, method), f"{query_dataset}_{method}", axes[i])
+        plt.tight_layout()
+        plt.savefig(f"imgs/{query_dataset}.png", dpi=300)
+        plt.show()

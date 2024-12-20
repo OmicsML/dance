@@ -1,3 +1,22 @@
+"""Count the total number of experiment runs across different tasks in W&B project.
+
+This script analyzes experiment results stored in a W&B project by:
+1. Reading task data from Excel sheets
+2. Extracting sweep URLs for each task
+3. Querying W&B API to count runs in each sweep
+4. Computing the total number of experimental runs
+
+Parameters
+----------
+None
+
+Returns
+-------
+int
+    Total number of runs across all tasks and sweeps
+
+"""
+
 import sys
 from pathlib import Path
 
