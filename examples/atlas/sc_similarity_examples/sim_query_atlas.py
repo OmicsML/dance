@@ -26,15 +26,26 @@ file_root = str(Path(__file__).resolve().parent.parent)
 
 
 def find_unique_matching_row(df, config_col, input_dict_list):
-    """Find a unique matching row in DataFrame based on the specified column and input
-    dictionary list.
+    """Find a unique matching row in DataFrame based on specified criteria.
 
-    :param df: pandas.DataFrame, containing the data to search.
-    :param config_col: str, name of the DataFrame column containing dictionary list
-        strings.
-    :param input_dict_list: list of dicts, input dictionary list for matching.
-    :return: pandas.Series, the matching row.
-    :raises ValueError: if the number of matching rows is not equal to 1.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing the data to search
+    config_col : str
+        Name of the DataFrame column containing dictionary list strings
+    input_dict_list : list of dict
+        Input dictionary list for matching
+
+    Returns
+    -------
+    pandas.Series
+        The matching row from the DataFrame
+
+    Raises
+    ------
+    ValueError
+        If the number of matching rows is not exactly one
 
     """
 
