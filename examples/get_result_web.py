@@ -15,6 +15,15 @@ from dance.utils import try_import
 
 
 def check_identical_strings(string_list):
+    """
+    Check if all strings in the list are identical
+    Args:
+        string_list: List of strings to compare
+    Returns:
+        The common string if all strings are identical
+    Raises:
+        ValueError if list is empty or strings are different
+    """
     if not string_list:
         raise ValueError("The list is empty")
 
@@ -34,6 +43,14 @@ def check_identical_strings(string_list):
 
 
 def get_sweep_url(step_csv: pd.DataFrame, single=True):
+    """
+    Extract wandb sweep URL from a DataFrame containing run IDs
+    Args:
+        step_csv: DataFrame containing run IDs
+        single: If True, only process the first run
+    Returns:
+        The sweep URL
+    """
     ids = step_csv["id"]
     sweep_urls = []
     for run_id in tqdm(reversed(ids),
@@ -51,6 +68,13 @@ import re
 
 
 def spilt_web(url: str):
+    """
+    Parse wandb URL to extract entity, project and sweep ID
+    Args:
+        url: wandb sweep URL
+    Returns:
+        Tuple of (entity, project, sweep_id) or None if parsing fails
+    """
     pattern = r"https://wandb\.ai/([^/]+)/([^/]+)/sweeps/([^/]+)"
 
     match = re.search(pattern, url)
@@ -70,6 +94,14 @@ def spilt_web(url: str):
 
 
 def get_best_method(urls, metric_col="test_acc"):
+    """
+    Find the best performing method across multiple sweeps
+    Args:
+        urls: List of sweep URLs to compare
+        metric_col: Metric column name to use for comparison
+    Returns:
+        Tuple of (best_step_name, best_run, best_metric_value)
+    """
     all_best_run = None
     all_best_step_name = None
     step_names = ["step2", "step3_0", "step3_1", "step3_2"]
@@ -105,6 +137,15 @@ def get_best_method(urls, metric_col="test_acc"):
 
 
 def get_best_yaml(step_name, best_run, file_path):
+    """
+    Generate YAML configuration for the best performing run
+    Args:
+        step_name: Name of the step ('step2' or 'step3_X')
+        best_run: Best wandb run object
+        file_path: Path to configuration files
+    Returns:
+        YAML string containing the best configuration
+    """
     if step_name == "step2":
         conf = OmegaConf.load(f"{file_path}/pipeline_params_tuning_config.yaml")
         for i, fun in enumerate(conf["pipeline"]):
@@ -141,6 +182,13 @@ def get_best_yaml(step_name, best_run, file_path):
 
 
 def check_exist(file_path):
+    """
+    Check if results directory exists and contains multiple files
+    Args:
+        file_path: Path to check
+    Returns:
+        Boolean indicating if valid results exist
+    """
     file_path = f"{file_path}/results/params/"
     if os.path.exists(file_path) and os.path.isdir(file_path):
         file_num = len(os.listdir(file_path))
@@ -150,6 +198,12 @@ def check_exist(file_path):
 
 
 def write_ans(tissue):
+    """
+    Process results for a specific tissue type and write to CSV
+    Args:
+        tissue: Name of the tissue to process
+    Writes results to a CSV file named '{tissue}_ans.csv'
+    """
     ans = []
     collect_datasets = all_datasets[tissue]
 
@@ -182,9 +236,12 @@ def write_ans(tissue):
 
 
 if __name__ == "__main__":
+    # Initialize wandb and set global configuration
     wandb = try_import("wandb")
     entity = "xzy11632"
     project = "dance-dev"
+
+    # Load dataset configuration and process results for tissue
     file_root = str(Path(__file__).resolve().parent)
     with open(f"{file_root}/dataset_server.json") as f:
         all_datasets = json.load(f)
