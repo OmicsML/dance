@@ -12,10 +12,10 @@ import pandas as pd
 import scipy
 import torch
 import torch.utils.data as data_utils
-import wandb
 from sklearn import preprocessing
 
 import dance.utils.metrics as metrics
+import wandb
 from dance import logger
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.dcca import DCCA
@@ -122,8 +122,8 @@ if __name__ == "__main__":
             #                 feature_channel_type=["layers", "layers", None, None, "obsm", "obsm"],
             #                 feature_channel=["counts", "counts", None, None, "size_factors",
             #                                 "size_factors"], label_channel="labels")
-            #TODO 感觉layers中的counts才是raw
-            #TODO 的确感觉layers中的counts才是raw，不知道反过来影响大不大
+            # TODO Feels like counts in layers should be raw
+            # TODO Indeed feels like counts in layers should be raw, not sure how big the reverse impact would be
             (x_train, y_train, x_train_raw, y_train_raw, x_train_size,
             y_train_size), train_labels = data.get_train_data(return_type="torch")
             (x_test, y_test, x_test_raw, y_test_raw, x_test_size,
@@ -201,7 +201,7 @@ if __name__ == "__main__":
                     logger.info(f"Variable '{var}' does not exist, continuing...")
             torch.cuda.empty_cache()
             gc.collect()
-        #主要是报错时没有执行这些命令导致的，我感觉
+        # This is mainly caused by these commands not being executed when errors occur, I think
 
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
