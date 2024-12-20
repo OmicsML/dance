@@ -26,40 +26,42 @@ file_root = str(Path(__file__).resolve().parent.parent)
 
 
 def find_unique_matching_row(df, config_col, input_dict_list):
-    """在 DataFrame 中查找指定列中与输入字典列表匹配的唯一一行。
+    """Find a unique matching row in DataFrame based on the specified column and input
+    dictionary list.
 
-    :param df: pandas.DataFrame，包含要搜索的数据。
-    :param config_col: str，DataFrame 中包含字典列表字符串的列名。
-    :param input_dict_list: list of dicts，输入的字典列表，用于匹配。
-    :return: pandas.Series，匹配的行。
-    :raises ValueError: 如果匹配的行数不等于1。
+    :param df: pandas.DataFrame, containing the data to search.
+    :param config_col: str, name of the DataFrame column containing dictionary list
+        strings.
+    :param input_dict_list: list of dicts, input dictionary list for matching.
+    :return: pandas.Series, the matching row.
+    :raises ValueError: if the number of matching rows is not equal to 1.
 
     """
 
-    # 定义一个函数，用于解析字符串并比较
+    # Define a function for parsing strings and comparing
     def is_match(config_str):
         try:
-            # 使用 ast.literal_eval 安全地解析字符串为 Python 对象
+            # Safely parse string to Python object using ast.literal_eval
             config = ast.literal_eval(config_str)
             return config == input_dict_list
         except (ValueError, SyntaxError):
-            # 如果解析失败，则不匹配
+            # If parsing fails, no match
             return False
 
-    # 应用比较函数，得到一个布尔系列
+    # Apply comparison function to get a boolean series
     matches = df[config_col].apply(is_match)
 
-    # 获取所有匹配的行
+    # Get all matching rows
     matching_rows = df[matches]
 
-    # 检查匹配的行数
+    # Check number of matching rows
     num_matches = len(matching_rows)
     if num_matches == 1:
         return matching_rows.iloc[0]
     elif num_matches == 0:
-        raise ValueError("未找到匹配的行。")
+        raise ValueError("No matching rows found.")
     else:
-        raise ValueError(f"找到 {num_matches} 行匹配，预期恰好一行。")
+        raise ValueError(f"Found {num_matches} matching rows, expected exactly one.")
 
 
 wandb = try_import("wandb")
