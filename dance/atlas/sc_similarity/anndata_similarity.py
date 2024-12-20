@@ -31,6 +31,32 @@ def get_anndata(tissue: str = "Blood", species: str = "human", filetype: str = "
 
 
 class AnnDataSimilarity:
+    """A class to compute various similarity metrics between two AnnData objects.
+
+    Parameters
+    ----------
+    adata1 : anndata.AnnData
+        First AnnData object for comparison
+    adata2 : anndata.AnnData
+        Second AnnData object for comparison
+    sample_size : Optional[int]
+        Number of cells to sample from each dataset. If None, uses min(adata1.n_obs, adata2.n_obs)
+    init_random_state : Optional[int]
+        Random seed for reproducibility
+    n_runs : int
+        Number of times to run each similarity computation
+    ground_truth_conf_path : Optional[str]
+        Path to ground truth configuration file
+    adata1_name : Optional[str]
+        Name identifier for first dataset
+    adata2_name : Optional[str]
+        Name identifier for second dataset
+    methods : List[str]
+        List of cell type annotation methods to use
+    tissue : str
+        Tissue type being analyzed
+
+    """
 
     def __init__(self, adata1: anndata.AnnData, adata2: anndata.AnnData, sample_size: Optional[int] = None,
                  init_random_state: Optional[int] = None, n_runs: int = 10,
@@ -52,6 +78,14 @@ class AnnDataSimilarity:
         self.n_runs = n_runs
 
     def filter_gene(self, n_top_genes=3000):
+        """Filter genes to keep only highly variable genes common between datasets.
+
+        Parameters
+        ----------
+        n_top_genes : int
+            Number of top variable genes to select
+
+        """
         sc.pp.highly_variable_genes(self.origin_adata1, n_top_genes=n_top_genes, flavor='seurat_v3')
         sc.pp.highly_variable_genes(self.origin_adata2, n_top_genes=n_top_genes, flavor='seurat_v3')
 
@@ -159,6 +193,14 @@ class AnnDataSimilarity:
         return np.nanmean(similarity_matrix)
 
     def compute_mmd(self) -> float:
+        """Compute Maximum Mean Discrepancy between datasets.
+
+        Returns
+        -------
+        float
+            Normalized MMD similarity score between 0 and 1
+
+        """
         X = self.X
         Y = self.Y
         kernel = "rbf"
@@ -196,8 +238,14 @@ class AnnDataSimilarity:
         raise NotImplementedError("data company")
 
     def wasserstein_dist(self) -> float:
-        """Computes the average Wasserstein distance between all pairs of cells from the
-        two datasets."""
+        """Compute Wasserstein distance between datasets.
+
+        Returns
+        -------
+        float
+            Normalized Wasserstein similarity score between 0 and 1
+
+        """
         X = self.X
         Y = self.Y
         a = np.ones((X.shape[0], )) / X.shape[0]
@@ -272,6 +320,15 @@ class AnnDataSimilarity:
         return 1 / (1 + np.linalg.norm(eig_A - eig_B))
 
     def get_dataset_meta_sim(self):
+        """Compute metadata similarity between datasets based on discrete and continuous
+        features.
+
+        Returns
+        -------
+        float
+            Average similarity score across all metadata features
+
+        """
         # dis_cols=['assay', 'cell_type', 'development_stage','disease','is_primary_data','self_reported_ethnicity','sex', 'suspension_type', 'tissue','tissue_type', 'tissue_general']
         con_cols = [
             "nnz_mean", "nnz_var", "nnz_counts_mean", "nnz_counts_var", "n_measured_vars", "n_counts_mean",
@@ -357,11 +414,19 @@ class AnnDataSimilarity:
             'cosine', 'pearson', 'jaccard', 'js_distance', 'otdd', 'common_genes_num', "ground_truth", "metadata_sim"
         ]
     ) -> Dict[str, float]:
-        """Computes the specified similarity measure. Parameters:
+        """Compute multiple similarity metrics between datasets.
 
-        methods: List of similarity measures to be computed. Supports 'cosine', 'pearson', 'jaccard', 'js_distance', 'wasserstein','otdd'
-        Returns:
-        Dictionary containing the similarity matrices
+        Parameters
+        ----------
+        random_state : int
+            Random seed for cell sampling
+        methods : List[str]
+            List of similarity methods to compute
+
+        Returns
+        -------
+        Dict[str, float]
+            Dictionary mapping method names to similarity scores
 
         """
         self.adata1 = self.origin_adata1.copy()
