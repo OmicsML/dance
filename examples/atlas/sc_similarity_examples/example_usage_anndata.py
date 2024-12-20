@@ -55,6 +55,23 @@ class CustomEncoder(json.JSONEncoder):
 
 
 def dataset_from_anndata(adata: AnnData, label_key: str = 'cell_type', classes=None):
+    """Convert AnnData object to PyTorch TensorDataset.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Input AnnData object
+    label_key : str, default='cell_type'
+        Column name in adata.obs containing cell type labels
+    classes : list, optional
+        Predefined class labels. If None, will be inferred from data
+
+    Returns
+    -------
+    TensorDataset
+        PyTorch dataset with features and labels
+
+    """
     X = adata.X
     if issparse(X):
         X = X.toarray()
@@ -88,22 +105,39 @@ def run_test_otdd():
 
 
 def run_test_case(source_file):
+    """Calculate similarity matrices between source and target datasets.
+
+    Parameters
+    ----------
+    source_file : str
+        Name of the source dataset file
+
+    Returns
+    -------
+    pandas.DataFrame
+        Similarity scores for different metrics
+
+    """
     ans = {}
     for target_file in target_files:
         # source_data=sc.read_h5ad(f"{data_root}/{source_file}.h5ad")
         # target_data=sc.read_h5ad(f"{data_root}/{target_file}.h5ad")
         source_data = get_anndata(train_dataset=[f"{source_file}"], data_dir=data_dir)
         target_data = get_anndata(train_dataset=[f"{target_file}"], data_dir=data_dir)
+
+        # Initialize similarity calculator with multiple metrics
         similarity_calculator = AnnDataSimilarity(adata1=source_data, adata2=target_data, sample_size=10,
                                                   init_random_state=42, n_runs=1,
                                                   ground_truth_conf_path="Cell Type Annotation Atlas.xlsx",
                                                   adata1_name=source_file, adata2_name=target_file)
+
+        # Calculate similarity using multiple methods
         ans[target_file] = similarity_calculator.get_similarity_matrix_A2B(methods=[
             "wasserstein", "Hausdorff", "chamfer", "energy", "sinkhorn2", "bures", "spectral", "common_genes_num",
             "ground_truth", "mmd", "metadata_sim"
         ])
-    # with open(f'sim_{source_file}.json', 'w') as f:
-    #     json.dump(ans, f,indent=4,cls=CustomEncoder)
+
+    # Convert results to DataFrame and save
     ans = pd.DataFrame(ans)
     ans.to_csv(f'sim_{source_file}.csv')
     return ans

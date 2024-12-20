@@ -28,9 +28,29 @@ file_root = Path(__file__).resolve().parent
 ground_truth_conf = pd.read_excel(file_root / "Cell Type Annotation Atlas.xlsx", sheet_name="blood", index_col=0)
 methods = ["cta_actinn", "cta_celltypist", "cta_scdeepsort", "cta_singlecellnet"]
 feature_name = "spectral"
+"""Visualization script for comparing model performance across different datasets and
+methods.
+
+This script loads experiment results from wandb and compares them with atlas-based
+predictions, generating violin plots to visualize the distribution of accuracies.
+
+"""
 
 
 def get_accs(sweep):
+    """Extract test accuracies from a wandb sweep.
+
+    Parameters
+    ----------
+    sweep : wandb.Sweep
+        Sweep object containing multiple runs
+
+    Returns
+    -------
+    list
+        List of test accuracies from all runs
+
+    """
     ans = []
     for run in sweep.runs:
         if "test_acc" in run.summary:
@@ -39,6 +59,19 @@ def get_accs(sweep):
 
 
 def get_runs(sweep_record):
+    """Parse sweep URLs and collect all run results.
+
+    Parameters
+    ----------
+    sweep_record : str
+        String containing sweep URLs for different steps
+
+    Returns
+    -------
+    list
+        Combined list of test accuracies from all sweeps
+
+    """
     step_links = {}
     pattern = r'(step\d+):((?:https?://[^|,]+(?:,)?)+)'
     matches = re.finditer(pattern, sweep_record)
@@ -57,16 +90,45 @@ def get_runs(sweep_record):
 
 
 def get_atlas_ans(query_dataset, method):
+    """Calculate atlas-based prediction accuracy for a given dataset and method.
+
+    Parameters
+    ----------
+    query_dataset : str
+        Dataset identifier
+    method : str
+        Method name to evaluate
+
+    Returns
+    -------
+    float
+        Predicted accuracy based on atlas similarity
+
+    """
     data = pd.read_excel("Blood_similarity.xlsx", sheet_name=query_dataset[:4], index_col=0)
-    weight1 = 1.0
-    weight2 = 0.0
+    weight1 = 1.0  # Weight for feature-based similarity
+    weight2 = 0.0  # Weight for metadata similarity
     weighted_sum = data.loc[feature_name, :] * weight1 + data.loc["metadata_sim", :] * weight2
-    atlas_dataset_res = weighted_sum.idxmax()
+    atlas_dataset_res = weighted_sum.idxmax()  # Get most similar dataset
     max_value = weighted_sum.max()
     return data.loc[:, atlas_dataset_res][method]
 
 
 def vis(data, target_value, title, ax):
+    """Create violin plot comparing distribution of accuracies with atlas prediction.
+
+    Parameters
+    ----------
+    data : list
+        List of accuracy values
+    target_value : float
+        Atlas-predicted accuracy value
+    title : str
+        Plot title
+    ax : matplotlib.axes.Axes
+        Axes object to plot on
+
+    """
     # sns.boxplot(data=data, color='skyblue',ax=ax)
     # if target_value is not np.nan:
     #     ax.axhline(y=target_value, color='red', linestyle='--', linewidth=2, label=f'atlas_value = {target_value}')
@@ -102,9 +164,11 @@ if __name__ == "__main__":
         runs = json.load(f)
     plt.style.use("default")
 
+    # Generate visualization for each dataset
     for query_dataset in query_datasets:
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         axes = axes.flatten()
+        # Create subplot for each method
         for i, method in enumerate(methods):
             vis(runs[query_dataset][method], get_atlas_ans(query_dataset, method), f"{query_dataset}_{method}", axes[i])
         plt.tight_layout()
