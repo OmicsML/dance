@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pandas as pd
 import torch
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.multimodality import ModalityPredictionDataset
 from dance.modules.multi_modality.predict_modality.babel import BabelWrapper
@@ -77,7 +77,7 @@ if __name__ == "__main__":
         x_test, y_test = data.get_test_data(return_type="torch")
         x_train, y_train, x_test, y_test = x_train.float(), y_train.float(), x_test.float(), y_test.float()
         # Train and evaluate the model
-        #突然想到，或许有些算法可以降维，而有些算法不能降维，所以还是要依据算法而定
+        # Just realized some algorithms can do dimensionality reduction while others cannot, so it depends on the algorithm
         model = BabelWrapper(args, dim_in=x_train.shape[1], dim_out=y_train.shape[1])
         model.fit(x_train, y_train, val_ratio=0.15)
         wandb.log({'rmse': model.score(x_test, y_test)})
