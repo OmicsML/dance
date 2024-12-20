@@ -30,9 +30,33 @@ from typing_extensions import deprecated
 
 
 #use get_important_pattern_sweep.py
-#asceding need to think
 #Negative pattern, just need to change the order
 def get_important_pattern(test_accs, ascending, vis=True, alpha=0.05, title=""):
+    """Identify important patterns in test accuracies using statistical tests.
+
+    Given multiple groups of test accuracies, this function performs Kruskal-Wallis test followed by
+    Dunn's post-hoc test to identify statistically significant differences between groups. The results
+    are then used to rank the groups based on their relative performance.
+
+    Parameters
+    ----------
+    test_accs
+        List of test accuracy groups to compare.
+    ascending
+        Boolean indicating whether to sort results in ascending order.
+    vis
+        Whether to visualize the results using box plots.
+    alpha
+        Significance level for statistical tests.
+    title
+        Title for the visualization plot.
+
+    Returns
+    -------
+    list
+        List of ranks indicating the relative importance of each group.
+
+    """
 
     if vis:
         fig = plt.figure(figsize=(12, 4))
@@ -91,6 +115,30 @@ def are_all_elements_same_direct(list_2d):
 
 
 def get_frequent_itemsets(step2_data, metric_name, ascending, threshold_per=0.1, multi_mod=False):
+    """Extract frequent patterns from top performing pipeline configurations.
+
+    Given a DataFrame containing pipeline configurations and their performance metrics, this function
+    identifies frequent patterns in the top performing configurations using the Apriori algorithm.
+
+    Parameters
+    ----------
+    step2_data
+        DataFrame containing pipeline configurations and metrics.
+    metric_name
+        Name of the performance metric to optimize.
+    ascending
+        Boolean indicating whether to sort in ascending order.
+    threshold_per
+        Percentage of top configurations to consider.
+    multi_mod
+        Whether to use multiple modalities (not implemented).
+
+    Returns
+    -------
+    list
+        List of dictionaries containing frequent itemsets and their support values.
+
+    """
     if multi_mod:
         raise NotImplementedError("need multimod")
     threshold = int(len(step2_data) * threshold_per)
@@ -176,6 +224,28 @@ def get_significant_items(data):
 
 
 def get_forest_model_pattern(step2_data, metric_name):
+    """Analyze feature importance using Random Forest and SHAP values.
+
+    Given pipeline configurations and their performance metrics, this function trains a Random Forest model
+    and uses SHAP values to identify important feature interactions. It also computes point-biserial
+    correlations to validate the importance of identified patterns.
+
+    Parameters
+    ----------
+    step2_data
+        DataFrame containing pipeline configurations and metrics.
+    metric_name
+        Target metric to predict.
+
+    Returns
+    -------
+    dict
+        Dictionary containing:
+        - Important feature interactions and their SHAP values
+        - Point-biserial correlation statistics
+        - Best model parameters and MSE
+
+    """
     columns = sorted([col for col in step2_data.columns if col.startswith("pipeline")])
     X = step2_data.loc[:, columns]
     y = step2_data.loc[:, metric_name]
@@ -287,24 +357,24 @@ def list_files(directories, metric_name, ascending, file_name="best_test_acc.csv
     return ans_all
 
 
-if __name__ == "__main__":
-    directories = []
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("task", default="cluster")
-    parser.add_argument("metric_name", default="acc")
-    parser.add_argument("ascending", default=False)
-    args = parser.parse_args()
-    task = args.task
-    metric_name = args.metric_name
-    ascending = args.ascending
-    file_root = Path(__file__).resolve().parent.parent / "tuning"
-    for path in file_root.iterdir():
-        if path.is_dir():
-            if str(path.name).startswith(task):
-                directories.append(path)
-    ans_all = list_files(directories, metric_name, ascending)
-    df = pd.DataFrame(ans_all)
-    pivot_df = df.pivot(index="dataset", columns="method", values="ans")
-    pivot_df.to_csv(f"{task}_pattern.csv")
+# if __name__ == "__main__":
+#     directories = []
+#     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+#     parser.add_argument("task", default="cluster")
+#     parser.add_argument("metric_name", default="acc")
+#     parser.add_argument("ascending", default=False)
+#     args = parser.parse_args()
+#     task = args.task
+#     metric_name = args.metric_name
+#     ascending = args.ascending
+#     file_root = Path(__file__).resolve().parent.parent / "tuning"
+#     for path in file_root.iterdir():
+#         if path.is_dir():
+#             if str(path.name).startswith(task):
+#                 directories.append(path)
+#     ans_all = list_files(directories, metric_name, ascending)
+#     df = pd.DataFrame(ans_all)
+#     pivot_df = df.pivot(index="dataset", columns="method", values="ans")
+#     pivot_df.to_csv(f"{task}_pattern.csv")
 
-    # print(summary_pattern("/home/zyxing/dance/examples/tuning/cta_actinn/328_138/results/pipeline/best_test_acc.csv",alpha=0.3,vis=True))
+#     # print(summary_pattern("/home/zyxing/dance/examples/tuning/cta_actinn/328_138/results/pipeline/best_test_acc.csv",alpha=0.3,vis=True))
