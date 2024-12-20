@@ -8,8 +8,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.scmogcn import ScMoGCNWrapper
@@ -100,7 +100,7 @@ if __name__ == "__main__":
                 data.data["mod1"].obsm["phase_labels"] = np.zeros(data.data['mod1'].shape[0])
 
             # train_size = len(data.get_split_idx("train"))
-            #按理说meta1应该包括mod1前半部分的所有内容，可能中途打乱了顺序
+            # In theory, meta1 should include all content from the first half of mod1, the order might have been shuffled during processing
             data = CellFeatureBipartiteGraph(cell_feature_channel="feature.cell", mod="mod1")(data)
             data = CellFeatureBipartiteGraph(cell_feature_channel="feature.cell", mod="mod2")(data)
             # data.set_config(
