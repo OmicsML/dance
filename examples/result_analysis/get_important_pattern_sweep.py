@@ -15,10 +15,14 @@ from get_result_web import spilt_web
 from dance.pipeline import flatten_dict
 from dance.utils import try_import
 
+# Define basic configuration parameters
 entity = "xzy11632"
 project = "dance-dev"
+# List of tasks to analyze
 tasks = ["cell type annotation new", "clustering", "imputation_new", "spatial domain", "cell type deconvolution"]
+# Corresponding metrics for each task
 mertic_names = ["test_acc", "acc", "MRE", "ARI", "MSE"]
+# Whether higher values are better for each metric
 ascendings = [False, False, True, False, True]
 
 multi_mod = False
@@ -43,13 +47,27 @@ wandb = try_import("wandb")
 
 
 def get_additional_sweep(sweep_id):
-    # if sweep has piror runs
-    # every run get command , get additional sweep id
-    # or last run command
+    """Recursively retrieve all related sweep IDs from a given sweep.
+
+    Given a sweep ID, this function recursively finds all related sweep IDs by examining the command
+    arguments of the runs within each sweep. It handles cases where sweeps may have prior runs or
+    additional sweep references.
+
+    Parameters
+    ----------
+    sweep_id : str
+        The initial sweep ID to start the search from.
+
+    Returns
+    -------
+    list
+        A list containing all related sweep IDs, including the input sweep_id.
+
+    """
     sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
+    additional_sweep_ids = [sweep_id]
     #last run command
     run = next((t_run for t_run in sweep.runs if t_run.state == "finished"), None)
-    additional_sweep_ids = [sweep_id]
     if run is None:  # check summary data count, note aznph5wt, quantities may be inconsistent
         return additional_sweep_ids
     run_id = run.id
@@ -63,7 +81,34 @@ def get_additional_sweep(sweep_id):
 
 
 def summary_pattern(step2_origin_data, metric_name, ascending, alpha=0.05, vis=False):
-    # try:
+    """Analyze patterns in pipeline configurations and their impact on performance
+    metrics.
+
+    This function examines the relationship between pipeline configurations and their corresponding
+    performance metrics. It handles missing values differently based on whether higher or lower
+    metric values are better, and can optionally visualize the results.
+
+    Parameters
+    ----------
+    step2_origin_data : pd.DataFrame
+        DataFrame containing pipeline configurations and their results.
+    metric_name : str
+        Name of the performance metric to analyze.
+    ascending : bool
+        Whether higher metric values indicate better performance.
+    alpha : float, optional
+        Significance level for statistical tests, by default 0.05.
+    vis : bool, optional
+        Whether to generate visualizations, by default False.
+
+    Returns
+    -------
+    dict
+        A dictionary containing either:
+        - Error message if all metric values are NaN
+        - Pattern analysis results including forest model and/or APR analysis
+
+    """
     columns = sorted([col for col in step2_origin_data.columns if col.startswith("pipeline")])
     step2_data = step2_origin_data.loc[:, columns + [metric_name]]
     # com_ans = get_com_all(step2_data, metric_name, ascending, vis=vis, alpha=alpha)
@@ -92,23 +137,24 @@ def summary_pattern(step2_origin_data, metric_name, ascending, alpha=0.05, vis=F
         return {"forest_model": get_forest_model_pattern(step2_data, metric_name), "apr_ans": apr_ans}
     else:
         return {"apr_ans": apr_ans}
-    # except Exception as e:
-    #     print(e)
-    #     return str(e)
 
 
 if __name__ == "__main__":
     start = True
     ans_all = []
     for i, task in enumerate(tasks):
-
+        # Skip tasks not in choose_tasks list
         if task not in choose_tasks:
             continue
+
+        # Read and preprocess results from Excel file
         data = pd.read_excel(file_root / "results.xlsx", sheet_name=task, dtype=str)
         data = data.ffill().set_index(['Methods'])
+
+        # Iterate through each method and dataset combination
         for row_idx in range(data.shape[0]):
             for col_idx in range(data.shape[1]):
-
+                # Extract metadata
                 method = data.index[row_idx]
                 dataset = data.columns[col_idx]
                 value = data.iloc[row_idx, col_idx]
