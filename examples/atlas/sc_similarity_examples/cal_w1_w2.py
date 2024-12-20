@@ -1,3 +1,21 @@
+"""Calculate optimal weights for combining similarity metrics in cell type annotation.
+
+This script analyzes different similarity metrics (like Wasserstein, Hausdorff, etc.) and metadata similarity
+to find optimal weights that minimize the total rank of correct cell type predictions across multiple datasets.
+
+The script:
+1. Loads similarity scores from Excel files
+2. Computes rankings for different cell type annotation methods
+3. Finds optimal weights (w1, w2) for combining feature-based and metadata-based similarity
+4. Outputs the best performing feature and its corresponding weight
+
+Returns
+-------
+DataFrame
+    Results containing feature names, weights, and corresponding total ranks
+
+"""
+
 import ast
 import re
 from pathlib import Path
@@ -23,6 +41,14 @@ feature_names = ["wasserstein", "Hausdorff", "chamfer", "energy", "sinkhorn2", "
 
 
 def get_ans():
+    """Load similarity scores from Excel files for each dataset.
+
+    Returns
+    -------
+    dict
+        Dictionary mapping dataset IDs to their similarity score DataFrames
+
+    """
     ans = {}
     for query_dataset in query_datasets:
         data = pd.read_excel(file_root / "Blood_similarity.xlsx", sheet_name=query_dataset[:4], index_col=0)
@@ -31,6 +57,12 @@ def get_ans():
 
 
 def get_rank():
+    """Calculate rankings for each cell type annotation method.
+
+    Updates the input DataFrames with rank columns for each method, where lower ranks
+    indicate better performance.
+
+    """
     for query_dataset, data in ans.items():
         for method in methods:
             rank_col = 'rank_' + method
@@ -39,6 +71,19 @@ def get_rank():
 
 
 def convert_to_complex(s):
+    """Convert string representations of complex numbers to float values.
+
+    Parameters
+    ----------
+    s : str or float
+        Input value to convert
+
+    Returns
+    -------
+    float
+        Real part of complex number or NaN if conversion fails
+
+    """
     if isinstance(s, float) or isinstance(s, int):
         return float(s)
     try:
@@ -48,6 +93,21 @@ def convert_to_complex(s):
 
 
 def objective(w1, feature_name):
+    """Calculate total rank score for given weights and feature.
+
+    Parameters
+    ----------
+    w1 : float
+        Weight for the feature-based similarity (0-1)
+    feature_name : str
+        Name of the similarity feature to evaluate
+
+    Returns
+    -------
+    float
+        Total rank score (lower is better)
+
+    """
     w2 = 1 - w1
     total_rank = 0
     for query_dataset, data in ans.items():
@@ -89,6 +149,6 @@ results_df = pd.DataFrame(all_results)
 results_df.to_csv("temp/results_df.csv")
 best_result = results_df.loc[results_df['total_rank'].idxmin()]
 
-print('最佳相似性特征:', best_result['feature_name'])
-print('最佳 w1:', best_result['w1'])
-print('对应的总排名:', best_result['total_rank'])
+print('Best similarity feature:', best_result['feature_name'])
+print('Best w1:', best_result['w1'])
+print('Corresponding total rank:', best_result['total_rank'])
