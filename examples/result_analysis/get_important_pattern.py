@@ -228,7 +228,8 @@ def get_forest_model_pattern(step2_data, metric_name):
 
     Given pipeline configurations and their performance metrics, this function trains a Random Forest model
     and uses SHAP values to identify important feature interactions. It also computes point-biserial
-    correlations to validate the importance of identified patterns.
+    correlations to validate the importance of identified patterns.The reason for using the random forest model can be found at https://docs.wandb.ai/guides/app/features/panels/parameter-importance/
+    For calculations of arbitrary-order Shapley interactions, see https://github.com/mmschlk/shapiq
 
     Parameters
     ----------
