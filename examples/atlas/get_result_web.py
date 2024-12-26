@@ -282,7 +282,7 @@ def get_new_ans(tissue):
     return new_df
 
 
-def write_ans(tissue, new_df,output_file=None):
+def write_ans(tissue, new_df, output_file=None):
     """Process and write results for a specific tissue type to CSV.
 
     Parameters
@@ -308,7 +308,7 @@ def write_ans(tissue, new_df,output_file=None):
         # 设置Dataset_id为索引以便更容易合并
         if existing_df.index.name != 'Dataset_id':
             existing_df.set_index('Dataset_id', inplace=True)
-        if new_df.index.name != 'Dataset_id':   
+        if new_df.index.name != 'Dataset_id':
             new_df.set_index('Dataset_id', inplace=True)
 
         # 检查重叠的Dataset_id
