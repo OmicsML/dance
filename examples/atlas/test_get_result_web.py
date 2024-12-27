@@ -52,44 +52,37 @@ def test_write_ans(tmp_path):
     output_file = output_dir / f"{tissue}_ans.csv"
 
     # 创建测试数据
-    existing_data = [
-        {
-            'Dataset_id': 'dataset1',
-            'method1': 'url1',
-            'method1_best_yaml': 'yaml1',
-            'method1_best_res': 0.8
-        },
-        {
-            'Dataset_id': 'dataset2',
-            'method1': 'url2',
-            'method1_best_yaml': 'yaml2',
-            'method1_best_res': 0.9
-        }
-    ]
+    existing_data = [{
+        'Dataset_id': 'dataset1',
+        'method1': 'url1',
+        'method1_best_yaml': 'yaml1',
+        'method1_best_res': 0.8
+    }, {
+        'Dataset_id': 'dataset2',
+        'method1': 'url2',
+        'method1_best_yaml': 'yaml2',
+        'method1_best_res': 0.9
+    }]
     existing_df = pd.DataFrame(existing_data)
     existing_df.to_csv(output_file)
 
     # 创建新数据
-    new_data = [
-        {
-            'Dataset_id': 'dataset2',
-            'method1': 'url2',
-            'method1_best_yaml': 'yaml2',
-            'method1_best_res': 0.9
-        },
-        {
-            'Dataset_id': 'dataset3',
-            'method1': 'url3',
-            'method1_best_yaml': 'yaml3',
-            'method1_best_res': 0.95
-        },
-        {
-            'Dataset_id': 'dataset2',
-            'method2': 'url2_2',
-            'method2_best_yaml': 'yaml2_2',
-            'method2_best_res': 0.95
-        }
-    ]
+    new_data = [{
+        'Dataset_id': 'dataset2',
+        'method1': 'url2',
+        'method1_best_yaml': 'yaml2',
+        'method1_best_res': 0.9
+    }, {
+        'Dataset_id': 'dataset3',
+        'method1': 'url3',
+        'method1_best_yaml': 'yaml3',
+        'method1_best_res': 0.95
+    }, {
+        'Dataset_id': 'dataset2',
+        'method2': 'url2_2',
+        'method2_best_yaml': 'yaml2_2',
+        'method2_best_res': 0.95
+    }]
     new_df = pd.DataFrame(new_data)
 
     # 测试正常更新
@@ -97,7 +90,7 @@ def test_write_ans(tmp_path):
     # 读取更新后的文件
     updated_df = pd.read_csv(output_file, index_col=0)
     print(updated_df)
-    
+
     # 验证结果
     assert len(updated_df) == 3  # 应该有3个不同的数据集
     assert 'dataset3' in updated_df.index.values
@@ -105,14 +98,12 @@ def test_write_ans(tmp_path):
     assert updated_df.loc['dataset2', 'method2_best_res'] == 0.95
 
     # 测试结果冲突
-    conflict_data = [
-        {
-            'Dataset_id': 'dataset1',
-            'method1': 'url1_new',
-            'method1_best_yaml': 'yaml1_new',
-            'method1_best_res': 0.7  # 与现有的0.8不同，应该引发冲突
-        }
-    ]
+    conflict_data = [{
+        'Dataset_id': 'dataset1',
+        'method1': 'url1_new',
+        'method1_best_yaml': 'yaml1_new',
+        'method1_best_res': 0.7  # 与现有的0.8不同，应该引发冲突
+    }]
     conflict_df = pd.DataFrame(conflict_data)
 
     # 验证冲突检测
@@ -129,20 +120,17 @@ def test_write_ans_new_file(tmp_path):
     tissue = "heart"
 
     # 创建新数据
-    new_data = [
-        {
-            'Dataset_id': 'dataset1',
-            'method1': 'url1',
-            'method1_best_yaml': 'yaml1',
-            'method1_best_res': 0.8
-        },
-        {
-            'Dataset_id': 'dataset2',
-            'method1': 'url2',
-            'method1_best_yaml': 'yaml2',
-            'method1_best_res': 0.9
-        }
-    ]
+    new_data = [{
+        'Dataset_id': 'dataset1',
+        'method1': 'url1',
+        'method1_best_yaml': 'yaml1',
+        'method1_best_res': 0.8
+    }, {
+        'Dataset_id': 'dataset2',
+        'method1': 'url2',
+        'method1_best_yaml': 'yaml2',
+        'method1_best_res': 0.9
+    }]
     new_df = pd.DataFrame(new_data)
 
     # 测试创建新文件
