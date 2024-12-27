@@ -248,14 +248,15 @@ def check_exist(file_path):
 
 def get_new_ans(tissue):
     ans = []
+    # temp=all_datasets[all_datasets["tissue"] == tissue]["data_fname"].tolist()
     collect_datasets = [
         collect_dataset.split(tissue)[1].split("_")[0]
         for collect_dataset in all_datasets[all_datasets["tissue"] == tissue]["data_fname"].tolist()
     ]
 
-    for method_folder in tqdm(collect_datasets):
-        for dataset_id in collect_datasets[method_folder]:
-            file_path = f"../examples/tuning/{method_folder}/{dataset_id}"
+    for method_folder in tqdm(methods):
+        for dataset_id in collect_datasets:
+            file_path = f"../tuning/{method_folder}/{dataset_id}"
             if not check_exist(file_path):
                 continue
             step2_url = get_sweep_url(pd.read_csv(f"{file_path}/results/pipeline/best_test_acc.csv"))
@@ -347,12 +348,14 @@ def write_ans(tissue, new_df, output_file=None):
 wandb = try_import("wandb")
 entity = "xzy11632"
 project = "dance-dev"
+methods = ["cta_actinn", "cta_celltypist", "cta_scdeepsort", "cta_singlecellnet"]
 if __name__ == "__main__":
     # Initialize wandb and set global configuration
     # Load dataset configuration and process results for tissue
     all_datasets = pd.read_csv(METADIR / "scdeepsort.csv", header=0, skiprows=[i for i in range(1, 69)])
-    args = argparse.ArgumentParser()
-    args.add_argument("--tissue", type=str, default="heart")
-    args = args.parse_args()
-    new_df = get_new_ans(args.tissue)
-    write_ans(args.tissue, new_df)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--tissue", type=str, default="Heart")
+    args = parser.parse_args()
+    tissue = args.tissue.capitalize()
+    new_df = get_new_ans(tissue)
+    write_ans(tissue, new_df)
