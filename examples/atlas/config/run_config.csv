@@ -19,3 +19,15 @@ cta_actinn,71be997d-ff75-41b9-8a9f-1288c865f921(Lung),human,Lung,h5ad,800,cuda:4
 cta_actinn,53d208b0-2cfd-4366-9866-c3c6114081bc(Pancreas),human,Pancreas,h5ad,800,cuda:5
 cta_actinn,78f10833-3e61-4fad-96c9-4bbd4f14bdfa,human,Pancreas,h5ad,800,cuda:6
 cta_actinn,f7c1c579-2dc0-47e2-ba19-8165c5a0e353(Pancreas),human,Pancreas,h5ad,800,cuda:7
+cta_actinn,37b21763-7f0f-41ae-9001-60bad6e2841d,human,Pancreas,h5ad,800,cuda:0
+cta_actinn,9c4c8515-8f82-4c72-b0c6-f87647b00bbe,human,Pancreas,h5ad,800,cuda:1
+cta_actinn,fa27492b-82ff-4ab7-ac61-0e2b184eee67(Pancreas),human,Pancreas,h5ad,800,cuda:2
+cta_actinn,b07e5164-baf6-43d2-bdba-5a249d0da879,human,Pancreas,h5ad,800,cuda:3
+cta_actinn,c5d88abe-f23a-45fa-a534-788985e93dad(Pancreas),human,Pancreas,h5ad,800,cuda:4
+cta_actinn,a68b64d8-aee3-4947-81b7-36b8fe5a44d2(Pancreas),human,Pancreas,h5ad,800,cuda:5
+cta_actinn,5a11f879-d1ef-458a-910c-9b0bdfca5ebf(Pancreas),human,Pancreas,h5ad,800,cuda:6
+cta_actinn,3294d050-6eeb-4a00-b24c-71aacc9b777f,human,Pancreas,h5ad,800,cuda:7
+cta_actinn,2adb1f8a-a6b1-4909-8ee8-484814e2d4bf(Pancreas),human,Pancreas,h5ad,800,cuda:0
+cta_actinn,ff45e623-7f5f-46e3-b47d-56be0341f66b,human,Pancreas,h5ad,800,cuda:1
+cta_actinn,66d15835-5dc8-4e96-b0eb-f48971cb65e8,human,Pancreas,h5ad,800,cuda:2
+cta_actinn,97a17473-e2b1-4f31-a544-44a60773e2dd(Pancreas),human,Pancreas,h5ad,800,cuda:3
