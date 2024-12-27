@@ -255,7 +255,7 @@ def get_new_ans(tissue):
 
     for method_folder in tqdm(collect_datasets):
         for dataset_id in collect_datasets[method_folder]:
-            file_path = f"tuning/{method_folder}/{dataset_id}"
+            file_path = f"../examples/tuning/{method_folder}/{dataset_id}"
             if not check_exist(file_path):
                 continue
             step2_url = get_sweep_url(pd.read_csv(f"{file_path}/results/pipeline/best_test_acc.csv"))
@@ -282,7 +282,7 @@ def get_new_ans(tissue):
     return new_df
 
 
-def write_ans(tissue, new_df):
+def write_ans(tissue, new_df, output_file=None):
     """Process and write results for a specific tissue type to CSV.
 
     Parameters
@@ -300,13 +300,16 @@ def write_ans(tissue, new_df):
 
     """
     # 检查是否存在现有文件
-    output_file = f"atlas/sweep_results/{tissue}_ans.csv"
+    if output_file is None:
+        output_file = f"sweep_results/{tissue}_ans.csv"
     if os.path.exists(output_file):
         existing_df = pd.read_csv(output_file, index_col=0)
 
         # 设置Dataset_id为索引以便更容易合并
-        existing_df.set_index('Dataset_id', inplace=True)
-        new_df.set_index('Dataset_id', inplace=True)
+        if existing_df.index.name != 'Dataset_id':
+            existing_df.set_index('Dataset_id', inplace=True)
+        if new_df.index.name != 'Dataset_id':
+            new_df.set_index('Dataset_id', inplace=True)
 
         # 检查重叠的Dataset_id
         common_indices = existing_df.index.intersection(new_df.index)
