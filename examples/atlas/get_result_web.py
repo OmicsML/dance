@@ -287,11 +287,11 @@ def write_ans(tissue, new_df, output_file=None):
     """Process and write results for a specific tissue type to CSV."""
     if output_file is None:
         output_file = f"sweep_results/{tissue}_ans.csv"
-    
+
     # 确保Dataset_id是索引
     if 'Dataset_id' in new_df.columns:
         new_df = new_df.set_index('Dataset_id')
-    
+
     # 处理新数据，合并相同Dataset_id的非NA值
     new_df_processed = pd.DataFrame()
     for idx in new_df.index.unique():
@@ -301,17 +301,14 @@ def write_ans(tissue, new_df, output_file=None):
             values = subset[col].dropna().unique()
             if len(values) > 0:
                 row_data[col] = values[0]
-        new_df_processed = pd.concat([
-            new_df_processed, 
-            pd.DataFrame(row_data, index=[idx])
-        ])
-    
+        new_df_processed = pd.concat([new_df_processed, pd.DataFrame(row_data, index=[idx])])
+
     if os.path.exists(output_file):
         # 读取现有数据
         existing_df = pd.read_csv(output_file)
         if 'Dataset_id' in existing_df.columns:
             existing_df = existing_df.set_index('Dataset_id')
-        
+
         # 创建合并后的DataFrame，包含所有列
         merged_df = existing_df.copy()
         # 添加新数据中的列（如果不存在）
@@ -332,17 +329,17 @@ def write_ans(tissue, new_df, output_file=None):
                             if pd.notna(new_value) and pd.notna(existing_value):
                                 if abs(new_value - existing_value) > 1e-10:
                                     raise ValueError(f"结果冲突: Dataset {idx}, Column {col}\n"
-                                                  f"现有值: {existing_value}\n新值: {new_value}")
+                                                     f"现有值: {existing_value}\n新值: {new_value}")
                                 else:
                                     print(f"提示: 发现重复值 Dataset {idx}, Column {col}\n"
-                                        f"现有值和新值都是: {new_value}")
+                                          f"现有值和新值都是: {new_value}")
                     # 如果新值不是NaN，更新该值
                     if pd.notna(new_value):
                         merged_df.loc[idx, col] = new_value
             else:
                 # 如果是新的Dataset_id，直接添加整行
                 merged_df.loc[idx] = new_df_processed.loc[idx]
-        
+
         # 保存合并后的数据
         merged_df.to_csv(output_file)
     else:
