@@ -288,63 +288,72 @@ def write_ans(tissue, new_df, output_file=None):
     if output_file is None:
         output_file = f"sweep_results/{tissue}_ans.csv"
 
-    # 确保Dataset_id是索引
+    # 重置索引，确保Dataset_id成为一个普通列
     if 'Dataset_id' in new_df.columns:
-        new_df = new_df.set_index('Dataset_id')
+        new_df = new_df.reset_index(drop=True)
 
     # 处理新数据，合并相同Dataset_id的非NA值
     new_df_processed = pd.DataFrame()
-    for idx in new_df.index.unique():
-        row_data = {}
-        subset = new_df.loc[new_df.index == idx]
+    for dataset_id in new_df['Dataset_id'].unique():
+        row_data = {'Dataset_id': dataset_id}
+        subset = new_df[new_df['Dataset_id'] == dataset_id]
         for col in new_df.columns:
-            values = subset[col].dropna().unique()
-            if len(values) > 0:
-                row_data[col] = values[0]
-        new_df_processed = pd.concat([new_df_processed, pd.DataFrame(row_data, index=[idx])])
+            if col != 'Dataset_id':
+                values = subset[col].dropna().unique()
+                if len(values) > 0:
+                    row_data[col] = values[0]
+        new_df_processed = pd.concat([new_df_processed, pd.DataFrame([row_data])])
 
     if os.path.exists(output_file):
-        # 读取现有数据
+        # 读取现有数据，不将任何列设置为索引
         existing_df = pd.read_csv(output_file)
-        if 'Dataset_id' in existing_df.columns:
-            existing_df = existing_df.set_index('Dataset_id')
 
-        # 创建合并后的DataFrame，包含所有列
+        # 清理可能存在的Unnamed列
+        existing_df = existing_df.loc[:, ~existing_df.columns.str.contains('^Unnamed')]
+
+        # 创建合并后的DataFrame
         merged_df = existing_df.copy()
+
         # 添加新数据中的列（如果不存在）
         for col in new_df_processed.columns:
             if col not in merged_df.columns:
                 merged_df[col] = pd.NA
+
         # 对每个Dataset_id进行合并和冲突检查
-        for idx in new_df_processed.index:
-            if idx in existing_df.index:
+        for _, new_row in new_df_processed.iterrows():
+            dataset_id = new_row['Dataset_id']
+            existing_row = merged_df[merged_df['Dataset_id'] == dataset_id]
+
+            if len(existing_row) > 0:
                 # 检查每一列的值
                 for col in new_df_processed.columns:
-                    new_value = new_df_processed.loc[idx, col]
-                    # 检查列是否存在于现有数据中
-                    if col in existing_df.columns:
-                        existing_value = existing_df.loc[idx, col]
-                        # 只对_best_res结尾的列进行冲突检查
-                        if str(col).endswith("_best_res"):
-                            if pd.notna(new_value) and pd.notna(existing_value):
-                                if abs(new_value - existing_value) > 1e-10:
-                                    raise ValueError(f"结果冲突: Dataset {idx}, Column {col}\n"
-                                                     f"现有值: {existing_value}\n新值: {new_value}")
-                                else:
-                                    print(f"提示: 发现重复值 Dataset {idx}, Column {col}\n"
-                                          f"现有值和新值都是: {new_value}")
+                    if col == 'Dataset_id':
+                        continue
+                    new_value = new_row[col]
+                    existing_value = existing_row[col].iloc[0] if len(existing_row) > 0 else pd.NA
+
+                    # 只对_best_res结尾的列进行冲突检查
+                    if str(col).endswith("_best_res"):
+                        if pd.notna(new_value) and pd.notna(existing_value):
+                            if abs(float(new_value) - float(existing_value)) > 1e-10:
+                                raise ValueError(f"结果冲突: Dataset {dataset_id}, Column {col}\n"
+                                                 f"现有值: {existing_value}\n新值: {new_value}")
+                            else:
+                                print(f"提示: 发现重复值 Dataset {dataset_id}, Column {col}\n"
+                                      f"现有值和新值都是: {new_value}")
+
                     # 如果新值不是NaN，更新该值
                     if pd.notna(new_value):
-                        merged_df.loc[idx, col] = new_value
+                        merged_df.loc[merged_df['Dataset_id'] == dataset_id, col] = new_value
             else:
                 # 如果是新的Dataset_id，直接添加整行
-                merged_df.loc[idx] = new_df_processed.loc[idx]
+                merged_df = pd.concat([merged_df, pd.DataFrame([new_row])], ignore_index=True)
 
-        # 保存合并后的数据
-        merged_df.to_csv(output_file)
+        # 保存合并后的数据，不包含索引
+        merged_df.to_csv(output_file, index=False)
     else:
-        # 如果文件不存在，直接保存处理后的新数据
-        new_df_processed.to_csv(output_file)
+        # 如果文件不存在，直接保存处理后的新数据，不包含索引
+        new_df_processed.to_csv(output_file, index=False)
 
 
 wandb = try_import("wandb")
