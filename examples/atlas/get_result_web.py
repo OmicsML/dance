@@ -248,14 +248,15 @@ def check_exist(file_path):
 
 def get_new_ans(tissue):
     ans = []
+    # temp=all_datasets[all_datasets["tissue"] == tissue]["data_fname"].tolist()
     collect_datasets = [
         collect_dataset.split(tissue)[1].split("_")[0]
         for collect_dataset in all_datasets[all_datasets["tissue"] == tissue]["data_fname"].tolist()
     ]
 
-    for method_folder in tqdm(collect_datasets):
-        for dataset_id in collect_datasets[method_folder]:
-            file_path = f"tuning/{method_folder}/{dataset_id}"
+    for method_folder in tqdm(methods):
+        for dataset_id in collect_datasets:
+            file_path = f"../tuning/{method_folder}/{dataset_id}"
             if not check_exist(file_path):
                 continue
             step2_url = get_sweep_url(pd.read_csv(f"{file_path}/results/pipeline/best_test_acc.csv"))
@@ -282,74 +283,90 @@ def get_new_ans(tissue):
     return new_df
 
 
-def write_ans(tissue, new_df):
-    """Process and write results for a specific tissue type to CSV.
+def write_ans(tissue, new_df, output_file=None):
+    """Process and write results for a specific tissue type to CSV."""
+    if output_file is None:
+        output_file = f"sweep_results/{tissue}_ans.csv"
 
-    Parameters
-    ----------
-    tissue : str
-        Name of the tissue to process
+    # 重置索引，确保Dataset_id成为一个普通列
+    if 'Dataset_id' in new_df.columns:
+        new_df = new_df.reset_index(drop=True)
 
-    Notes
-    -----
-    Writes results to '{tissue}_ans.csv' containing:
-    - Dataset IDs
-    - Sweep URLs for each step
-    - Best performing YAML configurations
-    - Best result metrics
+    # 处理新数据，合并相同Dataset_id的非NA值
+    new_df_processed = pd.DataFrame()
+    for dataset_id in new_df['Dataset_id'].unique():
+        row_data = {'Dataset_id': dataset_id}
+        subset = new_df[new_df['Dataset_id'] == dataset_id]
+        for col in new_df.columns:
+            if col != 'Dataset_id':
+                values = subset[col].dropna().unique()
+                if len(values) > 0:
+                    row_data[col] = values[0]
+        new_df_processed = pd.concat([new_df_processed, pd.DataFrame([row_data])])
 
-    """
-    # 检查是否存在现有文件
-    output_file = f"atlas/sweep_results/{tissue}_ans.csv"
     if os.path.exists(output_file):
-        existing_df = pd.read_csv(output_file, index_col=0)
+        # 读取现有数据，不将任何列设置为索引
+        existing_df = pd.read_csv(output_file)
 
-        # 设置Dataset_id为索引以便更容易合并
-        existing_df.set_index('Dataset_id', inplace=True)
-        new_df.set_index('Dataset_id', inplace=True)
+        # 清理可能存在的Unnamed列
+        existing_df = existing_df.loc[:, ~existing_df.columns.str.contains('^Unnamed')]
 
-        # 检查重叠的Dataset_id
-        common_indices = existing_df.index.intersection(new_df.index)
+        # 创建合并后的DataFrame
+        merged_df = existing_df.copy()
 
-        # 对于每个重叠的Dataset_id，检查是否有冲突
-        for idx in common_indices:
-            for col in existing_df.columns.intersection(new_df.columns):
-                if not str(col).endswith("_best_res"):
-                    continue
-                existing_value = existing_df.loc[idx, col]
-                new_value = new_df.loc[idx, col]
+        # 添加新数据中的列（如果不存在）
+        for col in new_df_processed.columns:
+            if col not in merged_df.columns:
+                merged_df[col] = pd.NA
 
-                # 如果两者都不是NaN且值不同
-                if (pd.notna(existing_value) and pd.notna(new_value)
-                        and (not isinstance(existing_value, float) or abs(existing_value - new_value) > 1e-10)):
-                    raise ValueError(f"结果冲突: Dataset {idx}, Column {col}\n"
-                                     f"现有值: {existing_value}\n新值: {new_value}")
+        # 对每个Dataset_id进行合并和冲突检查
+        for _, new_row in new_df_processed.iterrows():
+            dataset_id = new_row['Dataset_id']
+            existing_row = merged_df[merged_df['Dataset_id'] == dataset_id]
 
-        # 合并数据
-        # 1. 对于重叠的index，使用update更新非NaN的值
-        existing_df.update(new_df)
+            if len(existing_row) > 0:
+                # 检查每一列的值
+                for col in new_df_processed.columns:
+                    if col == 'Dataset_id':
+                        continue
+                    new_value = new_row[col]
+                    existing_value = existing_row[col].iloc[0] if len(existing_row) > 0 else pd.NA
 
-        # 2. 添加仅在new_df中存在的行
-        new_indices = new_df.index.difference(existing_df.index)
-        if len(new_indices) > 0:
-            existing_df = pd.concat([existing_df, new_df.loc[new_indices]])
+                    # 只对_best_res结尾的列进行冲突检查
+                    if str(col).endswith("_best_res"):
+                        if pd.notna(new_value) and pd.notna(existing_value):
+                            if abs(float(new_value) - float(existing_value)) > 1e-10:
+                                raise ValueError(f"结果冲突: Dataset {dataset_id}, Column {col}\n"
+                                                 f"现有值: {existing_value}\n新值: {new_value}")
+                            else:
+                                print(f"提示: 发现重复值 Dataset {dataset_id}, Column {col}\n"
+                                      f"现有值和新值都是: {new_value}")
 
-        # 重置索引并保存
-        existing_df.to_csv(output_file)
+                    # 如果新值不是NaN，更新该值
+                    if pd.notna(new_value):
+                        merged_df.loc[merged_df['Dataset_id'] == dataset_id, col] = new_value
+            else:
+                # 如果是新的Dataset_id，直接添加整行
+                merged_df = pd.concat([merged_df, pd.DataFrame([new_row])], ignore_index=True)
+
+        # 保存合并后的数据，不包含索引
+        merged_df.to_csv(output_file, index=False)
     else:
-        # 如果文件不存在，直接写入新文件
-        new_df.to_csv(output_file)
+        # 如果文件不存在，直接保存处理后的新数据，不包含索引
+        new_df_processed.to_csv(output_file, index=False)
 
 
 wandb = try_import("wandb")
 entity = "xzy11632"
 project = "dance-dev"
+methods = ["cta_actinn", "cta_celltypist", "cta_scdeepsort", "cta_singlecellnet"]
 if __name__ == "__main__":
     # Initialize wandb and set global configuration
     # Load dataset configuration and process results for tissue
     all_datasets = pd.read_csv(METADIR / "scdeepsort.csv", header=0, skiprows=[i for i in range(1, 69)])
-    args = argparse.ArgumentParser()
-    args.add_argument("--tissue", type=str, default="heart")
-    args = args.parse_args()
-    new_df = get_new_ans(args.tissue)
-    write_ans(args.tissue, new_df)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--tissue", type=str, default="Heart")
+    args = parser.parse_args()
+    tissue = args.tissue.capitalize()
+    new_df = get_new_ans(tissue)
+    write_ans(tissue, new_df)
