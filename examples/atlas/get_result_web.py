@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from dance.settings import METADIR
 from dance.utils import try_import
-
+from dance import logger
 # get yaml of best method
 
 
@@ -291,9 +291,12 @@ def write_ans(tissue, new_df, output_file=None):
     # 重置索引，确保Dataset_id成为一个普通列
     if 'Dataset_id' in new_df.columns:
         new_df = new_df.reset_index(drop=True)
-
+    else:
+        logger.warning("Dataset_id not in new_df.columns")
+        return
     # 处理新数据，合并相同Dataset_id的非NA值
     new_df_processed = pd.DataFrame()
+        
     for dataset_id in new_df['Dataset_id'].unique():
         row_data = {'Dataset_id': dataset_id}
         subset = new_df[new_df['Dataset_id'] == dataset_id]
