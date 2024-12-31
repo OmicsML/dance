@@ -172,7 +172,8 @@ def get_best_method(urls, metric_col="test_acc"):
         elif all_best_run.summary[metric_col] > best_run.summary[metric_col] and goal == "minimize":
             all_best_run = best_run
             all_best_step_name = step_name
-    run_states["finished_rate"]=f"{run_states["all_finished_runs"]/run_states["all_total_runs"]:.2%}"
+    num=run_states["all_finished_runs"]/run_states["all_total_runs"]
+    run_states["finished_rate"]=f"{num:.2%}"
     runs_states_str="|".join([f"{k}:{v}" for k,v in run_states.items()])
     return all_best_step_name, all_best_run, all_best_run.summary[metric_col],runs_states_str
 
