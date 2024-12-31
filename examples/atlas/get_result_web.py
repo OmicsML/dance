@@ -144,16 +144,20 @@ def get_best_method(urls, metric_col="test_acc"):
 
     def get_metric(run):
         if metric_col not in run.summary:
-            return float('-inf')#TODO 根据metric_col的名称来判断
+            return float('-inf')  #TODO 根据metric_col的名称来判断
         else:
             return run.summary[metric_col]
-    run_states={"all_total_runs":0,"all_finished_runs":0}
+
+    run_states = {"all_total_runs": 0, "all_finished_runs": 0}
     for step_name, url in zip(step_names, urls):
         _, _, sweep_id = spilt_web(url)
         sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
-        run_states.update({f"{step_name}_total_runs":len(sweep.runs),f"{step_name}_finished_runs":len([run for run in sweep.runs if run.state == "finished"])})
-        run_states["all_total_runs"]+=run_states[f"{step_name}_total_runs"]
-        run_states["all_finished_runs"]+=run_states[f"{step_name}_finished_runs"]
+        run_states.update({
+            f"{step_name}_total_runs": len(sweep.runs),
+            f"{step_name}_finished_runs": len([run for run in sweep.runs if run.state == "finished"])
+        })
+        run_states["all_total_runs"] += run_states[f"{step_name}_total_runs"]
+        run_states["all_finished_runs"] += run_states[f"{step_name}_finished_runs"]
         goal = sweep.config["metric"]["goal"]
         if goal == "maximize":
             best_run = max(sweep.runs, key=get_metric)
@@ -172,10 +176,10 @@ def get_best_method(urls, metric_col="test_acc"):
         elif all_best_run.summary[metric_col] > best_run.summary[metric_col] and goal == "minimize":
             all_best_run = best_run
             all_best_step_name = step_name
-    num=run_states["all_finished_runs"]/run_states["all_total_runs"]
-    run_states["finished_rate"]=f"{num:.2%}"
-    runs_states_str="|".join([f"{k}:{v}" for k,v in run_states.items()])
-    return all_best_step_name, all_best_run, all_best_run.summary[metric_col],runs_states_str
+    num = run_states["all_finished_runs"] / run_states["all_total_runs"]
+    run_states["finished_rate"] = f"{num:.2%}"
+    runs_states_str = "|".join([f"{k}:{v}" for k, v in run_states.items()])
+    return all_best_step_name, all_best_run, all_best_run.summary[metric_col], runs_states_str
 
 
 def get_best_yaml(step_name, best_run, file_path):
