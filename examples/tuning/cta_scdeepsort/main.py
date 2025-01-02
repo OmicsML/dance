@@ -1,5 +1,6 @@
 import argparse
 import gc
+import os
 import pprint
 import sys
 from pathlib import Path
@@ -45,6 +46,7 @@ if __name__ == "__main__":
     parser.add_argument("--filetype", default="csv")
     args = parser.parse_args()
     logger.setLevel(args.log_level)
+    os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
     logger.info(f"Running ScDeepSort with the following parameters:\n{pprint.pformat(vars(args))}")
     file_root_path = Path(
         args.root_path, "_".join([
