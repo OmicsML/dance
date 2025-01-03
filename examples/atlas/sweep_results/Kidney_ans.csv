@@ -1,0 +1,464 @@
+Dataset_id,cta_actinn,cta_actinn_best_yaml,cta_actinn_best_res,cta_actinn_run_stats
+a51c6ece-5731-4128-8c1e-5060e80c69e4,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/80xdc1ba|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/sny3930k,https://wandb.ai/xzy11632/dance-dev/sweeps/volqelag,https://wandb.ai/xzy11632/dance-dev/sweeps/5jxnqx6h","- type: filter.gene
+  target: FilterGenesPlaceHolder
+  params: {}
+- type: normalize
+  target: Log1P
+  params: {}
+- type: filter.gene
+  target: FilterGenesTopK
+  params:
+    num_genes: 3000
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+    split_name: train
+  target: WeightedFeatureSVD
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.2770000100135803,all_total_runs:600|all_finished_runs:447|step2_total_runs:540|step2_finished_runs:401|step3_0_total_runs:20|step3_0_finished_runs:18|step3_1_total_runs:20|step3_1_finished_runs:9|step3_2_total_runs:20|step3_2_finished_runs:19|finished_rate:74.50%
+105c7dad-0468-4628-a5be-2bb42c6a8ae4,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/avkuxvpt|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/jdctlnyj,https://wandb.ai/xzy11632/dance-dev/sweeps/2i0dhz25,https://wandb.ai/xzy11632/dance-dev/sweeps/esaiggjt","- type: filter.gene
+  target: FilterGenesScanpyOrder
+  params:
+    order:
+    - min_counts
+    - min_cells
+    - max_counts
+    - max_cells
+    min_counts: 0.01
+    max_counts: 0.99
+    min_cells: 0.01
+    max_cells: 0.99
+- type: normalize
+  target: ScaleFeature
+  params: {}
+- type: filter.gene
+  target: HighlyVariableGenesRawCount
+  params:
+    n_top_genes: 3000
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+    split_name: train
+  target: WeightedFeatureSVD
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.7124999761581421,all_total_runs:600|all_finished_runs:440|step2_total_runs:540|step2_finished_runs:392|step3_0_total_runs:20|step3_0_finished_runs:20|step3_1_total_runs:20|step3_1_finished_runs:15|step3_2_total_runs:20|step3_2_finished_runs:13|finished_rate:73.33%
+5af90777-6760-4003-9dba-8f945fec6fdf,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/x43ntzx4|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/irntnkow,https://wandb.ai/xzy11632/dance-dev/sweeps/9tdspve1,https://wandb.ai/xzy11632/dance-dev/sweeps/5yvw6kpr","- type: filter.gene
+  target: FilterGenesPercentile
+  params: {}
+- type: normalize
+  target: Log1P
+  params: {}
+- type: filter.gene
+  target: FilterGenesTopK
+  params:
+    num_genes: 3000
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+    split_name: train
+  target: WeightedFeaturePCA
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.2994999885559082,all_total_runs:586|all_finished_runs:420|step2_total_runs:540|step2_finished_runs:386|step3_0_total_runs:20|step3_0_finished_runs:19|step3_1_total_runs:6|step3_1_finished_runs:0|step3_2_total_runs:20|step3_2_finished_runs:15|finished_rate:71.67%
+dea717d4-7bc0-4e46-950f-fd7e1cc8df7d,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/51phjfg4|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/rb2c4x3n,https://wandb.ai/xzy11632/dance-dev/sweeps/4m4fq5j5,https://wandb.ai/xzy11632/dance-dev/sweeps/pqqd7mez","- type: filter.gene
+  target: FilterGenesPercentile
+  params:
+    min_val: 6
+    max_val: 99
+    mode: rv
+- type: normalize
+  target: Log1P
+  params:
+    base: 7.449177659482961
+- type: filter.gene
+  target: FilterGenesTopK
+  params:
+    num_genes: 5312
+    top: true
+    mode: var
+- type: feature.cell
+  target: WeightedFeaturePCA
+  params:
+    out: feature.cell
+    log_level: INFO
+    n_components: 375
+    feat_norm_mode: standardize
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.2224999964237213,all_total_runs:600|all_finished_runs:457|step2_total_runs:540|step2_finished_runs:400|step3_0_total_runs:20|step3_0_finished_runs:18|step3_1_total_runs:20|step3_1_finished_runs:19|step3_2_total_runs:20|step3_2_finished_runs:20|finished_rate:76.17%
+9df60c57-fdf3-4e93-828e-fe9303f20438,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/ku1n6b7v|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/ng92wwrv,https://wandb.ai/xzy11632/dance-dev/sweeps/67oq9j9d,https://wandb.ai/xzy11632/dance-dev/sweeps/4holfqbm","- type: filter.gene
+  target: FilterGenesPlaceHolder
+- type: normalize
+  target: Log1P
+  params:
+    base: 5.085645037530894
+- type: filter.gene
+  target: FilterGenesTopK
+  params:
+    num_genes: 8932
+    top: false
+    mode: rv
+- type: feature.cell
+  target: WeightedFeaturePCA
+  params:
+    out: feature.cell
+    log_level: INFO
+    n_components: 108
+    feat_norm_mode: standardize
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.27649998664855957,all_total_runs:600|all_finished_runs:443|step2_total_runs:540|step2_finished_runs:403|step3_0_total_runs:20|step3_0_finished_runs:17|step3_1_total_runs:20|step3_1_finished_runs:16|step3_2_total_runs:20|step3_2_finished_runs:7|finished_rate:73.83%
+be39785b-67cb-4177-be19-a40ee3747e45,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/bueblvgh|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/qxcu5gfb,https://wandb.ai/xzy11632/dance-dev/sweeps/dl2izc9t,https://wandb.ai/xzy11632/dance-dev/sweeps/11iznmvf","- type: filter.gene
+  target: FilterGenesPlaceHolder
+  params: {}
+- type: normalize
+  target: Log1P
+  params: {}
+- type: filter.gene
+  target: FilterGenesTopK
+  params:
+    num_genes: 3000
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+    split_name: train
+  target: WeightedFeatureSVD
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.4440000057220459,all_total_runs:600|all_finished_runs:445|step2_total_runs:540|step2_finished_runs:400|step3_0_total_runs:20|step3_0_finished_runs:18|step3_1_total_runs:20|step3_1_finished_runs:8|step3_2_total_runs:20|step3_2_finished_runs:19|finished_rate:74.17%
+32b9bdce-2481-4c85-ba1b-6ad5fcea844c,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/ch3i3tkk|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/3ra9d12m,https://wandb.ai/xzy11632/dance-dev/sweeps/0yy5nksn,https://wandb.ai/xzy11632/dance-dev/sweeps/0dpb06b7","- type: filter.gene
+  target: FilterGenesPlaceHolder
+  params: {}
+- type: normalize
+  target: Log1P
+  params: {}
+- type: filter.gene
+  target: FilterGenesNumberPlaceHolder
+  params: {}
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+    split_name: train
+  target: WeightedFeaturePCA
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.2370000034570694,all_total_runs:600|all_finished_runs:501|step2_total_runs:540|step2_finished_runs:441|step3_0_total_runs:20|step3_0_finished_runs:20|step3_1_total_runs:20|step3_1_finished_runs:20|step3_2_total_runs:20|step3_2_finished_runs:20|finished_rate:83.50%
+0b4a15a7-4e9e-4555-9733-2423e5c66469,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/b17chya1|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/2knyp5e6,https://wandb.ai/xzy11632/dance-dev/sweeps/fpvymfqu,https://wandb.ai/xzy11632/dance-dev/sweeps/7yvf6lid","- type: filter.gene
+  target: FilterGenesPlaceHolder
+  params: {}
+- type: normalize
+  target: Log1P
+  params: {}
+- type: filter.gene
+  target: FilterGenesTopK
+  params:
+    num_genes: 3000
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+    split_name: train
+  target: WeightedFeatureSVD
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.2485000044107437,all_total_runs:600|all_finished_runs:470|step2_total_runs:540|step2_finished_runs:416|step3_0_total_runs:20|step3_0_finished_runs:20|step3_1_total_runs:20|step3_1_finished_runs:20|step3_2_total_runs:20|step3_2_finished_runs:14|finished_rate:78.33%
+53d208b0-2cfd-4366-9866-c3c6114081bc,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/p6h1i8ws|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/fhzengv5,https://wandb.ai/xzy11632/dance-dev/sweeps/23unbp67,https://wandb.ai/xzy11632/dance-dev/sweeps/9j9n7dtn","- type: filter.gene
+  target: FilterGenesScanpyOrder
+  params:
+    order:
+    - min_counts
+    - min_cells
+    - max_counts
+    - max_cells
+    min_counts: 0.01
+    max_counts: 0.99
+    min_cells: 0.01
+    max_cells: 0.99
+- type: normalize
+  target: ScaleFeature
+  params: {}
+- type: filter.gene
+  target: HighlyVariableGenesRawCount
+  params:
+    n_top_genes: 3000
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+    split_name: train
+  target: WeightedFeatureSVD
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.8750647902488708,all_total_runs:600|all_finished_runs:449|step2_total_runs:540|step2_finished_runs:400|step3_0_total_runs:20|step3_0_finished_runs:20|step3_1_total_runs:20|step3_1_finished_runs:15|step3_2_total_runs:20|step3_2_finished_runs:14|finished_rate:74.83%
+6a30bf44-c490-41ac-965b-0bb58432b10a,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/0vjmseqv|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/tjum1tpz,https://wandb.ai/xzy11632/dance-dev/sweeps/buc7ui45,https://wandb.ai/xzy11632/dance-dev/sweeps/dsbpgsg6","- type: filter.gene
+  target: FilterGenesPlaceHolder
+  params: {}
+- type: normalize
+  target: ScTransform
+  params:
+    processes_num: 8
+- type: filter.gene
+  target: HighlyVariableGenesRawCount
+  params:
+    n_top_genes: 3000
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+  target: CellSVD
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.5,all_total_runs:572|all_finished_runs:443|step2_total_runs:540|step2_finished_runs:441|step3_0_total_runs:20|step3_0_finished_runs:2|step3_1_total_runs:6|step3_1_finished_runs:0|step3_2_total_runs:6|step3_2_finished_runs:0|finished_rate:77.45%
+f801b7a9-80a6-4d09-9161-71474deb58ae,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/0my62r0x|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/2j2fewq5,https://wandb.ai/xzy11632/dance-dev/sweeps/cepp4w5d,https://wandb.ai/xzy11632/dance-dev/sweeps/6xvxfv4t","- type: filter.gene
+  target: FilterGenesScanpyOrder
+  params:
+    order:
+    - min_counts
+    - min_cells
+    - max_counts
+    - max_cells
+    min_counts: 0.01
+    max_counts: 0.99
+    min_cells: 0.01
+    max_cells: 0.99
+- type: normalize
+  target: ScTransform
+  params:
+    processes_num: 8
+- type: filter.gene
+  target: HighlyVariableGenesRawCount
+  params:
+    n_top_genes: 3000
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+    split_name: train
+  target: WeightedFeatureSVD
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.3672456443309784,all_total_runs:558|all_finished_runs:429|step2_total_runs:540|step2_finished_runs:429|step3_0_total_runs:6|step3_0_finished_runs:0|step3_1_total_runs:6|step3_1_finished_runs:0|step3_2_total_runs:6|step3_2_finished_runs:0|finished_rate:76.88%
+20d87640-4be8-487f-93d4-dce38378d00f,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/zn9j6dg5|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/06i2q2p7,https://wandb.ai/xzy11632/dance-dev/sweeps/1te143pv,https://wandb.ai/xzy11632/dance-dev/sweeps/i2bo7l98","- type: filter.gene
+  target: FilterGenesPlaceHolder
+  params: {}
+- type: normalize
+  target: Log1P
+  params: {}
+- type: filter.gene
+  target: FilterGenesTopK
+  params:
+    num_genes: 3000
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+    split_name: train
+  target: WeightedFeaturePCA
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.33247917890548706,all_total_runs:600|all_finished_runs:483|step2_total_runs:540|step2_finished_runs:423|step3_0_total_runs:20|step3_0_finished_runs:20|step3_1_total_runs:20|step3_1_finished_runs:20|step3_2_total_runs:20|step3_2_finished_runs:20|finished_rate:80.50%
+2d31c0ca-0233-41ce-bd1a-05aa8404b073,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/0vcqva6z|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/t219mhhy,https://wandb.ai/xzy11632/dance-dev/sweeps/o8k3c6lv,https://wandb.ai/xzy11632/dance-dev/sweeps/n54ib73r","- type: filter.gene
+  target: FilterGenesScanpyOrder
+  params:
+    order:
+    - min_counts
+    - min_cells
+    - max_counts
+    - max_cells
+    min_counts: 0.01
+    max_counts: 0.99
+    min_cells: 0.01
+    max_cells: 0.99
+- type: normalize
+  target: ScaleFeature
+  params: {}
+- type: filter.gene
+  target: HighlyVariableGenesRawCount
+  params:
+    n_top_genes: 3000
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+    split_name: train
+  target: WeightedFeatureSVD
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.3620437979698181,all_total_runs:600|all_finished_runs:469|step2_total_runs:540|step2_finished_runs:411|step3_0_total_runs:20|step3_0_finished_runs:20|step3_1_total_runs:20|step3_1_finished_runs:20|step3_2_total_runs:20|step3_2_finished_runs:18|finished_rate:78.17%
+fd072bc3-2dfb-46f8-b4e3-467cb3223182,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/l6gb8igg|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/avpo32k2,https://wandb.ai/xzy11632/dance-dev/sweeps/8ga8qet1,https://wandb.ai/xzy11632/dance-dev/sweeps/0lz70ruz","- type: filter.gene
+  target: FilterGenesPercentile
+  params: {}
+- type: normalize
+  target: Log1P
+  params: {}
+- type: filter.gene
+  target: HighlyVariableGenesLogarithmizedByMeanAndDisp
+  params: {}
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+    split_name: train
+  target: WeightedFeaturePCA
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.28049999475479126,all_total_runs:600|all_finished_runs:487|step2_total_runs:540|step2_finished_runs:427|step3_0_total_runs:20|step3_0_finished_runs:20|step3_1_total_runs:20|step3_1_finished_runs:20|step3_2_total_runs:20|step3_2_finished_runs:20|finished_rate:81.17%
+0b75c598-0893-4216-afe8-5414cab7739d,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/zw08f3vc|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/zokwex9g,https://wandb.ai/xzy11632/dance-dev/sweeps/6w8eah70,https://wandb.ai/xzy11632/dance-dev/sweeps/rh47nlz0","- type: filter.gene
+  target: FilterGenesScanpyOrder
+  params:
+    order:
+    - min_counts
+    - min_cells
+    - max_counts
+    - max_cells
+    min_counts: 0.01
+    max_counts: 0.99
+    min_cells: 0.01
+    max_cells: 0.99
+- type: normalize
+  target: NormalizeTotal
+  params: {}
+- type: filter.gene
+  target: FilterGenesTopK
+  params:
+    num_genes: 3000
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+    split_name: train
+  target: WeightedFeatureSVD
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.244499996304512,all_total_runs:600|all_finished_runs:466|step2_total_runs:540|step2_finished_runs:406|step3_0_total_runs:20|step3_0_finished_runs:20|step3_1_total_runs:20|step3_1_finished_runs:20|step3_2_total_runs:20|step3_2_finished_runs:20|finished_rate:77.67%
+2aa1c93c-4ef3-4e9a-98e7-0bd37933953c,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/zw2x3j2g|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/yayfm8nk,https://wandb.ai/xzy11632/dance-dev/sweeps/shh6b1z9,https://wandb.ai/xzy11632/dance-dev/sweeps/oyem3gtm","- type: filter.gene
+  target: FilterGenesScanpyOrder
+  params:
+    order:
+    - min_counts
+    - min_cells
+    - max_counts
+    - max_cells
+    min_counts: 0.01
+    max_counts: 0.99
+    min_cells: 0.01
+    max_cells: 0.99
+- type: normalize
+  target: ScTransform
+  params:
+    processes_num: 8
+- type: filter.gene
+  target: FilterGenesNumberPlaceHolder
+  params: {}
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+    split_name: train
+  target: WeightedFeatureSVD
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.488034188747406,all_total_runs:599|all_finished_runs:466|step2_total_runs:540|step2_finished_runs:408|step3_0_total_runs:19|step3_0_finished_runs:18|step3_1_total_runs:20|step3_1_finished_runs:20|step3_2_total_runs:20|step3_2_finished_runs:20|finished_rate:77.80%
+2423ce2c-3149-4cca-a2ff-cf682ea29b5f,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/yvdvm8br|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/tuecazpp,https://wandb.ai/xzy11632/dance-dev/sweeps/1axejlbz,https://wandb.ai/xzy11632/dance-dev/sweeps/zpq9n7oj","- type: filter.gene
+  target: FilterGenesScanpyOrder
+  params:
+    order:
+    - min_counts
+    - min_cells
+    - max_counts
+    - max_cells
+    min_counts: 0.01
+    max_counts: 0.99
+    min_cells: 0.01
+    max_cells: 0.99
+- type: normalize
+  target: ScaleFeature
+  params: {}
+- type: filter.gene
+  target: HighlyVariableGenesRawCount
+  params:
+    n_top_genes: 3000
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+    split_name: train
+  target: WeightedFeatureSVD
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.8750647902488708,all_total_runs:586|all_finished_runs:488|step2_total_runs:540|step2_finished_runs:450|step3_0_total_runs:6|step3_0_finished_runs:0|step3_1_total_runs:20|step3_1_finished_runs:18|step3_2_total_runs:20|step3_2_finished_runs:20|finished_rate:83.28%
