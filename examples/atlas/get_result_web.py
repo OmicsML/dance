@@ -74,7 +74,7 @@ def get_sweep_url(step_csv: pd.DataFrame, single=True):
     sweep_urls = []
     for run_id in tqdm(reversed(ids),
                        leave=False):  #The reversal of order is related to additional_sweep_ids.append(sweep_id)
-        api = wandb.Api(timeout=39)
+        api = wandb.Api(timeout=1000)
         run = api.run(f"/{entity}/{project}/runs/{run_id}")
         sweep_urls.append(run.sweep.url)
         if single:
@@ -151,7 +151,7 @@ def get_best_method(urls, metric_col="test_acc"):
     run_states = {"all_total_runs": 0, "all_finished_runs": 0}
     for step_name, url in zip(step_names, urls):
         _, _, sweep_id = spilt_web(url)
-        sweep = wandb.Api(timeout=39).sweep(f"{entity}/{project}/{sweep_id}")
+        sweep = wandb.Api(timeout=1000).sweep(f"{entity}/{project}/{sweep_id}")
         run_states.update({
             f"{step_name}_total_runs": len(sweep.runs),
             f"{step_name}_finished_runs": len([run for run in sweep.runs if run.state == "finished"])
