@@ -136,11 +136,13 @@ def get_ans_from_cache(query_dataset, method):
         for run in sweep.runs:
             if is_matching_dict(best_yaml, run.config):
                 if match_run is not None:
-
+                    raise ValueError("match_run只能被赋值一次")
+                else:
                     match_run = run
-
-        # for
-        # ans.loc[method, atlas_datasets[i]]
+            if match_run is None:
+                raise ValueError("未找到匹配")
+        ans.loc[method, atlas_dataset] = match_run.summary["test_acc"]
+    return ans
 
 
 ans_all = {}
