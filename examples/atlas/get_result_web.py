@@ -261,8 +261,10 @@ def check_exist(file_path):
 def get_new_ans(tissue):
     ans = []
     # temp=all_datasets[all_datasets["tissue"] == tissue]["data_fname"].tolist()
+
     collect_datasets = [
-        collect_dataset.split(tissue)[1].split("_")[0]
+        collect_dataset.split(tissue)[1] +
+        (tissue + collect_dataset.split(tissue)[2] if len(collect_dataset.split(tissue)) >= 3 else '')
         for collect_dataset in all_datasets[all_datasets["tissue"] == tissue]["data_fname"].tolist()
     ]
 
@@ -381,7 +383,7 @@ if __name__ == "__main__":
     # Load dataset configuration and process results for tissue
     all_datasets = pd.read_csv(METADIR / "scdeepsort.csv", header=0, skiprows=[i for i in range(1, 69)])
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tissue", type=str, default="Heart")
+    parser.add_argument("--tissue", type=str, default="Intestine")
     args = parser.parse_args()
     tissue = args.tissue.capitalize()
     new_df = get_new_ans(tissue)
