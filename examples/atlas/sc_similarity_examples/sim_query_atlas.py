@@ -1,7 +1,10 @@
 import argparse
+import os
+import re
 from pathlib import Path
 
 import pandas as pd
+import yaml
 
 atlas_datasets = [
     "01209dce-3575-4bed-b1df-129f57fbc031", "055ca631-6ffb-40de-815e-b931e10718c0",
@@ -20,6 +23,7 @@ import ast
 
 from get_result_web import get_sweep_url, spilt_web
 
+from dance import logger
 from dance.utils import try_import
 
 file_root = str(Path(__file__).resolve().parent.parent)
@@ -85,8 +89,30 @@ query_datasets = [
 ]
 
 
+def is_matching_dict(yaml_str, target_dict):
+
+    # 解析YAML字符串
+    yaml_config = yaml.safe_load(yaml_str)
+
+    # 构建期望的字典格式
+    expected_dict = {}
+    for i, item in enumerate(yaml_config):
+        if item['type'] == 'misc':  # 跳过misc类型
+            continue
+        key = f"pipeline.{i}.{item['type']}"
+        value = item['target']
+        expected_dict[key] = value
+
+    # 直接比较两个字典是否相等
+    return expected_dict == target_dict
+
+
 def get_ans(query_dataset, method):
-    data = pd.read_csv(f"{file_root}/tuning/{method}/{query_dataset}/results/atlas/best_test_acc.csv")
+    result_path = f"{file_root}/tuning/{method}/{query_dataset}/results/atlas/best_test_acc.csv"
+    if not os.path.exists(result_path):
+        logger.warning(f"{result_path} not exists")
+        return None
+    data = pd.read_csv(result_path)
     sweep_url = get_sweep_url(data)
     _, _, sweep_id = spilt_web(sweep_url)
     sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
@@ -97,11 +123,35 @@ def get_ans(query_dataset, method):
     return ans
 
 
+def get_ans_from_cache(query_dataset, method):
+    #1:get best method from step2 of atlas datasets
+    #2:search acc according to best method(需要注意的是，应该都是有值的，没有值的需要检查一下)
+    ans = pd.DataFrame(index=method, columns=[f"{atlas_dataset}_from_cache" for atlas_dataset in atlas_datasets])
+    sweep_url = re.search(r"step2:([^|]+)", conf_data[conf_data["Dataset_id"] == query_dataset][method]).group(1)
+    _, _, sweep_id = spilt_web(sweep_url)
+    sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
+    for atlas_dataset in atlas_datasets:
+        best_yaml = conf_data[conf_data["Dataset_id"] == atlas_dataset][f"{method}_method"]
+        match_run = None
+        for run in sweep.runs:
+            if is_matching_dict(best_yaml, run.config):
+                if match_run is not None:
+
+                    match_run = run
+
+        # for
+        # ans.loc[method, atlas_datasets[i]]
+
+
 ans_all = {}
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--methods", default=["cta_actinn", "cta_scdeepsort"], nargs="+")
+parser.add_argument("--methods", default=["cta_actinn", "cta_scdeepsort", "cta_singlecellnet", "cta_celltypist"],
+                    nargs="+")
+parser.add_argument("--tissue", type=str)
 args = parser.parse_args()
 methods = args.methods
+tissue = args.tissue
+conf_data = pd.read_excel("Cell Type Annotation Atlas.xlsx", sheet_name=tissue)
 if __name__ == "__main__":
     for query_dataset in query_datasets:
         ans = []
