@@ -261,10 +261,10 @@ def check_exist(file_path):
 def get_new_ans(tissue):
     ans = []
     # temp=all_datasets[all_datasets["tissue"] == tissue]["data_fname"].tolist()
-
     collect_datasets = [
-        collect_dataset.split(tissue)[1] +
-        (tissue + collect_dataset.split(tissue)[2] if len(collect_dataset.split(tissue)) >= 3 else '')
+        (collect_dataset.split(tissue)[1] +
+         (tissue + collect_dataset.split(tissue)[2] if len(collect_dataset.split(tissue)) >= 3 else '')).split('_')[0]
+        #TODO 有问题，需要调试
         for collect_dataset in all_datasets[all_datasets["tissue"] == tissue]["data_fname"].tolist()
     ]
 

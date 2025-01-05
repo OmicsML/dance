@@ -327,3 +327,69 @@ d6dfdef1-406d-4efb-808c-3c5eddbfe0cb,"step2:https://wandb.ai/xzy11632/dance-dev/
     config_dict:
       label_channel: cell_type
 ",0.5648086071014404,all_total_runs:168|all_finished_runs:75|step2_total_runs:150|step2_finished_runs:75|step3_0_total_runs:6|step3_0_finished_runs:0|step3_1_total_runs:6|step3_1_finished_runs:0|step3_2_total_runs:6|step3_2_finished_runs:0|finished_rate:44.64%|need_to_check:True
+f7c1c579-2dc0-47e2-ba19-8165c5a0e353(Intestine),,,,,,,,,,,,,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/dedm26ib|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/765195mr,https://wandb.ai/xzy11632/dance-dev/sweeps/4f58apli,https://wandb.ai/xzy11632/dance-dev/sweeps/fvoqt6jw","- type: filter.gene
+  target: FilterGenesPercentile
+  params:
+    min_val: 7
+    max_val: 96
+    mode: cv
+- type: normalize
+  target: ScaleFeature
+  params:
+    mode: l2
+    eps: 0.3
+- type: filter.gene
+  target: FilterGenesTopK
+  params:
+    num_genes: 8455
+    top: false
+    mode: cv
+- type: feature.cell
+  target: WeightedFeatureSVD
+  params:
+    out: feature.cell
+    log_level: INFO
+    n_components: 747
+    feat_norm_mode: l2
+- type: graph.cell
+  target: CellFeatureGraph
+  params:
+    cell_feature_channel: feature.cell
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      label_channel: cell_type
+",0.4900000095367432,all_total_runs:210|all_finished_runs:166|step2_total_runs:150|step2_finished_runs:113|step3_0_total_runs:20|step3_0_finished_runs:14|step3_1_total_runs:20|step3_1_finished_runs:19|step3_2_total_runs:20|step3_2_finished_runs:20|finished_rate:79.05%|need_to_check:False
+fa27492b-82ff-4ab7-ac61-0e2b184eee67(Intestine),,,,,,,,,,,,,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/n6knsnsf|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/6opqehxd,https://wandb.ai/xzy11632/dance-dev/sweeps/2xlryh6l,https://wandb.ai/xzy11632/dance-dev/sweeps/lz3o81dv","- type: filter.gene
+  target: FilterGenesPercentile
+  params:
+    min_val: 1
+    max_val: 96
+    mode: var
+- type: normalize
+  target: Log1P
+  params:
+    base: 3.4792913454298
+- type: filter.gene
+  target: FilterGenesRegression
+  params:
+    method: scmap
+    num_genes: 7286
+- type: feature.cell
+  target: WeightedFeaturePCA
+  params:
+    out: feature.cell
+    log_level: INFO
+    n_components: 770
+    feat_norm_mode: null
+- type: graph.cell
+  target: CellFeatureGraph
+  params:
+    cell_feature_channel: feature.cell
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      label_channel: cell_type
+",0.512499988079071,all_total_runs:196|all_finished_runs:147|step2_total_runs:150|step2_finished_runs:119|step3_0_total_runs:20|step3_0_finished_runs:13|step3_1_total_runs:20|step3_1_finished_runs:15|step3_2_total_runs:6|step3_2_finished_runs:0|finished_rate:75.00%|need_to_check:False
