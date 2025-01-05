@@ -178,9 +178,9 @@ def get_best_method(urls, metric_col="test_acc"):
             all_best_step_name = step_name
     num = run_states["all_finished_runs"] / run_states["all_total_runs"]
     run_states["finished_rate"] = f"{num:.2%}"
-    run_states["need_to_check"] = num < 0.6
+    need_to_check = num < 0.6
     runs_states_str = "|".join([f"{k}:{v}" for k, v in run_states.items()])
-    return all_best_step_name, all_best_run, all_best_run.summary[metric_col], runs_states_str
+    return all_best_step_name, all_best_run, all_best_run.summary[metric_col], runs_states_str, need_to_check
 
 
 def get_best_yaml(step_name, best_run, file_path):
@@ -262,7 +262,9 @@ def get_new_ans(tissue):
     ans = []
     # temp=all_datasets[all_datasets["tissue"] == tissue]["data_fname"].tolist()
     collect_datasets = [
-        collect_dataset.split(tissue)[1].split("_")[0]
+        (collect_dataset.split(tissue)[1] +
+         (tissue + collect_dataset.split(tissue)[2] if len(collect_dataset.split(tissue)) >= 3 else '')).split('_')[0]
+        #TODO 有问题，需要调试
         for collect_dataset in all_datasets[all_datasets["tissue"] == tissue]["data_fname"].tolist()
     ]
 
@@ -281,14 +283,15 @@ def get_new_ans(tissue):
                 step3_urls.append(get_sweep_url(pd.read_csv(file_csv)))
             step3_str = ",".join(step3_urls)
             step_str = f"step2:{step2_url}|step3:{step3_str}"
-            step_name, best_run, best_res, run_stats_str = get_best_method([step2_url] + step3_urls)
+            step_name, best_run, best_res, run_stats_str, need_to_check = get_best_method([step2_url] + step3_urls)
             best_yaml = get_best_yaml(step_name, best_run, file_path)
             ans.append({
                 "Dataset_id": dataset_id,
                 method_folder: step_str,
                 f"{method_folder}_best_yaml": best_yaml,
                 f"{method_folder}_best_res": best_res,
-                f"{method_folder}_run_stats": run_stats_str
+                f"{method_folder}_run_stats": run_stats_str,
+                f"{method_folder}_check": need_to_check
             })
     # with open('temp_ans.json', 'w') as f:
     #     json.dump(ans, f,indent=4)
@@ -381,7 +384,7 @@ if __name__ == "__main__":
     # Load dataset configuration and process results for tissue
     all_datasets = pd.read_csv(METADIR / "scdeepsort.csv", header=0, skiprows=[i for i in range(1, 69)])
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tissue", type=str, default="Heart")
+    parser.add_argument("--tissue", type=str, default="Intestine")
     args = parser.parse_args()
     tissue = args.tissue.capitalize()
     new_df = get_new_ans(tissue)
