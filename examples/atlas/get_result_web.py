@@ -264,12 +264,13 @@ def get_new_ans(tissue):
     collect_datasets = [
         (collect_dataset.split(tissue)[1] +
          (tissue + collect_dataset.split(tissue)[2] if len(collect_dataset.split(tissue)) >= 3 else '')).split('_')[0]
-        #TODO 有问题，需要调试
         for collect_dataset in all_datasets[all_datasets["tissue"] == tissue]["data_fname"].tolist()
     ]
 
     for method_folder in tqdm(methods):
         for dataset_id in collect_datasets:
+            if dataset_id == "f72958f5-7f42-4ebb-98da-445b0c6de516":  #f72958f5-7f42-4ebb-98da-445b0c6de516
+                pass
             file_path = f"../tuning/{method_folder}/{dataset_id}"
             if not check_exist(file_path):
                 continue
@@ -384,7 +385,7 @@ if __name__ == "__main__":
     # Load dataset configuration and process results for tissue
     all_datasets = pd.read_csv(METADIR / "scdeepsort.csv", header=0, skiprows=[i for i in range(1, 69)])
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tissue", type=str, default="Intestine")
+    parser.add_argument("--tissue", type=str, default="Lung")
     args = parser.parse_args()
     tissue = args.tissue.capitalize()
     new_df = get_new_ans(tissue)
