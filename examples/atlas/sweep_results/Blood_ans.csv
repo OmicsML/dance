@@ -2542,7 +2542,7 @@ eeacb0c1-2217-4cf6-b8ce-1f0fedf1b569,"step2:https://wandb.ai/xzy11632/dance-dev/
     config_dict:
       feature_channel: SCNFeature
       label_channel: cell_type
-",0.44521739130434784,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/8o3jnu7v|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/jlyqtiff,https://wandb.ai/xzy11632/dance-dev/sweeps/vax5rga7,https://wandb.ai/xzy11632/dance-dev/sweeps/14jfmmg9","- type: filter.gene
+",0.4452173913043478,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/8o3jnu7v|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/jlyqtiff,https://wandb.ai/xzy11632/dance-dev/sweeps/vax5rga7,https://wandb.ai/xzy11632/dance-dev/sweeps/14jfmmg9","- type: filter.gene
   target: FilterGenesScanpyOrder
   params:
     order:
