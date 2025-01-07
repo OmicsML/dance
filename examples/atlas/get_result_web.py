@@ -355,8 +355,8 @@ def write_ans(tissue, new_df, output_file=None):
                     if str(col).endswith("_best_res"):
                         if pd.notna(new_value) and pd.notna(existing_value):
                             if abs(float(new_value) - float(existing_value)) > 1e-10:
-                                raise ValueError(f"结果冲突: Dataset {dataset_id}, Column {col}\n"
-                                                 f"现有值: {existing_value}\n新值: {new_value}")
+                                print(f"结果冲突: Dataset {dataset_id}, Column {col}\n"
+                                      f"现有值: {existing_value}\n新值: {new_value}")
                             else:
                                 print(f"提示: 发现重复值 Dataset {dataset_id}, Column {col}\n"
                                       f"现有值和新值都是: {new_value}")
@@ -382,7 +382,7 @@ methods = ["cta_actinn", "cta_celltypist", "cta_scdeepsort", "cta_singlecellnet"
 if __name__ == "__main__":
     # Initialize wandb and set global configuration
     # Load dataset configuration and process results for tissue
-    all_datasets = pd.read_csv(METADIR / "scdeepsort.csv", header=0, skiprows=[i for i in range(1, 69)])
+    all_datasets = pd.read_csv(METADIR / "scdeepsort.csv", header=0, skiprows=[i for i in range(1, 68)])
     parser = argparse.ArgumentParser()
     parser.add_argument("--tissue", type=str, default="Intestine")
     args = parser.parse_args()
