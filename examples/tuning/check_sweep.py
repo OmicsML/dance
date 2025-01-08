@@ -10,21 +10,22 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--sweep_id", type=str, default="c3yy5fd3")
 args = parser.parse_args()
 sweep_id = args.sweep_id
-sweep = wandb.Api(timeout=1000).sweep(f"{entity}/{project}/{sweep_id}")
+
 import time
 
 
-def delete_unfinished_runs(sweep, max_attempts=3, check_interval=1):
+def delete_unfinished_runs(sweep_id, max_attempts=3, check_interval=1):
     """删除所有未完成的运行，并确保删除成功.
 
     参数:
-    - sweep: sweep对象
+    - sweep_id: sweep对象的id
     - max_attempts: 最大重试次数
     - check_interval: 每次检查间隔的秒数
 
     """
     attempt = 0
     while attempt < max_attempts:
+        sweep = wandb.Api(timeout=1000).sweep(f"{entity}/{project}/{sweep_id}")
         # 检查是否还有未完成的运行
         unfinished_runs = [run for run in sweep.runs if run.state != 'finished']
 
@@ -54,7 +55,7 @@ def delete_unfinished_runs(sweep, max_attempts=3, check_interval=1):
 
 
 # 使用示例
-success = delete_unfinished_runs(sweep)
+success = delete_unfinished_runs(sweep_id)
 if success:
     print("所有未完成的运行已成功删除")
 else:
