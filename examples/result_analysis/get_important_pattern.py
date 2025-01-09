@@ -247,7 +247,8 @@ def get_forest_model_pattern(step2_data, metric_name):
         - Best model parameters and MSE
 
     """
-    columns = sorted([col for col in step2_data.columns if col.startswith("pipeline")])
+    columns = sorted(
+        [col for col in step2_data.columns if (col.startswith("pipeline") or col.startswith("run_kwargs_pipeline"))])
     X = step2_data.loc[:, columns]
     y = step2_data.loc[:, metric_name]
     preprocessor = ColumnTransformer(transformers=[('onehot', OneHotEncoder(drop='first'),
@@ -280,7 +281,7 @@ def get_forest_model_pattern(step2_data, metric_name):
     model = best_pipeline.named_steps['regressor']
     X_preprocessed = best_pipeline.named_steps['preprocessor'].transform(X)
     feature_names = best_pipeline.named_steps['preprocessor'].get_feature_names_out(columns)
-    logger.info(f"X_preprocessed.columns={X_preprocessed.columns}")
+    logger.info(f"X.columns={X.columns}")
     logger.info(f"feature_names={feature_names}")
     explainer = shapiq.TreeExplainer(
         model=model, index="k-SII", max_order=3
@@ -310,15 +311,17 @@ def get_forest_model_pattern(step2_data, metric_name):
     preprocessed_df[metric_name] = step2_data[metric_name]
     preprocessed_df_copy = deepcopy(preprocessed_df)
     real_ans = {}
+    new_columns = {}
     for k, v in ans.items():
         feature_name = k.split(' x ')
         one_col = f"{','.join(feature_name)}__all__one"
-        preprocessed_df_copy[one_col] = preprocessed_df_copy[feature_name].eq(1).all(axis=1)
+        new_columns[one_col] = preprocessed_df_copy[feature_name].eq(1).all(axis=1)
         # method='pearson'
         # pearson_corr = preprocessed_df_copy.loc[:,one_col].corr(preprocessed_df_copy.loc[:,metric_name], method=method)
-        r_pb, p_value = pointbiserialr(preprocessed_df_copy.loc[:, one_col].astype('category'),
-                                       preprocessed_df_copy.loc[:, metric_name])
+        r_pb, p_value = pointbiserialr(new_columns[one_col].astype('category'), preprocessed_df_copy.loc[:,
+                                                                                                         metric_name])
         real_ans[k] = {"shapiq": v, "pointbiserialr": {"r_pb": r_pb, "p_value": p_value}}
+    preprocessed_df_copy = pd.concat([preprocessed_df_copy, pd.DataFrame(new_columns)], axis=1)
     real_ans["best_params"] = grid_search.best_params_
     real_ans["best_mse"] = -grid_search.best_score_
     return real_ans

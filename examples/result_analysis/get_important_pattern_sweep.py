@@ -19,11 +19,14 @@ from dance.utils import try_import
 entity = "xzy11632"
 project = "dance-dev"
 # List of tasks to analyze
-tasks = ["cell type annotation new", "clustering", "imputation_new", "spatial domain", "cell type deconvolution"]
+# tasks = ["cell type annotation new", "clustering", "imputation_new", "spatial domain", "cell type deconvolution"]
+tasks = ['joint embedding']
 # Corresponding metrics for each task
-mertic_names = ["test_acc", "acc", "MRE", "ARI", "MSE"]
+# mertic_names = ["test_acc", "acc", "MRE", "ARI", "MSE"]
+mertic_names = ["ARI"]
+ascendings = [False]
 # Whether higher values are better for each metric
-ascendings = [False, False, True, False, True]
+# ascendings = [False, False, True, False, True]
 
 multi_mod = False
 if multi_mod:
@@ -109,7 +112,10 @@ def summary_pattern(step2_origin_data, metric_name, ascending, alpha=0.05, vis=F
         - Pattern analysis results including forest model and/or APR analysis
 
     """
-    columns = sorted([col for col in step2_origin_data.columns if col.startswith("pipeline")])
+    columns = sorted([
+        col for col in step2_origin_data.columns
+        if (col.startswith("pipeline") or col.startswith("run_kwargs_pipeline"))
+    ])
     step2_data = step2_origin_data.loc[:, columns + [metric_name]]
     # com_ans = get_com_all(step2_data, metric_name, ascending, vis=vis, alpha=alpha)
     step2_data[metric_name] = step2_data[metric_name].astype(float)
@@ -159,8 +165,8 @@ if __name__ == "__main__":
                 dataset = data.columns[col_idx]
                 value = data.iloc[row_idx, col_idx]
                 step_name = data.iloc[row_idx]["Unnamed: 1"]
-                # if dataset=="Dataset6:pancreatic_cancer" and method == "Stlearn":
-                #     start=True
+                if method != "dcca":
+                    start = True
                 if not start:
                     continue
                 # if method !="ACTINN" :
