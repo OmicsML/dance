@@ -88,27 +88,29 @@ def test_write_ans(tmp_path):
     # 测试正常更新
     write_ans(tissue, new_df, output_file=output_file)
     # 读取更新后的文件
-    updated_df = pd.read_csv(output_file, index_col=0)
-    print(updated_df)
+    updated_df = pd.read_csv(output_file)
 
     # 验证结果
     assert len(updated_df) == 3  # 应该有3个不同的数据集
-    assert 'dataset3' in updated_df.index.values
-    assert updated_df.loc['dataset2', 'method1_best_res'] == 0.9
-    assert updated_df.loc['dataset2', 'method2_best_res'] == 0.95
+    assert 'dataset3' in updated_df['Dataset_id'].values
+    assert updated_df[updated_df['Dataset_id'] == 'dataset2']['method1_best_res'].iloc[0] == 0.9
+    assert updated_df[updated_df['Dataset_id'] == 'dataset2']['method2_best_res'].iloc[0] == 0.95
 
-    # 测试结果冲突
+    # 测试结果冲突情况（现在应该更新值而不是抛出错误）
     conflict_data = [{
         'Dataset_id': 'dataset1',
         'method1': 'url1_new',
         'method1_best_yaml': 'yaml1_new',
-        'method1_best_res': 0.7  # 与现有的0.8不同，应该引发冲突
+        'method1_best_res': 0.7  # 与现有的0.8不同，应该打印警告而不是报错
     }]
     conflict_df = pd.DataFrame(conflict_data)
 
-    # 验证冲突检测
-    with pytest.raises(ValueError, match="结果冲突"):
-        write_ans(tissue, conflict_df, output_file=output_file)
+    # 测试冲突情况的处理
+    write_ans(tissue, conflict_df, output_file=output_file)
+    final_df = pd.read_csv(output_file)
+    
+    # 验证新值被更新
+    assert final_df[final_df['Dataset_id'] == 'dataset1']['method1_best_res'].iloc[0] == 0.7
 
 
 def test_write_ans_new_file(tmp_path):

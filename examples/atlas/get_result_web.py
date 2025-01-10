@@ -1,4 +1,5 @@
 import argparse
+from functools import partial
 import json
 import os
 from pathlib import Path
@@ -119,9 +120,27 @@ def spilt_web(url: str):
         print("No match found")
 
 
+def get_metric(run,metric_col):
+    """Extract metric value from wandb run.
+    
+    Parameters
+    ----------
+    run : wandb.Run
+        Weights & Biases run object
+        
+    Returns
+    -------
+    float
+        Metric value or negative infinity if metric not found
+    """
+    if metric_col not in run.summary:
+        return float('-inf')  # Return -inf for missing metrics to handle in comparisons
+    return run.summary[metric_col]
+
+
 def get_best_method(urls, metric_col="test_acc"):
     """Find the best performing method across multiple wandb sweeps.
-
+    
     Parameters
     ----------
     urls : list
@@ -142,29 +161,31 @@ def get_best_method(urls, metric_col="test_acc"):
     all_best_step_name = None
     step_names = ["step2", "step3_0", "step3_1", "step3_2"]
 
-    def get_metric(run):
-        if metric_col not in run.summary:
-            return float('-inf')  #TODO 根据metric_col的名称来判断
-        else:
-            return run.summary[metric_col]
-
+    # Track run statistics
     run_states = {"all_total_runs": 0, "all_finished_runs": 0}
+    
     for step_name, url in zip(step_names, urls):
         _, _, sweep_id = spilt_web(url)
         sweep = wandb.Api(timeout=1000).sweep(f"{entity}/{project}/{sweep_id}")
+        
+        # Update run statistics
+        finished_runs = [run for run in sweep.runs if run.state == "finished"]
         run_states.update({
             f"{step_name}_total_runs": len(sweep.runs),
-            f"{step_name}_finished_runs": len([run for run in sweep.runs if run.state == "finished"])
+            f"{step_name}_finished_runs": len(finished_runs)
         })
         run_states["all_total_runs"] += run_states[f"{step_name}_total_runs"]
         run_states["all_finished_runs"] += run_states[f"{step_name}_finished_runs"]
+
+        # Find best run based on optimization goal
         goal = sweep.config["metric"]["goal"]
-        if goal == "maximize":
-            best_run = max(sweep.runs, key=get_metric)
-        elif goal == "minimize":
-            best_run = min(sweep.runs, key=get_metric)
-        else:
-            raise RuntimeError("choose goal in ['minimize','maximize']")
+        best_run = max(sweep.runs, key=partial(get_metric, metric_col=metric_col)) if goal == "maximize" else \
+                   min(sweep.runs, key=partial(get_metric, metric_col=metric_col)) if goal == "minimize" else \
+                   None
+                   
+        if best_run is None:
+            raise RuntimeError("Optimization goal must be either 'minimize' or 'maximize'")
+            
         if metric_col not in best_run.summary:
             continue
         if all_best_run is None:
@@ -301,78 +322,91 @@ def get_new_ans(tissue):
 
 
 def write_ans(tissue, new_df, output_file=None):
-    """Process and write results for a specific tissue type to CSV."""
+    """Process and write results for a specific tissue type to CSV.
+    
+    Handles merging of new results with existing data, including conflict detection
+    for metric values.
+    
+    Parameters
+    ----------
+    tissue : str
+        Tissue type being processed
+    new_df : pd.DataFrame
+        New results to be written
+    output_file : str, optional
+        Output file path. Defaults to 'sweep_results/{tissue}_ans.csv'
+    """
     if output_file is None:
         output_file = f"sweep_results/{tissue}_ans.csv"
 
-    # 重置索引，确保Dataset_id成为一个普通列
-    if 'Dataset_id' in new_df.columns:
-        new_df = new_df.reset_index(drop=True)
-    else:
-        logger.warning("Dataset_id not in new_df.columns")
+    if 'Dataset_id' not in new_df.columns:
+        logger.warning("Dataset_id column missing in input DataFrame")
         return
-    # 处理新数据，合并相同Dataset_id的非NA值
-    new_df_processed = pd.DataFrame()
 
+    # Reset index to ensure Dataset_id is a regular column
+    new_df = new_df.reset_index(drop=True)
+    
+    # Process new data by merging rows with same Dataset_id
+    new_df_processed = pd.DataFrame()
     for dataset_id in new_df['Dataset_id'].unique():
         row_data = {'Dataset_id': dataset_id}
         subset = new_df[new_df['Dataset_id'] == dataset_id]
         for col in new_df.columns:
             if col != 'Dataset_id':
-                values = subset[col].dropna().unique()
-                if len(values) > 0:
-                    row_data[col] = values[0]
+                non_null_values = subset[col].dropna().unique()
+                if len(non_null_values) > 0:
+                    row_data[col] = non_null_values[0]
         new_df_processed = pd.concat([new_df_processed, pd.DataFrame([row_data])])
 
     if os.path.exists(output_file):
-        # 读取现有数据，不将任何列设置为索引
+        # Read existing data without setting any column as index
         existing_df = pd.read_csv(output_file)
 
-        # 清理可能存在的Unnamed列
+        # Clean up any potential 'Unnamed' columns
         existing_df = existing_df.loc[:, ~existing_df.columns.str.contains('^Unnamed')]
 
-        # 创建合并后的DataFrame
+        # Create merged DataFrame
         merged_df = existing_df.copy()
 
-        # 添加新数据中的列（如果不存在）
+        # Add columns from new data if they don't exist
         for col in new_df_processed.columns:
             if col not in merged_df.columns:
                 merged_df[col] = pd.NA
 
-        # 对每个Dataset_id进行合并和冲突检查
+        # Merge and check conflicts for each Dataset_id
         for _, new_row in new_df_processed.iterrows():
             dataset_id = new_row['Dataset_id']
             existing_row = merged_df[merged_df['Dataset_id'] == dataset_id]
 
             if len(existing_row) > 0:
-                # 检查每一列的值
+                # Check values for each column
                 for col in new_df_processed.columns:
                     if col == 'Dataset_id':
                         continue
                     new_value = new_row[col]
                     existing_value = existing_row[col].iloc[0] if len(existing_row) > 0 else pd.NA
 
-                    # 只对_best_res结尾的列进行冲突检查
+                    # Only check for conflicts in columns ending with _best_res
                     if str(col).endswith("_best_res"):
                         if pd.notna(new_value) and pd.notna(existing_value):
                             if abs(float(new_value) - float(existing_value)) > 1e-10:
-                                print(f"结果冲突: Dataset {dataset_id}, Column {col}\n"
-                                      f"现有值: {existing_value}\n新值: {new_value}")
+                                print(f"Result conflict: Dataset {dataset_id}, Column {col}\n"
+                                      f"Existing value: {existing_value}\nNew value: {new_value}")
                             else:
-                                print(f"提示: 发现重复值 Dataset {dataset_id}, Column {col}\n"
-                                      f"现有值和新值都是: {new_value}")
+                                print(f"Note: Duplicate value found for Dataset {dataset_id}, Column {col}\n"
+                                      f"Both existing and new values are: {new_value}")
 
-                    # 如果新值不是NaN，更新该值
+                    # Update value if new value is not NaN
                     if pd.notna(new_value):
                         merged_df.loc[merged_df['Dataset_id'] == dataset_id, col] = new_value
             else:
-                # 如果是新的Dataset_id，直接添加整行
+                # If it's a new Dataset_id, add the entire row
                 merged_df = pd.concat([merged_df, pd.DataFrame([new_row])], ignore_index=True)
 
-        # 保存合并后的数据，不包含索引
+        # Save merged data without index
         merged_df.to_csv(output_file, index=False)
     else:
-        # 如果文件不存在，直接保存处理后的新数据，不包含索引
+        # If file doesn't exist, save processed new data directly without index
         new_df_processed.to_csv(output_file, index=False)
 
 
