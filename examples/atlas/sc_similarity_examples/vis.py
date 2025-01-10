@@ -1,3 +1,4 @@
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -5,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from dance.utils import try_import
+from dance.utils import set_seed, try_import
 
 sys.path.append("..")
 import json
@@ -19,13 +20,15 @@ from get_result_web import spilt_web
 wandb = try_import("wandb")
 entity = "xzy11632"
 project = "dance-dev"
-query_datasets = [
-    "c7775e88-49bf-4ba2-a03b-93f00447c958", "456e8b9b-f872-488b-871d-94534090a865",
-    "738942eb-ac72-44ff-a64b-8943b5ecd8d9", "a5d95a42-0137-496f-8a60-101e17f263c8",
-    "71be997d-ff75-41b9-8a9f-1288c865f921"
-]
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument("--tissue", type=str, default="blood")
+args = parser.parse_args()
+tissue = args.tissue
+set_seed(42)
+conf_data = pd.read_csv(f"results/{tissue}_result.csv", index_col=0)
+query_datasets = list(conf_data[conf_data["queryed"] == True]["dataset_id"])
+
 file_root = Path(__file__).resolve().parent
-ground_truth_conf = pd.read_excel(file_root / "Cell Type Annotation Atlas.xlsx", sheet_name="blood", index_col=0)
 methods = ["cta_actinn", "cta_celltypist", "cta_scdeepsort", "cta_singlecellnet"]
 feature_name = "spectral"
 """Visualization script for comparing model performance across different datasets and
@@ -84,7 +87,7 @@ def get_runs(sweep_record):
     for step, links in step_links.items():
         for sweep_url in links:
             _, _, sweep_id = spilt_web(sweep_url)
-        sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
+        sweep = wandb.Api(timeout=1000).sweep(f"{entity}/{project}/{sweep_id}")
         ans += get_accs(sweep)
     return ans
 
@@ -105,13 +108,16 @@ def get_atlas_ans(query_dataset, method):
         Predicted accuracy based on atlas similarity
 
     """
-    data = pd.read_excel("Blood_similarity.xlsx", sheet_name=query_dataset[:4], index_col=0)
+    data = pd.read_excel(f"{tissue}_similarity.xlsx", sheet_name=query_dataset[:4], index_col=0)
     weight1 = 1.0  # Weight for feature-based similarity
     weight2 = 0.0  # Weight for metadata similarity
     weighted_sum = data.loc[feature_name, :] * weight1 + data.loc["metadata_sim", :] * weight2
     atlas_dataset_res = weighted_sum.idxmax()  # Get most similar dataset
     max_value = weighted_sum.max()
-    return data.loc[:, atlas_dataset_res][method]
+    if method in data.index:
+        return data.loc[method, atlas_dataset_res]
+    else:
+        return 0
 
 
 def vis(data, target_value, title, ax):
@@ -151,6 +157,18 @@ def vis(data, target_value, title, ax):
     ax.legend()
 
 
+def get_runs(query_dataset, method):
+    step_str = conf_data[conf_data["dataset_id"] == query_dataset][method].iloc[0]
+    step2_str = step_str.split("step2:")[1].split("|")[0]
+    _, _, sweep_id = spilt_web(step2_str)
+    sweep = wandb.Api(timeout=1000).sweep(f"{entity}/{project}/{sweep_id}")
+    runs = []
+    for run in sweep.runs:
+        if "test_acc" in run.summary:
+            runs.append(run.summary["test_acc"])
+    return runs
+
+
 if __name__ == "__main__":
     # ans_all=defaultdict(dict)
     # for query_dataset in query_datasets:
@@ -160,8 +178,8 @@ if __name__ == "__main__":
     # with open("runs.json","w") as f:
     #     json.dump(ans_all,f)
 
-    with open("runs.json") as f:
-        runs = json.load(f)
+    # with open("runs.json") as f:
+    #     runs = json.load(f)
     plt.style.use("default")
 
     # Generate visualization for each dataset
@@ -170,7 +188,8 @@ if __name__ == "__main__":
         axes = axes.flatten()
         # Create subplot for each method
         for i, method in enumerate(methods):
-            vis(runs[query_dataset][method], get_atlas_ans(query_dataset, method), f"{query_dataset}_{method}", axes[i])
+            vis(get_runs(query_dataset, method), get_atlas_ans(query_dataset, method), f"{query_dataset}_{method}",
+                axes[i])
         plt.tight_layout()
         plt.savefig(f"imgs/{query_dataset}.png", dpi=300)
         plt.show()

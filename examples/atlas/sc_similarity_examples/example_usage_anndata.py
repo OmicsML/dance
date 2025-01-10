@@ -11,35 +11,32 @@ from anndata import AnnData
 from scipy.sparse import issparse
 from torch.utils.data import TensorDataset
 
-from dance.atlas.sc_similarity import AnnDataSimilarity, get_anndata
+from dance.atlas.sc_similarity.anndata_similarity import AnnDataSimilarity, get_anndata
 from dance.otdd.pytorch.distance import DatasetDistance
 from dance.utils import set_seed
 
-data_root = "/home/zyxing/dance/examples/tuning/temp_data/train/human"
-
-target_files = [
-    "01209dce-3575-4bed-b1df-129f57fbc031", "055ca631-6ffb-40de-815e-b931e10718c0",
-    "2a498ace-872a-4935-984b-1afa70fd9886", "2adb1f8a-a6b1-4909-8ee8-484814e2d4bf",
-    "3faad104-2ab8-4434-816d-474d8d2641db", "471647b3-04fe-4c76-8372-3264feb950e8",
-    "4c4cd77c-8fee-4836-9145-16562a8782fe", "84230ea4-998d-4aa8-8456-81dd54ce23af",
-    "8a554710-08bc-4005-87cd-da9675bdc2e7", "ae29ebd0-1973-40a4-a6af-d15a5f77a80f",
-    "bc260987-8ee5-4b6e-8773-72805166b3f7", "bc2a7b3d-f04e-477e-96c9-9d5367d5425c",
-    "d3566d6a-a455-4a15-980f-45eb29114cab", "d9b4bc69-ed90-4f5f-99b2-61b0681ba436",
-    "eeacb0c1-2217-4cf6-b8ce-1f0fedf1b569"
-]
+# target_files = [
+#     "01209dce-3575-4bed-b1df-129f57fbc031", "055ca631-6ffb-40de-815e-b931e10718c0",
+#     "2a498ace-872a-4935-984b-1afa70fd9886", "2adb1f8a-a6b1-4909-8ee8-484814e2d4bf",
+#     "3faad104-2ab8-4434-816d-474d8d2641db", "471647b3-04fe-4c76-8372-3264feb950e8",
+#     "4c4cd77c-8fee-4836-9145-16562a8782fe", "84230ea4-998d-4aa8-8456-81dd54ce23af",
+#     "8a554710-08bc-4005-87cd-da9675bdc2e7", "ae29ebd0-1973-40a4-a6af-d15a5f77a80f",
+#     "bc260987-8ee5-4b6e-8773-72805166b3f7", "bc2a7b3d-f04e-477e-96c9-9d5367d5425c",
+#     "d3566d6a-a455-4a15-980f-45eb29114cab", "d9b4bc69-ed90-4f5f-99b2-61b0681ba436",
+#     "eeacb0c1-2217-4cf6-b8ce-1f0fedf1b569"
+# ]
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument(
-    "--source_files", default=[
-        "71be997d-ff75-41b9-8a9f-1288c865f921", "456e8b9b-f872-488b-871d-94534090a865",
-        "738942eb-ac72-44ff-a64b-8943b5ecd8d9", "a5d95a42-0137-496f-8a60-101e17f263c8",
-        "c7775e88-49bf-4ba2-a03b-93f00447c958"
-    ])
-parser.add_argument("--data_dir", default="../tuning/temp_data")
+parser.add_argument("--tissue", type=str, default="blood")
+parser.add_argument("--data_dir", default="../../tuning/temp_data")
 args = parser.parse_args()
-source_files = args.source_files
+
 data_dir = args.data_dir
 file_root = Path(__file__).resolve().parent
 set_seed(42)
+tissue = args.tissue
+conf_data = pd.read_csv(f"results/{tissue}_result.csv", index_col=0)
+target_files = list(conf_data[conf_data["queryed"] == False]["dataset_id"])
+source_files = list(conf_data[conf_data["queryed"] == True]["dataset_id"])
 
 
 class CustomEncoder(json.JSONEncoder):
@@ -94,14 +91,15 @@ def dataset_from_anndata(adata: AnnData, label_key: str = 'cell_type', classes=N
     return ds
 
 
-def run_test_otdd():
-    for target_file in target_files:
-        source_data = sc.read_h5ad(f"{data_root}/human_Blood{source_file}_data.h5ad")
-        target_data = sc.read_h5ad(f"{data_root}/human_Blood{target_file}_data.h5ad")
-        source_ds = dataset_from_anndata(source_data)
-        target_ds = dataset_from_anndata(target_data)
-        dist = DatasetDistance(source_ds, target_ds)
-        dist.distance()
+# def run_test_otdd():
+#     data_root = "/home/zyxing/dance/examples/tuning/temp_data/train/human"
+#     for target_file in target_files:
+#         source_data = sc.read_h5ad(f"{data_root}/human_{tissue.capitalize()}{source_file}_data.h5ad")
+#         target_data = sc.read_h5ad(f"{data_root}/human_{tissue.capitalize()}{target_file}_data.h5ad")
+#         source_ds = dataset_from_anndata(source_data)
+#         target_ds = dataset_from_anndata(target_data)
+#         dist = DatasetDistance(source_ds, target_ds)
+#         dist.distance()
 
 
 def run_test_case(source_file):
@@ -144,7 +142,7 @@ def run_test_case(source_file):
 
 
 query_data = os.listdir(file_root / "query_data")
-with pd.ExcelWriter(file_root / "Blood_similarity.xlsx", engine='openpyxl') as writer:
+with pd.ExcelWriter(file_root / f"{tissue}_similarity.xlsx", engine='openpyxl') as writer:
     for source_file in source_files:
         query_ans = [
             pd.read_csv(file_root / "query_data" / element, index_col=0) for element in query_data

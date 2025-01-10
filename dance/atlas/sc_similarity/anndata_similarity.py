@@ -1,6 +1,7 @@
 # anndata_similarity.py
 import re
 import warnings
+from math import isnan
 from typing import Callable, Dict, List, Optional
 
 import anndata
@@ -24,6 +25,8 @@ from dance.datasets.singlemodality import CellTypeAnnotationDataset
 
 def get_anndata(tissue: str = "Blood", species: str = "human", filetype: str = "h5ad", train_dataset=[],
                 test_dataset=[], valid_dataset=[], data_dir="../temp_data"):
+    if train_dataset == ['84230ea4-998d-4aa8-8456-81dd54ce23af']:
+        pass
     data = CellTypeAnnotationDataset(train_dataset=train_dataset, test_dataset=test_dataset,
                                      valid_dataset=valid_dataset, data_dir=data_dir, tissue=tissue, species=species,
                                      filetype=filetype).load_data()
@@ -358,11 +361,11 @@ class AnnDataSimilarity:
             con_sim["gene_num"] = len(data.var)
             con_sim["n_counts_mean"] = np.mean(data.obs["n_counts"])
             con_sim["n_counts_var"] = np.var(data.obs["n_counts"])
-            if "n_counts" not in data.var.columns:
-                if scipy.sparse.issparse(data.X):
-                    gene_counts = np.array(data.X.sum(axis=0)).flatten()
-                else:
-                    gene_counts = data.X.sum(axis=0)
+            # if "n_counts" not in data.var.columns:
+            if scipy.sparse.issparse(data.X):
+                gene_counts = np.array(data.X.sum(axis=0)).flatten()
+            else:
+                gene_counts = data.X.sum(axis=0)
             data.var["n_counts"] = gene_counts
             data.var["n_counts"] = data.var["n_counts"].astype(float)
             con_sim["var_n_counts_mean"] = np.mean(data.var["n_counts"])
@@ -400,8 +403,12 @@ class AnnDataSimilarity:
 
         sim_targets = []
         for method in self.methods:
-            query_dataset_truth = ground_truth_conf.loc[self.adata1_name, f"{method}_method"]
-            atlas_dataset_truth = ground_truth_conf.loc[self.adata2_name, f"{method}_method"]
+            query_dataset_truth = ground_truth_conf.loc[ground_truth_conf["dataset_id"] == self.adata1_name,
+                                                        f"{method}_best_yaml"].iloc[0]
+            atlas_dataset_truth = ground_truth_conf.loc[ground_truth_conf["dataset_id"] == self.adata2_name,
+                                                        f"{method}_best_yaml"].iloc[0]
+            if type(atlas_dataset_truth) == float and np.isnan(atlas_dataset_truth):
+                return 0
             query_targets = get_targets(query_dataset_truth)
             atlas_targets = get_targets(atlas_dataset_truth)
             assert len(query_targets) == len(atlas_targets)
@@ -568,6 +575,7 @@ def extract_type_target_params(item_text):
 
 def fix_yaml_string(original_str):
     #It will be deleted
+
     yaml_str = original_str.replace('\\n', '\n').strip()
     items = re.split(r'(?=-\s*type:)', yaml_str)
     config_list = []

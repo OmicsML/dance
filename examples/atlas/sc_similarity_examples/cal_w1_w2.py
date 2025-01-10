@@ -16,6 +16,7 @@ DataFrame
 
 """
 
+import argparse
 import ast
 import re
 from pathlib import Path
@@ -23,18 +24,25 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from dance.utils import try_import
+from dance.utils import set_seed, try_import
 
 wandb = try_import("wandb")
 entity = "xzy11632"
 project = "dance-dev"
-query_datasets = [
-    "c7775e88-49bf-4ba2-a03b-93f00447c958",
-    "456e8b9b-f872-488b-871d-94534090a865",
-    "738942eb-ac72-44ff-a64b-8943b5ecd8d9",
-    # "a5d95a42-0137-496f-8a60-101e17f263c8",
-    "71be997d-ff75-41b9-8a9f-1288c865f921"
-]
+# query_datasets = [
+#     "c7775e88-49bf-4ba2-a03b-93f00447c958",
+#     "456e8b9b-f872-488b-871d-94534090a865",
+#     "738942eb-ac72-44ff-a64b-8943b5ecd8d9",
+#     # "a5d95a42-0137-496f-8a60-101e17f263c8",
+#     "71be997d-ff75-41b9-8a9f-1288c865f921"
+# ]
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument("--tissue", type=str, default="blood")
+args = parser.parse_args()
+tissue = args.tissue
+set_seed(42)
+conf_data = pd.read_csv(f"results/{tissue}_result.csv", index_col=0)
+query_datasets = list(conf_data[conf_data["queryed"] == True]["dataset_id"])
 methods = ["cta_actinn", "cta_celltypist", "cta_scdeepsort", "cta_singlecellnet"]
 file_root = Path(__file__).resolve().parent
 feature_names = ["wasserstein", "Hausdorff", "chamfer", "energy", "sinkhorn2", "bures", "spectral", "mmd"]
@@ -51,7 +59,7 @@ def get_ans():
     """
     ans = {}
     for query_dataset in query_datasets:
-        data = pd.read_excel(file_root / "Blood_similarity.xlsx", sheet_name=query_dataset[:4], index_col=0)
+        data = pd.read_excel(file_root / f"{tissue}_similarity.xlsx", sheet_name=query_dataset[:4], index_col=0)
         ans[query_dataset] = data
     return ans
 
@@ -66,6 +74,9 @@ def get_rank():
     for query_dataset, data in ans.items():
         for method in methods:
             rank_col = 'rank_' + method
+            if method not in data.index:
+                data.loc[rank_col, :] = 10000
+                continue
             data.loc[rank_col, :] = data.loc[method, :].rank(ascending=False, method='min', na_option='bottom')
             # data.loc[rank_col,:] = data.loc[rank_col,:].fillna(10000)
 
