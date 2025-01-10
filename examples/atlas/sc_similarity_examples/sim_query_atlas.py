@@ -160,8 +160,8 @@ tissue = args.tissue
 #     "738942eb-ac72-44ff-a64b-8943b5ecd8d9", "a5d95a42-0137-496f-8a60-101e17f263c8",
 #     "71be997d-ff75-41b9-8a9f-1288c865f921"
 # ]
-# conf_data = pd.read_excel("Cell Type Annotation Atlas.xlsx", sheet_name=tissue)
-conf_data = pd.read_csv(f"results/{tissue}_result.csv", index_col=0)
+conf_data = pd.read_excel("Cell Type Annotation Atlas.xlsx", sheet_name=tissue)
+# conf_data = pd.read_csv(f"results/{tissue}_result.csv", index_col=0)
 atlas_datasets = list(conf_data[conf_data["queryed"] == False]["dataset_id"])
 query_datasets = list(conf_data[conf_data["queryed"] == True]["dataset_id"])
 if __name__ == "__main__":
