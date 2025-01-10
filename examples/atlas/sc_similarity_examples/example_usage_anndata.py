@@ -12,7 +12,6 @@ from scipy.sparse import issparse
 from torch.utils.data import TensorDataset
 
 from dance.atlas.sc_similarity.anndata_similarity import AnnDataSimilarity, get_anndata
-from dance.otdd.pytorch.distance import DatasetDistance
 from dance.utils import set_seed
 
 # target_files = [

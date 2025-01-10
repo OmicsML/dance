@@ -75,24 +75,51 @@ project = "dance-dev"
 
 
 def is_matching_dict(yaml_str, target_dict):
-
-    # 解析YAML字符串
+    """Compare YAML configuration with target dictionary.
+    
+    Parameters
+    ----------
+    yaml_str : str
+        YAML configuration string to parse
+    target_dict : dict
+        Target dictionary to compare against
+        
+    Returns
+    -------
+    bool
+        True if dictionaries match, False otherwise
+    """
+    # Parse YAML string
     yaml_config = yaml.safe_load(yaml_str)
 
-    # 构建期望的字典格式
+    # Build expected dictionary format
     expected_dict = {}
     for i, item in enumerate(yaml_config):
-        if item['type'] in ['misc', 'graph.cell'] or item['target'] == 'SCNFeature':  # 跳过misc类型
+        # Skip misc and graph.cell types, or SCNFeature targets
+        if item['type'] in ['misc', 'graph.cell'] or item['target'] == 'SCNFeature':
             continue
         key = f"pipeline.{i}.{item['type']}"
         value = item['target']
         expected_dict[key] = value
 
-    # 直接比较两个字典是否相等
     return expected_dict == target_dict
 
 
 def get_ans(query_dataset, method):
+    """Get test accuracy results for a given dataset and method.
+    
+    Parameters
+    ----------
+    query_dataset : str
+        Dataset identifier
+    method : str
+        Method name to analyze
+        
+    Returns
+    -------
+    pandas.DataFrame or None
+        DataFrame containing test accuracy results, None if results don't exist
+    """
     result_path = f"{file_root}/tuning/{method}/{query_dataset}/results/atlas/best_test_acc.csv"
     if not os.path.exists(result_path):
         logger.warning(f"{result_path} not exists")
@@ -109,30 +136,50 @@ def get_ans(query_dataset, method):
 
 
 def get_ans_from_cache(query_dataset, method):
-    #1:get best method from step2 of atlas datasets
-    #2:search acc according to best method(需要注意的是，应该都是有值的，没有值的需要检查一下)
-    ans = pd.DataFrame(index=[method], columns=[f"{atlas_dataset}_from_cache" for atlas_dataset in atlas_datasets])
-    print(conf_data[conf_data["dataset_id"] == query_dataset][method])
+    """Get cached test accuracy results for atlas datasets.
+    
+    Parameters
+    ----------
+    query_dataset : str
+        Query dataset identifier
+    method : str
+        Method name to analyze
+        
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing test accuracy results from cache
+    """
+    # Get best method from step2 of atlas datasets
+    # Search accuracy according to best method (all values should exist)
+    ans = pd.DataFrame(index=[method], 
+                      columns=[f"{atlas_dataset}_from_cache" for atlas_dataset in atlas_datasets])
+    
     sweep_url = re.search(r"step2:([^|]+)",
-                          conf_data[conf_data["dataset_id"] == query_dataset][method].iloc[0]).group(1)
+                         conf_data[conf_data["dataset_id"] == query_dataset][method].iloc[0]).group(1)
     _, _, sweep_id = spilt_web(sweep_url)
     sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
+    
     for atlas_dataset in atlas_datasets:
         best_yaml = conf_data[conf_data["dataset_id"] == atlas_dataset][f"{method}_best_yaml"].iloc[0]
         match_run = None
+        
+        # Find matching run configuration
         for run in sweep.runs:
-            if type(best_yaml) == float and np.isnan(best_yaml):
+            if isinstance(best_yaml, float) and np.isnan(best_yaml):
                 continue
             if is_matching_dict(best_yaml, run.config):
                 if match_run is not None:
-                    raise ValueError("match_run只能被赋值一次")
-                else:
-                    match_run = run
+                    raise ValueError("Multiple matching runs found when only one expected")
+                match_run = run
+                
         if match_run is None:
-            logger.warning(f"{atlas_dataset}在{method}下未找到匹配")
+            logger.warning(f"No matching configuration found for {atlas_dataset} with method {method}")
         else:
-            ans.loc[method, f"{atlas_dataset}_from_cache"] = match_run.summary[
-                "test_acc"] if "test_acc" in match_run.summary else np.nan
+            ans.loc[method, f"{atlas_dataset}_from_cache"] = (
+                match_run.summary["test_acc"] if "test_acc" in match_run.summary else np.nan
+            )
+    
     return ans
 
 
