@@ -1,7 +1,7 @@
 import argparse
-from functools import partial
 import json
 import os
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -120,18 +120,19 @@ def spilt_web(url: str):
         print("No match found")
 
 
-def get_metric(run,metric_col):
+def get_metric(run, metric_col):
     """Extract metric value from wandb run.
-    
+
     Parameters
     ----------
     run : wandb.Run
         Weights & Biases run object
-        
+
     Returns
     -------
     float
         Metric value or negative infinity if metric not found
+
     """
     if metric_col not in run.summary:
         return float('-inf')  # Return -inf for missing metrics to handle in comparisons
@@ -140,7 +141,7 @@ def get_metric(run,metric_col):
 
 def get_best_method(urls, metric_col="test_acc"):
     """Find the best performing method across multiple wandb sweeps.
-    
+
     Parameters
     ----------
     urls : list
@@ -163,11 +164,11 @@ def get_best_method(urls, metric_col="test_acc"):
 
     # Track run statistics
     run_states = {"all_total_runs": 0, "all_finished_runs": 0}
-    
+
     for step_name, url in zip(step_names, urls):
         _, _, sweep_id = spilt_web(url)
         sweep = wandb.Api(timeout=1000).sweep(f"{entity}/{project}/{sweep_id}")
-        
+
         # Update run statistics
         finished_runs = [run for run in sweep.runs if run.state == "finished"]
         run_states.update({
@@ -182,10 +183,10 @@ def get_best_method(urls, metric_col="test_acc"):
         best_run = max(sweep.runs, key=partial(get_metric, metric_col=metric_col)) if goal == "maximize" else \
                    min(sweep.runs, key=partial(get_metric, metric_col=metric_col)) if goal == "minimize" else \
                    None
-                   
+
         if best_run is None:
             raise RuntimeError("Optimization goal must be either 'minimize' or 'maximize'")
-            
+
         if metric_col not in best_run.summary:
             continue
         if all_best_run is None:
@@ -323,10 +324,10 @@ def get_new_ans(tissue):
 
 def write_ans(tissue, new_df, output_file=None):
     """Process and write results for a specific tissue type to CSV.
-    
+
     Handles merging of new results with existing data, including conflict detection
     for metric values.
-    
+
     Parameters
     ----------
     tissue : str
@@ -335,6 +336,7 @@ def write_ans(tissue, new_df, output_file=None):
         New results to be written
     output_file : str, optional
         Output file path. Defaults to 'sweep_results/{tissue}_ans.csv'
+
     """
     if output_file is None:
         output_file = f"sweep_results/{tissue}_ans.csv"
@@ -345,7 +347,7 @@ def write_ans(tissue, new_df, output_file=None):
 
     # Reset index to ensure Dataset_id is a regular column
     new_df = new_df.reset_index(drop=True)
-    
+
     # Process new data by merging rows with same Dataset_id
     new_df_processed = pd.DataFrame()
     for dataset_id in new_df['Dataset_id'].unique():
