@@ -108,7 +108,7 @@ def test_write_ans(tmp_path):
     # 测试冲突情况的处理
     write_ans(tissue, conflict_df, output_file=output_file)
     final_df = pd.read_csv(output_file)
-    
+
     # 验证新值被更新
     assert final_df[final_df['Dataset_id'] == 'dataset1']['method1_best_res'].iloc[0] == 0.7
 
