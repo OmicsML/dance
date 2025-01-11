@@ -71,28 +71,32 @@ def test_write_ans(tmp_path):
     existing_df.to_csv(output_file)
 
     # 创建新数据
-    new_data = [{
-        'Dataset_id': 'dataset2',
-        'cta_actinn': 'url2',
-        'cta_actinn_best_yaml': 'yaml2',
-        'cta_actinn_best_res': 0.85,  # 低于现有值，不应更新
-        'cta_actinn_run_stats': 'stats2_new',
-        'cta_actinn_check': True
-    }, {
-        'Dataset_id': 'dataset3',
-        'cta_actinn': 'url3',
-        'cta_actinn_best_yaml': 'yaml3',
-        'cta_actinn_best_res': 0.95,
-        'cta_actinn_run_stats': 'stats3',
-        'cta_actinn_check': False
-    }, {
-        'Dataset_id': 'dataset2',
-        'cta_celltypist': 'url2_2',
-        'cta_celltypist_best_yaml': 'yaml2_2',
-        'cta_celltypist_best_res': 0.95,
-        'cta_celltypist_run_stats': 'stats2_2',
-        'cta_celltypist_check': True
-    }]
+    new_data = [
+        {
+            'Dataset_id': 'dataset2',
+            'cta_actinn': 'url2',
+            'cta_actinn_best_yaml': 'yaml2',
+            'cta_actinn_best_res': 0.85,  # 低于现有值，不应更新
+            'cta_actinn_run_stats': 'stats2_new',
+            'cta_actinn_check': True
+        },
+        {
+            'Dataset_id': 'dataset3',
+            'cta_actinn': 'url3',
+            'cta_actinn_best_yaml': 'yaml3',
+            'cta_actinn_best_res': 0.95,
+            'cta_actinn_run_stats': 'stats3',
+            'cta_actinn_check': False
+        },
+        {
+            'Dataset_id': 'dataset2',
+            'cta_celltypist': 'url2_2',
+            'cta_celltypist_best_yaml': 'yaml2_2',
+            'cta_celltypist_best_res': 0.95,
+            'cta_celltypist_run_stats': 'stats2_2',
+            'cta_celltypist_check': True
+        }
+    ]
     new_df = pd.DataFrame(new_data)
 
     # 测试更新
@@ -102,11 +106,11 @@ def test_write_ans(tmp_path):
     # 验证结果
     assert len(updated_df) == 3  # 应该有3个不同的数据集
     assert 'dataset3' in updated_df['Dataset_id'].values
-    
+
     # dataset2的cta_actinn不应该被更新（因为新值较低）
     assert updated_df[updated_df['Dataset_id'] == 'dataset2']['cta_actinn_best_res'].iloc[0] == 0.9
     assert updated_df[updated_df['Dataset_id'] == 'dataset2']['cta_actinn_run_stats'].iloc[0] == 'stats2'
-    
+
     # dataset2的cta_celltypist应该被添加
     assert updated_df[updated_df['Dataset_id'] == 'dataset2']['cta_celltypist_best_res'].iloc[0] == 0.95
 
@@ -123,7 +127,7 @@ def test_write_ans(tmp_path):
 
     write_ans(tissue, higher_df, output_file=output_file)
     final_df = pd.read_csv(output_file)
-    
+
     # 验证所有相关列都被更新
     dataset1_row = final_df[final_df['Dataset_id'] == 'dataset1'].iloc[0]
     assert dataset1_row['cta_actinn_best_res'] == 0.9

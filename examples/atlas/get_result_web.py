@@ -324,10 +324,10 @@ def get_new_ans(tissue):
 
 def write_ans(tissue, new_df, output_file=None):
     """Process and write results for a specific tissue type to CSV.
-    
+
     Updates all columns with matching method_folder prefix only when new _best_res
     value is greater than existing value.
-    
+
     Parameters
     ----------
     tissue : str
@@ -383,10 +383,8 @@ def write_ans(tissue, new_df, output_file=None):
                         existing_value = existing_row[best_res_col].iloc[0]
 
                         # 只有当新值存在且大于现有值时才更新
-                        if pd.notna(new_value) and (
-                            pd.isna(existing_value) or 
-                            float(new_value) > float(existing_value)
-                        ):
+                        if pd.notna(new_value) and (pd.isna(existing_value)
+                                                    or float(new_value) > float(existing_value)):
                             # 更新所有以method开头的列
                             method_cols = [col for col in new_row.index if col.startswith(method)]
                             for col in method_cols:
