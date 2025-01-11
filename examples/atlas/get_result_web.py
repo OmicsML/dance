@@ -324,8 +324,8 @@ def get_new_ans(tissue):
 def write_ans(tissue, new_df, output_file=None):
     """Process and write results for a specific tissue type to CSV.
     
-    Handles merging of new results with existing data, including conflict detection
-    for metric values.
+    Updates all columns with matching method_folder prefix only when new _best_res
+    value is greater than existing value.
     
     Parameters
     ----------
@@ -359,54 +359,46 @@ def write_ans(tissue, new_df, output_file=None):
         new_df_processed = pd.concat([new_df_processed, pd.DataFrame([row_data])])
 
     if os.path.exists(output_file):
-        # Read existing data without setting any column as index
         existing_df = pd.read_csv(output_file)
-
-        # Clean up any potential 'Unnamed' columns
         existing_df = existing_df.loc[:, ~existing_df.columns.str.contains('^Unnamed')]
-
-        # Create merged DataFrame
         merged_df = existing_df.copy()
 
-        # Add columns from new data if they don't exist
         for col in new_df_processed.columns:
             if col not in merged_df.columns:
                 merged_df[col] = pd.NA
 
-        # Merge and check conflicts for each Dataset_id
+        # 遍历每个新数据行
         for _, new_row in new_df_processed.iterrows():
             dataset_id = new_row['Dataset_id']
             existing_row = merged_df[merged_df['Dataset_id'] == dataset_id]
 
             if len(existing_row) > 0:
-                # Check values for each column
-                for col in new_df_processed.columns:
-                    if col == 'Dataset_id':
-                        continue
-                    new_value = new_row[col]
-                    existing_value = existing_row[col].iloc[0] if len(existing_row) > 0 else pd.NA
+                # 检查每个method的best_res
+                for method in methods:
+                    best_res_col = f"{method}_best_res"
+                    if best_res_col in new_row and best_res_col in existing_row:
+                        new_value = new_row[best_res_col]
+                        existing_value = existing_row[best_res_col].iloc[0]
 
-                    # Only check for conflicts in columns ending with _best_res
-                    if str(col).endswith("_best_res"):
-                        if pd.notna(new_value) and pd.notna(existing_value):
-                            if abs(float(new_value) - float(existing_value)) > 1e-10:
-                                print(f"Result conflict: Dataset {dataset_id}, Column {col}\n"
-                                      f"Existing value: {existing_value}\nNew value: {new_value}")
-                            else:
-                                print(f"Note: Duplicate value found for Dataset {dataset_id}, Column {col}\n"
-                                      f"Both existing and new values are: {new_value}")
-
-                    # Update value if new value is not NaN
-                    if pd.notna(new_value):
-                        merged_df.loc[merged_df['Dataset_id'] == dataset_id, col] = new_value
+                        # 只有当新值存在且大于现有值时才更新
+                        if pd.notna(new_value) and (
+                            pd.isna(existing_value) or 
+                            float(new_value) > float(existing_value)
+                        ):
+                            # 更新所有以method开头的列
+                            method_cols = [col for col in new_row.index if col.startswith(method)]
+                            for col in method_cols:
+                                merged_df.loc[merged_df['Dataset_id'] == dataset_id, col] = new_row[col]
+                        elif pd.notna(new_value) and pd.notna(existing_value):
+                            # 打印调试信息
+                            print(f"Skipping update for {dataset_id}, {method}: "
+                                  f"existing value ({existing_value}) >= new value ({new_value})")
             else:
-                # If it's a new Dataset_id, add the entire row
+                # 如果是新的Dataset_id，直接添加整行
                 merged_df = pd.concat([merged_df, pd.DataFrame([new_row])], ignore_index=True)
 
-        # Save merged data without index
         merged_df.to_csv(output_file, index=False)
     else:
-        # If file doesn't exist, save processed new data directly without index
         new_df_processed.to_csv(output_file, index=False)
 
 
