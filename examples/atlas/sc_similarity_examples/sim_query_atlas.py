@@ -76,18 +76,19 @@ project = "dance-dev"
 
 def is_matching_dict(yaml_str, target_dict):
     """Compare YAML configuration with target dictionary.
-    
+
     Parameters
     ----------
     yaml_str : str
         YAML configuration string to parse
     target_dict : dict
         Target dictionary to compare against
-        
+
     Returns
     -------
     bool
         True if dictionaries match, False otherwise
+
     """
     # Parse YAML string
     yaml_config = yaml.safe_load(yaml_str)
@@ -107,18 +108,19 @@ def is_matching_dict(yaml_str, target_dict):
 
 def get_ans(query_dataset, method):
     """Get test accuracy results for a given dataset and method.
-    
+
     Parameters
     ----------
     query_dataset : str
         Dataset identifier
     method : str
         Method name to analyze
-        
+
     Returns
     -------
     pandas.DataFrame or None
         DataFrame containing test accuracy results, None if results don't exist
+
     """
     result_path = f"{file_root}/tuning/{method}/{query_dataset}/results/atlas/best_test_acc.csv"
     if not os.path.exists(result_path):
@@ -137,33 +139,33 @@ def get_ans(query_dataset, method):
 
 def get_ans_from_cache(query_dataset, method):
     """Get cached test accuracy results for atlas datasets.
-    
+
     Parameters
     ----------
     query_dataset : str
         Query dataset identifier
     method : str
         Method name to analyze
-        
+
     Returns
     -------
     pandas.DataFrame
         DataFrame containing test accuracy results from cache
+
     """
     # Get best method from step2 of atlas datasets
     # Search accuracy according to best method (all values should exist)
-    ans = pd.DataFrame(index=[method], 
-                      columns=[f"{atlas_dataset}_from_cache" for atlas_dataset in atlas_datasets])
-    
+    ans = pd.DataFrame(index=[method], columns=[f"{atlas_dataset}_from_cache" for atlas_dataset in atlas_datasets])
+
     sweep_url = re.search(r"step2:([^|]+)",
-                         conf_data[conf_data["dataset_id"] == query_dataset][method].iloc[0]).group(1)
+                          conf_data[conf_data["dataset_id"] == query_dataset][method].iloc[0]).group(1)
     _, _, sweep_id = spilt_web(sweep_url)
     sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
-    
+
     for atlas_dataset in atlas_datasets:
         best_yaml = conf_data[conf_data["dataset_id"] == atlas_dataset][f"{method}_best_yaml"].iloc[0]
         match_run = None
-        
+
         # Find matching run configuration
         for run in sweep.runs:
             if isinstance(best_yaml, float) and np.isnan(best_yaml):
@@ -172,14 +174,13 @@ def get_ans_from_cache(query_dataset, method):
                 if match_run is not None:
                     raise ValueError("Multiple matching runs found when only one expected")
                 match_run = run
-                
+
         if match_run is None:
             logger.warning(f"No matching configuration found for {atlas_dataset} with method {method}")
         else:
-            ans.loc[method, f"{atlas_dataset}_from_cache"] = (
-                match_run.summary["test_acc"] if "test_acc" in match_run.summary else np.nan
-            )
-    
+            ans.loc[method, f"{atlas_dataset}_from_cache"] = (match_run.summary["test_acc"]
+                                                              if "test_acc" in match_run.summary else np.nan)
+
     return ans
 
 
@@ -207,8 +208,8 @@ tissue = args.tissue
 #     "738942eb-ac72-44ff-a64b-8943b5ecd8d9", "a5d95a42-0137-496f-8a60-101e17f263c8",
 #     "71be997d-ff75-41b9-8a9f-1288c865f921"
 # ]
-# conf_data = pd.read_excel("Cell Type Annotation Atlas.xlsx", sheet_name=tissue)
-conf_data = pd.read_csv(f"results/{tissue}_result.csv", index_col=0)
+conf_data = pd.read_excel("Cell Type Annotation Atlas.xlsx", sheet_name=tissue)
+# conf_data = pd.read_csv(f"results/{tissue}_result.csv", index_col=0)
 atlas_datasets = list(conf_data[conf_data["queryed"] == False]["dataset_id"])
 query_datasets = list(conf_data[conf_data["queryed"] == True]["dataset_id"])
 if __name__ == "__main__":

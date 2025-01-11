@@ -33,7 +33,8 @@ data_dir = args.data_dir
 file_root = Path(__file__).resolve().parent
 set_seed(42)
 tissue = args.tissue
-conf_data = pd.read_csv(f"results/{tissue}_result.csv", index_col=0)
+# conf_data = pd.read_csv(f"results/{tissue}_result.csv", index_col=0)
+conf_data = pd.read_excel("Cell Type Annotation Atlas.xlsx", sheet_name=tissue)
 target_files = list(conf_data[conf_data["queryed"] == False]["dataset_id"])
 source_files = list(conf_data[conf_data["queryed"] == True]["dataset_id"])
 
@@ -149,4 +150,13 @@ with pd.ExcelWriter(file_root / f"{tissue}_similarity.xlsx", engine='openpyxl') 
         ]
         ans = run_test_case(source_file)
         merged_df = pd.concat(query_ans + [ans], join='inner')
-        merged_df.to_excel(writer, sheet_name=source_file[:4], index=True)
+        try:
+            # 尝试读取指定的分表
+            existing_df = pd.read_excel(file_root / f"{tissue}_similarity.xlsx", sheet_name=source_file[:4])
+            # 找出在新数据框中存在但在现有表格中不存在的行
+            merged_df = pd.concat([existing_df, merged_df])
+            merged_df = merged_df.drop_duplicates(keep='first')
+            # 使用 ExcelWriter 更新特定分表
+            merged_df.to_excel(writer, sheet_name=source_file[:4], index=False)
+        except ValueError:
+            merged_df.to_excel(writer, sheet_name=source_file[:4], index=True)
