@@ -12,7 +12,7 @@ from sympy import im
 from tqdm import tqdm
 
 from dance import logger
-from dance.settings import METADIR
+from dance.settings import DANCEDIR, METADIR
 from dance.utils import try_import
 
 # get yaml of best method
@@ -73,8 +73,18 @@ def get_sweep_url(step_csv: pd.DataFrame, single=True):
     """
     ids = step_csv["id"]
     sweep_urls = []
-    for run_id in tqdm(reversed(ids),
-                       leave=False):  #The reversal of order is related to additional_sweep_ids.append(sweep_id)
+    test_accs_exists = False
+    if "test_acc" in step_csv.columns:
+        test_accs = reversed(step_csv["test_acc"])
+        test_accs_exists = True
+    else:
+        test_accs = [np.nan] * len(ids)
+
+    for run_id, test_acc in tqdm(
+            zip(reversed(ids),
+                test_accs), leave=False):  #The reversal of order is related to additional_sweep_ids.append(sweep_id)
+        if test_accs_exists and pd.isna(test_acc):
+            continue
         api = wandb.Api(timeout=1000)
         run = api.run(f"/{entity}/{project}/runs/{run_id}")
         sweep_urls.append(run.sweep.url)
@@ -291,9 +301,9 @@ def get_new_ans(tissue):
 
     for method_folder in tqdm(methods):
         for dataset_id in collect_datasets:
-            if dataset_id == "f72958f5-7f42-4ebb-98da-445b0c6de516":  #f72958f5-7f42-4ebb-98da-445b0c6de516
+            if dataset_id == "0b4a15a7-4e9e-4555-9733-2423e5c66469":  #f72958f5-7f42-4ebb-98da-445b0c6de516
                 pass
-            file_path = f"../tuning/{method_folder}/{dataset_id}"
+            file_path = DANCEDIR / f"examples/tuning/{method_folder}/{dataset_id}"
             if not check_exist(file_path):
                 continue
             step2_url = get_sweep_url(pd.read_csv(f"{file_path}/results/pipeline/best_test_acc.csv"))
