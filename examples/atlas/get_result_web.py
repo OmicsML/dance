@@ -171,7 +171,7 @@ def get_best_method(urls, metric_col="test_acc"):
     all_best_run = None
     all_best_step_name = None
     step_names = ["step2", "step3_0", "step3_1", "step3_2"]
-
+    step2_best_run = None
     # Track run statistics
     run_states = {"all_total_runs": 0, "all_finished_runs": 0}
 
@@ -208,11 +208,14 @@ def get_best_method(urls, metric_col="test_acc"):
         elif all_best_run.summary[metric_col] > best_run.summary[metric_col] and goal == "minimize":
             all_best_run = best_run
             all_best_step_name = step_name
+        if step2_best_run is None and step_name == "step2":
+            step2_best_run = best_run
     num = run_states["all_finished_runs"] / run_states["all_total_runs"]
     run_states["finished_rate"] = f"{num:.2%}"
     need_to_check = num < 0.6
     runs_states_str = "|".join([f"{k}:{v}" for k, v in run_states.items()])
-    return all_best_step_name, all_best_run, all_best_run.summary[metric_col], runs_states_str, need_to_check
+    return all_best_step_name, all_best_run, all_best_run.summary[
+        metric_col], runs_states_str, need_to_check, step2_best_run, step2_best_run.summary[metric_col]
 
 
 def get_best_yaml(step_name, best_run, file_path):
@@ -316,15 +319,19 @@ def get_new_ans(tissue):
                 step3_urls.append(get_sweep_url(pd.read_csv(file_csv)))
             step3_str = ",".join(step3_urls)
             step_str = f"step2:{step2_url}|step3:{step3_str}"
-            step_name, best_run, best_res, run_stats_str, need_to_check = get_best_method([step2_url] + step3_urls)
+            step_name, best_run, best_res, run_stats_str, need_to_check, step2_best_run, step2_best_res = get_best_method(
+                [step2_url] + step3_urls)
             best_yaml = get_best_yaml(step_name, best_run, file_path)
+            step2_best_yaml = get_best_yaml("step2", step2_best_run, file_path)
             ans.append({
                 "Dataset_id": dataset_id,
                 method_folder: step_str,
                 f"{method_folder}_best_yaml": best_yaml,
                 f"{method_folder}_best_res": best_res,
                 f"{method_folder}_run_stats": run_stats_str,
-                f"{method_folder}_check": need_to_check
+                f"{method_folder}_check": need_to_check,
+                f"{method_folder}_step2_best_yaml": step2_best_yaml,
+                f"{method_folder}_step2_best_res": step2_best_res
             })
     # with open('temp_ans.json', 'w') as f:
     #     json.dump(ans, f,indent=4)
