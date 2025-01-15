@@ -251,7 +251,7 @@ def get_forest_model_pattern(step2_data, metric_name):
         [col for col in step2_data.columns if (col.startswith("pipeline") or col.startswith("run_kwargs_pipeline"))])
     X = step2_data.loc[:, columns]
     y = step2_data.loc[:, metric_name]
-    preprocessor = ColumnTransformer(transformers=[('onehot', OneHotEncoder(drop='first'),
+    preprocessor = ColumnTransformer(transformers=[('onehot', OneHotEncoder(drop='first', handle_unknown='ignore'),
                                                     columns)  # drop='first' to prevent dummy variable trap
                                                    ])
     pipeline = Pipeline(steps=[('preprocessor', preprocessor),
