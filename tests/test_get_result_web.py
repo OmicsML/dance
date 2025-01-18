@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -63,9 +64,19 @@ def mock_wandb(mocker):
     return mock_api
 
 
-def test_write_ans(tmp_path):
-    # 模拟 atlas/sweep_results 目录
-    sweep_results_dir = tmp_path / "atlas" / "sweep_results"
+# 添加一个mock fixture来模拟ATLASDIR
+@pytest.fixture(autouse=True)
+def mock_settings(tmp_path, monkeypatch):
+    """Mock ATLASDIR setting for tests."""
+    mock_atlas_dir = tmp_path / "atlas"
+    mock_atlas_dir.mkdir(parents=True)
+    monkeypatch.setattr("examples.get_result_web.ATLASDIR", mock_atlas_dir)
+    return mock_atlas_dir
+
+
+def test_write_ans(mock_settings):
+    # 使用mock_settings而不是创建新的临时目录
+    sweep_results_dir = mock_settings / "sweep_results"
     sweep_results_dir.mkdir(parents=True)
 
     # 创建测试数据
@@ -113,9 +124,9 @@ def test_write_ans(tmp_path):
 
 
 # 测试完全新的数据写入（文件不存在的情况）
-def test_write_ans_new_file(tmp_path):
-    # 模拟 atlas/sweep_results 目录
-    sweep_results_dir = tmp_path / "atlas" / "sweep_results"
+def test_write_ans_new_file(mock_settings):
+    # 使用mock_settings而不是创建新的临时目录
+    sweep_results_dir = mock_settings / "sweep_results"
     sweep_results_dir.mkdir(parents=True)
 
     new_data = pd.DataFrame({
