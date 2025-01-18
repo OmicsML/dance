@@ -127,10 +127,10 @@ def test_write_ans_new_file(tmp_path):
 
     # 测试写入新文件
     from examples.get_result_web import write_ans
-    write_ans("heart", new_data)
 
     # 验证文件被创建并包含正确的数据
     output_file = sweep_results_dir / "heart_ans.csv"
+    write_ans("heart", new_data, output_file)
     assert output_file.exists()
 
     written_df = pd.read_csv(output_file, index_col=0)
