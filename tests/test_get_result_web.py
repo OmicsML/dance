@@ -8,7 +8,7 @@ import pytest
 from dance.settings import DANCEDIR
 
 sys.path.append(str(DANCEDIR))
-from examples.atlas.get_result_web import check_exist, check_identical_strings, spilt_web
+from examples.atlas.get_result_web import check_exist, check_identical_strings, spilt_web, write_ans
 
 
 # 测试 check_identical_strings 函数
@@ -90,52 +90,43 @@ def mock_settings(tmp_path, monkeypatch):
 
 
 def test_write_ans(mock_settings):
-    # 使用mock_settings而不是创建新的临时目录
     sweep_results_dir = mock_settings / "sweep_results"
     sweep_results_dir.mkdir(parents=True)
-
-    # 创建测试数据
-    existing_data = pd.DataFrame({
-        'Dataset_id': ['dataset1', 'dataset2', 'dataset3'],
-        'method1': ['url1', 'url2', 'url3'],
-        'method1_best_yaml': ['yaml1', 'yaml2', 'yaml3'],
-        'method1_best_res': [0.8, 0.9, 0.7]
-    })
-
-    new_data = pd.DataFrame({
-        'Dataset_id': ['dataset2', 'dataset3', 'dataset4'],  # 部分重叠的数据
-        'method1': ['url2_new', 'url3_new', 'url4'],
-        'method1_best_yaml': ['yaml2_new', 'yaml3_new', 'yaml4'],
-        'method1_best_res': [0.9, 0.7, 0.85]  # dataset2和dataset3的结果与现有数据相同
-    })
-
-    # 写入现有数据
     output_file = sweep_results_dir / "heart_ans.csv"
+
+    # 创建初始数据
+    existing_data = pd.DataFrame({
+        'Dataset_id': ['dataset1', 'dataset2'],
+        'cta_actinn': ['url1', 'url2'],
+        'cta_actinn_best_yaml': ['yaml1', 'yaml2'],
+        'cta_actinn_best_res': [0.8, 0.7]
+    })
     existing_data.to_csv(output_file)
 
-    # 测试写入新数据
-    from examples.atlas.get_result_web import write_ans
-    write_ans("heart", new_data, output_file)
-
-    # 读取合并后的结果
-    merged_df = pd.read_csv(output_file, index_col=0)
-
-    # 验证结果
-    assert len(merged_df) == 4  # 应该有4个唯一的Dataset_id
-    assert 'dataset4' in merged_df.index  # 新数据被添加
-    assert merged_df.loc['dataset2', 'method1'] == 'url2_new'  # 更新了已存在的数据
-
-    # 测试结果冲突的情况
-    conflicting_data = pd.DataFrame({
-        'Dataset_id': ['dataset1'],
-        'method1': ['url1_new'],
-        'method1_best_yaml': ['yaml1_new'],
-        'method1_best_res': [0.95]  # 不同的结果值
+    # 测试数据：包含较低分数和较高分数的情况
+    new_data = pd.DataFrame({
+        'Dataset_id': ['dataset1', 'dataset2'],
+        'cta_actinn': ['url1_new', 'url2_new'],
+        'cta_actinn_best_yaml': ['yaml1_new', 'yaml2_new'],
+        'cta_actinn_best_res': [0.9, 0.6]  # dataset1更高分数，dataset2更低分数
     })
 
-    # 验证冲突数据会引发异常
-    with pytest.raises(ValueError, match="结果冲突"):
-        write_ans("heart", conflicting_data)
+    write_ans("heart", new_data, output_file)
+
+    # 验证结果
+    result_df = pd.read_csv(output_file)
+
+    # 验证高分数更新成功
+    dataset1_row = result_df[result_df['Dataset_id'] == 'dataset1'].iloc[0]
+    assert dataset1_row['cta_actinn_best_res'] == 0.9
+    assert dataset1_row['cta_actinn'] == 'url1_new'
+    assert dataset1_row['cta_actinn_best_yaml'] == 'yaml1_new'
+
+    # 验证低分数保持不变
+    dataset2_row = result_df[result_df['Dataset_id'] == 'dataset2'].iloc[0]
+    assert dataset2_row['cta_actinn_best_res'] == 0.7
+    assert dataset2_row['cta_actinn'] == 'url2'
+    assert dataset2_row['cta_actinn_best_yaml'] == 'yaml2'
 
 
 # 测试完全新的数据写入（文件不存在的情况）
@@ -143,19 +134,18 @@ def test_write_ans_new_file(mock_settings):
     # 使用mock_settings而不是创建新的临时目录
     sweep_results_dir = mock_settings / "sweep_results"
     sweep_results_dir.mkdir(parents=True)
+    output_file = sweep_results_dir / "new_heart_ans.csv"
 
     new_data = pd.DataFrame({
         'Dataset_id': ['dataset1', 'dataset2'],
-        'method1': ['url1', 'url2'],
-        'method1_best_yaml': ['yaml1', 'yaml2'],
-        'method1_best_res': [0.8, 0.9]
+        'cta_actinn': ['url1', 'url2'],
+        'cta_actinn_best_yaml': ['yaml1', 'yaml2'],
+        'cta_actinn_best_res': [0.8, 0.9]
     })
 
     # 测试写入新文件
-    from examples.atlas.get_result_web import write_ans
 
     # 验证文件被创建并包含正确的数据
-    output_file = sweep_results_dir / "heart_ans.csv"
     write_ans("heart", new_data, output_file)
     assert output_file.exists()
 
