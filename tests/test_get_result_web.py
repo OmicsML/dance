@@ -89,7 +89,7 @@ def test_write_ans(tmp_path):
 
     # 测试写入新数据
     from examples.get_result_web import write_ans
-    write_ans("heart", new_data)
+    write_ans("heart", new_data, output_file)
 
     # 读取合并后的结果
     merged_df = pd.read_csv(output_file, index_col=0)

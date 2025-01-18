@@ -10,7 +10,7 @@ from omegaconf import OmegaConf
 from sympy import im
 from tqdm import tqdm
 
-from dance.settings import METADIR
+from dance.settings import ATLASDIR, METADIR
 from dance.utils import try_import
 
 # get yaml of best method
@@ -282,7 +282,7 @@ def get_new_ans(tissue):
     return new_df
 
 
-def write_ans(tissue, new_df):
+def write_ans(tissue, new_df, output_file=None):
     """Process and write results for a specific tissue type to CSV.
 
     Parameters
@@ -300,7 +300,8 @@ def write_ans(tissue, new_df):
 
     """
     # 检查是否存在现有文件
-    output_file = f"atlas/sweep_results/{tissue}_ans.csv"
+    if output_file is None:
+        output_file = ATLASDIR / f"sweep_results/{tissue}_ans.csv"
     if os.path.exists(output_file):
         existing_df = pd.read_csv(output_file, index_col=0)
 
