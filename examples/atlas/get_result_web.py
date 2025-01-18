@@ -12,7 +12,7 @@ from sympy import im
 from tqdm import tqdm
 
 from dance import logger
-from dance.settings import DANCEDIR, METADIR
+from dance.settings import ATLASDIR, DANCEDIR, METADIR
 from dance.utils import try_import
 
 # get yaml of best method

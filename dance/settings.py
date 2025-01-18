@@ -47,7 +47,10 @@ CURDIR = Path().resolve()
 DANCEDIR = Path(__file__).resolve().parents[1]
 DANCEPKGDIR = DANCEDIR / "dance"
 METADIR = DANCEPKGDIR / "metadata"
-
+ATLASDIR = DANCEDIR / "examples/atlas"
+SIMILARITYDIR = ATLASDIR / "sc_similarity_examples"
+entity = "xzy11632"
+project = "dance-dev"
 __all__ = [
     "change_log_level",
 ]

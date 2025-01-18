@@ -18,6 +18,8 @@ from scipy.spatial import cKDTree
 from scipy.spatial.distance import cdist, directed_hausdorff, jaccard, jensenshannon
 from sklearn.metrics.pairwise import cosine_similarity, rbf_kernel
 
+from dance.settings import METADIR
+
 # Suppress scipy warnings for constant input in Pearson correlation
 warnings.filterwarnings("ignore", message="An input array is constant")
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
@@ -25,8 +27,23 @@ from dance.datasets.singlemodality import CellTypeAnnotationDataset
 
 def get_anndata(tissue: str = "Blood", species: str = "human", filetype: str = "h5ad", train_dataset=[],
                 test_dataset=[], valid_dataset=[], data_dir="../temp_data"):
-    if train_dataset == ['84230ea4-998d-4aa8-8456-81dd54ce23af']:
-        pass
+
+    def find_dataset_in_metadata(datasets, tissue):
+        datasets_in_metadata = []
+        for dataset_id in datasets:
+            all_datasets = pd.read_csv(METADIR / "scdeepsort.csv", header=0, skiprows=[i for i in range(1, 68)])
+            for collect_dataset in all_datasets[all_datasets["tissue"] == tissue]["data_fname"].tolist():
+                if dataset_id in collect_dataset:
+                    datasets_in_metadata.append(
+                        (collect_dataset.split(tissue)[1] +
+                         (tissue + collect_dataset.split(tissue)[2] if len(collect_dataset.split(tissue)) >= 3 else '')
+                         ).split('_')[0])
+                    break
+        return datasets_in_metadata
+
+    train_dataset = find_dataset_in_metadata(train_dataset, tissue)
+    valid_dataset = find_dataset_in_metadata(valid_dataset, tissue)
+    test_dataset = find_dataset_in_metadata(test_dataset, tissue)
     data = CellTypeAnnotationDataset(train_dataset=train_dataset, test_dataset=test_dataset,
                                      valid_dataset=valid_dataset, data_dir=data_dir, tissue=tissue, species=species,
                                      filetype=filetype).load_data()
@@ -89,6 +106,8 @@ class AnnDataSimilarity:
             Number of top variable genes to select
 
         """
+        sc.pp.filter_genes(self.origin_adata1, min_counts=3)
+        sc.pp.filter_genes(self.origin_adata2, min_counts=3)
         sc.pp.highly_variable_genes(self.origin_adata1, n_top_genes=n_top_genes, flavor='seurat_v3')
         sc.pp.highly_variable_genes(self.origin_adata2, n_top_genes=n_top_genes, flavor='seurat_v3')
 
@@ -194,6 +213,20 @@ class AnnDataSimilarity:
         # Convert divergence to similarity and compute the average
         similarity_matrix = 1 - divergence_matrix
         return np.nanmean(similarity_matrix)
+
+    def compute_mmd_alternative(self) -> float:
+        X = self.X
+        Y = self.Y
+        gamma = 1.0
+        K_XX = rbf_kernel(X, X, gamma)
+        K_YY = rbf_kernel(Y, Y, gamma)
+        K_XY = rbf_kernel(X, Y, gamma)
+        n_x = X.shape[0]
+        n_y = Y.shape[0]
+        mmd = (K_XX.sum() - np.trace(K_XX)) / (n_x * (n_x - 1)) \
+            + (K_YY.sum() - np.trace(K_YY)) / (n_y * (n_y - 1)) \
+            - 2 * K_XY.mean()
+        return 1 / (1 + np.sqrt(max(mmd, 0)))
 
     def compute_mmd(self) -> float:
         """Compute Maximum Mean Discrepancy between datasets.
@@ -359,6 +392,12 @@ class AnnDataSimilarity:
             con_sim["n_measured_vars"] = np.mean(data.obs["n_measured_vars"])
             con_sim["cell_num"] = len(data.obs)
             con_sim["gene_num"] = len(data.var)
+            if "n_counts" not in data.obs.columns:
+                if scipy.sparse.issparse(data.X):
+                    cell_counts = np.array(data.X.sum(axis=1)).flatten()
+                else:
+                    cell_counts = data.X.sum(axis=1)
+                data.obs["n_counts"] = cell_counts
             con_sim["n_counts_mean"] = np.mean(data.obs["n_counts"])
             con_sim["n_counts_var"] = np.var(data.obs["n_counts"])
             # if "n_counts" not in data.var.columns:
@@ -404,9 +443,9 @@ class AnnDataSimilarity:
         sim_targets = []
         for method in self.methods:
             query_dataset_truth = ground_truth_conf.loc[ground_truth_conf["dataset_id"] == self.adata1_name,
-                                                        f"{method}_best_yaml"].iloc[0]
+                                                        f"{method}_step2_best_yaml"].iloc[0]
             atlas_dataset_truth = ground_truth_conf.loc[ground_truth_conf["dataset_id"] == self.adata2_name,
-                                                        f"{method}_best_yaml"].iloc[0]
+                                                        f"{method}_step2_best_yaml"].iloc[0]
             if type(atlas_dataset_truth) == float and np.isnan(atlas_dataset_truth):
                 return 0
             query_targets = get_targets(query_dataset_truth)

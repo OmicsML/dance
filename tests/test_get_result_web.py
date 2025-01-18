@@ -1,10 +1,14 @@
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
 import pytest
 
-from examples.get_result_web import check_exist, check_identical_strings, spilt_web
+from dance.settings import DANCEDIR
+
+sys.path.append(str(DANCEDIR))
+from examples.atlas.get_result_web import check_exist, check_identical_strings, spilt_web
 
 
 # 测试 check_identical_strings 函数
@@ -79,8 +83,8 @@ def mock_settings(tmp_path, monkeypatch):
     monkeypatch.setenv("META_DIR", str(mock_meta_dir))
 
     # 如果直接从dance.settings导入，也替换这些值
-    monkeypatch.setattr("examples.get_result_web.ATLASDIR", mock_atlas_dir)
-    monkeypatch.setattr("examples.get_result_web.METADIR", mock_meta_dir)
+    monkeypatch.setattr("examples.atlas.get_result_web.ATLASDIR", mock_atlas_dir)
+    monkeypatch.setattr("examples.atlas.get_result_web.METADIR", mock_meta_dir)
 
     return mock_atlas_dir
 
@@ -110,7 +114,7 @@ def test_write_ans(mock_settings):
     existing_data.to_csv(output_file)
 
     # 测试写入新数据
-    from examples.get_result_web import write_ans
+    from examples.atlas.get_result_web import write_ans
     write_ans("heart", new_data, output_file)
 
     # 读取合并后的结果
@@ -148,7 +152,7 @@ def test_write_ans_new_file(mock_settings):
     })
 
     # 测试写入新文件
-    from examples.get_result_web import write_ans
+    from examples.atlas.get_result_web import write_ans
 
     # 验证文件被创建并包含正确的数据
     output_file = sweep_results_dir / "heart_ans.csv"
