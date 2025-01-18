@@ -67,10 +67,21 @@ def mock_wandb(mocker):
 # 添加一个mock fixture来模拟ATLASDIR
 @pytest.fixture(autouse=True)
 def mock_settings(tmp_path, monkeypatch):
-    """Mock ATLASDIR setting for tests."""
+    """Mock ATLASDIR and METADIR settings for tests."""
+    # 创建临时目录
     mock_atlas_dir = tmp_path / "atlas"
+    mock_meta_dir = tmp_path / "meta"
     mock_atlas_dir.mkdir(parents=True)
+    mock_meta_dir.mkdir(parents=True)
+
+    # 设置环境变量
+    monkeypatch.setenv("ATLAS_DIR", str(mock_atlas_dir))
+    monkeypatch.setenv("META_DIR", str(mock_meta_dir))
+
+    # 如果直接从dance.settings导入，也替换这些值
     monkeypatch.setattr("examples.get_result_web.ATLASDIR", mock_atlas_dir)
+    monkeypatch.setattr("examples.get_result_web.METADIR", mock_meta_dir)
+
     return mock_atlas_dir
 
 

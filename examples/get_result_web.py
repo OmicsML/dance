@@ -10,7 +10,13 @@ from omegaconf import OmegaConf
 from sympy import im
 from tqdm import tqdm
 
-from dance.settings import ATLASDIR, METADIR
+try:
+    from dance.settings import ATLASDIR, METADIR
+except ImportError:
+    # 如果无法导入，使用默认值
+    ATLASDIR = Path(os.getenv('ATLAS_DIR', Path.home() / 'atlas'))
+    METADIR = Path(os.getenv('META_DIR', Path.home() / 'meta'))
+
 from dance.utils import try_import
 
 # get yaml of best method
