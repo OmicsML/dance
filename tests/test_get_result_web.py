@@ -155,6 +155,6 @@ def test_write_ans_new_file(mock_settings):
     write_ans("heart", new_data, output_file)
     assert output_file.exists()
 
-    written_df = pd.read_csv(output_file, index_col=0)
+    written_df = pd.read_csv(output_file, index_col='Dataset_id')
     assert len(written_df) == 2
     assert all(written_df.index == ['dataset1', 'dataset2'])
