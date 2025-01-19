@@ -12,7 +12,7 @@ from scipy.sparse import issparse
 from torch.utils.data import TensorDataset
 
 from dance.atlas.sc_similarity.anndata_similarity import AnnDataSimilarity, get_anndata
-from dance.settings import DANCEDIR, METADIR
+from dance.settings import DANCEDIR, SIMILARITYDIR
 from dance.utils import set_seed
 
 # target_files = [
@@ -26,16 +26,15 @@ from dance.utils import set_seed
 #     "eeacb0c1-2217-4cf6-b8ce-1f0fedf1b569"
 # ]
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--tissue", type=str, default="heart")
+parser.add_argument("--tissue", type=str, default="pancreas")
 parser.add_argument("--data_dir", default=DANCEDIR / f"examples/tuning/temp_data")
 args = parser.parse_args()
 
 data_dir = args.data_dir
-file_root = Path(__file__).resolve().parent
 set_seed(42)
 tissue = args.tissue
 # conf_data = pd.read_csv(f"results/{tissue}_result.csv", index_col=0)
-conf_data = pd.read_excel("Cell Type Annotation Atlas.xlsx", sheet_name=tissue)
+conf_data = pd.read_excel(SIMILARITYDIR / "data/Cell Type Annotation Atlas.xlsx", sheet_name=tissue)
 atlas_datasets = list(conf_data[conf_data["queryed"] == False]["dataset_id"])
 query_datasets = list(conf_data[conf_data["queryed"] == True]["dataset_id"])
 
@@ -126,46 +125,46 @@ def run_test_case(source_file):
         target_data = get_anndata(train_dataset=[f"{target_file}"], data_dir=data_dir, tissue=tissue.capitalize())
 
         # Initialize similarity calculator with multiple metrics
-        similarity_calculator = AnnDataSimilarity(adata1=source_data, adata2=target_data, sample_size=10,
-                                                  init_random_state=42, n_runs=1,
-                                                  ground_truth_conf_path="Cell Type Annotation Atlas.xlsx",
-                                                  adata1_name=source_file, adata2_name=target_file, tissue=tissue)
+        similarity_calculator = AnnDataSimilarity(
+            adata1=source_data, adata2=target_data, sample_size=10, init_random_state=42, n_runs=1,
+            ground_truth_conf_path=SIMILARITYDIR / "data/Cell Type Annotation Atlas.xlsx", adata1_name=source_file,
+            adata2_name=target_file, tissue=tissue)
 
         # Calculate similarity using multiple methods
         ans[target_file] = similarity_calculator.get_similarity_matrix_A2B(methods=[
             "wasserstein",
-            "Hausdorff",
-            "chamfer",
-            "energy",
-            "sinkhorn2",
-            "bures",
-            "spectral",
-            "common_genes_num",
-            # "ground_truth",
-            "mmd",
-            "metadata_sim"
+            # "Hausdorff",
+            # "chamfer",
+            # "energy",
+            # "sinkhorn2",
+            # "bures",
+            # "spectral",
+            # "common_genes_num",
+            "ground_truth",
+            # "mmd",
+            # "metadata_sim"
         ])
 
     # Convert results to DataFrame and save
     ans = pd.DataFrame(ans)
-    ans_to_path = f'sims/{tissue}/sim_{source_file}.csv'
-    os.makedirs(os.path.dirname(ans_to_path), exist_ok=True)
-    ans.to_csv(ans_to_path)
+    # ans_to_path = f'sims/{tissue}/sim_{source_file}.csv'
+    # os.makedirs(os.path.dirname(ans_to_path), exist_ok=True)
+    # ans.to_csv(ans_to_path)
     return ans
 
 
 start = False
-query_data = os.listdir(file_root / "in_atlas_datas" / f"{tissue}")
-excel_path = file_root / f"{tissue}_similarity.xlsx"
+query_data = os.listdir(SIMILARITYDIR / "data/in_atlas_datas" / f"{tissue}")
+excel_path = SIMILARITYDIR / f"data/dataset_similarity/{tissue}_similarity.xlsx"
 # with pd.ExcelWriter(file_root / f"{tissue}_similarity.xlsx", engine='openpyxl') as writer:
 for source_file in query_datasets:
-    # if source_file[:4]=='c777':
+    # if source_file[:4]=='e868':
     #     start=True
     # if not start:
     #     continue
     query_ans = pd.concat([
-        pd.read_csv(file_root / "in_atlas_datas" / f"{tissue}" / element, index_col=0) for element in query_data
-        if element.split("_")[-3] == source_file
+        pd.read_csv(SIMILARITYDIR / "data/in_atlas_datas" / f"{tissue}" / element, index_col=0)
+        for element in query_data if element.split("_")[-3] == source_file
     ])
     rename_dict = {col: col.replace('_from_cache', '') for col in query_ans.columns if '_from_cache' in col}
     query_ans = query_ans.rename(columns=rename_dict)
@@ -175,11 +174,14 @@ for source_file in query_datasets:
         excel = pd.ExcelFile(excel_path, engine='openpyxl')
         if source_file[:4] in excel.sheet_names:
             # 尝试读取指定的分表
-            existing_df = pd.read_excel(file_root / f"{tissue}_similarity.xlsx", sheet_name=source_file[:4],
-                                        engine="openpyxl", index_col=0)
+            existing_df = pd.read_excel(SIMILARITYDIR / f"data/dataset_similarity/{tissue}_similarity.xlsx",
+                                        sheet_name=source_file[:4], engine="openpyxl", index_col=0)
             # 找出在新数据框中存在但在现有表格中不存在的行
             merged_df = pd.concat([existing_df, merged_df])
-            merged_df = merged_df.drop_duplicates(subset=merged_df.index.name, keep='last')
+            merged_df = merged_df.applymap(lambda x: tuple(x) if isinstance(x, list) else x)
+            # 2. 然后去重，这时应该使用keep='last'而不是subset参数
+            merged_df = merged_df[~merged_df.index.duplicated(keep='last')]
+            # merged_df = merged_df.drop_duplicates(subset=merged_df.index.name, keep='last')
         excel.close()
     if os.path.exists(excel_path):
         mode = 'a'

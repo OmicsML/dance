@@ -7,13 +7,17 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
+from tqdm import tqdm
 
-sys.path.append("..")
+from dance.settings import DANCEDIR, SIMILARITYDIR
+
+sys.path.append(str(DANCEDIR))
 import ast
 
 from get_result_web import get_sweep_url, spilt_web
 
 from dance import logger
+from dance.settings import entity, project
 from dance.utils import try_import
 
 file_root = str(Path(__file__).resolve().parent.parent)
@@ -70,8 +74,6 @@ def find_unique_matching_row(df, config_col, input_dict_list):
 
 
 wandb = try_import("wandb")
-entity = "xzy11632"
-project = "dance-dev"
 
 
 def is_matching_dict(yaml_str, target_dict):
@@ -156,18 +158,20 @@ def get_ans_from_cache(query_dataset, method):
     # Get best method from step2 of atlas datasets
     # Search accuracy according to best method (all values should exist)
     ans = pd.DataFrame(index=[method], columns=[f"{atlas_dataset}_from_cache" for atlas_dataset in atlas_datasets])
-
-    sweep_url = re.search(r"step2:([^|]+)",
-                          conf_data[conf_data["dataset_id"] == query_dataset][method].iloc[0]).group(1)
+    step_str = conf_data[conf_data["dataset_id"] == query_dataset][method].iloc[0]
+    if pd.isna(step_str):
+        logger.warning(f"{query_dataset} is nan in {method}")
+        return ans
+    sweep_url = re.search(r"step2:([^|]+)", step_str).group(1)
     _, _, sweep_id = spilt_web(sweep_url)
     sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
-
-    for atlas_dataset in atlas_datasets:
-        best_yaml = conf_data[conf_data["dataset_id"] == atlas_dataset][f"{method}_best_yaml"].iloc[0]
+    runs = sweep.runs
+    for atlas_dataset in tqdm(atlas_datasets):
+        best_yaml = conf_data[conf_data["dataset_id"] == atlas_dataset][f"{method}_step2_best_yaml"].iloc[0]
         match_run = None
 
         # Find matching run configuration
-        for run in sweep.runs:
+        for run in tqdm(runs, leave=False):
             if isinstance(best_yaml, float) and np.isnan(best_yaml):
                 continue
             if is_matching_dict(best_yaml, run.config):
@@ -188,7 +192,7 @@ ans_all = {}
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--methods", default=["cta_actinn", "cta_celltypist", "cta_scdeepsort", "cta_singlecellnet"],
                     nargs="+")
-parser.add_argument("--tissue", type=str, default="blood")
+parser.add_argument("--tissue", type=str, default="pancreas")
 args = parser.parse_args()
 methods = args.methods
 tissue = args.tissue
@@ -208,7 +212,7 @@ tissue = args.tissue
 #     "738942eb-ac72-44ff-a64b-8943b5ecd8d9", "a5d95a42-0137-496f-8a60-101e17f263c8",
 #     "71be997d-ff75-41b9-8a9f-1288c865f921"
 # ]
-conf_data = pd.read_excel("Cell Type Annotation Atlas.xlsx", sheet_name=tissue)
+conf_data = pd.read_excel(SIMILARITYDIR / "data/Cell Type Annotation Atlas.xlsx", sheet_name=tissue)
 # conf_data = pd.read_csv(f"results/{tissue}_result.csv", index_col=0)
 atlas_datasets = list(conf_data[conf_data["queryed"] == False]["dataset_id"])
 query_datasets = list(conf_data[conf_data["queryed"] == True]["dataset_id"])
@@ -219,8 +223,9 @@ if __name__ == "__main__":
             ans.append(get_ans_from_cache(query_dataset, method))
         ans = pd.concat(ans)
         ans_all[query_dataset] = ans
-    for k, v in ans_all.items():
-        file_path = f"in_atlas_datas/{tissue}/{str(methods)}_{k}_in_atlas.csv"
+        print(query_dataset)
+        # for k, v in ans_all.items():
+        file_path = SIMILARITYDIR / f"data/in_atlas_datas/{tissue}/{str(methods)}_{query_dataset}_in_atlas.csv"
         folder_path = Path(file_path).parent
         folder_path.mkdir(parents=True, exist_ok=True)
-        v.to_csv(file_path)
+        ans.to_csv(file_path)

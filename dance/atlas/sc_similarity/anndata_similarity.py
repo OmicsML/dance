@@ -288,7 +288,7 @@ class AnnDataSimilarity:
         b = np.ones((Y.shape[0], )) / Y.shape[0]
         M = ot.dist(X, Y, metric='euclidean')
         wasserstein_dist = ot.emd2(a, b, M)
-        return 1 / 1 + wasserstein_dist
+        return 1 / (1 + wasserstein_dist)
 
     def get_Hausdorff(self):
         X = self.X

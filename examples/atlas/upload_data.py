@@ -1,27 +1,35 @@
 import argparse
 import json
+import os
 import pathlib
 
 import pandas as pd
 import scanpy as sc
+from dotenv import load_dotenv
 
 from dance.atlas.data_dropbox_upload import get_ans, get_data
 
 if __name__ == "__main__":
+    # 加载环境变量
+    load_dotenv()
+
     args = argparse.ArgumentParser()
     args.add_argument("--maindir", type=str)
     args.add_argument("--filedir", type=str)
     args.add_argument("--tissues", type=str, nargs="+")
-    args.add_argument("--access_token", type=str)
     args.add_argument("--dropbox_dest_path", type=str)
     args = args.parse_args()
+
+    # 从环境变量获取 access_token
+    ACCESS_TOKEN = os.getenv('DROPBOX_ACCESS_TOKEN')
+    if not ACCESS_TOKEN:
+        raise ValueError("未找到 DROPBOX_ACCESS_TOKEN 环境变量！\n"
+                         "请在 .env 文件中设置 DROPBOX_ACCESS_TOKEN=your_token_here")
+
     MAINDIR = pathlib.Path(args.maindir)
     FILEDIR = pathlib.Path(args.filedir)
     tissues = args.tissues
-    # tissues=["kidney","lung","pancreas"]
-    # Configuration parameters
-    ACCESS_TOKEN = args.access_token
-    DROPBOX_DEST_PATH = args.dropbox_dest_path  # Destination path on Dropbox
+    DROPBOX_DEST_PATH = args.dropbox_dest_path
 
     def get_data(dataset_id, in_atlas=False, large=False):
         """Load h5ad dataset from local path.
