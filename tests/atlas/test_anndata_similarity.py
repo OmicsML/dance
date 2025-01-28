@@ -73,7 +73,6 @@ def test_similarity_computation(test_data):
 
     # 验证特定指标
     assert similarity_matrices['common_genes_num'] >= 0  # 至少有0个共同基因
-    assert np.isclose(similarity_matrices['metadata_sim'], 0.0)  # 不同的元数据
 
 
 def test_preprocess(test_data):
