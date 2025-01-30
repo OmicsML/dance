@@ -1,3 +1,18 @@
+"""Upload Atlas and Query datasets to Dropbox.
+
+This script handles the upload of single-cell RNA sequencing datasets to Dropbox.
+It processes both atlas and query datasets, handling large (>10000 cells) and small datasets separately.
+The script reads data from local h5ad files and uploads them to a specified Dropbox location.
+
+Required environment variables:
+    DROPBOX_ACCESS_TOKEN: Authentication token for Dropbox API
+
+Usage:
+    python upload_data.py --maindir <atlas_dir> --filedir <query_dir>
+                         --tissues <tissue_list> --dropbox_dest_path <dest_path>
+
+"""
+
 import argparse
 import json
 import os
@@ -10,7 +25,7 @@ from dotenv import load_dotenv
 from dance.atlas.data_dropbox_upload import get_ans, get_data
 
 if __name__ == "__main__":
-    # 加载环境变量
+    # Load environment variables
     load_dotenv()
 
     args = argparse.ArgumentParser()
@@ -20,11 +35,11 @@ if __name__ == "__main__":
     args.add_argument("--dropbox_dest_path", type=str)
     args = args.parse_args()
 
-    # 从环境变量获取 access_token
+    # Get access token from environment variables
     ACCESS_TOKEN = os.getenv('DROPBOX_ACCESS_TOKEN')
     if not ACCESS_TOKEN:
-        raise ValueError("未找到 DROPBOX_ACCESS_TOKEN 环境变量！\n"
-                         "请在 .env 文件中设置 DROPBOX_ACCESS_TOKEN=your_token_here")
+        raise ValueError("DROPBOX_ACCESS_TOKEN environment variable not found!\n"
+                         "Please set DROPBOX_ACCESS_TOKEN=your_token_here in .env file")
 
     MAINDIR = pathlib.Path(args.maindir)
     FILEDIR = pathlib.Path(args.filedir)
@@ -61,35 +76,51 @@ if __name__ == "__main__":
         data = sc.read_h5ad(local_path)
         return data, local_path
 
-    ans_all = []
+    upload_results = []
 
+    # Load atlas and query results
     with open(FILEDIR / "results/atlas_result.json") as f:
-        result = json.load(f)
+        atlas_result = json.load(f)
     with open(FILEDIR / "results/query_result.json") as f:
         query_result = json.load(f)
+
     for tissue in tissues:
-        large_dataset_ids = result[tissue][0]
-        small_dataset_ids = result[tissue][1]
-        for large_dataset_id in large_dataset_ids:
-            data, local_path = get_data(dataset_id=large_dataset_id, in_atlas=True, large=True)
-            ans_all.append(
-                get_ans(dataset_id=large_dataset_id, tissue=tissue, data=data, local_path=local_path,
+        # Process atlas datasets
+        large_dataset_ids = atlas_result[tissue][0]
+        small_dataset_ids = atlas_result[tissue][1]
+
+        # Upload large atlas datasets
+        for dataset_id in large_dataset_ids:
+            data, local_path = get_data(dataset_id=dataset_id, in_atlas=True, large=True)
+            upload_results.append(
+                get_ans(dataset_id=dataset_id, tissue=tissue, data=data, local_path=local_path,
                         ACCESS_TOKEN=ACCESS_TOKEN, DROPBOX_DEST_PATH=DROPBOX_DEST_PATH))
-        for small_dataset_id in small_dataset_ids:
-            data, local_path = get_data(dataset_id=small_dataset_id, in_atlas=True, large=False)
-            ans_all.append(
-                get_ans(dataset_id=small_dataset_id, tissue=tissue, data=data, local_path=local_path,
+
+        # Upload small atlas datasets
+        for dataset_id in small_dataset_ids:
+            data, local_path = get_data(dataset_id=dataset_id, in_atlas=True, large=False)
+            upload_results.append(
+                get_ans(dataset_id=dataset_id, tissue=tissue, data=data, local_path=local_path,
                         ACCESS_TOKEN=ACCESS_TOKEN, DROPBOX_DEST_PATH=DROPBOX_DEST_PATH))
-        large_query_dataset_ids = query_result[tissue][0]
-        small_query_dataset_ids = query_result[tissue][1]
-        for large_query_dataset_id in large_query_dataset_ids:
-            data, local_path = get_data(dataset_id=large_query_dataset_id, in_atlas=False, large=True)
-            ans_all.append(
-                get_ans(dataset_id=large_query_dataset_id, tissue=tissue, data=data, local_path=local_path,
+
+        # Process query datasets
+        large_query_ids = query_result[tissue][0]
+        small_query_ids = query_result[tissue][1]
+
+        # Upload large query datasets
+        for dataset_id in large_query_ids:
+            data, local_path = get_data(dataset_id=dataset_id, in_atlas=False, large=True)
+            upload_results.append(
+                get_ans(dataset_id=dataset_id, tissue=tissue, data=data, local_path=local_path,
                         ACCESS_TOKEN=ACCESS_TOKEN, DROPBOX_DEST_PATH=DROPBOX_DEST_PATH))
-        for small_query_dataset_id in small_query_dataset_ids:
-            data, local_path = get_data(dataset_id=small_query_dataset_id, in_atlas=False, large=False)
-            ans_all.append(
-                get_ans(dataset_id=small_query_dataset_id, tissue=tissue, data=data, local_path=local_path,
+
+        # Upload small query datasets
+        for dataset_id in small_query_ids:
+            data, local_path = get_data(dataset_id=dataset_id, in_atlas=False, large=False)
+            upload_results.append(
+                get_ans(dataset_id=dataset_id, tissue=tissue, data=data, local_path=local_path,
                         ACCESS_TOKEN=ACCESS_TOKEN, DROPBOX_DEST_PATH=DROPBOX_DEST_PATH))
-    pd.DataFrame(ans_all).set_index("species").to_csv(",".join(tissues) + "scdeeepsort.csv")
+
+    # Save upload results
+    output_filename = f"{','.join(tissues)}_scdeepsort.csv"
+    pd.DataFrame(upload_results).set_index("species").to_csv(output_filename)
