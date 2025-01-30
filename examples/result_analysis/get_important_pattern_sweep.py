@@ -18,15 +18,43 @@ from dance.utils import try_import
 # Define basic configuration parameters
 entity = "xzy11632"
 project = "dance-dev"
-# List of tasks to analyze
-# tasks = ["cell type annotation new", "clustering", "imputation_new", "spatial domain", "cell type deconvolution"]
-tasks = ['joint embedding']
-# Corresponding metrics for each task
-# mertic_names = ["test_acc", "acc", "MRE", "ARI", "MSE"]
-mertic_names = ["ARI"]
-ascendings = [False]
-# Whether higher values are better for each metric
-# ascendings = [False, False, True, False, True]
+# # List of tasks to analyze
+# # tasks = ["cell type annotation new", "clustering", "imputation_new", "spatial domain", "cell type deconvolution"]
+# tasks = ['joint embedding']
+# # Corresponding metrics for each task
+# # mertic_names = ["test_acc", "acc", "MRE", "ARI", "MSE"]
+# mertic_names = ["ARI"]
+# ascendings = [False]
+# # Whether higher values are better for each metric
+# # ascendings = [False, False, True, False, True]
+metrics_dict = [{
+    "task": "cell type annotation new",
+    "metric": "test_acc",
+    "ascending": False
+}, {
+    "task": "clustering",
+    "metric": "acc",
+    "ascending": False
+}, {
+    "task": "imputation_new",
+    "metric": "MRE",
+    "ascending": True
+}, {
+    "task": "spatial domain",
+    "metric": "ARI",
+    "ascending": False
+}, {
+    "task": "cell type deconvolution",
+    "metric": "MSE",
+    "ascending": True
+}, {
+    "task": "joint embedding",
+    "metric": "ARI",
+    "ascending": False
+}]
+tasks = [d["task"] for d in metrics_dict]
+mertic_names = [d["metric"] for d in metrics_dict]
+ascendings = [d["ascending"] for d in metrics_dict]
 
 multi_mod = False
 if multi_mod:
@@ -146,7 +174,7 @@ def summary_pattern(step2_origin_data, metric_name, ascending, alpha=0.05, vis=F
 
 
 if __name__ == "__main__":
-    start = True
+    start = False
     ans_all = []
     for i, task in enumerate(tasks):
         # Skip tasks not in choose_tasks list
@@ -165,12 +193,12 @@ if __name__ == "__main__":
                 dataset = data.columns[col_idx]
                 value = data.iloc[row_idx, col_idx]
                 step_name = data.iloc[row_idx]["Unnamed: 1"]
-                if method != "dcca":
-                    start = True
-                if not start:
-                    continue
-                # if method !="ACTINN" :
+                # if method == "Scmvae" and dataset=="Dataset3:openproblems_2022_multi_atac2gex":
+                #     start = True
+                # if not start:
                 #     continue
+                if method != "Scgnn2":
+                    continue
                 if isinstance(value, str) and value.startswith(prefix) and (
                         str(step_name).lower() == "step2" or str(step_name).lower() == "step 2"):  #TODO add step3
                     sweep_url = value

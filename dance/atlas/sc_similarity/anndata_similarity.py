@@ -1,8 +1,7 @@
 # anndata_similarity.py
 import re
 import warnings
-from math import isnan
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import anndata
 import anndata as ad
@@ -15,9 +14,10 @@ import yaml
 from omegaconf import OmegaConf
 from scipy.linalg import sqrtm
 from scipy.spatial import cKDTree
-from scipy.spatial.distance import cdist, directed_hausdorff, jaccard, jensenshannon
+from scipy.spatial.distance import cdist, directed_hausdorff, jensenshannon
 from sklearn.metrics.pairwise import cosine_similarity, rbf_kernel
 
+from dance import logger
 from dance.settings import METADIR
 
 # Suppress scipy warnings for constant input in Pearson correlation
@@ -446,8 +446,11 @@ class AnnDataSimilarity:
                                                         f"{method}_step2_best_yaml"].iloc[0]
             atlas_dataset_truth = ground_truth_conf.loc[ground_truth_conf["dataset_id"] == self.adata2_name,
                                                         f"{method}_step2_best_yaml"].iloc[0]
-            if type(atlas_dataset_truth) == float and np.isnan(atlas_dataset_truth):
+            if (type(atlas_dataset_truth) == float
+                    and np.isnan(atlas_dataset_truth)) or (type(query_dataset_truth) == float
+                                                           and np.isnan(query_dataset_truth)):
                 return 0
+
             query_targets = get_targets(query_dataset_truth)
             atlas_targets = get_targets(atlas_dataset_truth)
             assert len(query_targets) == len(atlas_targets)
@@ -483,7 +486,7 @@ class AnnDataSimilarity:
 
         results = {}
         for method in methods:
-            print(method)
+            logger.info(f"method: {method}")
             if method == 'cosine':
                 results['cosine'] = self.cosine_sim_sampled()
             elif method == 'pearson':

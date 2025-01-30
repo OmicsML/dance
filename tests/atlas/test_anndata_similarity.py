@@ -11,15 +11,13 @@ from dance.atlas.sc_similarity.anndata_similarity import AnnDataSimilarity
 
 @pytest.fixture
 def test_data():
-    """创建测试用的AnnData对象."""
+    """Create test AnnData objects."""
     n_cells = 20
     n_genes = 40
 
-    # 使用稀疏的非负数据来模拟单细胞数据
     X1 = np.random.negative_binomial(n=5, p=0.3, size=(n_cells, n_genes))
     X2 = np.random.negative_binomial(n=5, p=0.3, size=(n_cells, n_genes))
 
-    # 确保数据是稀疏的并转换为CSR格式
     X1[np.random.random(X1.shape) > 0.5] = 0
     X2[np.random.random(X2.shape) > 0.5] = 0
     X1 = sparse.csr_matrix(X1)
@@ -44,7 +42,7 @@ def test_data():
     adata1 = AnnData(X1, obs=obs1)
     adata2 = AnnData(X2, obs=obs2)
 
-    # 进行标准的单细胞数据预处理
+    # Perform standard single-cell data preprocessing
     for adata in [adata1, adata2]:
         sc.pp.normalize_total(adata, target_sum=1e4)
         sc.pp.log1p(adata)
@@ -53,13 +51,13 @@ def test_data():
 
 
 def test_similarity_computation(test_data):
-    """测试相似性计算的正确性."""
+    """Test the correctness of similarity computation."""
     adata1, adata2 = test_data
 
-    # 初始化相似性计算器
+    # Initialize similarity calculator
     similarity_calculator = AnnDataSimilarity(adata1, adata2, sample_size=2, init_random_state=42, n_runs=1)
 
-    # 计算相似性
+    # Calculate similarity
     similarity_matrices = similarity_calculator.get_similarity_matrix_A2B(methods=[
         'wasserstein', 'Hausdorff', 'chamfer', 'energy', 'sinkhorn2', 'bures', 'spectral', 'common_genes_num',
         'metadata_sim', 'mmd'
@@ -67,29 +65,29 @@ def test_similarity_computation(test_data):
     for k, v in similarity_matrices.items():
         print(k, v)
 
-    # 验证结果格式和基本属性
+    # Verify result format and basic properties
     assert isinstance(similarity_matrices, dict)
     assert all(0 <= v <= 1 for k, v in similarity_matrices.items() if k not in ['common_genes_num', 'bures'])
 
-    # 验证特定指标
-    assert similarity_matrices['common_genes_num'] >= 0  # 至少有0个共同基因
+    # Verify specific metrics
+    assert similarity_matrices['common_genes_num'] >= 0  # At least 0 common genes
 
 
 def test_preprocess(test_data):
-    """测试数据预处理功能."""
+    """Test data preprocessing functionality."""
     adata1, adata2 = test_data
 
     calculator = AnnDataSimilarity(adata1, adata2)
     calculator.preprocess()
 
-    # 验证基因过滤
+    # Verify gene filtering
     assert len(calculator.common_genes) > 0
     assert all(gene in calculator.origin_adata1.var_names for gene in calculator.common_genes)
     assert all(gene in calculator.origin_adata2.var_names for gene in calculator.common_genes)
 
 
 def test_sample_cells(test_data):
-    """测试细胞采样功能."""
+    """Test cell sampling functionality."""
     adata1, adata2 = test_data
     sample_size = 1
 
@@ -98,14 +96,14 @@ def test_sample_cells(test_data):
     calculator.adata2 = calculator.origin_adata2.copy()
     calculator.sample_cells(random_state=42)
 
-    # 验证采样大小
+    # Verify sample size
     assert calculator.sampled_adata1.n_obs == sample_size
     assert calculator.sampled_adata2.n_obs == sample_size
 
 
 @pytest.mark.xfail(raises=ValueError, strict=True)
 def test_invalid_method(test_data):
-    """测试无效的相似性计算方法."""
+    """Test invalid similarity computation method."""
     adata1, adata2 = test_data
     calculator = AnnDataSimilarity(adata1, adata2)
 
