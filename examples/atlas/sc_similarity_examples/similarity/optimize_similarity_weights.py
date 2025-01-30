@@ -26,6 +26,7 @@ import pandas as pd
 from dance.settings import SIMILARITYDIR
 
 sys.path.append(str(SIMILARITYDIR))  # 添加父目录到路径
+print(sys.path)
 from similarity.process_tissue_similarity_matrices import convert_to_complex
 from visualization.visualize_atlas_performance import get_runs
 

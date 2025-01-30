@@ -16,8 +16,8 @@ import json
 
 import matplotlib.pyplot as plt
 import seaborn as sns
-from data_processing.process_tissue_similarity_matrices import convert_to_complex
 from get_result_web import spilt_web
+from similarity.process_tissue_similarity_matrices import convert_to_complex
 
 wandb = try_import("wandb")
 

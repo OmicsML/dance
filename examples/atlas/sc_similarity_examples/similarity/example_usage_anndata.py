@@ -11,6 +11,7 @@ from anndata import AnnData
 from scipy.sparse import issparse
 from torch.utils.data import TensorDataset
 
+from dance import logger
 from dance.atlas.sc_similarity.anndata_similarity import AnnDataSimilarity, get_anndata
 from dance.settings import DANCEDIR, SIMILARITYDIR
 from dance.utils import set_seed
@@ -132,17 +133,8 @@ def run_test_case(source_file):
 
         # Calculate similarity using multiple methods
         ans[target_file] = similarity_calculator.get_similarity_matrix_A2B(methods=[
-            "wasserstein",
-            # "Hausdorff",
-            # "chamfer",
-            # "energy",
-            # "sinkhorn2",
-            # "bures",
-            # "spectral",
-            # "common_genes_num",
-            "ground_truth",
-            # "mmd",
-            # "metadata_sim"
+            "wasserstein", "Hausdorff", "chamfer", "energy", "sinkhorn2", "bures", "spectral", "common_genes_num",
+            "ground_truth", "mmd", "metadata_sim"
         ])
 
     # Convert results to DataFrame and save
@@ -157,11 +149,13 @@ start = False
 query_data = os.listdir(SIMILARITYDIR / "data/in_atlas_datas" / f"{tissue}")
 excel_path = SIMILARITYDIR / f"data/dataset_similarity/{tissue}_similarity.xlsx"
 # with pd.ExcelWriter(file_root / f"{tissue}_similarity.xlsx", engine='openpyxl') as writer:
+logger.info(f"tissue: {tissue}")
 for source_file in query_datasets:
     # if source_file[:4]=='e868':
     #     start=True
     # if not start:
     #     continue
+    logger.info(f"source_file: {source_file}")
     query_ans = pd.concat([
         pd.read_csv(SIMILARITYDIR / "data/in_atlas_datas" / f"{tissue}" / element, index_col=0)
         for element in query_data if element.split("_")[-3] == source_file
