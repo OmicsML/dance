@@ -1,4 +1,4 @@
-"""Calculate optimal weights for combining similarity metrics in cell type annotation.
+"""Calculate optimal weights for similarity metrics in cell type annotation.
 
 This script analyzes different similarity metrics (like Wasserstein, Hausdorff, etc.) and metadata similarity
 to find optimal weights that minimize the total rank of correct cell type predictions across multiple datasets.
