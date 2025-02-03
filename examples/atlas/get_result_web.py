@@ -386,32 +386,32 @@ def write_ans(tissue, new_df, output_file=None):
             if col not in merged_df.columns:
                 merged_df[col] = pd.NA
 
-        # 遍历每个新数据行
+        # Iterate through each new data row
         for _, new_row in new_df_processed.iterrows():
             dataset_id = new_row['Dataset_id']
             existing_row = merged_df[merged_df['Dataset_id'] == dataset_id]
 
             if len(existing_row) > 0:
-                # 检查每个method的best_res
+                # Check best_res for each method
                 for method in methods:
                     best_res_col = f"{method}_best_res"
                     if best_res_col in new_row and best_res_col in existing_row:
                         new_value = new_row[best_res_col]
                         existing_value = existing_row[best_res_col].iloc[0]
 
-                        # 只有当新值存在且大于现有值时才更新
+                        # Only update when new value exists and is greater than existing value
                         if pd.notna(new_value) and (pd.isna(existing_value)
                                                     or float(new_value) > float(existing_value)):
-                            # 更新所有以method开头的列
+                            # Update all columns starting with method
                             method_cols = [col for col in new_row.index if col.startswith(method)]
                             for col in method_cols:
                                 merged_df.loc[merged_df['Dataset_id'] == dataset_id, col] = new_row[col]
                         elif pd.notna(new_value) and pd.notna(existing_value):
-                            # 打印调试信息
+                            # Print debug information
                             print(f"Skipping update for {dataset_id}, {method}: "
                                   f"existing value ({existing_value}) >= new value ({new_value})")
             else:
-                # 如果是新的Dataset_id，直接添加整行
+                # If it's a new Dataset_id, add the entire row
                 merged_df = pd.concat([merged_df, pd.DataFrame([new_row])], ignore_index=True)
 
         merged_df.to_csv(output_file, index=False)
