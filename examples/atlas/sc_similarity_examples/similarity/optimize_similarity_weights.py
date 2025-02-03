@@ -25,7 +25,7 @@ import pandas as pd
 
 from dance.settings import SIMILARITYDIR
 
-sys.path.append(str(SIMILARITYDIR))  # 添加父目录到路径
+sys.path.append(str(SIMILARITYDIR))
 print(sys.path)
 from similarity.process_tissue_similarity_matrices import convert_to_complex
 from visualization.visualize_atlas_performance import get_runs
@@ -194,6 +194,6 @@ if __name__ == "__main__":
         "feature_name": best_result['feature_name'],
         "weight1": best_result['w1'],
         "total rank": int(best_result['total_rank'])
-    }  # 添加单个值
+    }
     with open(result_path, 'w', encoding='utf-8') as f:
         json.dump(sim_dict, f, indent=4, ensure_ascii=False)
