@@ -114,8 +114,8 @@ def evaluate_pipeline(tune_mode, pipeline_planer):
     # Initialize wandb
     wandb.init(settings=wandb.Settings(start_method='thread'))
 
-    # Load data
-    dataloader = ClusteringDataset(args.data_dir, args.dataset)
+    # Load data according to the task
+    dataloader = TaskDataset(args.data_dir, args.dataset)
     data = dataloader.load_data(cache=args.cache)
 
     # Apply preprocessing pipeline
