@@ -1,6 +1,6 @@
 # How to Add New Algorithms to the Auto-Search Framework
 
-This document explains how to integrate new single-cell clustering algorithms into the project's automatic search framework.
+This document explains how to integrate new single-cell algorithms into the project's automatic search framework.
 
 ## Implementation Requirements
 
