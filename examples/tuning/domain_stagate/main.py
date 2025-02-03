@@ -5,8 +5,8 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.stagate import Stagate
@@ -30,6 +30,7 @@ if __name__ == "__main__":
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
     parser.add_argument("--data_dir", type=str, default='../temp_data', help='test directory')
     parser.add_argument("--sample_file", type=str, default=None)
+    parser.add_argument("--device", type=str, default="cpu", help="Computation device")
     parser.add_argument('--additional_sweep_ids', action='append', type=str, help='get prior runs')
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
     args = parser.parse_args()
@@ -58,7 +59,7 @@ if __name__ == "__main__":
         edge_list_array = np.vstack(np.nonzero(adj))
 
         # Train and evaluate model
-        model = Stagate([x.shape[1]] + args.hidden_dims)
+        model = Stagate([x.shape[1]] + args.hidden_dims, device=args.device)
         score = model.fit_score((x, edge_list_array), y, epochs=args.epochs, random_state=args.seed)
         wandb.log({"ARI": score})
         gc.collect()
