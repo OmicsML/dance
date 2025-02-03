@@ -31,18 +31,18 @@ def convert_to_complex(s):
 
 
 def convert_complex_value(x):
-    """转换单个值的辅助函数."""
+    """Helper function to convert a single value."""
     if isinstance(x, str):
         try:
             complex_val = complex(x.strip('()'))
-            # 如果虚部接近0，返回实部
+            # If imaginary part is close to 0, return real part
             if abs(complex_val.imag) < 1e-10:
                 return float(complex_val.real)
             return complex_val
         except ValueError:
             return x
     elif isinstance(x, complex):
-        # 如果虚部接近0，返回实部
+        # If imaginary part is close to 0, return real part
         if abs(x.imag) < 1e-10:
             return float(x.real)
         return x
@@ -50,7 +50,7 @@ def convert_complex_value(x):
 
 
 def unify_complex_float_types_cell(df):
-    """按单元格处理."""
+    """Process by cell."""
     for col in df.columns:
         for idx in df.index:
             df.at[idx, col] = convert_complex_value(df.at[idx, col])
@@ -58,62 +58,62 @@ def unify_complex_float_types_cell(df):
 
 
 def unify_complex_float_types_row(df):
-    """按行处理."""
+    """Process by row."""
     for idx in df.index:
         df.loc[idx] = df.loc[idx].apply(convert_complex_value)
     return df
 
 
 def unify_complex_float_types(df):
-    """按列处理."""
+    """Process by column."""
     for col in df.columns:
-        # 跳过非数值列
+        # Skip non-numeric columns
         if not pd.api.types.is_numeric_dtype(df[col]):
             continue
 
-        # 检查是否包含复数
+        # Check if contains complex numbers
         has_complex = df[col].apply(lambda x: isinstance(x, complex)).any()
 
         if has_complex:
-            # 将列转换为复数并处理
+            # Convert column to complex and process
             df[col] = df[col].apply(convert_complex_value)
 
     return df
 
 
 def process_excel_files(excel_files):
-    # 存储所有数据的列表
+    # List to store all data
     all_data = []
 
     for file_path in excel_files:
-        # 获取文件名（不含扩展名）
+        # Get filename (without extension)
         file_name = os.path.splitext(os.path.basename(file_path))[0]
 
-        # 读取Excel文件中的所有表
+        # Read all sheets in Excel file
         excel = pd.ExcelFile(file_path)
 
-        # 处理每个表
+        # Process each sheet
         for sheet_name in excel.sheet_names:
-            # 读取数据
+            # Read data
             df = pd.read_excel(file_path, sheet_name=sheet_name)
 
-            # 转置数据
+            # Transpose data
             df_transposed = df.transpose()
 
-            # 添加文件名和表名列
+            # Add filename and sheet name columns
             df_transposed['file_name'] = file_name
             df_transposed['sheet_name'] = sheet_name
 
-            # 将数据添加到列表中
+            # Add data to list
             all_data.append(df_transposed)
 
-    # 合并所有数据
+    # Merge all data
     final_df = pd.concat(all_data, ignore_index=True)
 
-    # 统一数据类型
+    # Unify data types
     final_df = unify_complex_float_types(final_df)
 
-    # 保存为CSV
+    # Save as CSV
     output_path = os.path.join(os.path.dirname(excel_files[0]), 'combined_output.csv')
     final_df.to_csv(output_path, encoding='utf-8-sig', index=True)
 
@@ -128,8 +128,10 @@ if __name__ == "__main__":
         for sheet_name in excel.sheet_names:
             df = pd.read_excel(file_path, sheet_name=sheet_name, index_col=0)
             df = df[~df.index.duplicated(keep='last')]
-            # df=unify_complex_float_types_row(df) #TODO 导致一些复数失真，但因为比较的时候只用实部，问题不大
-            df = unify_complex_float_types_cell(df)  #TODO 导致一些复数失真，但因为比较的时候只用实部，问题不大
+            # df=unify_complex_float_types_row(df) #Some complex numbers may lose precision, but it's not a big issue since only real parts are used for comparison
+            df = unify_complex_float_types_cell(
+                df
+            )  #Some complex numbers may lose precision, but it's not a big issue since only real parts are used for comparison
             if os.path.exists(SIMILARITYDIR / f"data/new_sim/{tissue}_similarity.xlsx"):
                 mode = 'a'
                 if_sheet_exists = "replace"
@@ -141,4 +143,4 @@ if __name__ == "__main__":
                 df.to_excel(writer, sheet_name=sheet_name)
     excel_files = [SIMILARITYDIR / f"data/new_sim/{tissue}_similarity.xlsx" for tissue in tissues]
     output_file = process_excel_files(excel_files)
-    print(f"已将合并后的数据保存到: {output_file}")
+    print(f"Combined data has been saved to: {output_file}")
