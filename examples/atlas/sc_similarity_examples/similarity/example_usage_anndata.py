@@ -167,13 +167,13 @@ for source_file in query_datasets:
     if os.path.exists(excel_path):
         excel = pd.ExcelFile(excel_path, engine='openpyxl')
         if source_file[:4] in excel.sheet_names:
-            # 尝试读取指定的分表
+            # Try to read the specified sheet
             existing_df = pd.read_excel(SIMILARITYDIR / f"data/dataset_similarity/{tissue}_similarity.xlsx",
                                         sheet_name=source_file[:4], engine="openpyxl", index_col=0)
-            # 找出在新数据框中存在但在现有表格中不存在的行
+            # Find rows that exist in the new dataframe but not in the existing table
             merged_df = pd.concat([existing_df, merged_df])
             merged_df = merged_df.applymap(lambda x: tuple(x) if isinstance(x, list) else x)
-            # 2. 然后去重，这时应该使用keep='last'而不是subset参数
+            # Then deduplicate, using keep='last' instead of subset parameter
             merged_df = merged_df[~merged_df.index.duplicated(keep='last')]
             # merged_df = merged_df.drop_duplicates(subset=merged_df.index.name, keep='last')
         excel.close()
