@@ -97,12 +97,24 @@ Create `main.py` in the algorithm directory with these key components:
 ```python
 parser = argparse.ArgumentParser()
 # Add necessary parameters
-parser.add_argument("--data_dir", default="../temp_data")
-parser.add_argument("--dataset", type=str, choices=[...])
+parser.add_argument("--data_dir", default="../temp_data"，help="Directory path containing the input data files")
+parser.add_argument("--dataset", type=str, choices=[...]，help="Dataset name")
 parser.add_argument("--tune_mode", default="pipeline_params",
-                   choices=["pipeline", "params", "pipeline_params"])
-parser.add_argument("--sweep_id", type=str, default=None)
-parser.add_argument("--count", type=int, default=2)
+                   choices=["pipeline", "params", "pipeline_params"]， help="Tuning mode: 'pipeline' for pipeline tuning only, 'params' for parameter tuning only, 'pipeline_params' for both")
+parser.add_argument("--sweep_id", type=str, default=None，help="Existing sweep ID to resume. If None, creates a new sweep")
+parser.add_argument("--count", type=int, default=2，help="Number of times to run the sweep agent")
+parser.add_argument(
+        "--summary_file_path",
+        default="results/pipeline/best_test_acc.csv",
+        type=str,
+        help="Path to save the summary results file"
+    )
+parser.add_argument(
+        "--root_path",
+        default=str(Path(__file__).resolve().parent),
+        type=str,
+        help="Root directory path for saving results and configuration files"
+    )
 # ... other model-specific parameters ...
 args = parser.parse_args()
 ```
@@ -158,11 +170,13 @@ if __name__ == "__main__":
         root_path=file_root_path
     )
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
+      #generate step3_default_params.yaml
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
                        root_path=file_root_path, required_funs=["SaveRaw", "UpdateRaw", "NeighborGraph", "SetConfig"],
                        required_indexes=[2, 5, sys.maxsize - 1, sys.maxsize], metric="acc")
         if args.tune_mode == "pipeline_params":
+            #run step3
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 ```
 
@@ -202,8 +216,8 @@ Configuration file example:
 # pipeline_params_tuning_config.yaml
 type: preprocessor
 tune_mode: pipeline_params
-pipeline_tuning_top_k: 3
-parameter_tuning_freq_n: 20
+pipeline_tuning_top_k: 3 #topk for pipeline tuning to use parameter tuning
+parameter_tuning_freq_n: 20 #frequency for parameter tuning
 pipeline:
   - type: filter.gene
     include:
