@@ -9,7 +9,9 @@ import requests
 from get_important_pattern import get_com_all, get_forest_model_pattern, get_frequent_itemsets
 from numpy import choose
 
-sys.path.append("..")
+from dance.settings import ATLASDIR
+
+sys.path.append(str(ATLASDIR))
 from get_result_web import spilt_web
 
 from dance.pipeline import flatten_dict
@@ -193,12 +195,12 @@ if __name__ == "__main__":
                 dataset = data.columns[col_idx]
                 value = data.iloc[row_idx, col_idx]
                 step_name = data.iloc[row_idx]["Unnamed: 1"]
-                # if method == "Scmvae" and dataset=="Dataset3:openproblems_2022_multi_atac2gex":
-                #     start = True
-                # if not start:
-                #     continue
-                if method != "Scgnn2":
+                if method == "Scmvae" and dataset == "Dataset3:openproblems_2022_multi_atac2gex":
+                    start = True
+                if not start:
                     continue
+                # if method != "Scgnn2":
+                #     continue
                 if isinstance(value, str) and value.startswith(prefix) and (
                         str(step_name).lower() == "step2" or str(step_name).lower() == "step 2"):  #TODO add step3
                     sweep_url = value
