@@ -1,14 +1,10 @@
-"""
-Test suite for the Atlas similarity calculation functionality.
+"""Test suite for the Atlas similarity calculation functionality.
+
 This test verifies that the main function correctly returns:
 1. The most similar dataset from the atlas
 2. Its corresponding configuration settings
 3. The similarity score
 
-The test ensures:
-- Return value types are correct
-- Similarity score is within valid range (0-1)
-- Configuration dictionary contains all required cell type annotation methods
 """
 
 import json
