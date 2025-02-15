@@ -24,12 +24,12 @@ def test_main():
     # Construct test parameters with a sample Brain tissue dataset
     class Args:
         tissue = "Brain"
-        data_dir = str(DANCEDIR / "examples/tuning/temp_data/train/human")
-        source_file = "human_Brain364348b4-bc34-4fe1-a851-60d99e36cafa_data"
+        data_dir = str(DANCEDIR / "tests/atlas/data")
+        source_file = "human_Brain576f193c-75d0-4a11-bd25-8676587e6dc2_data"
 
     args = Args()
     logger.info(f"testing main with args: {args}")
-    source_id = "3643"
+    source_id = "576f"
 
     # Execute main function with test parameters
     ans_file, ans_conf, ans_value = main(args)
