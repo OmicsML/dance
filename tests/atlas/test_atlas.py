@@ -8,6 +8,7 @@ This test verifies that the main function correctly returns:
 """
 
 import json
+import pathlib
 import sys
 
 import pandas as pd
@@ -21,7 +22,6 @@ from demos.main import main
 from dance import logger
 
 
-@pytest.mark.skip(reason="Skipping test due to sensitive data")
 def test_main():
     # Construct test parameters with a sample Brain tissue dataset
     class Args:
@@ -32,7 +32,8 @@ def test_main():
     args = Args()
     logger.info(f"testing main with args: {args}")
     source_id = "576f"
-
+    if not pathlib.Path(f"{args.data_dir}/{args.source_file}.h5ad").exists():
+        pytest.skip("Data file not found - skipping test")  #may be sensitive data
     # Execute main function with test parameters
     ans_file, ans_conf, ans_value = main(args)
 
