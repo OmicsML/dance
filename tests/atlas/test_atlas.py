@@ -20,6 +20,7 @@ from demos.main import main
 from dance import logger
 
 
+@pytest.mark.skip(reason="Skipping test due to sensitive data")
 def test_main():
     # Construct test parameters with a sample Brain tissue dataset
     class Args:
