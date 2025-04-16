@@ -1,3 +1,4 @@
+import copy
 from pprint import pformat
 from typing import Optional
 
@@ -69,6 +70,33 @@ class Compose(BaseTransform):
         for transform in self.transforms:
             transform(data)
 
+    def transform_with_history(self, data: Data) -> Dict[str, Data]:
+        """Apply all transformations sequentially and record intermediate results.
+
+        Parameters
+        ----------
+        data : Data
+            The data object to be transformed.
+
+        Returns
+        -------
+        Dict[str, Data]
+            A dictionary containing the original data and results after each transformation.
+            Keys are transformation names or indices, values are the transformed data.
+
+        """
+        self.logger.info(f"Applying composed transformations with history tracking:\n{self!r}")
+
+        # Create a dictionary to store results
+        history = {"original": copy.deepcopy(data)}
+
+        # Apply each transformation and store results
+        for i, transform in enumerate(self.transforms):
+            transform(data)
+            history[transform.name] = copy.deepcopy(data)
+
+        return history
+
 
 @register_preprocessor("misc")
 class SetConfig(BaseTransform):
@@ -78,12 +106,14 @@ class SetConfig(BaseTransform):
     ----------
     config_dict
         Dance data object configuration dictionary. See :meth:`~dance.data.base.BaseData.set_config_from_dict`.
+    dummy_params
+        When the search space is empty, use this parameter to verify through wandb
 
     """
 
     _DISPLAY_ATTRS = ("config_dict", )
 
-    def __init__(self, config_dict: Dict[str, Any], **kwargs):
+    def __init__(self, config_dict: Dict[str, Any], dummy_params=10, **kwargs):
         super().__init__(**kwargs)
         self.config_dict = config_dict
 

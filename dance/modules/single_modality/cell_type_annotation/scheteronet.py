@@ -1,8 +1,12 @@
 from collections import Counter
 from functools import partial
+from typing import Literal
+from weakref import ref
 
+import dgl
 import numpy as np
 import pandas as pd
+import scanpy as sc
 import scipy.sparse
 import torch
 import torch.nn as nn
@@ -11,6 +15,7 @@ from sklearn import preprocessing
 from sklearn.metrics import average_precision_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import NearestNeighbors
+from sympy import Nor
 from torch_geometric.data import Data
 from torch_geometric.nn import JumpingKnowledge
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
@@ -19,12 +24,22 @@ from torch_sparse import SparseTensor, matmul
 
 from dance import data, logger
 from dance.modules.base import BaseClassificationMethod
-from dance.typing import Any, Mapping, Optional, Tuple, Union
+from dance.registry import register_preprocessor
+from dance.transforms.base import BaseTransform
+from dance.transforms.cell_feature import CellPCA
+from dance.transforms.filter import (
+    FilterCellsType,
+    HighlyVariableGenesLogarithmizedByMeanAndDisp,
+    HighlyVariableGenesLogarithmizedByTopGenes,
+)
+from dance.transforms.graph import HeteronetGraph
+from dance.transforms.interface import AnnDataTransform
+from dance.transforms.misc import Compose, SaveRaw, SetConfig
+from dance.transforms.normalize import Log1P, NormalizeTotal, ScaleFeature, UpdateSizeFactors
+from dance.typing import Any, LogLevel, Mapping, Optional, Tuple, Union
 from dance.utils.metrics import resolve_score_func
 
 
-#TODO 关于eval_acc和score的部分有待核实
-#TODO train valid test的score可以加到result里，就可以获得全局或者局部score
 def eval_acc(true_labels, model_output, acc):
     predicted_indices = torch.argmax(model_output, dim=1)  # Shape [N], on device
     num_classes = model_output.shape[1]  # Get number of classes from model output
@@ -47,143 +62,6 @@ def eval_acc(true_labels, model_output, acc):
 
     accuary = acc(true_one_hot, predicted_indices)
     return accuary
-
-
-def print_statistics(results, run=None):
-    if run is not None:
-        result = 100 * torch.tensor(results[run])
-        ood_result, test_score, valid_loss = result[:, :-2], result[:, -2], result[:, -1]
-        argmin = valid_loss.argmin().item()
-        print(f'Run {run + 1:02d}:')
-        print(f'Chosen epoch: {argmin + 1}')
-        for k in range(result.shape[1] // 3):
-            print(f'OOD Test {k+1} Final AUROC: {ood_result[argmin, k*3]:.2f}')
-            print(f'OOD Test {k+1} Final AUPR: {ood_result[argmin, k*3+1]:.2f}')
-            print(f'OOD Test {k+1} Final FPR95: {ood_result[argmin, k*3+2]:.2f}')
-        print(f'IND Test Score: {test_score[argmin]:.2f}')
-    else:
-        result = 100 * torch.tensor(results)
-
-        ood_te_num = result.shape[2] // 3
-
-        best_results = []
-        for r in result:
-            ood_result, test_score, valid_loss = r[:, :-2], r[:, -2], r[:, -1]
-            score_val = test_score[valid_loss.argmin()].item()
-            ood_result_val = []
-            for k in range(ood_te_num):
-                auroc_val = ood_result[valid_loss.argmin(), k * 3].item()
-                aupr_val = ood_result[valid_loss.argmin(), k * 3 + 1].item()
-                fpr_val = ood_result[valid_loss.argmin(), k * 3 + 2].item()
-                ood_result_val += [auroc_val, aupr_val, fpr_val]
-            best_results.append(ood_result_val + [score_val])
-
-        best_result = torch.tensor(best_results)
-
-        if best_result.shape[0] == 1:
-            print(f'All runs:')
-            for k in range(ood_te_num):
-                r = best_result[:, k * 3]
-                print(f'OOD Test {k + 1} Final AUROC: {r.mean():.2f}')
-                r = best_result[:, k * 3 + 1]
-                print(f'OOD Test {k + 1} Final AUPR: {r.mean():.2f}')
-                r = best_result[:, k * 3 + 2]
-                print(f'OOD Test {k + 1} Final FPR: {r.mean():.2f}')
-            r = best_result[:, -1]
-            print(f'IND Test Score: {r.mean():.2f}')
-        else:
-            print(f'All runs:')
-            for k in range(ood_te_num):
-                r = best_result[:, k * 3]
-                print(f'OOD Test {k+1} Final AUROC: {r.mean():.2f} ± {r.std():.2f}')
-                r = best_result[:, k * 3 + 1]
-                print(f'OOD Test {k+1} Final AUPR: {r.mean():.2f} ± {r.std():.2f}')
-                r = best_result[:, k * 3 + 2]
-                print(f'OOD Test {k+1} Final FPR: {r.mean():.2f} ± {r.std():.2f}')
-            r = best_result[:, -1]
-            print(f'IND Test Score: {r.mean():.2f} ± {r.std():.2f}')
-
-        return best_result
-
-
-def stable_cumsum(arr, rtol=1e-05, atol=1e-08):
-    """Use high precision for cumsum and check that final value matches sum.
-
-    Parameters
-    ----------
-    arr : array-like
-        To be cumulatively summed as flat
-    rtol : float
-        Relative tolerance, see ``np.allclose``
-    atol : float
-        Absolute tolerance, see ``np.allclose``
-
-    """
-    out = np.cumsum(arr, dtype=np.float64)
-    expected = np.sum(arr, dtype=np.float64)
-    if not np.allclose(out[-1], expected, rtol=rtol, atol=atol):
-        raise RuntimeError('cumsum was found to be unstable: '
-                           'its last element does not correspond to sum')
-    return out
-
-
-def fpr_and_fdr_at_recall(y_true, y_score, recall_level=0.95, pos_label=None):
-    classes = np.unique(y_true)
-    if (pos_label is None
-            and not (np.array_equal(classes, [0, 1]) or np.array_equal(classes, [-1, 1])
-                     or np.array_equal(classes, [0]) or np.array_equal(classes, [-1]) or np.array_equal(classes, [1]))):
-        raise ValueError("Data is not binary and pos_label is not specified")
-    elif pos_label is None:
-        pos_label = 1.
-
-    # make y_true a boolean vector
-    y_true = (y_true == pos_label)
-
-    # sort scores and corresponding truth values
-    desc_score_indices = np.argsort(y_score, kind="mergesort")[::-1]
-    y_score = y_score[desc_score_indices]
-    y_true = y_true[desc_score_indices]
-
-    # y_score typically has many tied values. Here we extract
-    # the indices associated with the distinct values. We also
-    # concatenate a value for the end of the curve.
-    distinct_value_indices = np.where(np.diff(y_score))[0]
-    threshold_idxs = np.r_[distinct_value_indices, y_true.size - 1]
-
-    # accumulate the true positives with decreasing threshold
-    tps = stable_cumsum(y_true)[threshold_idxs]
-    fps = 1 + threshold_idxs - tps  # add one because of zero-based indexing
-
-    thresholds = y_score[threshold_idxs]
-
-    recall = tps / tps[-1]
-
-    last_ind = tps.searchsorted(tps[-1])
-    sl = slice(last_ind, None, -1)  # [last_ind::-1]
-    recall, fps, tps, thresholds = np.r_[recall[sl], 1], np.r_[fps[sl], 0], np.r_[tps[sl], 0], thresholds[sl]
-
-    cutoff = np.argmin(np.abs(recall - recall_level))
-    if np.array_equal(classes, [1]):
-        return thresholds[cutoff]  # return threshold
-
-    return fps[cutoff] / (np.sum(np.logical_not(y_true))), thresholds[cutoff]
-
-
-def get_measures(_pos, _neg, recall_level=0.95):
-    pos = np.array(_pos[:]).reshape((-1, 1))
-    neg = np.array(_neg[:]).reshape((-1, 1))
-    examples = np.squeeze(np.vstack((pos, neg)))
-    labels = np.zeros(len(examples), dtype=np.int32)
-    labels[:len(pos)] += 1
-
-    auroc = roc_auc_score(labels, examples)
-    aupr = average_precision_score(labels, examples)
-    fpr, threshould = fpr_and_fdr_at_recall(labels, examples, recall_level)
-
-    return auroc, aupr, fpr, threshould
-
-
-dataset_prefix = '_processed'
 
 
 class NCDataset:
@@ -228,85 +106,173 @@ class NCDataset:
         return '{}({})'.format(self.__class__.__name__, len(self))
 
 
-def build_graph(adata, radius=None, knears=None, distance_metrics='l2'):
+def set_graph_split(adata, ref_adata_name, g: dgl.graph):
+    # 6. Add Split Masks (convert indices to boolean masks)
+    train_idx = adata.uns['train_idx']
+    val_idx = adata.uns['val_idx']
+    test_idx = adata.uns['test_idx']
+    id_idx = adata.uns['id_idx']
+    ood_idx = adata.uns['ood_idx']
+    num_nodes = g.num_nodes()
+    train_mask = torch.zeros(num_nodes, dtype=torch.bool)
+    val_mask = torch.zeros(num_nodes, dtype=torch.bool)
+    test_mask = torch.zeros(num_nodes, dtype=torch.bool)
+    id_mask = torch.zeros(num_nodes, dtype=torch.bool)
+    ood_mask = torch.zeros(num_nodes, dtype=torch.bool)
+
+    train_mask[train_idx] = True
+    val_mask[val_idx] = True
+    test_mask[test_idx] = True
+    id_mask[id_idx] = True
+    ood_mask[ood_idx] = True
+
+    g.ndata['train_mask'] = train_mask
+    g.ndata['val_mask'] = val_mask
+    g.ndata['test_mask'] = test_mask
+    g.ndata['id_mask'] = id_mask
+    g.ndata['ood_mask'] = ood_mask
+
+    # Add original indices as node data if needed for exact reconstruction
+    # (although masks are more standard in DGL)
+    g.ndata['orig_id_idx'] = torch.tensor(id_idx, dtype=torch.long)
+    g.ndata['orig_ood_idx'] = torch.tensor(ood_idx, dtype=torch.long)
+    g.ndata['orig_train_idx'] = torch.tensor(train_idx, dtype=torch.long)
+    g.ndata['orig_val_idx'] = torch.tensor(val_idx, dtype=torch.long)
+    g.ndata['orig_test_idx'] = torch.tensor(test_idx, dtype=torch.long)
+
+    # Optionally, add metadata
+    g.graph_name = ref_adata_name  # Store the name if needed
+
+    print(f"DGL graph created: {g}")
+    print(f"Node features shape: {g.ndata['feat'].shape}")
+    print(f"Node labels shape: {g.ndata['label'].shape}")
+    print(f"Number of edges: {g.num_edges()}")
+
+    return g
+
+
+def convert_dgl_to_original_format(g: dgl.DGLGraph, adata: sc.AnnData, ref_adata_name: str):
+    """Converts a DGL graph (created by create_dgl_graph_from_adata) back to the
+    NCDataset and torch_geometric.data.Data format.
+
+    Args:
+        g: The DGL graph.
+        ref_adata_name: The name for the NCDataset.
+
+    Returns:
+        tuple: (dataset_ind, dataset_ood_tr, dataset_ood_te)
+            - dataset_ind: NCDataset object for in-distribution data.
+            - dataset_ood_tr: torch_geometric.data.Data object for OOD train/test.
+            - dataset_ood_te: torch_geometric.data.Data object for OOD train/test.
+
     """
-    based on https://github.com/hannshu/st_datasets/blob/master/utils/preprocess.py
-    """
-    if (isinstance(adata.X, np.ndarray)):
-        coor = pd.DataFrame(adata.X)
-    else:
-        coor = pd.DataFrame(adata.X.todense())
+    # 1. Extract data from DGL graph
+    features = g.ndata['feat']
+    labels = g.ndata['label']
+    num_nodes = g.num_nodes()
+    src, dst = g.edges()
+    edge_index = torch.stack([src, dst], dim=0)
+    train_idx = adata.uns['train_idx']  #严格来说，g进行了过滤，和train_idx不见得能对齐了
+    val_idx = adata.uns['val_idx']
+    test_idx = adata.uns['test_idx']
+    id_idx = adata.uns['id_idx']
+    ood_idx = adata.uns['ood_idx']
 
-    if (radius):
-        nbrs = NearestNeighbors(radius=radius, metric=distance_metrics).fit(coor)
-        _, indices = nbrs.radius_neighbors(coor, return_distance=True)
-    else:
-        nbrs = NearestNeighbors(n_neighbors=knears + 1, metric=distance_metrics).fit(coor)
-        _, indices = nbrs.kneighbors(coor)
+    # # Retrieve original indices stored in the graph
+    # train_idx = g.ndata['orig_train_idx']
+    # val_idx = g.ndata['orig_val_idx']
+    # test_idx = g.ndata['orig_test_idx']
+    # id_idx = g.ndata['orig_id_idx']
+    # ood_idx = g.ndata['orig_ood_idx']
 
-    edge_list = np.array([[i, j] for i, sublist in enumerate(indices) for j in sublist])
-    return edge_list
-
-
-def load_dataset_fixed(ref_adata, ref_adata_name, ignore_first=False, ood=False, knn_num=5):
-    dataset = NCDataset(ref_adata_name)
-    # encoding label to id
-    y = ref_adata.obsm['cell_type'].copy()
-    X = ref_adata.X.copy()
-    y = torch.as_tensor(np.argmax(y, axis=1))
-    features = torch.as_tensor(X)
-    labels = y
-    num_nodes = features.shape[0]
-
-    dataset.graph = {'edge_index': None, 'edge_feat': None, 'node_feat': features, 'num_nodes': num_nodes}
-    dataset.num_nodes = len(labels)
-    dataset.label = torch.LongTensor(labels)
-    edge_index = edge_index = build_graph(ref_adata, knears=knn_num)
-    edge_index = torch.tensor(edge_index.T, dtype=torch.long)
-    dataset.edge_index = dataset.graph['edge_index'] = edge_index
-    dataset.x = features
-    # if ignore some class.  not fully match
-    if ignore_first:
-        dataset.label[dataset.label == 0] = -1
-    dataset.splits = {
-        'train': ref_adata.uns['train_idxs'],
-        'valid': ref_adata.uns['val_idxs'],
-        'test': ref_adata.uns['test_idxs']
+    # 2. Create NCDataset (In-Distribution)
+    dataset_ind = NCDataset(ref_adata_name)
+    dataset_ind.graph = {
+        'edge_index': edge_index,
+        'edge_feat': None,  # Assuming no edge features originally
+        'node_feat': features,
+        'num_nodes': num_nodes
     }
+    dataset_ind.label = labels
+    dataset_ind.num_nodes = num_nodes
+    dataset_ind.edge_index = edge_index
+    dataset_ind.x = features
+    dataset_ind.y = labels  # Add y attribute consistent with original usage
+    dataset_ind.node_idx = id_idx  # Set node_idx to the ID indices
+    dataset_ind.splits = {'train': train_idx, 'valid': val_idx, 'test': test_idx}
 
-    ref_adata.var['gene_name'] = ref_adata.var.index
-    return dataset, ref_adata
+    # 3. Create PyG Data objects (Out-of-Distribution)
+    # Both OOD train and test use the full graph features/edges but reference OOD nodes
+    dataset_ood_tr = Data(x=features, edge_index=edge_index, y=labels)
+    dataset_ood_tr.node_idx = ood_idx
+
+    # Create a separate object for test, although it's identical in this setup
+    dataset_ood_te = Data(x=features, edge_index=edge_index, y=labels)
+    dataset_ood_te.node_idx = ood_idx
+
+    print("Conversion complete.")
+    print(f"NCDataset (ID): Nodes={dataset_ind.num_nodes}, Edges={dataset_ind.edge_index.shape[1]}")
+    print(
+        f"OOD Data (TR): Nodes={dataset_ood_tr.num_nodes}, Edges={dataset_ood_tr.edge_index.shape[1]}, OOD Nodes referenced={len(dataset_ood_tr.node_idx)}"
+    )
+    print(
+        f"OOD Data (TE): Nodes={dataset_ood_te.num_nodes}, Edges={dataset_ood_te.edge_index.shape[1]}, OOD Nodes referenced={len(dataset_ood_te.node_idx)}"
+    )
+
+    return dataset_ind, dataset_ood_tr, dataset_ood_te, adata
 
 
-def load_cell_graph_fixed(ref_adata, ref_adata_name, runs):
-    """
-    given the dataset split data into: ID (train,val,test) and OOD.
-    Since we do not use OOD train, we make it equal to OOD test
-    """
-    dataset, ref_adata = load_dataset_fixed(ref_adata, ref_adata_name, ood=True)
-    dataset.y = dataset.label
-    dataset.node_idx = torch.arange(dataset.num_nodes)
-    dataset_ind = dataset  # in distribution dataset
-    number_class = dataset.y.max().item() + 1
-    print('number of classes', number_class)
-    # class_t = number_class//2-1  # ood training classes
-    dataset_ind_list, dataset_ood_tr_list, dataset_ood_te_list = [], [], []
-    for run in range(runs):
-        train_idx, val_idx, test_idx = ref_adata.uns['train_idxs'][str(run)], ref_adata.uns['val_idxs'][str(
-            run)], ref_adata.uns['test_idxs'][str(run)]
-        ood_idx = ref_adata.uns["ood_idxs"][str(run)]
-        id_idx = ref_adata.uns["id_idxs"][str(run)]
+# def load_dataset_fixed(ref_adata, ref_adata_name, ignore_first=False, ood=False, knn_num=5):
+#     dataset = NCDataset(ref_adata_name)
+#     # encoding label to id
+#     y = ref_adata.obsm['cell_type'].copy()
+#     X = ref_adata.X.copy()
+#     y = torch.as_tensor(np.argmax(y, axis=1))
+#     features = torch.as_tensor(X)
+#     labels = y
+#     num_nodes = features.shape[0]
 
-        dataset_ind.node_idx = id_idx
-        dataset_ind.splits = {'train': train_idx, 'valid': val_idx, 'test': test_idx}
-        dataset_ood_tr = Data(x=dataset.graph['node_feat'], edge_index=dataset.graph['edge_index'], y=dataset.y)
-        dataset_ood_te = Data(x=dataset.graph['node_feat'], edge_index=dataset.graph['edge_index'], y=dataset.y)
+#     dataset.graph = {'edge_index': None, 'edge_feat': None, 'node_feat': features, 'num_nodes': num_nodes}
+#     dataset.num_nodes = len(labels)
+#     dataset.label = torch.LongTensor(labels)
+#     edge_index = build_graph(ref_adata, knears=knn_num)
+#     edge_index = torch.tensor(edge_index.T, dtype=torch.long)
+#     dataset.edge_index = dataset.graph['edge_index'] = edge_index
+#     dataset.x = features
+#     # if ignore some class.  not fully match
+#     if ignore_first:
+#         dataset.label[dataset.label == 0] = -1
+#     dataset.splits = {
+#         'train': ref_adata.uns['train_idx'],
+#         'valid': ref_adata.uns['val_idx'],
+#         'test': ref_adata.uns['test_idx']
+#     }
 
-        dataset_ood_tr.node_idx = dataset_ood_te.node_idx = ood_idx
-        dataset_ind_list.append(dataset_ind)
-        dataset_ood_tr_list.append(dataset_ood_tr)
-        dataset_ood_te_list.append(dataset_ood_te)
-    return dataset_ind_list, dataset_ood_tr_list, dataset_ood_te_list, ref_adata
+#     ref_adata.var['gene_name'] = ref_adata.var.index
+#     return dataset, ref_adata
+
+# def load_cell_graph_fixed(ref_adata, ref_adata_name):
+#     """
+#     given the dataset split data into: ID (train,val,test) and OOD.
+#     Since we do not use OOD train, we make it equal to OOD test
+#     """
+#     dataset, ref_adata = load_dataset_fixed(ref_adata, ref_adata_name, ood=True)
+#     dataset.y = dataset.label
+#     dataset.node_idx = torch.arange(dataset.num_nodes)
+#     dataset_ind = dataset  # in distribution dataset
+#     number_class = dataset.y.max().item() + 1
+#     print('number of classes', number_class)
+#     # class_t = number_class//2-1  # ood training classes
+#     dataset_ind_list, dataset_ood_tr_list, dataset_ood_te_list = [], [], []
+#     train_idx, val_idx, test_idx = ref_adata.uns['train_idx'], ref_adata.uns['val_idx'], ref_adata.uns['test_idx']
+#     ood_idx = ref_adata.uns["ood_idx"]
+#     id_idx = ref_adata.uns["id_idx"]
+#     dataset_ind.node_idx = id_idx
+#     dataset_ind.splits = {'train': train_idx, 'valid': val_idx, 'test': test_idx}
+#     dataset_ood_tr = Data(x=dataset.graph['node_feat'], edge_index=dataset.graph['edge_index'], y=dataset.y)
+#     dataset_ood_te = Data(x=dataset.graph['node_feat'], edge_index=dataset.graph['edge_index'], y=dataset.y)
+#     dataset_ood_tr.node_idx = dataset_ood_te.node_idx = ood_idx
+#     return dataset_ind, dataset_ood_tr, dataset_ood_te, ref_adata
 
 
 def contrastive_loss(z1, z2, temperature=0.5):
@@ -614,11 +580,21 @@ class scHeteroNet(nn.Module, BaseClassificationMethod):
     def reset_parameters(self):
         self.encoder.reset_parameters()
 
-    def preprocessing_pipeline():
-        pass
-
-    def predict(self, x):
-        return super().predict(x)
+    @staticmethod
+    def preprocessing_pipeline(log_level: LogLevel = "INFO"):
+        transforms = []
+        transforms.append(FilterCellsType())
+        transforms.append(AnnDataTransform(sc.pp.filter_genes, min_counts=3))
+        transforms.append(AnnDataTransform(sc.pp.filter_cells, min_counts=1))
+        transforms.append(HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=4000, flavor="cell_ranger"))
+        transforms.append(SaveRaw())
+        transforms.append(NormalizeTotal())
+        transforms.append(UpdateSizeFactors())
+        transforms.append(Log1P())
+        transforms.append(ScaleFeature())
+        transforms.append(HeteronetGraph())
+        transforms.append(SetConfig({"label_channel": "cell_type"}))
+        return Compose(*transforms, log_level=log_level)
 
     def forward(self, dataset):
         """Return predicted logits."""
@@ -688,9 +664,8 @@ class scHeteroNet(nn.Module, BaseClassificationMethod):
 
         return loss, _mean, _disp, _pi, train_in_idx, logits_in
 
-    def fit(self, dataset_ind, dataset_ood_tr, use_zinb, data, zinb_weight, cl_weight, mask_ratio, criterion,
+    def fit(self, dataset_ind, dataset_ood_tr, use_zinb, adata, zinb_weight, cl_weight, mask_ratio, criterion,
             optimizer):
-        adata = data.data
         self.train()
         optimizer.zero_grad()
         loss, _mean, _disp, _pi, train_idx, logit_in = self.loss_compute(dataset_ind, dataset_ood_tr, criterion,
@@ -750,11 +725,11 @@ class scHeteroNet(nn.Module, BaseClassificationMethod):
                   f'Test Score: {100 * result[-2]:.2f}%')
         return result
 
-    def score(self, x, y, *, score_func: Optional[Union[str, Mapping[Any, float]]] = None,
+    def score(self, x, y, idx, *, score_func: Optional[Union[str, Mapping[Any, float]]] = None,
               return_pred: bool = False) -> Union[float, Tuple[float, Any]]:
-        y_pred = self.predict(x)
+        y_pred = self.predict_proba(x)
         func = partial(eval_acc, acc=resolve_score_func(score_func or self._DEFAULT_METRIC))
-        score = func(y, y_pred)
+        score = func(y[idx], y_pred[idx])
         return (score, y_pred) if return_pred else score
 
     # @torch.no_grad()  # this seems quite important, the orignal impl donot set this.
@@ -802,6 +777,45 @@ class scHeteroNet(nn.Module, BaseClassificationMethod):
                 return result
 
 
+def get_genename(raw_adata):
+    if "gene_id" in raw_adata.var.keys():
+        gene_name = raw_adata.var["gene_id"].values
+    elif "symbol" in raw_adata.var.keys():
+        gene_name = raw_adata.var["symbol"].values
+    else:
+        gene_name = raw_adata.var.index
+    return gene_name
+
+
+def set_split(data, train_idx=[], val_idx=[], test_idx=[]):
+    adata = data.data
+    raw_adata = adata
+    raw_adata.obs['assay'] = '10x 3\' v2'
+    raw_adata = raw_adata[raw_adata.obs['assay'] == '10x 3\' v2']
+    y = np.argmax(raw_adata.obsm["cell_type"], axis=1)
+
+    for obsm in raw_adata.obsm.keys():
+        if obsm in ["cell_type"]:
+            adata.obs[obsm + "_raw"] = np.argmax(raw_adata.obsm[obsm].values, axis=1)
+        print("copy", obsm)
+        if isinstance(raw_adata.obsm[obsm], pd.DataFrame):
+            adata.obsm[obsm] = raw_adata.obsm[obsm].values
+    adata.obs["cell"] = y
+    adata.var["gene_name"] = get_genename(raw_adata)
+    ood_class = min(Counter(y).items(), key=lambda x: x[1])[0]
+    ood_idx = [i for i, value in enumerate(y) if value == ood_class]
+    id_idx = [i for i, value in enumerate(y) if value != ood_class]
+    train_idx = [i for i in train_idx if i not in ood_idx]
+    val_idx = [i for i in val_idx if i not in ood_idx]
+    test_idx = [i for i in test_idx if i not in ood_idx]
+    adata.uns["train_idx"] = train_idx
+    adata.uns["val_idx"] = val_idx
+    adata.uns["test_idx"] = test_idx
+    adata.uns["ood_idx"] = ood_idx
+    adata.uns["id_idx"] = id_idx
+    adata.obs['n_counts'] = adata.X.sum(axis=1)
+
+
 # def ood_test(run,dataset_ind_list, dataset_ood_tr_list, dataset_ood_te_list,device,hidden_channels,num_layers,dropout,use_bn,lr,weight_decay,epochs,use_zinb,zinb_weight,cl_weight,mask_ratio,criterion,eval_func,display_step,adata,le,results):
 #         dataset_ind, dataset_ood_tr, dataset_ood_te = dataset_ind_list[run], dataset_ood_tr_list[run], dataset_ood_te_list[run]
 #         if len(dataset_ind.y.shape) == 1:
@@ -843,89 +857,46 @@ class scHeteroNet(nn.Module, BaseClassificationMethod):
 #         acc_list.append(float(np.sum(correct))/len(correct))
 
 #     return sum(acc_list)/len(acc_list)
-import anndata as ad
 
-
-def get_genename(raw_adata):
-    if "gene_id" in raw_adata.var.keys():
-        gene_name = raw_adata.var["gene_id"].values
-    elif "symbol" in raw_adata.var.keys():
-        gene_name = raw_adata.var["symbol"].values
-    else:
-        gene_name = raw_adata.var.index
-    return gene_name
-
-
-# def set_idx_split(data,train_idxs = [],
-#     val_idxs = [],
-#     test_idxs = []):
-#     adata=data.data
+# def set_split(data, seeds=[42, 66, 88, 2023, 2024]):
+#     adata = data.data
 #     raw_adata = adata
 #     y = np.argmax(raw_adata.obsm["cell_type"], axis=1)
 #     for obsm in raw_adata.obsm.keys():
 #         if obsm in ["cell_type"]:
-#             adata.obs[obsm + "_raw"] = np.argmax(raw_adata.obsm[obsm].values , axis=1)
+#             adata.obs[obsm + "_raw"] = np.argmax(raw_adata.obsm[obsm].values, axis=1)
 #         print("copy", obsm)
 #         adata.obsm[obsm] = raw_adata.obsm[obsm].values
 #     adata.obs["cell"] = y
 #     adata.var["gene_name"] = get_genename(raw_adata)
-
+#     train_idxs = []
+#     val_idxs = []
+#     test_idxs = []
 #     ood_idxs = []
 #     id_idxs = []
-#     ood_class = min(Counter(y).items(), key=lambda x: x[1])[0]
-#     ood_idx = [i for i, value in enumerate(y) if value == ood_class]
-#     id_idx = [i for i, value in enumerate(y) if value != ood_class]
-#     ood_idxs.append(ood_idx)
-#     id_idxs.append(id_idx)
+#     for seed in seeds:
+#         ood_class = min(Counter(y).items(), key=lambda x: x[1])[0]
+#         ood_idx = [i for i, value in enumerate(y) if value == ood_class]
+#         id_idx = [i for i, value in enumerate(y) if value != ood_class]
+#         full_indices = np.arange(adata.shape[0])
+#         train_idx, test_idx = train_test_split(full_indices, test_size=0.2, random_state=seed)
+#         train_val_indices = train_idx
+#         train_idx, val_idx = train_test_split(train_val_indices, test_size=0.25, random_state=seed)
+#         train_idx = [i for i in train_idx if i not in ood_idx]
+#         val_idx = [i for i in val_idx if i not in ood_idx]
+#         test_idx = [i for i in test_idx if i not in ood_idx]
+#         train_idxs.append(train_idx)
+#         val_idxs.append(val_idx)
+#         test_idxs.append(test_idx)
+#         ood_idxs.append(ood_idx)
+#         id_idxs.append(id_idx)
 #     adata.uns["train_idxs"] = {str(key): value for key, value in enumerate(train_idxs)}
 #     adata.uns["val_idxs"] = {str(key): value for key, value in enumerate(val_idxs)}
 #     adata.uns["test_idxs"] = {str(key): value for key, value in enumerate(test_idxs)}
 #     adata.uns["ood_idxs"] = {str(key): value for key, value in enumerate(ood_idxs)}
 #     adata.uns["id_idxs"] = {str(key): value for key, value in enumerate(id_idxs)}
-#     adata.obs['n_counts']= adata.X.sum(axis=1)
+#     adata.obs['n_counts'] = adata.X.sum(axis=1)
 #     adata.obs['size_factors'] = adata.obs.n_counts / np.median(adata.obs.n_counts)
-
-
-def set_split(data, seeds=[42, 66, 88, 2023, 2024]):
-    adata = data.data
-    raw_adata = adata
-    y = np.argmax(raw_adata.obsm["cell_type"], axis=1)
-    for obsm in raw_adata.obsm.keys():
-        if obsm in ["cell_type"]:
-            adata.obs[obsm + "_raw"] = np.argmax(raw_adata.obsm[obsm].values, axis=1)
-        print("copy", obsm)
-        adata.obsm[obsm] = raw_adata.obsm[obsm].values
-    adata.obs["cell"] = y
-    adata.var["gene_name"] = get_genename(raw_adata)
-    train_idxs = []
-    val_idxs = []
-    test_idxs = []
-    ood_idxs = []
-    id_idxs = []
-    for seed in seeds:
-        ood_class = min(Counter(y).items(), key=lambda x: x[1])[0]
-        ood_idx = [i for i, value in enumerate(y) if value == ood_class]
-        id_idx = [i for i, value in enumerate(y) if value != ood_class]
-        full_indices = np.arange(adata.shape[0])
-        train_idx, test_idx = train_test_split(full_indices, test_size=0.2, random_state=seed)
-        train_val_indices = train_idx
-        train_idx, val_idx = train_test_split(train_val_indices, test_size=0.25, random_state=seed)
-        train_idx = [i for i in train_idx if i not in ood_idx]
-        val_idx = [i for i in val_idx if i not in ood_idx]
-        test_idx = [i for i in test_idx if i not in ood_idx]
-        train_idxs.append(train_idx)
-        val_idxs.append(val_idx)
-        test_idxs.append(test_idx)
-        ood_idxs.append(ood_idx)
-        id_idxs.append(id_idx)
-    adata.uns["train_idxs"] = {str(key): value for key, value in enumerate(train_idxs)}
-    adata.uns["val_idxs"] = {str(key): value for key, value in enumerate(val_idxs)}
-    adata.uns["test_idxs"] = {str(key): value for key, value in enumerate(test_idxs)}
-    adata.uns["ood_idxs"] = {str(key): value for key, value in enumerate(ood_idxs)}
-    adata.uns["id_idxs"] = {str(key): value for key, value in enumerate(id_idxs)}
-    adata.obs['n_counts'] = adata.X.sum(axis=1)
-    adata.obs['size_factors'] = adata.obs.n_counts / np.median(adata.obs.n_counts)
-
 
 # import scanpy as sc
 # import numpy as np
@@ -990,3 +961,207 @@ def set_split(data, seeds=[42, 66, 88, 2023, 2024]):
 #     # sc.pp.normalize_per_cell(adata, counts_per_cell_after=1e4)
 #     # sc.pp.log1p(adata)
 #     adata = normalize_adata(adata, size_factors=True, normalize_input=normalize_input, logtrans_input=logtrans_input)
+
+
+def print_statistics(results, run=None):
+    if run is not None:
+        result = 100 * torch.tensor(results[run])
+        ood_result, test_score, valid_loss = result[:, :-2], result[:, -2], result[:, -1]
+        argmin = valid_loss.argmin().item()
+        print(f'Run {run + 1:02d}:')
+        print(f'Chosen epoch: {argmin + 1}')
+        for k in range(result.shape[1] // 3):
+            print(f'OOD Test {k+1} Final AUROC: {ood_result[argmin, k*3]:.2f}')
+            print(f'OOD Test {k+1} Final AUPR: {ood_result[argmin, k*3+1]:.2f}')
+            print(f'OOD Test {k+1} Final FPR95: {ood_result[argmin, k*3+2]:.2f}')
+        print(f'IND Test Score: {test_score[argmin]:.2f}')
+    else:
+        result = 100 * torch.tensor(results)
+
+        ood_te_num = result.shape[2] // 3
+
+        best_results = []
+        for r in result:
+            ood_result, test_score, valid_loss = r[:, :-2], r[:, -2], r[:, -1]
+            score_val = test_score[valid_loss.argmin()].item()
+            ood_result_val = []
+            for k in range(ood_te_num):
+                auroc_val = ood_result[valid_loss.argmin(), k * 3].item()
+                aupr_val = ood_result[valid_loss.argmin(), k * 3 + 1].item()
+                fpr_val = ood_result[valid_loss.argmin(), k * 3 + 2].item()
+                ood_result_val += [auroc_val, aupr_val, fpr_val]
+            best_results.append(ood_result_val + [score_val])
+
+        best_result = torch.tensor(best_results)
+
+        if best_result.shape[0] == 1:
+            print(f'All runs:')
+            for k in range(ood_te_num):
+                r = best_result[:, k * 3]
+                print(f'OOD Test {k + 1} Final AUROC: {r.mean():.2f}')
+                r = best_result[:, k * 3 + 1]
+                print(f'OOD Test {k + 1} Final AUPR: {r.mean():.2f}')
+                r = best_result[:, k * 3 + 2]
+                print(f'OOD Test {k + 1} Final FPR: {r.mean():.2f}')
+            r = best_result[:, -1]
+            print(f'IND Test Score: {r.mean():.2f}')
+        else:
+            print(f'All runs:')
+            for k in range(ood_te_num):
+                r = best_result[:, k * 3]
+                print(f'OOD Test {k+1} Final AUROC: {r.mean():.2f} ± {r.std():.2f}')
+                r = best_result[:, k * 3 + 1]
+                print(f'OOD Test {k+1} Final AUPR: {r.mean():.2f} ± {r.std():.2f}')
+                r = best_result[:, k * 3 + 2]
+                print(f'OOD Test {k+1} Final FPR: {r.mean():.2f} ± {r.std():.2f}')
+            r = best_result[:, -1]
+            print(f'IND Test Score: {r.mean():.2f} ± {r.std():.2f}')
+
+        return best_result
+
+
+def stable_cumsum(arr, rtol=1e-05, atol=1e-08):
+    """Use high precision for cumsum and check that final value matches sum.
+
+    Parameters
+    ----------
+    arr : array-like
+        To be cumulatively summed as flat
+    rtol : float
+        Relative tolerance, see ``np.allclose``
+    atol : float
+        Absolute tolerance, see ``np.allclose``
+
+    """
+    out = np.cumsum(arr, dtype=np.float64)
+    expected = np.sum(arr, dtype=np.float64)
+    if not np.allclose(out[-1], expected, rtol=rtol, atol=atol):
+        raise RuntimeError('cumsum was found to be unstable: '
+                           'its last element does not correspond to sum')
+    return out
+
+
+def fpr_and_fdr_at_recall(y_true, y_score, recall_level=0.95, pos_label=None):
+    classes = np.unique(y_true)
+    if (pos_label is None
+            and not (np.array_equal(classes, [0, 1]) or np.array_equal(classes, [-1, 1])
+                     or np.array_equal(classes, [0]) or np.array_equal(classes, [-1]) or np.array_equal(classes, [1]))):
+        raise ValueError("Data is not binary and pos_label is not specified")
+    elif pos_label is None:
+        pos_label = 1.
+
+    # make y_true a boolean vector
+    y_true = (y_true == pos_label)
+
+    # sort scores and corresponding truth values
+    desc_score_indices = np.argsort(y_score, kind="mergesort")[::-1]
+    y_score = y_score[desc_score_indices]
+    y_true = y_true[desc_score_indices]
+
+    # y_score typically has many tied values. Here we extract
+    # the indices associated with the distinct values. We also
+    # concatenate a value for the end of the curve.
+    distinct_value_indices = np.where(np.diff(y_score))[0]
+    threshold_idxs = np.r_[distinct_value_indices, y_true.size - 1]
+
+    # accumulate the true positives with decreasing threshold
+    tps = stable_cumsum(y_true)[threshold_idxs]
+    fps = 1 + threshold_idxs - tps  # add one because of zero-based indexing
+
+    thresholds = y_score[threshold_idxs]
+
+    recall = tps / tps[-1]
+
+    last_ind = tps.searchsorted(tps[-1])
+    sl = slice(last_ind, None, -1)  # [last_ind::-1]
+    recall, fps, tps, thresholds = np.r_[recall[sl], 1], np.r_[fps[sl], 0], np.r_[tps[sl], 0], thresholds[sl]
+
+    cutoff = np.argmin(np.abs(recall - recall_level))
+    if np.array_equal(classes, [1]):
+        return thresholds[cutoff]  # return threshold
+
+    return fps[cutoff] / (np.sum(np.logical_not(y_true))), thresholds[cutoff]
+
+
+def get_measures(_pos, _neg, recall_level=0.95):
+    pos = np.array(_pos[:]).reshape((-1, 1))
+    neg = np.array(_neg[:]).reshape((-1, 1))
+    examples = np.squeeze(np.vstack((pos, neg)))
+    labels = np.zeros(len(examples), dtype=np.int32)
+    labels[:len(pos)] += 1
+
+    auroc = roc_auc_score(labels, examples)
+    aupr = average_precision_score(labels, examples)
+    fpr, threshould = fpr_and_fdr_at_recall(labels, examples, recall_level)
+
+    return auroc, aupr, fpr, threshould
+
+
+dataset_prefix = '_processed'
+
+# def build_graph(adata, radius=None, knears=None, distance_metrics='l2'):
+#     """
+#     based on https://github.com/hannshu/st_datasets/blob/master/utils/preprocess.py
+#     """
+#     if (isinstance(adata.X, np.ndarray)):
+#         coor = pd.DataFrame(adata.X)
+#     else:
+#         coor = pd.DataFrame(adata.X.todense())
+#     if (radius):
+#         nbrs = NearestNeighbors(radius=radius, metric=distance_metrics).fit(coor)
+#         _, indices = nbrs.radius_neighbors(coor, return_distance=True)
+#     else:
+#         nbrs = NearestNeighbors(n_neighbors=knears + 1, metric=distance_metrics).fit(coor)
+#         _, indices = nbrs.kneighbors(coor)
+
+#     edge_list = np.array([[i, j] for i, sublist in enumerate(indices) for j in sublist])
+#     return edge_list
+# def load_dataset_fixed(ref_adata, ref_adata_name, ignore_first=False, ood=False, knn_num=5):
+#     dataset = NCDataset(ref_adata_name)
+#     # encoding label to id
+#     y = ref_adata.obsm['cell_type'].copy()
+#     X = ref_adata.X.copy()
+#     y = torch.as_tensor(np.argmax(y, axis=1))
+#     features = torch.as_tensor(X)
+#     labels = y
+#     num_nodes = features.shape[0]
+#     dataset.graph = {'edge_index': None, 'edge_feat': None, 'node_feat': features, 'num_nodes': num_nodes}
+#     dataset.num_nodes = len(labels)
+#     dataset.label = torch.LongTensor(labels)
+#     edge_index = build_graph(ref_adata, knears=knn_num)
+#     edge_index = torch.tensor(edge_index.T, dtype=torch.long)
+#     dataset.edge_index = dataset.graph['edge_index'] = edge_index
+#     dataset.x = features
+#     # if ignore some class.  not fully match
+#     if ignore_first:
+#         dataset.label[dataset.label == 0] = -1
+#     dataset.splits = {
+#         'train': ref_adata.uns['train_idx'],
+#         'valid': ref_adata.uns['val_idx'],
+#         'test': ref_adata.uns['test_idx']
+#     }
+
+#     ref_adata.var['gene_name'] = ref_adata.var.index
+#     return dataset, ref_adata
+# def load_cell_graph_fixed(ref_adata, ref_adata_name):
+#     """
+#     given the dataset split data into: ID (train,val,test) and OOD.
+#     Since we do not use OOD train, we make it equal to OOD test
+#     """
+#     dataset, ref_adata = load_dataset_fixed(ref_adata, ref_adata_name, ood=True)
+#     dataset.y = dataset.label
+#     dataset.node_idx = torch.arange(dataset.num_nodes)
+#     dataset_ind = dataset  # in distribution dataset
+#     number_class = dataset.y.max().item() + 1
+#     print('number of classes', number_class)
+#     # class_t = number_class//2-1  # ood training classes
+#     dataset_ind_list, dataset_ood_tr_list, dataset_ood_te_list = [], [], []
+#     train_idx, val_idx, test_idx = ref_adata.uns['train_idx'], ref_adata.uns['val_idx'], ref_adata.uns['test_idx']
+#     ood_idx = ref_adata.uns["ood_idx"]
+#     id_idx = ref_adata.uns["id_idx"]
+#     dataset_ind.node_idx = id_idx
+#     dataset_ind.splits = {'train': train_idx, 'valid': val_idx, 'test': test_idx}
+#     dataset_ood_tr = Data(x=dataset.graph['node_feat'], edge_index=dataset.graph['edge_index'], y=dataset.y)
+#     dataset_ood_te = Data(x=dataset.graph['node_feat'], edge_index=dataset.graph['edge_index'], y=dataset.y)
+#     dataset_ood_tr.node_idx = dataset_ood_te.node_idx = ood_idx
+#     return dataset_ind, dataset_ood_tr, dataset_ood_te, ref_adata

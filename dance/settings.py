@@ -46,6 +46,7 @@ def change_log_level(name: str = "dance", /, *, level: Union[str, int]):
 CURDIR = Path().resolve()
 DANCEDIR = Path(__file__).resolve().parents[1]
 DANCEPKGDIR = DANCEDIR / "dance"
+EXAMPLESDIR = DANCEDIR / "examples"
 METADIR = DANCEPKGDIR / "metadata"
 ATLASDIR = DANCEDIR / "examples/atlas"
 SIMILARITYDIR = ATLASDIR / "sc_similarity_examples"

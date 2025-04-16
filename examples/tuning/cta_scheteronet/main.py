@@ -1,4 +1,10 @@
 import argparse
+import gc
+import os
+import pprint
+import sys
+from pathlib import Path
+from typing import get_args
 
 import numpy as np
 import scanpy as sc
@@ -6,22 +12,27 @@ import torch
 import torch.nn as nn
 from sklearn.model_selection import train_test_split
 
+import wandb
+from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scheteronet import (
     convert_dgl_to_original_format,
     eval_acc,
     print_statistics,
     scHeteroNet,
-    set_graph_split,
     set_split,
 )
+from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
 from dance.transforms.misc import Compose, SaveRaw
+from dance.typing import LogLevel
 from dance.utils import set_seed
 
+#saveRAW 以及 updateRAW
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_dataset", nargs="+", type=int, default=[1759], help="Testing dataset IDs")
     parser.add_argument("--tissue", default="Spleen", type=str)
+    parser.add_argument("--valid_dataset", nargs="+", default=None, help="List of valid dataset ids.")
     parser.add_argument("--train_dataset", nargs="+", type=int, default=[1970], help="List of training dataset ids.")
     parser.add_argument("--val_size", type=float, default=0.2, help="val size")
     parser.add_argument("--species", default="mouse", type=str)
@@ -29,6 +40,7 @@ if __name__ == "__main__":
     parser.add_argument('--data_dir', type=str, default='../temp_data')
 
     parser.add_argument('--gpu', type=int, default=0, help='which gpu to use if any (default: 0)')
+    parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--eval_step', type=int, default=1, help='how often to print')
     parser.add_argument("--num_runs", type=int, default=1, help="Number of repetitions")
@@ -64,28 +76,51 @@ if __name__ == "__main__":
     parser.add_argument('--cl_weight', type=float, default=0.0)
     parser.add_argument('--mask_ratio', type=float, default=0.8)
     parser.add_argument('--spatial', action='store_false', help='read spatial')
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--log_level", type=str, default="INFO", choices=get_args(LogLevel))
+
+    parser.add_argument("--tune_mode", default="pipeline_params", choices=["pipeline", "params", "pipeline_params"])
+    parser.add_argument("--count", type=int, default=2)
+    parser.add_argument("--sweep_id", type=str, default=None)
+    parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
+    parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
+    parser.add_argument("--filetype", default="csv")
     args = parser.parse_args()
+    logger.setLevel(args.log_level)
+    os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
+    logger.info(f"Running ScDeepSort with the following parameters:\n{pprint.pformat(vars(args))}")
+    file_root_path = Path(
+        args.root_path, "_".join([
+            "-".join([str(num) for num in dataset])
+            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
+            if (dataset is not None and dataset != [])
+        ])).resolve()
+    logger.info(f"\n files is saved in {file_root_path}")
+    pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
     runs = args.num_runs
     results = [[] for _ in range(runs)]
     if args.gpu == -1:
         device = torch.device("cpu")
     else:
         device = torch.device("cuda:" + str(args.gpu)) if torch.cuda.is_available() else torch.device("cpu")
+
     eval_func = eval_acc
-    for run in range(runs):
-        set_seed(args.seed + run)
-        dataloader = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
-                                               train_dataset=args.train_dataset, data_dir=args.data_dir,
-                                               val_size=args.val_size)
-        ref_data_name = f"{args.species}_{args.tissue}_{args.train_dataset}"
-        preprocessing_pipeline = scHeteroNet.preprocessing_pipeline()
-        data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
+
+    def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
+        wandb.init(settings=wandb.Settings(start_method='thread'))
+        set_seed(args.seed)
+        data = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
+                                         train_dataset=args.train_dataset, data_dir=args.data_dir,
+                                         val_size=args.val_size).load_data()
+        # data = dataloader.load_data(transform=Compose(SaveRaw()), cache=args.cache)
+        # Prepare preprocessing pipeline and apply it to data
+        kwargs = {tune_mode: dict(wandb.config)}
+        preprocessing_pipeline = pipeline_planer.generate(**kwargs)
+        print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
+        preprocessing_pipeline(data)
+
         set_split(data, data.train_idx, data.val_idx, data.test_idx)
-        # dataset_ind, dataset_ood_tr, dataset_ood_te, adata = load_cell_graph_fixed(
-        #     data.data, ref_data_name)
         g = data.data.uns['HeteronetGraph']
-        # set_graph_split(data.data,ref_data_name,g)
+        ref_data_name = f"{args.species}_{args.tissue}_{args.train_dataset}"
         dataset_ind, dataset_ood_tr, dataset_ood_te, adata = convert_dgl_to_original_format(g, data.data, ref_data_name)
         if len(dataset_ind.y.shape) == 1:
             dataset_ind.y = dataset_ind.y.unsqueeze(1)
@@ -113,30 +148,28 @@ if __name__ == "__main__":
         for epoch in range(args.epochs):
             loss = model.fit(dataset_ind, dataset_ood_tr, args.use_zinb, adata, args.zinb_weight, args.cl_weight,
                              args.mask_ratio, criterion, optimizer)
-            # model.evaluate(dataset_ind, dataset_ood_te, criterion, eval_func, args.display_step, run, results, epoch,
-            #                loss, f"{args.species}_{args.tissue}_{args.train_dataset}", args.T, args.use_prop,
-            #                args.use_2hop, args.oodprop, args.oodalpha)
-            # test_idx=dataset_ind.splits['test']
-            test_score = model.score(dataset_ind, dataset_ind.y, data.test_idx)
-            print(test_score)
+        train_score = model.score(dataset_ind, dataset_ind.y, data.train_idx)
+        valod_score = model.score(dataset_ind, dataset_ood_te.y, data.val_idx)
+        test_score = model.score(dataset_ind, dataset_ind.y, data.test_idx)
+        wandb.log({"train_acc": train_score, "acc": valod_score, "test_acc": test_score})
+        wandb.finish()
+        gc.collect()
+        if args.gpu != -1: torch.cuda.empty_cache()
 
-#TODO test_score is true delete odd test以及其他评估方法，再次测试，然后将valid等和其他算法保持一致。
+    entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
+        evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
+    save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
+    if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
+        get_step3_yaml(
+            result_load_path=f"{args.summary_file_path}",
+            step2_pipeline_planer=pipeline_planer,
+            conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
+            root_path=file_root_path,
+            required_funs=["SaveRaw", "UpdateSizeFactors", "UpdateRaw", "HeteronetGraph", "SetConfig"],
+            required_indexes=[1, 3, 5, 7, sys.maxsize],
+        )
+        if args.tune_mode == "pipeline_params":
+            run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """
 
-Epoch: 00, Loss: 2.3264, AUROC: 44.03%, AUPR: 99.12%, FPR95: 100.00%, Test Score: 46.85%
-Run 01:
-Chosen epoch: 4
-OOD Test 1 Final AUROC: 64.61
-OOD Test 1 Final AUPR: 99.53
-OOD Test 1 Final FPR95: 100.00
-IND Test Score: 81.88
-All runs:
-OOD Test 1 Final AUROC: 64.61
-OOD Test 1 Final AUPR: 99.53
-OOD Test 1 Final FPR: 100.00
-IND Test Score: 81.88
-
-python scheteronet.py --gpu -1 --use_zinb --use_prop --use_2hop --epochs 4
-
-python scheteronet.py --gpu -1  --species human --tissue Brain --train_dataset 328 --test_dataset 138 --use_zinb --use_prop --use_2hop --epochs 4
 """

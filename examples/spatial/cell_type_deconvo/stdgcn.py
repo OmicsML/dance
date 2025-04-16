@@ -5,9 +5,153 @@ import os
 import sys
 import warnings
 
+import numpy as np
+import pandas as pd
+import torch
+
 warnings.filterwarnings("ignore")
 sys.path.append(os.getcwd())
-from dance.modules.spatial.cell_type_deconvo.stdgcn import run_STdGCN
+from dance.modules.spatial.cell_type_deconvo.stdgcn import (
+    combine_and_normalize_adj,
+    conGCN_train,
+    find_or_load_marker_genes,
+    generate_or_load_pseudo_spots,
+    load_data,
+    prepare_adjacency_matrices,
+    prepare_feature_matrix,
+    preprocess_data,
+    save_and_plot_results,
+    setup_gcn_components,
+)
+
+
+def train_gcn_model(model, feature, adjs, labels, train_valid_len, test_len, GCN_paras, optimizer, scheduler, loss_fn,
+                    load_test_groundtruth, GCN_device, n_jobs):
+    """Trains the GCN model."""
+    print("Starting GCN training...")
+    output, loss_history, trained_model = conGCN_train(
+        model=model,
+        train_valid_len=train_valid_len,
+        train_valid_ratio=0.9,  # Hardcoded, consider making a parameter
+        test_len=test_len,
+        feature=feature,
+        adjs=adjs,
+        label=labels,
+        epoch_n=GCN_paras['epoch_n'],
+        loss_fn=loss_fn,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        early_stopping_patience=GCN_paras['early_stopping_patience'],
+        clip_grad_max_norm=GCN_paras['clip_grad_max_norm'],
+        load_test_groundtruth=load_test_groundtruth,
+        print_epoch_step=GCN_paras['print_loss_epoch_step'],
+        cpu_num=n_jobs,
+        GCN_device=GCN_device)
+    print("GCN training finished.")
+    return output, loss_history, trained_model
+
+
+def run_STdGCN(paths, find_marker_genes_paras, pseudo_spot_simulation_paras, data_normalization_paras,
+               integration_for_adj_paras, inter_exp_adj_paras, spatial_adj_paras, real_intra_exp_adj_paras,
+               pseudo_intra_exp_adj_paras, integration_for_feature_paras, GCN_paras, load_test_groundtruth=False,
+               use_marker_genes=True, external_genes=False, generate_new_pseudo_spots=True, fraction_pie_plot=False,
+               cell_type_distribution_plot=True, n_jobs=-1, GCN_device='CPU'):
+    """Runs the STdGCN pipeline by calling modularized functions.
+
+    Parameters mirror the original function and argparse setup.
+
+    """
+    sc_path = paths['sc_path']
+    st_path = paths['ST_path']
+    output_path = paths['output_path']
+    os.makedirs(output_path, exist_ok=True)  # Ensure output dir exists
+
+    # 1. Load Data
+    sc_adata, st_adata, cell_types, word_to_idx_celltype, idx_to_word_celltype = load_data(
+        sc_path, st_path, load_test_groundtruth)
+
+    # 2. Find/Load Marker Genes
+    selected_genes = find_or_load_marker_genes(sc_adata, sc_path, output_path, use_marker_genes, external_genes,
+                                               find_marker_genes_paras)
+
+    # 3. Generate/Load Pseudo-spots
+    pseudo_adata = generate_or_load_pseudo_spots(sc_adata, output_path, generate_new_pseudo_spots,
+                                                 pseudo_spot_simulation_paras, idx_to_word_celltype, n_jobs)
+
+    # 4. Preprocess Data (Filter genes, Normalize, Scale)
+    st_adata_norm, pseudo_adata_norm = preprocess_data(st_adata, pseudo_adata, selected_genes, data_normalization_paras,
+                                                       cell_types)
+
+    # 5. Prepare Adjacency Matrices (Raw)
+    A_inter_exp, A_intra_space, A_real_intra_exp, A_pseudo_intra_exp = prepare_adjacency_matrices(
+        st_adata_norm, pseudo_adata_norm, integration_for_adj_paras, inter_exp_adj_paras, real_intra_exp_adj_paras,
+        pseudo_intra_exp_adj_paras, spatial_adj_paras, n_jobs, GCN_device)
+
+    # 6. Combine and Normalize Adjacency Matrices
+    real_num = st_adata_norm.shape[0]
+    pseudo_num = pseudo_adata_norm.shape[0]
+    adj_exp_final, adj_sp_final = combine_and_normalize_adj(
+        A_inter_exp,
+        A_real_intra_exp,
+        A_pseudo_intra_exp,
+        A_intra_space,
+        real_num,
+        pseudo_num,
+        adj_alpha=1,
+        adj_beta=1,
+        diag_power=20,
+        normalize=True  # Keep params or make configurable
+    )
+    adjs = [adj_exp_final, adj_sp_final]  # List of final adjacency tensors
+
+    # 7. Prepare Feature Matrix
+    feature = prepare_feature_matrix(st_adata_norm, pseudo_adata_norm, integration_for_feature_paras, n_jobs,
+                                     GCN_device)
+
+    # 8. Setup GCN Model, Optimizer, Scheduler, Loss
+    input_layer_dim = feature.shape[1]
+    hidden_layer_dim = min(int(st_adata_norm.shape[1] * 1 / 2), GCN_paras['dim'])  # Logic from original
+    output_layer_dim = len(cell_types)
+
+    model, optimizer, scheduler, loss_fn = setup_gcn_components(input_layer_dim, hidden_layer_dim, output_layer_dim,
+                                                                GCN_paras)
+
+    # 9. Prepare Labels for Training
+    # Use cell type fractions from pseudo-spots as labels
+    # Need to handle ST spot labels (if groundtruth exists or use pseudo-labels?)
+    # Original code appends ST obs (potentially GT or zeros) to pseudo obs
+    st_labels_df = st_adata_norm.obs[list(cell_types)]  # Get GT or zeros added in preprocess_data
+    pseudo_labels_df = pseudo_adata_norm.obs[list(cell_types)]  # Get fractions from pseudo generation
+    combined_labels_df = pd.concat([st_labels_df, pseudo_labels_df], axis=0)
+    # Ensure order matches the feature matrix order (assuming concat(ST, Pseudo))
+    labels_tensor = torch.tensor(combined_labels_df.values).float()  # Ensure float
+
+    # 10. Train GCN Model
+    train_valid_len = pseudo_num  # Train/Validation split happens on pseudo-spots
+    test_len = real_num  # Test predictions are for real spots
+    predictions_raw, loss_history, trained_model = train_gcn_model(model, feature, adjs, labels_tensor, train_valid_len,
+                                                                   test_len, GCN_paras, optimizer, scheduler, loss_fn,
+                                                                   load_test_groundtruth, GCN_device, n_jobs)
+
+    # 11. Save Results and Plot
+    # Extract the predictions for the real ST spots only
+    st_predictions_raw = predictions_raw[:test_len]
+
+    # Get column names used for pseudo labels (should match cell_types)
+    pseudo_adata_obs_cols = list(pseudo_adata_norm.obs[list(cell_types)].columns)
+
+    save_and_plot_results(output_path, st_adata_norm, trained_model, loss_history, st_predictions_raw, cell_types,
+                          pseudo_adata_obs_cols, load_test_groundtruth, fraction_pie_plot, cell_type_distribution_plot)
+
+    # 12. Add predictions to the final AnnData object and return
+    st_adata_norm.obsm['predict_result'] = np.exp(st_predictions_raw.detach().cpu().numpy())
+
+    # Optional: Clean up GPU memory
+    if GCN_device == 'GPU' and torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    print("STdGCN run finished successfully.")
+    return st_adata_norm
 
 
 def parse_args():
@@ -393,6 +537,9 @@ def main():
     print(f"N Jobs: {args.n_jobs}")
     print(f"GCN Device: {args.gcn_device}")
     print("------------------------------------")
+    # ==================================================================
+    # Main Refactored Function
+    # ==================================================================
 
     results = run_STdGCN(
         paths=paths,  # Pass the reconstructed dict
