@@ -10,6 +10,7 @@ from pprint import pformat
 
 import omegaconf
 import pandas as pd
+import requests
 from omegaconf import DictConfig, OmegaConf
 
 from dance import logger
@@ -841,6 +842,7 @@ class PipelinePlaner(Pipeline):
         else:
             entity = self.config.wandb.get("entity")
             project = self.config.wandb.get("project")
+            os.system(f"wandb sweep --resume {entity}/{project}/{sweep_id}")
 
         logger.info(f"Spawning agent: {sweep_id=}, {entity=}, {project=}, {count=}")
         wandb.agent(sweep_id, function=function, entity=entity, project=project, count=count)
@@ -848,7 +850,7 @@ class PipelinePlaner(Pipeline):
         return entity, project, sweep_id
 
 
-def save_summary_data(entity, project, sweep_id, summary_file_path, root_path, additional_sweep_ids=None):
+def save_summary_data(entity, project, sweep_id, summary_file_path, root_path, additional_sweep_ids=None, save=True):
     """Download sweep summary data from wandb and save to file.
 
     The returned dataframe includes running time, results and corresponding hyperparameters, etc.
@@ -881,7 +883,7 @@ def save_summary_data(entity, project, sweep_id, summary_file_path, root_path, a
     ans = pd.DataFrame(summary_data).set_index(["id"])
     ans.sort_index(axis=1, inplace=True)
 
-    if summary_file_path is not None:
+    if save:
         os.makedirs(os.path.dirname(summary_file_path), exist_ok=True)
         ans.to_csv(summary_file_path)  # save file
 
@@ -1007,7 +1009,7 @@ def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, requir
 
 
 def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_default_params.yaml",
-                   result_load_path="results/pipeline/best_test_acc.csv", metric="test_acc", ascending=False,
+                   result_load_path="results/pipeline/best_test_acc.csv", metric="acc", ascending=False,
                    step2_pipeline_planer=None, required_funs=["SetConfig"], required_indexes=[sys.maxsize],
                    root_path=None):
     """Generate the configuration file of step 3 based on the results of step 2.
@@ -1130,9 +1132,26 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
             continue
 
 
-# def get_params(preprocessing_pipeline:Pipeline,type,key,name):
-#     ans=[]
-#     pips=list(filter(lambda p: p.type==type, preprocessing_pipeline.config.pipeline))
-#     for p in pips:
-#         ans.append(p[key][name])
-#     return ans
+def get_additional_sweep(entity, project, sweep_id):
+    """Recursively retrieve all related sweep IDs from a given sweep.
+
+    Given a sweep ID, this function recursively finds all related sweep IDs by examining
+    the command arguments of the runs within each sweep. It handles cases where sweeps
+    may have prior runs or additional sweep references.
+
+    """
+    wandb = try_import("wandb")
+    sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
+    additional_sweep_ids = [sweep_id]
+    #last run command
+    run = next((t_run for t_run in sweep.runs if t_run.state == "finished"), None)
+    if run is None:  # check summary data count, note aznph5wt, quantities may be inconsistent
+        return additional_sweep_ids
+    run_id = run.id
+    web_abs = requests.get(f"https://api.wandb.ai/files/{run.entity}/{run.project}/{run_id}/wandb-metadata.json")
+    args = dict(web_abs.json())["args"]
+    for i in range(len(args)):
+        if args[i] == '--additional_sweep_ids':
+            if i + 1 < len(args):
+                additional_sweep_ids += get_additional_sweep(entity=entity, project=project, sweep_id=args[i + 1])
+    return additional_sweep_ids
