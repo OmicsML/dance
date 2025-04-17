@@ -7,6 +7,7 @@ import mudata as md
 import numpy as np
 import pandas as pd
 import scanpy as sc
+import scipy
 import scipy.sparse as sp
 from scipy.stats import rankdata
 from sklearn.linear_model import LinearRegression
@@ -484,7 +485,6 @@ class FilterGenes(BaseTransform, ABC):
             gene_summary = np.nan_to_num(np.array(x.var(0) / x.mean(0)), posinf=0, neginf=0).ravel()
         else:
             raise DevError(f"{self.mode!r} not expected, please inform dev to fix this error.")
-
         self.logger.info(f"Filtering genes based on {self.mode} expression percentiles in layer {self.channel!r}")
         mask = self._get_preserve_mask(gene_summary)
         selected_genes = sorted(data.data.var_names[mask])
@@ -504,7 +504,7 @@ class FilterGenes(BaseTransform, ABC):
             selected_genes = sorted(set(selected_genes) | whitelist_gene_set)
             num_added = len(selected_genes) - orig_num_selected
             self.logger.info(f"{num_added:,} genes originally unselected are being added due to whitelist")
-
+        data.data.uns['gene_summary'] = gene_summary
         # Update data
         self.logger.info(f"{data.shape[1] - len(selected_genes):,} genes removed")
         if self.inplace:
@@ -1462,3 +1462,42 @@ class FilterCellsScanpyOrder(BaseTransform):
         for parameter in self.filter_cells_order:
             cellScanpyOrder = self.cellScanpyOrderDict[parameter]
             cellScanpyOrder(data)
+
+
+@register_preprocessor("filter", "cell")
+@add_mod_and_transform
+class FilterCellsType(BaseTransform):  #TODO not in search
+    """Filter cell types based on the threshold."""
+
+    def __init__(self, cell_type_threshold=10, **kwargs):
+        super().__init__(**kwargs)
+        self.cell_type_threshold = cell_type_threshold
+
+    def __call__(self, data: Data) -> Data:
+        # adata_copied = data.data.copy()
+        # cellType_Number = data.data.obsm["cell_type"].value_counts()
+        # celltype_to_remove = cellType_Number[cellType_Number <= self.cell_type_threshold].index
+        # adata_copied = adata_copied[~adata_copied.obsm["cell_type"].isin(celltype_to_remove), :]
+        # data.data = adata_copied
+        # return data
+
+        adata = data.data
+        one_hot_cell_types_df = adata.obsm["cell_type"]
+        if not isinstance(one_hot_cell_types_df, pd.DataFrame):
+            raise TypeError(
+                f"Expected obsm['cell_type'] to be a pandas.DataFrame, but got {type(one_hot_cell_types_df)}")
+        cellType_Counts = one_hot_cell_types_df.sum(axis=0)
+        celltype_names_to_remove = cellType_Counts[cellType_Counts <= self.cell_type_threshold].index
+        print(f"Found {len(celltype_names_to_remove)} cell types with counts <= {self.cell_type_threshold}.")
+        if len(celltype_names_to_remove) > 0:
+            print(f"Cell types to remove: {celltype_names_to_remove.tolist()}")  # Show names
+        if not celltype_names_to_remove.empty:  # Check if the Index object is empty
+            sub_df_to_remove = one_hot_cell_types_df[celltype_names_to_remove]
+            is_cell_to_remove = sub_df_to_remove.sum(axis=1) > 0
+            keep_mask = ~is_cell_to_remove
+            print(f"Keeping {keep_mask.sum()} cells out of {adata.n_obs}.")
+        else:
+            print("No cell types below threshold. Keeping all cells.")
+            keep_mask = pd.Series(True, index=adata.obs_names)
+        adata = adata[keep_mask, :]
+        return data

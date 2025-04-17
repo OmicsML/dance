@@ -1,4 +1,5 @@
 import argparse
+import os
 import pprint
 import sys
 from pathlib import Path
@@ -39,7 +40,7 @@ if __name__ == "__main__":
     parser.add_argument("--tune_mode", default="pipeline_params", choices=["pipeline", "params", "pipeline_params"])
     parser.add_argument("--count", type=int, default=2)
     parser.add_argument("--sweep_id", type=str, default=None)
-    parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
+    parser.add_argument("--summary_file_path", default="results/pipeline/best_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
     parser.add_argument("--filetype", default="csv")
     args = parser.parse_args()
@@ -96,7 +97,7 @@ if __name__ == "__main__":
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
-                       root_path=file_root_path)
+                       root_path=file_root_path, metric="acc")
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """To reproduce ACTINN benchmarks, please refer to command lines below:
@@ -113,4 +114,6 @@ $ python actinn.py --species mouse --tissue Kidney --train_dataset 4682 --test_d
 Human CD4
 $ python main.py --species human --tissue CD4 --train_dataset 1013 1247 598 732 767 768 770 784 845 864 --test_dataset 315 340 376 381 390 404 437 490 551 559 --valid_dataset 1013 1247 598 732 767 768 770 784 845 864 --count 240
 
+
+python main.py --species human --tissue Spleen --train_dataset 3043 3777 4029 4115 4362 4657  --test_dataset 1729 2125 2184 2724 2743 --device cuda:1 --pipeline_name hvg_top_genes_pca
 """

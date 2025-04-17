@@ -11,6 +11,7 @@ import statsmodels.discrete.discrete_model
 import statsmodels.nonparametric.kernel_regression
 from KDEpy import FFTKDE
 from scipy import stats
+from sklearn.utils import issparse
 
 from dance.data.base import Data
 from dance.registry import register_preprocessor
@@ -237,7 +238,6 @@ class ScTransform(BaseTransform):
 
     """
 
-    _DISPLAY_ATTRS = ("mode", "eps", "split_names", "batch_key")
 
     def __init__(
         self,
@@ -638,6 +638,24 @@ class NormalizePlaceHolder(BaseTransform):
         super().__init__(**kwargs)
 
     def __call__(self, data: Data) -> Data:
+        return data
+
+
+@register_preprocessor("normalize")
+@add_mod_and_transform
+# @deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+class UpdateSizeFactors(BaseTransform):
+    """Update sizefactors."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __call__(self, data: Data) -> Data:
+        if sp.issparse(data.data.X):
+            data.data.obs['n_counts'] = data.data.X.sum(axis=1).A.flatten()
+        else:
+            data.data.obs['n_counts'] = data.data.X.sum(axis=1)
+        data.data.obs['size_factors'] = data.data.obs.n_counts / np.median(data.data.obs.n_counts)
         return data
 
 

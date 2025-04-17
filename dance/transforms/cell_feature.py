@@ -1,3 +1,6 @@
+from re import A
+from typing import Literal
+
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA, SparsePCA, TruncatedSVD
@@ -144,34 +147,47 @@ class CellPCA(BaseTransform):
     _DISPLAY_ATTRS = ("n_components", )
 
     def __init__(self, n_components: Union[float, int] = 400, *, channel: Optional[str] = None,
-                 mod: Optional[str] = None, **kwargs):
+                 mod: Optional[str] = None, save_info: bool = False,
+                 svd_solver: Literal['auto', 'full', 'arpack', 'randomized'] = "auto", **kwargs):
         super().__init__(**kwargs)
 
         self.n_components = n_components
         self.channel = channel
+        self.save_info = save_info
+        self.svd_solver = svd_solver
 
     def __call__(self, data):
         feat = data.get_feature(return_type="numpy", channel=self.channel)
         if self.n_components > min(feat.shape):
             self.logger.warning(
-                f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='full'"
+                f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='{self.svd_solver}'"
             )
             self.n_components = min(feat.shape)
-        pca = PCA(n_components=self.n_components)
-        cell_feat = pca.fit_transform(feat)
+        if "pca" not in data.data.uns:
+            pca = PCA(n_components=self.n_components, svd_solver=self.svd_solver)
+            cell_feat = pca.fit_transform(feat)
+        else:
+            pca = data.data.uns["pca"]
+            cell_feat = pca.transform(feat)
         self.logger.info(f"Generating cell PCA features {feat.shape} (k={pca.n_components_})")
         evr = pca.explained_variance_ratio_
         self.logger.info(f"Top 10 explained variances: {evr[:10]}")
         self.logger.info(f"Total explained variance: {evr.sum():.2%}")
 
         data.data.obsm[self.out] = cell_feat
+        if self.save_info:
+            data.data.uns["pca_components"] = pca.components_
+            data.data.uns["pca_mean"] = pca.mean_
+            data.data.uns["pca_explained_variance"] = pca.explained_variance_
+            data.data.uns["pca_explained_variance_ratio"] = pca.explained_variance_ratio_
+            data.data.uns["pca"] = pca
 
         return data
 
 
 @register_preprocessor("feature", "cell")
 @add_mod_and_transform
-class SparsePCA(BaseTransform):
+class CellSparsePCA(BaseTransform):
     """Reduce cell feature matrix with SparsePCA.
 
     Parameters
@@ -223,17 +239,20 @@ class CellSVD(BaseTransform):
     _DISPLAY_ATTRS = ("n_components", )
 
     def __init__(self, n_components: Union[float, int] = 400, *, channel: Optional[str] = None,
-                 mod: Optional[str] = None, **kwargs):
+                 mod: Optional[str] = None, algorithm: Literal['arpack',
+                                                               'randomized'] = "randomized", save_info=True, **kwargs):
         super().__init__(**kwargs)
 
         self.n_components = n_components
         self.channel = channel
+        self.save_info = save_info
+        self.algorithm = algorithm
 
     def __call__(self, data):
         feat = data.get_feature(return_type="numpy", channel=self.channel)
         if isinstance(self.n_components, float):
             n_components = min(feat.shape) - 1
-            svd = TruncatedSVD(n_components=n_components)
+            svd = TruncatedSVD(n_components=n_components, algorithm=self.algorithm)
             svd.fit_transform(feat)
             explained_variance = svd.explained_variance_ratio_.cumsum()
             self.n_components = (explained_variance < self.n_components).sum() + 1
@@ -242,7 +261,7 @@ class CellSVD(BaseTransform):
                 f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='full'"
             )
             self.n_components = min(feat.shape)
-        svd = TruncatedSVD(n_components=self.n_components)
+        svd = TruncatedSVD(n_components=self.n_components, algorithm=self.algorithm)
 
         cell_feat = svd.fit_transform(feat)
         self.logger.info(f"Generating cell SVD features {feat.shape} (k={self.n_components})")
@@ -252,6 +271,10 @@ class CellSVD(BaseTransform):
         self.logger.info(f"Total explained variance: {evr.sum():.2%}")
 
         data.data.obsm[self.out] = cell_feat
+        if self.save_info:
+            data.data.uns["svd_components"] = svd.components_
+            data.data.uns["svd_explained_variance"] = svd.explained_variance_
+            data.data.uns["svd_explained_variance_ratio"] = svd.explained_variance_ratio_
 
         return data
 
