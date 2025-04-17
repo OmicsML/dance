@@ -6,8 +6,8 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.graphsc import GraphSC
