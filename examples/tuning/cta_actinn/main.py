@@ -40,7 +40,7 @@ if __name__ == "__main__":
     parser.add_argument("--tune_mode", default="pipeline_params", choices=["pipeline", "params", "pipeline_params"])
     parser.add_argument("--count", type=int, default=2)
     parser.add_argument("--sweep_id", type=str, default=None)
-    parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
+    parser.add_argument("--summary_file_path", default="results/pipeline/best_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
     parser.add_argument("--filetype", default="csv")
     args = parser.parse_args()
