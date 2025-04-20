@@ -2,12 +2,14 @@ import argparse
 import os
 import pprint
 import sys
+from cgi import test
 from pathlib import Path
 
 import numpy as np
 import torch
-import wandb
+from sklearn.model_selection import train_test_split
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.graphsc import GraphSC
@@ -74,7 +76,8 @@ if __name__ == "__main__":
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
-
+        total_idx = range(data.shape[0])
+        valid_idx, test_idx = train_test_split(total_idx, test_size=0.9, random_state=args.seed)
         graph, y = data.get_train_data()
         n_clusters = len(np.unique(y))
 
@@ -91,8 +94,8 @@ if __name__ == "__main__":
                         num_workers=args.num_workers, device=args.device)
         model.fit(graph, epochs=args.epochs, lr=args.learning_rate, show_epoch_ari=args.show_epoch_ari,
                   eval_epoch=args.eval_epoch)
-        score = model.score(None, y)
-        wandb.log({"acc": score})
+        valid_score, test_score = model.score(graph, y, valid_idx=valid_idx, test_idx=test_idx)
+        wandb.log({"ari": valid_score, "test_ari": test_score})
         wandb.finish()
         del model
         torch.cuda.empty_cache()
