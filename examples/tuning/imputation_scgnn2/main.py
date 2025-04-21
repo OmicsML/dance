@@ -5,6 +5,7 @@ from pathlib import Path
 from pprint import pformat
 
 import numpy as np
+import pandas as pd
 import wandb
 
 from dance import logger
@@ -173,6 +174,7 @@ if __name__ == "__main__":
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
+    parser.add_argument("--get_result", action="store_true",help="save imputation result")
     args = parser.parse_args()
     logger.info(pformat(vars(args)))
     file_root_path = Path(args.root_path, args.dataset).resolve()
@@ -188,7 +190,15 @@ if __name__ == "__main__":
 
         data = ImputationDataset(data_dir=args.data_dir, dataset=args.dataset, train_size=args.train_size).load_data()
         # Prepare preprocessing pipeline and apply it to data
-        kwargs = {tune_mode: dict(wandb.config)}
+        wandb_config = wandb.config
+        if "run_kwargs" in pipeline_planer.config:
+            if any(d == dict(wandb.config["run_kwargs"]) for d in pipeline_planer.config.run_kwargs):
+                wandb_config = wandb_config["run_kwargs"]
+            else:
+                wandb.log({"skip": 1})
+                wandb.finish()
+                return
+        kwargs = {tune_mode: dict(wandb_config)}
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
@@ -209,7 +219,16 @@ if __name__ == "__main__":
         actual[actual < 1e-10] = 1e-10
         mre = abs((actual - model.predict()[test_mask]) / actual).mean()
         wandb.log({"RMSE": np.sqrt(test_mse), "PCC": pcc, "MRE": mre})
-
+        if args.get_result:
+            result=model.predict()
+            array = result.detach().cpu().numpy()
+            # Create DataFrame
+            df = pd.DataFrame(
+                data=array,
+                index=data.data.obs_names,
+                columns=data.data.var_names
+            )
+            df.to_csv(f"{args.dataset}/result.csv")
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
