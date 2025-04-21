@@ -1514,13 +1514,14 @@ class FilterCellTransform(BaseTransform):
         super().__init__(**kwargs)
         sc.settings.figdir = image_save_path
         self.species = species
-        sc.settings.file_format_figs="png"
-        self.image_save_path=image_save_path
+        sc.settings.file_format_figs = "png"
+        self.image_save_path = image_save_path
+
     def is_outlier(self, adata, metric: str, nmads: int):
         M = adata.obs[metric]
-        floor=np.median(M) - nmads * median_abs_deviation(M)
-        cell=np.median(M) + nmads * median_abs_deviation(M)
-        outlier = (M < floor ) | (cell < M)
+        floor = np.median(M) - nmads * median_abs_deviation(M)
+        cell = np.median(M) + nmads * median_abs_deviation(M)
+        outlier = (M < floor) | (cell < M)
         self.logger.info(f"metric:{metric} floor:{floor} cell:{cell}")
         return outlier
 
@@ -1535,7 +1536,7 @@ class FilterCellTransform(BaseTransform):
         sc.pp.calculate_qc_metrics(adata, qc_vars=["mt", "ribo", "hb"], inplace=True, percent_top=[20], log1p=True)
         if self.image_save_path is not None:
             sc.pl.violin(adata, ["n_genes_by_counts", "total_counts", "pct_counts_mt"], jitter=0.4, multi_panel=True,
-                        show=False, save=True)
+                         show=False, save=True)
             sc.pl.scatter(adata, "total_counts", "n_genes_by_counts", color="pct_counts_mt", show=False, save=True)
         adata.obs["outlier"] = (self.is_outlier(adata, "log1p_total_counts", 5)
                                 | self.is_outlier(adata, "log1p_n_genes_by_counts", 5)
@@ -1558,8 +1559,9 @@ class ScrubletTransform(BaseTransform):
         super().__init__(**kwargs)
         if image_save_path is not None:
             sc.settings.figdir = image_save_path
-        self.image_save_path=image_save_path
-        sc.settings.file_format_figs="png"
+        self.image_save_path = image_save_path
+        sc.settings.file_format_figs = "png"
+
     def __call__(self, data: Data) -> Data:
         adata = data.data
         sc.pp.scrublet(adata)
