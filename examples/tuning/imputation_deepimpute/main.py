@@ -1,13 +1,14 @@
 import argparse
 import os
 import sys
+from cgi import test
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import torch
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.deepimpute import DeepImpute
@@ -39,7 +40,7 @@ if __name__ == '__main__':
     parser.add_argument("--tune_mode", default="pipeline_params", choices=["pipeline", "params", "pipeline_params"])
     parser.add_argument("--count", type=int, default=2)
     parser.add_argument("--sweep_id", type=str, default=None)
-    parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
+    parser.add_argument("--summary_file_path", default="results/pipeline/best.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
     parser.add_argument("--get_result", action="store_true", help="save imputation result")
     params = parser.parse_args()
@@ -69,7 +70,7 @@ if __name__ == '__main__':
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
-        X, X_raw, targets, predictors, mask = data.get_x(return_type="default")
+        X, X_raw, targets, predictors, mask, valid_mask, test_mask = data.get_x(return_type="default")
         if not isinstance(X, np.ndarray):
             X = X.toarray()
         if not isinstance(X_raw, np.ndarray):
@@ -83,10 +84,27 @@ if __name__ == '__main__':
 
         model.fit(X_train, X_train, mask, params.batch_size, params.lr, params.n_epochs, params.patience)
         imputed_data = model.predict(X_train, mask)
-        score = model.score(X, imputed_data, mask, "RMSE")
-        pcc = model.score(X, imputed_data, mask, "PCC")
-        mre = model.score(X, imputed_data, mask, metric="MRE")
-        wandb.log({"RMSE": score, "PCC": pcc, "MRE": mre})
+        train_RMSE = model.score(X, imputed_data, mask, "RMSE")
+        train_pcc = model.score(X, imputed_data, mask, "PCC")
+        train_mre = model.score(X, imputed_data, mask, metric="MRE")
+        val_RMSE = model.score(X, imputed_data, ~valid_mask, "RMSE")
+        val_pcc = model.score(X, imputed_data, ~valid_mask, "PCC")
+        val_mre = model.score(X, imputed_data, ~valid_mask, metric="MRE")
+        test_RMSE = model.score(X, imputed_data, ~test_mask, "RMSE")
+        test_pcc = model.score(X, imputed_data, ~test_mask, "PCC")
+        test_mre = model.score(X, imputed_data, ~test_mask, metric="MRE")
+        # wandb.log({"RMSE": score, "PCC": pcc, "MRE": mre})
+        wandb.log({
+            "train_RMSE": train_RMSE,
+            "train_PCC": train_pcc,
+            "train_MRE": train_mre,
+            "val_RMSE": val_RMSE,
+            "val_PCC": val_pcc,
+            "MRE": val_mre,
+            "test_RMSE": test_RMSE,
+            "test_PCC": test_pcc,
+            "test_MRE": test_mre
+        })
         if params.get_result:
             result = model.predict(X, None)
             array = result.detach().cpu().numpy()

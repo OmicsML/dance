@@ -1009,7 +1009,7 @@ def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, requir
 
 
 def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_default_params.yaml",
-                   result_load_path="results/pipeline/best_test_acc.csv", metric="acc", ascending=False,
+                   result_load_path="results/pipeline/best.csv", metric="acc", ascending=False,
                    step2_pipeline_planer=None, required_funs=["SetConfig"], required_indexes=[sys.maxsize],
                    root_path=None):
     """Generate the configuration file of step 3 based on the results of step 2.
@@ -1070,7 +1070,6 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
                             for target, d_p in p1.default_params.items():
                                 if target == p2["target"]:
                                     p2["params"] = d_p
-        #The order is wrong, refer to _sanitize_pipeline for modification TODO use test to check
         step2_pipeline = step2_pipeline_planer.config.pipeline
         # step2_pipeline=sorted(step2_pipeline_planer.config.pipeline,key=lambda x: float(x.split('.')[1]))
         for p1, p2 in zip(step2_pipeline, pipeline):  #need order
@@ -1085,7 +1084,7 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
         temp_conf.wandb = step2_pipeline_planer.config.wandb
         temp_conf.wandb.method = "bayes"
         os.makedirs(os.path.dirname(conf_save_path), exist_ok=True)
-        OmegaConf.save(temp_conf, f"{conf_save_path}/{count}_test_acc_params_tuning_config.yaml")
+        OmegaConf.save(temp_conf, f"{conf_save_path}/{count}_params_tuning_config.yaml")
         count += 1
 
 
@@ -1121,12 +1120,11 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
             continue
         try:
             pipeline_planer = PipelinePlaner.from_config_file(
-                f"{root_path}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml")
+                f"{root_path}/config_yamls/{tune_mode}/{i}_{tune_mode}_tuning_config.yaml")
             entity, project, step3_sweep_id = pipeline_planer.wandb_sweep_agent(
                 partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=step3_sweep_ids[i - step3_start_k],
                 count=step3_k)  # score can be recorded for each epoch
-            save_summary_data(entity, project, step3_sweep_id, f"results/{tune_mode}/{i}_best_test_acc.csv",
-                              root_path=root_path)
+            save_summary_data(entity, project, step3_sweep_id, f"results/{tune_mode}/{i}_best.csv", root_path=root_path)
         except wandb.UsageError:
             logger.warning("continue")
             continue
