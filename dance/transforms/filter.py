@@ -1510,15 +1510,18 @@ class FilterCellsType(BaseTransform):  #TODO not in search
 @add_mod_and_transform
 class FilterCellTransform(BaseTransform):
 
-    def __init__(self, species: Literal["human", "mouse"] = "human", image_save_path: str = "./figures/", **kwargs):
+    def __init__(self, species: Literal["human", "mouse"] = "human", image_save_path: str = None, **kwargs):
         super().__init__(**kwargs)
-        sc._settings.figdir = image_save_path
+        sc.settings.figdir = image_save_path
         self.species = species
-
+        sc.settings.file_format_figs="png"
+        self.image_save_path=image_save_path
     def is_outlier(self, adata, metric: str, nmads: int):
         M = adata.obs[metric]
-        outlier = (M < np.median(M) - nmads * median_abs_deviation(M)) | (np.median(M) + nmads * median_abs_deviation(M)
-                                                                          < M)
+        floor=np.median(M) - nmads * median_abs_deviation(M)
+        cell=np.median(M) + nmads * median_abs_deviation(M)
+        outlier = (M < floor ) | (cell < M)
+        self.logger.info(f"metric:{metric} floor:{floor} cell:{cell}")
         return outlier
 
     def __call__(self, data: Data) -> Data:
@@ -1530,9 +1533,10 @@ class FilterCellTransform(BaseTransform):
         # hemoglobin genes
         adata.var["hb"] = adata.var_names.str.contains("^HB[^(P)]")
         sc.pp.calculate_qc_metrics(adata, qc_vars=["mt", "ribo", "hb"], inplace=True, percent_top=[20], log1p=True)
-        sc.pl.violin(adata, ["n_genes_by_counts", "total_counts", "pct_counts_mt"], jitter=0.4, multi_panel=True,
-                     show=False, save=True)
-        sc.pl.scatter(adata, "total_counts", "n_genes_by_counts", color="pct_counts_mt", show=False, save=True)
+        if self.image_save_path is not None:
+            sc.pl.violin(adata, ["n_genes_by_counts", "total_counts", "pct_counts_mt"], jitter=0.4, multi_panel=True,
+                        show=False, save=True)
+            sc.pl.scatter(adata, "total_counts", "n_genes_by_counts", color="pct_counts_mt", show=False, save=True)
         adata.obs["outlier"] = (self.is_outlier(adata, "log1p_total_counts", 5)
                                 | self.is_outlier(adata, "log1p_n_genes_by_counts", 5)
                                 | self.is_outlier(adata, "pct_counts_in_top_20_genes", 5))
@@ -1553,12 +1557,14 @@ class ScrubletTransform(BaseTransform):
     def __init__(self, image_save_path: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
         if image_save_path is not None:
-            sc._settings.figdir = image_save_path
-
+            sc.settings.figdir = image_save_path
+        self.image_save_path=image_save_path
+        sc.settings.file_format_figs="png"
     def __call__(self, data: Data) -> Data:
         adata = data.data
         sc.pp.scrublet(adata)
-        sc.pl.scrublet_score_distribution(adata, show=False, save=True)
+        if self.image_save_path is not None:
+            sc.pl.scrublet_score_distribution(adata, show=False, save=True)
         self.logger.info(f"Original number of cells: {adata.n_obs}")
         mask = (~adata.obs['predicted_doublet'])
         data.filter_by_mask(mask)
