@@ -7,6 +7,8 @@ from pprint import pformat
 import numpy as np
 import pandas as pd
 import wandb
+from cycler import V
+from matplotlib.rcsetup import validate_aspect
 
 from dance import logger
 from dance.datasets.singlemodality import ImputationDataset
@@ -203,22 +205,47 @@ if __name__ == "__main__":
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
 
-        train_mask, test_mask = data.get_x(return_type="default")
+        train_mask, valid_mask, test_mask = data.get_x(return_type="default")
         if not isinstance(data.data.X, np.ndarray):
             x_train = data.data.X.A * train_mask
+            x_valid = data.data.X.A[valid_mask]
             x_test = data.data.X.A[test_mask]
         else:
             x_train = data.data.X * train_mask
+            x_valid = data.data.X[valid_mask]
             x_test = data.data.X[test_mask]
         model = ScGNN2(args, device=device)
 
         model.fit(x_train)
-        test_mse = ((x_test - model.predict()[test_mask])**2).mean()
-        pcc = np.corrcoef(x_test, model.predict()[test_mask])[0, 1]
-        actual = x_test
-        actual[actual < 1e-10] = 1e-10
-        mre = abs((actual - model.predict()[test_mask]) / actual).mean()
-        wandb.log({"RMSE": np.sqrt(test_mse), "PCC": pcc, "MRE": mre})
+        test_rmse = np.sqrt(((x_test - model.predict()[test_mask])**2).mean())
+        test_pcc = np.corrcoef(x_test, model.predict()[test_mask])[0, 1]
+        test_actual = x_test
+        test_actual[test_actual < 1e-10] = 1e-10
+        test_mre = abs((test_actual - model.predict()[test_mask]) / test_actual).mean()
+
+        train_rmse = np.sqrt(((x_train - model.predict()[train_mask])**2).mean())
+        train_pcc = np.corrcoef(x_train, model.predict()[train_mask])[0, 1]
+        train_actual = x_train
+        train_actual[train_actual < 1e-10] = 1e-10
+        train_mre = abs((train_actual - model.predict()[train_mask]) / train_actual).mean()
+
+        val_rmse = np.sqrt(((x_valid - model.predict()[valid_mask])**2).mean())
+        val_pcc = np.corrcoef(x_valid, model.predict()[valid_mask])[0, 1]
+        val_actual = x_valid
+        val_actual[val_actual < 1e-10] = 1e-10
+        val_mre = abs((val_actual - model.predict()[valid_mask]) / val_actual).mean()
+
+        wandb.log({
+            "train_RMSE": train_rmse,
+            "train_PCC": train_pcc,
+            "train_MRE": train_mre,
+            "val_RMSE": val_rmse,
+            "val_PCC": val_pcc,
+            "MRE": val_mre,
+            "test_RMSE": test_rmse,
+            "test_PCC": test_pcc,
+            "test_MRE": test_mre
+        })
         if args.get_result:
             result=model.predict()
             array = result.detach().cpu().numpy()

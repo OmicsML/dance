@@ -79,7 +79,7 @@ if __name__ == '__main__':
 
         preprocessing_pipeline(data)
 
-        X, X_raw, g, mask = data.get_x(return_type="default")
+        X, X_raw, g, mask, valid_mask, test_mask = data.get_x(return_type="default")
         if not isinstance(X, np.ndarray):
             X = X.toarray()
         if not isinstance(X_raw, np.ndarray):
@@ -100,10 +100,29 @@ if __name__ == '__main__':
         norm_func = [p for p in preprocessing_pipeline._pipeline if p.type == "normalize"][0].functional
         norm_func(data_imputed_data)
         processed_imputed_data = torch.tensor(data_imputed_data.data.X).to(device)
-        score = model.score(X, processed_imputed_data, mask, metric='RMSE', log1p=False)
-        pcc = model.score(X, processed_imputed_data, mask, metric='PCC', log1p=False)
-        mre = model.score(X, processed_imputed_data, mask, metric='MRE', log1p=False)
-        wandb.log({"RMSE": score, "PCC": pcc, "MRE": mre})
+        # score = model.score(X, processed_imputed_data, mask, metric='RMSE', log1p=False)
+        # pcc = model.score(X, processed_imputed_data, mask, metric='PCC', log1p=False)
+        # mre = model.score(X, processed_imputed_data, mask, metric='MRE', log1p=False)
+        train_RMSE = model.score(X, imputed_data, mask, "RMSE", log1p=False)
+        train_pcc = model.score(X, imputed_data, mask, "PCC", log1p=False)
+        train_mre = model.score(X, imputed_data, mask, metric="MRE", log1p=False)
+        val_RMSE = model.score(X, imputed_data, ~valid_mask, "RMSE", log1p=False)
+        val_pcc = model.score(X, imputed_data, ~valid_mask, "PCC", log1p=False)
+        val_mre = model.score(X, imputed_data, ~valid_mask, metric="MRE", log1p=False)
+        test_RMSE = model.score(X, imputed_data, ~test_mask, "RMSE", log1p=False)
+        test_pcc = model.score(X, imputed_data, ~test_mask, "PCC", log1p=False)
+        test_mre = model.score(X, imputed_data, ~test_mask, metric="MRE")
+        wandb.log({
+            "train_RMSE": train_RMSE,
+            "train_PCC": train_pcc,
+            "train_MRE": train_mre,
+            "val_RMSE": val_RMSE,
+            "val_PCC": val_pcc,
+            "MRE": val_mre,
+            "test_RMSE": test_RMSE,
+            "test_PCC": test_pcc,
+            "test_MRE": test_mre
+        })
         gc.collect()
         torch.cuda.empty_cache()
         if params.get_result:
