@@ -5,10 +5,10 @@ from pathlib import Path
 from pprint import pformat
 
 import numpy as np
+import wandb
 from cycler import V
 from matplotlib.rcsetup import validate_aspect
 
-import wandb
 from dance import logger
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.scgnn2 import ScGNN2
