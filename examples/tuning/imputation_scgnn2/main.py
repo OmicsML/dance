@@ -176,7 +176,7 @@ if __name__ == "__main__":
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
-    parser.add_argument("--get_result", action="store_true",help="save imputation result")
+    parser.add_argument("--get_result", action="store_true", help="save imputation result")
     args = parser.parse_args()
     logger.info(pformat(vars(args)))
     file_root_path = Path(args.root_path, args.dataset).resolve()
@@ -247,15 +247,12 @@ if __name__ == "__main__":
             "test_MRE": test_mre
         })
         if args.get_result:
-            result=model.predict()
+            result = model.predict()
             array = result.detach().cpu().numpy()
             # Create DataFrame
-            df = pd.DataFrame(
-                data=array,
-                index=data.data.obs_names,
-                columns=data.data.var_names
-            )
+            df = pd.DataFrame(data=array, index=data.data.obs_names, columns=data.data.var_names)
             df.to_csv(f"{args.dataset}/result.csv")
+
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)

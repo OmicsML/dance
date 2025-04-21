@@ -48,7 +48,7 @@ if __name__ == '__main__':
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
-    parser.add_argument("--get_result", action="store_true",help="save imputation result")
+    parser.add_argument("--get_result", action="store_true", help="save imputation result")
     params = parser.parse_args()
     print(vars(params))
     file_root_path = Path(params.root_path, params.dataset).resolve()
@@ -126,15 +126,12 @@ if __name__ == '__main__':
         gc.collect()
         torch.cuda.empty_cache()
         if params.get_result:
-            result=model.predict(X,X_raw,g,None)
+            result = model.predict(X, X_raw, g, None)
             array = result.detach().cpu().numpy()
             # Create DataFrame
-            df = pd.DataFrame(
-                data=array,
-                index=data.data.obs_names,
-                columns=data.data.var_names
-            )
+            df = pd.DataFrame(data=array, index=data.data.obs_names, columns=data.data.var_names)
             df.to_csv(f"{params.dataset}/result.csv")
+
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=params.sweep_id, count=params.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=params.summary_file_path, root_path=file_root_path)
