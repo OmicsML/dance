@@ -9,7 +9,7 @@ import pandas as pd
 import scanpy as sc
 import scipy
 import scipy.sparse as sp
-from scipy.stats import rankdata
+from scipy.stats import median_abs_deviation, rankdata
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import MinMaxScaler, PolynomialFeatures
 
@@ -1087,6 +1087,7 @@ class FilterGenesScanpyOrder(BaseTransform):
         add_n_counts=True,
         add_n_cells=True,
         inplace=True,
+        params_dict=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -1095,6 +1096,8 @@ class FilterGenesScanpyOrder(BaseTransform):
             ["min_counts", "min_cells", "max_counts", "max_cells"],
         )
         self.logger.info(f"Filter genes order: {self.filter_genes_order}")
+        # if load_params:
+
         geneParameterDict = {
             "min_counts": min_counts,
             "min_cells": min_cells,
@@ -1500,4 +1503,65 @@ class FilterCellsType(BaseTransform):  #TODO not in search
             print("No cell types below threshold. Keeping all cells.")
             keep_mask = pd.Series(True, index=adata.obs_names)
         adata = adata[keep_mask, :]
+        return data
+
+
+@register_preprocessor("filter", "cell")
+@add_mod_and_transform
+class FilterCellTransform(BaseTransform):
+
+    def __init__(self, species: Literal["human", "mouse"] = "human", image_save_path: str = "./figures/", **kwargs):
+        super().__init__(**kwargs)
+        sc._settings.figdir = image_save_path
+        self.species = species
+
+    def is_outlier(self, adata, metric: str, nmads: int):
+        M = adata.obs[metric]
+        outlier = (M < np.median(M) - nmads * median_abs_deviation(M)) | (np.median(M) + nmads * median_abs_deviation(M)
+                                                                          < M)
+        return outlier
+
+    def __call__(self, data: Data) -> Data:
+        adata = data.data
+        # mitochondrial genes, "MT-" for human, "Mt-" for mouse
+        adata.var["mt"] = adata.var_names.str.startswith("MT-" if self.species == "human" else "Mt-")
+        # ribosomal genes
+        adata.var["ribo"] = adata.var_names.str.startswith(("RPS", "RPL"))
+        # hemoglobin genes
+        adata.var["hb"] = adata.var_names.str.contains("^HB[^(P)]")
+        sc.pp.calculate_qc_metrics(adata, qc_vars=["mt", "ribo", "hb"], inplace=True, percent_top=[20], log1p=True)
+        sc.pl.violin(adata, ["n_genes_by_counts", "total_counts", "pct_counts_mt"], jitter=0.4, multi_panel=True,
+                     show=False, save=True)
+        sc.pl.scatter(adata, "total_counts", "n_genes_by_counts", color="pct_counts_mt", show=False, save=True)
+        adata.obs["outlier"] = (self.is_outlier(adata, "log1p_total_counts", 5)
+                                | self.is_outlier(adata, "log1p_n_genes_by_counts", 5)
+                                | self.is_outlier(adata, "pct_counts_in_top_20_genes", 5))
+        adata.obs["mt_outlier"] = self.is_outlier(adata, "pct_counts_mt", 3) | (adata.obs["pct_counts_mt"] > 8)
+        self.logger.info(f"Total number of cells: {adata.n_obs}")
+        mask = (~adata.obs['outlier']) & (~adata.obs['mt_outlier'])
+        # adata = adata[(~adata.obs.outlier) & (~adata.obs.mt_outlier)].copy()
+        data.filter_by_mask(mask)
+        adata = data.data
+        self.logger.info(f"Number of cells after filtering of low quality cells: {adata.n_obs}")
+        return data
+
+
+@register_preprocessor("filter", "cell")
+@add_mod_and_transform
+class ScrubletTransform(BaseTransform):
+
+    def __init__(self, image_save_path: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+        if image_save_path is not None:
+            sc._settings.figdir = image_save_path
+
+    def __call__(self, data: Data) -> Data:
+        adata = data.data
+        sc.pp.scrublet(adata)
+        sc.pl.scrublet_score_distribution(adata, show=False, save=True)
+        self.logger.info(f"Original number of cells: {adata.n_obs}")
+        mask = (~adata.obs['predicted_doublet'])
+        data.filter_by_mask(mask)
+        adata = data.data
+        self.logger.info(f"Number of cells after filtering: {adata.n_obs}")
         return data
