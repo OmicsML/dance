@@ -6,10 +6,10 @@ from pprint import pformat
 
 import numpy as np
 import pandas as pd
-import wandb
 from cycler import V
 from matplotlib.rcsetup import validate_aspect
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.scgnn2 import ScGNN2
@@ -208,32 +208,32 @@ if __name__ == "__main__":
         train_mask, valid_mask, test_mask = data.get_x(return_type="default")
         if not isinstance(data.data.X, np.ndarray):
             x_train = data.data.X.A * train_mask
-            x_valid = data.data.X.A[valid_mask]
-            x_test = data.data.X.A[test_mask]
+            x_valid = data.data.X.A * valid_mask
+            x_test = data.data.X.A * test_mask
         else:
             x_train = data.data.X * train_mask
-            x_valid = data.data.X[valid_mask]
-            x_test = data.data.X[test_mask]
+            x_valid = data.data.X * valid_mask
+            x_test = data.data.X * test_mask
         model = ScGNN2(args, device=device)
 
         model.fit(x_train)
-        test_rmse = np.sqrt(((x_test - model.predict()[test_mask])**2).mean())
-        test_pcc = np.corrcoef(x_test, model.predict()[test_mask])[0, 1]
+        test_rmse = np.sqrt(((x_test - model.predict() * test_mask)**2).mean())
+        test_pcc = np.corrcoef(x_test, model.predict() * test_mask)[0, 1]
         test_actual = x_test
         test_actual[test_actual < 1e-10] = 1e-10
-        test_mre = abs((test_actual - model.predict()[test_mask]) / test_actual).mean()
+        test_mre = abs((test_actual - model.predict() * test_mask) / test_actual).mean()
 
-        train_rmse = np.sqrt(((x_train - model.predict()[train_mask])**2).mean())
-        train_pcc = np.corrcoef(x_train, model.predict()[train_mask])[0, 1]
+        train_rmse = np.sqrt(((x_train - model.predict() * train_mask)**2).mean())
+        train_pcc = np.corrcoef(x_train, model.predict() * train_mask)[0, 1]
         train_actual = x_train
         train_actual[train_actual < 1e-10] = 1e-10
-        train_mre = abs((train_actual - model.predict()[train_mask]) / train_actual).mean()
+        train_mre = abs((train_actual - model.predict() * train_mask) / train_actual).mean()
 
-        val_rmse = np.sqrt(((x_valid - model.predict()[valid_mask])**2).mean())
-        val_pcc = np.corrcoef(x_valid, model.predict()[valid_mask])[0, 1]
+        val_rmse = np.sqrt(((x_valid - model.predict() * valid_mask)**2).mean())
+        val_pcc = np.corrcoef(x_valid, model.predict() * valid_mask)[0, 1]
         val_actual = x_valid
         val_actual[val_actual < 1e-10] = 1e-10
-        val_mre = abs((val_actual - model.predict()[valid_mask]) / val_actual).mean()
+        val_mre = abs((val_actual - model.predict() * valid_mask) / val_actual).mean()
 
         wandb.log({
             "train_RMSE": train_rmse,
@@ -257,10 +257,12 @@ if __name__ == "__main__":
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
-        get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
-                       conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
-                       root_path=file_root_path, required_funs=["CellwiseMaskData", "SetConfig"],
-                       required_indexes=[sys.maxsize - 1, sys.maxsize], metric="MRE", ascending=True)
+        get_step3_yaml(
+            result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
+            conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
+            root_path=file_root_path, required_funs=[
+                "FilterCellTransform", "FilterGenesScanpyOrder", "ScrubletTransform", "CellwiseMaskData", "SetConfig"
+            ], required_indexes=[0, 1, 2, 4, sys.maxsize], metric="MRE", ascending=True)
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """
