@@ -2,7 +2,7 @@
 
 # 定义数组
 array=("Blood" "Brain" "Heart" "Intestine" "Kidney" "Lung" "Pancreas")
-# array=("Blood")
+# array=("Lung")
 
 # 循环数组并在后台运行 Python 脚本
 for tissue in "${array[@]}"

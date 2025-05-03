@@ -5,9 +5,6 @@ from pathlib import Path
 from pprint import pformat
 
 import numpy as np
-import pandas as pd
-from cycler import V
-from matplotlib.rcsetup import validate_aspect
 
 import wandb
 from dance import logger
