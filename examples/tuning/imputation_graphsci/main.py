@@ -6,6 +6,7 @@ from pathlib import Path
 
 import anndata as ad
 import numpy as np
+import pandas as pd
 import torch
 
 import dance.transforms.normalize as NormFuncs
@@ -47,6 +48,7 @@ if __name__ == '__main__':
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
+    parser.add_argument("--get_result", action="store_true", help="save imputation result")
     params = parser.parse_args()
     print(vars(params))
     file_root_path = Path(params.root_path, params.dataset).resolve()
@@ -63,13 +65,21 @@ if __name__ == '__main__':
         data = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset,
                                  train_size=params.train_size).load_data()
         # Prepare preprocessing pipeline and apply it to data
-        kwargs = {tune_mode: dict(wandb.config)}
+        wandb_config = wandb.config
+        if "run_kwargs" in pipeline_planer.config:
+            if any(d == dict(wandb.config["run_kwargs"]) for d in pipeline_planer.config.run_kwargs):
+                wandb_config = wandb_config["run_kwargs"]
+            else:
+                wandb.log({"skip": 1})
+                wandb.finish()
+                return
+        kwargs = {tune_mode: dict(wandb_config)}
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
 
         preprocessing_pipeline(data)
 
-        X, X_raw, g, mask = data.get_x(return_type="default")
+        X, X_raw, g, mask, valid_mask, test_mask = data.get_x(return_type="default")
         if not isinstance(X, np.ndarray):
             X = X.toarray()
         if not isinstance(X_raw, np.ndarray):
@@ -90,12 +100,37 @@ if __name__ == '__main__':
         norm_func = [p for p in preprocessing_pipeline._pipeline if p.type == "normalize"][0].functional
         norm_func(data_imputed_data)
         processed_imputed_data = torch.tensor(data_imputed_data.data.X).to(device)
-        score = model.score(X, processed_imputed_data, mask, metric='RMSE', log1p=False)
-        pcc = model.score(X, processed_imputed_data, mask, metric='PCC', log1p=False)
-        mre = model.score(X, processed_imputed_data, mask, metric='MRE', log1p=False)
-        wandb.log({"RMSE": score, "PCC": pcc, "MRE": mre})
+        # score = model.score(X, processed_imputed_data, mask, metric='RMSE', log1p=False)
+        # pcc = model.score(X, processed_imputed_data, mask, metric='PCC', log1p=False)
+        # mre = model.score(X, processed_imputed_data, mask, metric='MRE', log1p=False)
+        train_RMSE = model.score(X, imputed_data, mask, "RMSE", log1p=False)
+        train_pcc = model.score(X, imputed_data, mask, "PCC", log1p=False)
+        train_mre = model.score(X, imputed_data, mask, metric="MRE", log1p=False)
+        val_RMSE = model.score(X, imputed_data, ~valid_mask, "RMSE", log1p=False)
+        val_pcc = model.score(X, imputed_data, ~valid_mask, "PCC", log1p=False)
+        val_mre = model.score(X, imputed_data, ~valid_mask, metric="MRE", log1p=False)
+        test_RMSE = model.score(X, imputed_data, ~test_mask, "RMSE", log1p=False)
+        test_pcc = model.score(X, imputed_data, ~test_mask, "PCC", log1p=False)
+        test_mre = model.score(X, imputed_data, ~test_mask, metric="MRE")
+        wandb.log({
+            "train_RMSE": train_RMSE,
+            "train_PCC": train_pcc,
+            "train_MRE": train_mre,
+            "val_RMSE": val_RMSE,
+            "val_PCC": val_pcc,
+            "MRE": val_mre,
+            "test_RMSE": test_RMSE,
+            "test_PCC": test_pcc,
+            "test_MRE": test_mre
+        })
         gc.collect()
         torch.cuda.empty_cache()
+        if params.get_result:
+            result = model.predict(X, X_raw, g, None)
+            array = result.detach().cpu().numpy()
+            # Create DataFrame
+            df = pd.DataFrame(data=array, index=data.data.obs_names, columns=data.data.var_names)
+            df.to_csv(f"{params.dataset}/result.csv")
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=params.sweep_id, count=params.count)  #Score can be recorded for each epoch

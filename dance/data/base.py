@@ -11,6 +11,7 @@ import mudata
 import numpy as np
 import omegaconf
 import pandas as pd
+import scanpy as sc
 import scipy.sparse as sp
 import torch
 
@@ -573,6 +574,232 @@ class BaseData(ABC):
 
         self._data = self._data[index_to_preserve]
         self._split_idx_dict = new_split_idx_dict
+
+    def filter_cells(self, **kwargs):
+        """Apply cell filtering using scanpy.pp.filter_cells and update splits.
+
+        Filters the cells in `self.data` based on the provided criteria,
+        similar to `scanpy.pp.filter_cells`. Crucially, this method also
+        updates the internal split indices (`train_idx`, `val_idx`, etc.)
+        to reflect the cells remaining after filtering.
+
+        Parameters
+        ----------
+        **kwargs
+            Arguments passed directly to `scanpy.pp.filter_cells`.
+            Common arguments include `min_counts`, `max_counts`,
+            `min_genes`, `max_genes`. Note: `inplace` is forced to `False`
+            internally to get the filter mask, then applied effectively inplace.
+
+        Returns
+        -------
+        self
+            Returns the instance to allow method chaining.
+
+        Raises
+        ------
+        NotImplementedError
+            If the underlying `self.data` is not an `anndata.AnnData` object.
+            Filtering `MuData` requires more careful consideration of modalities.
+
+        """
+        if not isinstance(self.data, anndata.AnnData):
+            # Filtering MuData needs careful handling: filter which modality?
+            # How to sync obs across modalities after filtering one?
+            raise NotImplementedError("filter_cells is currently only implemented for AnnData objects. "
+                                      "Filtering MuData requires specific modality handling.")
+
+        logger.info(f"Applying filter_cells with parameters: {kwargs}")
+        original_shape = self.data.shape
+        original_obs_names = self.data.obs_names.copy()
+
+        # 1. Store original obs_names for each split
+        # We need the *names* of the cells in each split before filtering
+        original_split_obs_names: Dict[str, pd.Index] = {}
+        for split_name, split_idx in self._split_idx_dict.items():
+            if split_idx is not None and len(split_idx) > 0:
+                original_split_obs_names[split_name] = original_obs_names[split_idx]
+            else:
+                original_split_obs_names[split_name] = pd.Index([])  # Handle empty splits
+
+        # 2. Determine which cells to keep using scanpy's logic
+        # We run it with inplace=False first to get the boolean mask
+        try:
+            kwargs_copy = kwargs.copy()
+            kwargs_copy['inplace'] = False
+            cells_mask = sc.pp.filter_cells(self.data, **kwargs_copy)
+        except Exception as e:
+            logger.error(f"Error during sc.pp.filter_cells execution: {e}")
+            raise
+
+        num_filtered = original_shape[0] - cells_mask.sum()
+
+        if num_filtered == 0:
+            logger.info("No cells were filtered.")
+            return self  # Nothing changed
+
+        logger.info(f"Filtering out {num_filtered} cells ({original_shape[0]} -> {cells_mask.sum()}).")
+
+        # 3. Apply the filtering to self.data
+        # Slicing creates a view or copy; we make it an explicit copy
+        # to ensure the underlying data is modified cleanly.
+        self._data = self.data[cells_mask, :].copy()
+        logger.debug(f"Data shape after filtering: {self.data.shape}")
+
+        # 4. Update split indices
+        new_obs_names = self.data.obs_names  # Names of cells *after* filtering
+        # Create a fast lookup for new index positions
+        new_obs_name_to_new_idx = {name: i for i, name in enumerate(new_obs_names)}
+
+        new_split_idx_dict = {}
+        total_kept_in_splits = 0
+        for split_name, original_names_in_split in original_split_obs_names.items():
+            # Find which names from this original split are still in the data
+            kept_names_in_split = original_names_in_split[original_names_in_split.isin(new_obs_names)]
+
+            # Get the *new* integer indices corresponding to these kept names
+            new_indices = [new_obs_name_to_new_idx[name] for name in kept_names_in_split]
+
+            if len(new_indices) > 0:
+                new_split_idx_dict[split_name] = sorted(new_indices)  # Store sorted indices
+                logger.debug(f"Split '{split_name}': {len(original_names_in_split)} -> {len(new_indices)} cells.")
+                total_kept_in_splits += len(new_indices)
+            else:
+                # Keep the split name but with an empty list, or remove?
+                # Keeping it might be less surprising.
+                new_split_idx_dict[split_name] = []
+                logger.warning(f"Split '{split_name}' is now empty after filtering.")
+
+        # 5. Check consistency
+        if total_kept_in_splits != self.data.shape[0]:
+            # This might happen if some cells were not assigned to any split initially
+            logger.warning(f"Total cells in updated splits ({total_kept_in_splits}) "
+                           f"does not match total cells after filtering ({self.data.shape[0]}). "
+                           "This may be expected if not all original cells were in a split.")
+
+        # Update the internal dictionary
+        self._split_idx_dict = new_split_idx_dict
+
+        # Update AnnData properties accessible directly from BaseData/Data
+        for prop in self._DATA_CHANNELS + ["X"]:  # Assuming AnnData here based on check above
+            if hasattr(self._data, prop):
+                setattr(self, prop, getattr(self._data, prop))
+
+        logger.info("Cell filtering complete and split indices updated.")
+        return self
+
+    # --- START NEW METHOD ---
+    def filter_by_mask(self, mask: Union[Sequence[bool], pd.Series, np.ndarray], update_splits: bool = True):
+        """Filter cells based on a boolean mask and optionally update splits.
+
+        Filters the cells in `self.data` using a provided boolean mask.
+        If `update_splits` is True, this method also updates the internal
+        split indices (`train_idx`, `val_idx`, etc.) to reflect the cells
+        remaining after filtering.
+
+        Parameters
+        ----------
+        mask : Union[Sequence[bool], pd.Series, np.ndarray]
+            A boolean mask (list, Series, or array) with the same length as
+            the current number of cells (`self.data.shape[0]`). Cells where
+            the mask is True will be kept.
+        update_splits : bool, optional
+            Whether to update the internal split indices to align with the
+            filtered data. Defaults to True. If set to False, the split
+            indices will become invalid if any cells are removed.
+
+        Returns
+        -------
+        self
+            Returns the instance to allow method chaining.
+
+        Raises
+        ------
+        ValueError
+            If the mask is not boolean or has an incorrect length.
+        NotImplementedError
+            If the underlying `self.data` is not an `anndata.AnnData` object
+            (as filtering MuData requires more careful handling).
+
+        """
+        if not isinstance(self.data, anndata.AnnData):
+            raise NotImplementedError("filter_by_mask is currently only implemented for AnnData objects.")
+
+        # --- Input Validation ---
+        if not isinstance(mask, (list, tuple, pd.Series, np.ndarray)):
+            raise TypeError(f"Mask must be a sequence, Series, or ndarray, got {type(mask)}")
+        if len(mask) != self.data.shape[0]:
+            raise ValueError(f"Mask length ({len(mask)}) must match number of cells ({self.data.shape[0]})")
+        try:
+            # Ensure boolean type (handles potential integer 0/1 masks)
+            mask = np.asarray(mask, dtype=bool)
+        except TypeError:
+            raise ValueError("Mask could not be converted to boolean.")
+
+        num_to_keep = mask.sum()
+        num_to_filter = len(mask) - num_to_keep
+
+        if num_to_filter == 0:
+            logger.info("Provided mask keeps all cells. No filtering applied.")
+            return self
+
+        logger.info(f"Filtering cells based on mask: {self.data.shape[0]} -> {num_to_keep} ({num_to_filter} removed).")
+
+        # --- Store Original State (if updating splits) ---
+        original_split_obs_names: Dict[str, pd.Index] = {}
+        if update_splits:
+            original_obs_names = self.data.obs_names.copy()
+            for split_name, split_idx in self._split_idx_dict.items():
+                if split_idx is not None and len(split_idx) > 0:
+                    # Check indices are valid before using them
+                    if max(split_idx) >= len(original_obs_names):
+                        raise IndexError(f"Invalid index found in split '{split_name}' before filtering.")
+                    original_split_obs_names[split_name] = original_obs_names[split_idx]
+                else:
+                    original_split_obs_names[split_name] = pd.Index([])
+
+        # --- Apply Filtering ---
+        # Slicing creates a view or copy; make it an explicit copy.
+        self._data = self.data[mask, :].copy()
+        logger.debug(f"Data shape after filtering: {self.data.shape}")
+
+        # --- Update Split Indices (if requested) ---
+        if update_splits:
+            new_obs_names = self.data.obs_names
+            new_obs_name_to_new_idx = {name: i for i, name in enumerate(new_obs_names)}
+            new_split_idx_dict = {}
+            total_kept_in_splits = 0
+
+            for split_name, original_names_in_split in original_split_obs_names.items():
+                kept_names_in_split = original_names_in_split[original_names_in_split.isin(new_obs_names)]
+                new_indices = [new_obs_name_to_new_idx[name] for name in kept_names_in_split]
+
+                if len(new_indices) > 0:
+                    new_split_idx_dict[split_name] = sorted(new_indices)
+                    logger.debug(f"Split '{split_name}': {len(original_names_in_split)} -> {len(new_indices)} cells.")
+                    total_kept_in_splits += len(new_indices)
+                else:
+                    new_split_idx_dict[split_name] = []
+                    logger.warning(f"Split '{split_name}' is now empty after filtering.")
+
+            if total_kept_in_splits != self.data.shape[0]:
+                logger.warning(f"Total cells in updated splits ({total_kept_in_splits}) "
+                               f"does not match total cells after filtering ({self.data.shape[0]}). "
+                               "This may be expected if not all original cells were in a split.")
+
+            self._split_idx_dict = new_split_idx_dict
+            logger.info("Split indices updated.")
+        else:
+            logger.warning("Filtering applied, but split indices were *not* updated as requested. "
+                           "Existing split indices are now likely invalid.")
+
+        # --- Update AnnData properties accessible directly ---
+        for prop in self._DATA_CHANNELS + ["X"]:
+            if hasattr(self._data, prop):
+                setattr(self, prop, getattr(self._data, prop))
+
+        logger.info("Filtering by mask complete.")
+        return self
 
 
 class Data(BaseData):
