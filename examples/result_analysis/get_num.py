@@ -25,14 +25,17 @@ import pandas as pd
 sys.path.append("..")
 import urllib
 
-from get_result_web import spilt_web
+from atlas.get_result_web import spilt_web
 
 from dance.utils import try_import
 
 wandb = try_import("wandb")
 entity = "xzy11632"
 project = "dance-dev"
-tasks = ["cell type annotation new", "clustering", "imputation_new", "spatial domain", "cell type deconvolution"]
+tasks = [
+    "cell type annotation new", "clustering", "imputation_new", "spatial domain", "cell type deconvolution",
+    "joint embedding"
+]
 file_root = Path(__file__).resolve().parent
 prefix = 'https://wandb.ai/xzy11632/dance-dev'
 

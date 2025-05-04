@@ -4,8 +4,9 @@ import sys
 from pathlib import Path
 
 import numpy as np
-
 import wandb
+from sklearn.model_selection import train_test_split
+
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.stlearn import StKmeans, StLouvain
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
@@ -58,11 +59,13 @@ if __name__ == "__main__":
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
+        total_idx = data.get_split_idx("train")
+        valid_idx, test_idx = train_test_split(total_idx, test_size=0.9, random_state=args.seed)
         x, y = data.get_data(return_type="default")
 
         # Train and evaluate model
-        score = model.fit_score(x, y.values.ravel())
-        wandb.log({"ARI": score})
+        valid_score, test_score = model.fit_score(x, y.values.ravel(), valid_idx=valid_idx, test_idx=test_idx)
+        wandb.log({"ARI": valid_score, "test_ari": test_score})
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
