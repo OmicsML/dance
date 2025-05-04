@@ -46,7 +46,7 @@ if __name__ == "__main__":
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
         total_idx = data.get_split_idx("test")
-        valid_idx, test_idx = train_test_split(total_idx, test_size=0.9, random_state=args.seed)
+        valid_idx, test_idx = train_test_split(total_idx, test_size=0.3, random_state=args.seed)
         # inputs: x_count, x_spatial
         inputs, y = data.get_data(split_name="test", return_type="numpy")
 

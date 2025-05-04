@@ -159,13 +159,7 @@ class SPOTlight(BaseRegressionMethod):
         else:
             valid_score = func(y[valid_idx], y_pred[valid_idx])
             test_score = func(y[test_idx], y_pred[test_idx])
-            return ({
-                "valid_score": valid_score,
-                "test_score": test_score
-            }, y_pred) if return_pred else {
-                "valid_score": valid_score,
-                "test_score": test_score
-            }
+            return (valid_score, test_score, y_pred) if return_pred else (valid_score, test_score)
 
     def fit_score(self, x, y, *, score_func: Optional[Union[str, Mapping[Any,
                                                                          float]]] = None, return_pred: bool = False,

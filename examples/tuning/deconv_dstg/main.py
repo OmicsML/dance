@@ -62,13 +62,13 @@ if __name__ == "__main__":
         adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
                                        torch.FloatTensor(adj.data.astype(np.int32)))
         train_mask = data.get_split_mask("pseudo", return_type="torch")
-        train_mask, valid_mask = train_test_split(train_mask, test_size=0.25, random_state=args.seed)
+        train_mask, valid_mask = train_test_split(train_mask, test_size=0.3, random_state=args.seed)
         inputs = (adj, x, train_mask)
 
         # Train and evaluate model
         model = DSTG(nhid=args.nhid, bias=args.bias, dropout=args.dropout, device=args.device)
         pred = model.fit_predict(inputs, y, lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
-        test_mask = data.get_split_mask("test", return_type="torch")  #TODO 进行修改
+        test_mask = data.get_split_mask("test", return_type="torch")
         valid_score = model.default_score_func(y[valid_mask], pred[valid_mask])
         test_score = model.default_score_func(y[test_mask], pred[test_mask])
         wandb.log({"MSE": valid_score, "test_MSE": test_score})

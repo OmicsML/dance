@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+from cgi import test
 from pathlib import Path
 from pprint import pprint
 
@@ -49,21 +50,17 @@ if __name__ == "__main__":
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
-        ref_idx = data.get_split_idx("ref")
-        train_idx, valid_idx = train_test_split(ref_idx, test_size=0.2, random_state=args.seed)
         cell_types = data.data.obsm["cell_type_portion"].columns.tolist()
 
         x, y = data.get_data(split_name="test", return_type="torch")
         ref_count = data.get_feature(split_name="ref", return_type="numpy")
         ref_annot = data.get_feature(split_name="ref", return_type="numpy", channel="cellType", channel_type="obs")
-
         # Train and evaluate model
-        model = SPOTlight(ref_count[train_idx], ref_annot[train_idx], cell_types, rank=args.rank, bias=args.bias,
-                          device=args.device)
-        valid_score, test_score = model.fit_score(torch.cat([ref_count[valid_idx], x]),
-                                                  torch.cat([ref_annot[valid_idx], y]), lr=args.lr,
-                                                  max_iter=args.max_iter, valid_idx=np.arange(len(valid_idx)),
-                                                  test_idx=np.arange(len(x)) + len(valid_idx))
+        model = SPOTlight(ref_count, ref_annot, cell_types, rank=args.rank, bias=args.bias, device=args.device)
+        valid_idx, test_idx = train_test_split(np.arange(len(x)), test_size=0.3)
+
+        valid_score, test_score = model.fit_score(x, y, lr=args.lr, max_iter=args.max_iter, valid_idx=valid_idx,
+                                                  test_idx=test_idx)
         wandb.log({"MSE": valid_score, "test_MSE": test_score})
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
