@@ -40,4 +40,8 @@ def list_files(directory, file_name="out.log", save_path="summary_file.csv"):
 
 
 if __name__ == "__main__":
-    list_files("/home/zyxing/dance/examples/tuning")
+    # list_files("/egr/research-dselab/dingjia5/zhongyu/dance/examples/tuning/imputation_scgnn2")
+
+    print(
+        read_log(
+            "/egr/research-dselab/dingjia5/zhongyu/dance/examples/tuning/imputation_scgnn2/mouse_visual_data/out.log"))

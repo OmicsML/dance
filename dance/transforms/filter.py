@@ -1502,7 +1502,7 @@ class FilterCellsType(BaseTransform):  #TODO not in search
         else:
             print("No cell types below threshold. Keeping all cells.")
             keep_mask = pd.Series(True, index=adata.obs_names)
-        adata = adata[keep_mask, :]
+        data.filter_by_mask(keep_mask)
         return data
 
 
