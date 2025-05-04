@@ -31,3 +31,4 @@ examples/atlas/config/run_config.csv
 *.h5ad
 *.gz
 *.tif
+examples/sc_similarity_examples
