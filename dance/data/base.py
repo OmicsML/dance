@@ -14,6 +14,7 @@ import pandas as pd
 import scanpy as sc
 import scipy.sparse as sp
 import torch
+from deprecated import deprecated
 
 from dance import logger
 from dance.typing import Any, Dict, FeatType, Iterator, List, ListConfig, Literal, Optional, Sequence, Tuple, Union
@@ -575,6 +576,7 @@ class BaseData(ABC):
         self._data = self._data[index_to_preserve]
         self._split_idx_dict = new_split_idx_dict
 
+    @deprecated("out of date")
     def filter_cells(self, **kwargs):
         """Apply cell filtering using scanpy.pp.filter_cells and update splits.
 

@@ -6,6 +6,7 @@ from pprint import pprint
 
 import numpy as np
 import wandb
+from sklearn.model_selection import train_test_split
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.spatialdecon import SpatialDecon
@@ -52,10 +53,12 @@ def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer)
     x, y = data.get_data(split_name="test", return_type="torch")
     ct_profile = data.get_feature(return_type="torch", channel="CellTopicProfile", channel_type="varm")
 
+    valid_idx, test_idx = train_test_split(np.arange(len(x)), test_size=0.3, random_state=args.seed)
     # Train and evaluate model
     spaDecon = SpatialDecon(ct_profile, ct_select=cell_types, bias=args.bias, device=args.device)
-    score = spaDecon.fit_score(x, y, lr=args.lr, max_iter=args.max_iter, print_period=100)
-    wandb.log({"MSE": score})
+    valid_score, test_score = spaDecon.fit_score(x, y, lr=args.lr, max_iter=args.max_iter, print_period=100,
+                                                 valid_idx=valid_idx, test_idx=test_idx)
+    wandb.log({"MSE": valid_score, "test_MSE": test_score})
 
 
 entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(evaluate_pipeline, sweep_id=args.sweep_id,

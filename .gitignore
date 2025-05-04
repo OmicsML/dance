@@ -26,4 +26,17 @@ examples/tuning/**/*.tar.gz
 examples/tuning/**/*.tif
 examples/tuning/**/*.txt
 examples/atlas/config/run_config.csv
+trash
+*.zip
+*.h5
+*.h5ad
+*.gz
+*.tif
+*.pth
+.vscode
+examples/atlas
+result_analysis
+readme.txt
+examples/tuning/check_sweep.py
+examples/tuning/result.md
 examples/tuning/figures

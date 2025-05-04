@@ -76,8 +76,6 @@ from dance.typing import Literal, Optional
 #         return data
 
 
-
-
 @register_preprocessor("split", "entry")
 class CellwiseMaskData(BaseTransform):
     """Randomly mask data in a cell-wise approach.

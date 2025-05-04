@@ -9,13 +9,8 @@ import requests
 from get_important_pattern import get_com_all, get_forest_model_pattern, get_frequent_itemsets
 from numpy import choose
 
-from dance.settings import ATLASDIR
-
-sys.path.append(str(ATLASDIR))
-from get_result_web import spilt_web
-
-from dance.pipeline import flatten_dict
-from dance.utils import try_import
+from dance.pipeline import flatten_dict, get_additional_sweep
+from dance.utils import spilt_web, try_import
 
 # Define basic configuration parameters
 entity = "xzy11632"
@@ -30,15 +25,15 @@ project = "dance-dev"
 # # Whether higher values are better for each metric
 # # ascendings = [False, False, True, False, True]
 metrics_dict = [{
-    "task": "cell type annotation new",
+    "task": "cell type annotation",
     "metric": "test_acc",
     "ascending": False
 }, {
-    "task": "clustering",
+    "task": "cluster",
     "metric": "acc",
     "ascending": False
 }, {
-    "task": "imputation_new",
+    "task": "imputation",
     "metric": "MRE",
     "ascending": True
 }, {
@@ -57,60 +52,6 @@ metrics_dict = [{
 tasks = [d["task"] for d in metrics_dict]
 mertic_names = [d["metric"] for d in metrics_dict]
 ascendings = [d["ascending"] for d in metrics_dict]
-
-multi_mod = False
-if multi_mod:
-    raise NotImplementedError("multi mod")
-
-parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--positive", action='store_true')
-parser.add_argument("--only_apr", action='store_true')
-parser.add_argument("--choose_tasks", nargs="+", default=tasks)
-args = parser.parse_args()
-choose_tasks = args.choose_tasks
-positive = args.positive
-only_apr = args.only_apr
-if not positive:
-    assert only_apr
-    ascendings = [not item for item in ascendings]
-file_root = Path(__file__).resolve().parent
-prefix = f'https://wandb.ai/{entity}/{project}'
-runs_sum = 0
-wandb = try_import("wandb")
-
-
-def get_additional_sweep(sweep_id):
-    """Recursively retrieve all related sweep IDs from a given sweep.
-
-    Given a sweep ID, this function recursively finds all related sweep IDs by examining the command
-    arguments of the runs within each sweep. It handles cases where sweeps may have prior runs or
-    additional sweep references.
-
-    Parameters
-    ----------
-    sweep_id : str
-        The initial sweep ID to start the search from.
-
-    Returns
-    -------
-    list
-        A list containing all related sweep IDs, including the input sweep_id.
-
-    """
-    sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
-    additional_sweep_ids = [sweep_id]
-    #last run command
-    run = next((t_run for t_run in sweep.runs if t_run.state == "finished"), None)
-    if run is None:  # check summary data count, note aznph5wt, quantities may be inconsistent
-        return additional_sweep_ids
-    run_id = run.id
-    web_abs = requests.get(f"https://api.wandb.ai/files/{run.entity}/{run.project}/{run_id}/wandb-metadata.json")
-    args = dict(web_abs.json())["args"]
-    for i in range(len(args)):
-        if args[i] == '--additional_sweep_ids':
-            if i + 1 < len(args):
-                additional_sweep_ids += get_additional_sweep(args[i + 1])
-    return additional_sweep_ids
 
 
 def summary_pattern(step2_origin_data, metric_name, ascending, alpha=0.05, vis=False):
@@ -176,6 +117,26 @@ def summary_pattern(step2_origin_data, metric_name, ascending, alpha=0.05, vis=F
 
 
 if __name__ == "__main__":
+    multi_mod = False
+    if multi_mod:
+        raise NotImplementedError("multi mod")
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--positive", action='store_true')
+    parser.add_argument("--only_apr", action='store_true')
+    parser.add_argument("--choose_tasks", nargs="+", default=tasks)
+    args = parser.parse_args()
+    choose_tasks = args.choose_tasks
+    positive = args.positive
+    only_apr = args.only_apr
+    if not positive:
+        assert only_apr
+        ascendings = [not item for item in ascendings]
+    file_root = Path(__file__).resolve().parent
+    prefix = f'https://wandb.ai/{entity}/{project}'
+    runs_sum = 0
+    wandb = try_import("wandb")
+
     start = False
     ans_all = []
     for i, task in enumerate(tasks):
@@ -195,8 +156,6 @@ if __name__ == "__main__":
                 dataset = data.columns[col_idx]
                 value = data.iloc[row_idx, col_idx]
                 step_name = data.iloc[row_idx]["Unnamed: 1"]
-                if method == "Scmvae" and dataset == "Dataset3:openproblems_2022_multi_atac2gex":
-                    start = True
                 if not start:
                     continue
                 # if method != "Scgnn2":
@@ -207,7 +166,7 @@ if __name__ == "__main__":
                 else:
                     continue
                 _, _, sweep_id = spilt_web(sweep_url)
-                sweep_ids = get_additional_sweep(sweep_id)
+                sweep_ids = get_additional_sweep(entity, project, sweep_id)
                 summary_data = []
                 for sweep_id in sweep_ids:
                     sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
