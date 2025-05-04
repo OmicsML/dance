@@ -63,7 +63,7 @@ if __name__ == '__main__':
                   params.weight_decay)
         model.load_model()
         imputed_data = model.predict(X_train, X_raw_train, g, mask)
-        score = model.score(X, imputed_data, mask, metric='RMSE')
+        score = model.score(X, imputed_data, mask, metric='RMSE')  #保留了90%，查看剩余10%的偏差
         print("RMSE: %.4f" % score)
         rmses.append(score)
 
