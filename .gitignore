@@ -40,3 +40,5 @@ readme.txt
 examples/tuning/check_sweep.py
 examples/tuning/result.md
 examples/tuning/figures
+examples/single_modality/imputation/data
+examples/tuning/imputation_magic/data
