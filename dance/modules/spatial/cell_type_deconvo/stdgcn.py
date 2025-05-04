@@ -1,6 +1,7 @@
 import copy
 import math
 import multiprocessing
+import os
 import time
 
 import numpy as np
@@ -254,279 +255,348 @@ import scanpy as sc
 import torch
 
 
-def run_STdGCN(paths, find_marker_genes_paras, pseudo_spot_simulation_paras, data_normalization_paras,
-               integration_for_adj_paras, inter_exp_adj_paras, spatial_adj_paras, real_intra_exp_adj_paras,
-               pseudo_intra_exp_adj_paras, integration_for_feature_paras, GCN_paras, load_test_groundtruth=False,
-               use_marker_genes=True, external_genes=False, generate_new_pseudo_spots=True, fraction_pie_plot=False,
-               cell_type_distribution_plot=True, n_jobs=-1, GCN_device='CPU'):
-
-    sc_path = paths['sc_path']
-    ST_path = paths['ST_path']
-    output_path = paths['output_path']
-
-    sc_adata = sc.read_csv(sc_path + "/sc_data.tsv", delimiter='\t')
-    sc_label = pd.read_table(sc_path + "/sc_label.tsv", sep='\t', header=0, index_col=0, encoding="utf-8")
+def load_data(sc_path, st_path, load_groundtruth=False):
+    """Loads scRNA-seq and ST data, labels, and coordinates."""
+    print("Loading data...")
+    # Load scRNA-seq
+    sc_adata = sc.read_csv(os.path.join(sc_path, "sc_data.tsv"), delimiter='\t')
+    sc_label = pd.read_table(os.path.join(sc_path, "sc_label.tsv"), sep='\t', header=0, index_col=0, encoding="utf-8")
     sc_label.columns = ['cell_type']
-    sc_adata.obs['cell_type'] = sc_label['cell_type'].values
+    sc_adata.obs['cell_type'] = sc_label.loc[sc_adata.obs_names, 'cell_type'].values  # Ensure index alignment
 
-    cell_type_num = len(sc_adata.obs['cell_type'].unique())
+    # Create cell type mappings
     cell_types = sc_adata.obs['cell_type'].unique()
-
     word_to_idx_celltype = {word: i for i, word in enumerate(cell_types)}
     idx_to_word_celltype = {i: word for i, word in enumerate(cell_types)}
+    sc_adata.obs['cell_type_idx'] = sc_adata.obs['cell_type'].map(word_to_idx_celltype)
+    print("Cell type counts:\n", sc_adata.obs['cell_type'].value_counts())
 
-    celltype_idx = [word_to_idx_celltype[w] for w in sc_adata.obs['cell_type']]
-    sc_adata.obs['cell_type_idx'] = celltype_idx
-    sc_adata.obs['cell_type'].value_counts()
+    # Load ST
+    st_adata = sc.read_csv(os.path.join(st_path, "ST_data.tsv"), delimiter='\t')
+    st_coor = pd.read_table(os.path.join(st_path, "coordinates.csv"), sep=',', header=0, index_col=0, encoding="utf-8")
+    st_adata.obs['coor_X'] = st_coor.loc[st_adata.obs_names, 'x'].values  # Ensure index alignment
+    st_adata.obs['coor_Y'] = st_coor.loc[st_adata.obs_names, 'y'].values  # Ensure index alignment
 
-    if use_marker_genes == True:
-        if external_genes == True:
-            with open(sc_path + "/marker_genes.tsv") as f:
-                selected_genes = [line.rstrip('\n') for line in f]
-        else:
-            selected_genes, cell_type_marker_genes = find_marker_genes(
-                sc_adata, preprocess=find_marker_genes_paras['preprocess'],
-                highly_variable_genes=find_marker_genes_paras['highly_variable_genes'],
-                PCA_components=find_marker_genes_paras['PCA_components'],
-                filter_wilcoxon_marker_genes=find_marker_genes_paras['filter_wilcoxon_marker_genes'],
-                marker_gene_method=find_marker_genes_paras['marker_gene_method'],
-                pvals_adj_threshold=find_marker_genes_paras['pvals_adj_threshold'],
-                log_fold_change_threshold=find_marker_genes_paras['log_fold_change_threshold'],
-                min_within_group_fraction_threshold=find_marker_genes_paras['min_within_group_fraction_threshold'],
-                max_between_group_fraction_threshold=find_marker_genes_paras['max_between_group_fraction_threshold'],
-                top_gene_per_type=find_marker_genes_paras['top_gene_per_type'])
-            with open(output_path + "/marker_genes.tsv", 'w') as f:
+    # Load optional ground truth
+    if load_groundtruth:
+        try:
+            st_groundtruth = pd.read_table(os.path.join(st_path, "ST_ground_truth.tsv"), sep='\t', header=0,
+                                           index_col=0, encoding="utf-8")
+            # Ensure ground truth columns match cell types from scRNA-seq
+            valid_gt_cols = [ct for ct in cell_types if ct in st_groundtruth.columns]
+            print(f"Loading ground truth for cell types: {valid_gt_cols}")
+            st_adata.obs[valid_gt_cols] = st_groundtruth.loc[st_adata.obs_names, valid_gt_cols].values  # Align indices
+        except FileNotFoundError:
+            print(f"Warning: Ground truth file not found at {os.path.join(st_path, 'ST_ground_truth.tsv')}")
+        except KeyError as e:
+            print(f"Warning: Column mismatch or index mismatch when loading ground truth: {e}")
+
+    return sc_adata, st_adata, cell_types, word_to_idx_celltype, idx_to_word_celltype
+
+
+def find_or_load_marker_genes(sc_adata, sc_path, output_path, use_marker_genes, external_genes,
+                              find_marker_genes_paras):
+    """Finds marker genes using specified method or loads an external list."""
+    if not use_marker_genes:
+        print("Skipping marker gene selection. Using common genes later.")
+        return None  # Indicate common genes should be used
+
+    selected_genes = None
+    if external_genes:
+        marker_file = os.path.join(sc_path, "marker_genes.tsv")
+        try:
+            with open(marker_file) as f:
+                selected_genes = [line.strip() for line in f if line.strip()]
+            print(f"Loaded {len(selected_genes)} external marker genes from {marker_file}")
+        except FileNotFoundError:
+            print(f"Error: External marker gene file not found: {marker_file}")
+            print("Proceeding without marker genes.")
+            return None  # Fallback or raise error? Decide based on desired behavior.
+    else:
+        print("Finding marker genes...")
+        # Make sure find_marker_genes exists and accepts these params
+        selected_genes, _ = find_marker_genes(sc_adata, **find_marker_genes_paras)  # Pass the dict directly
+
+        # Save the found marker genes
+        output_marker_file = os.path.join(output_path, "marker_genes.tsv")
+        try:
+            with open(output_marker_file, 'w') as f:
                 for gene in selected_genes:
                     f.write(str(gene) + '\n')
+            print(f"Saved {len(selected_genes)} found marker genes to {output_marker_file}")
+        except OSError as e:
+            print(f"Error saving marker genes: {e}")
 
-    print("{} genes have been selected as marker genes.".format(len(selected_genes)))
+    if selected_genes:
+        print(f"{len(selected_genes)} genes selected.")
+    return selected_genes
 
-    if generate_new_pseudo_spots == True:
-        pseudo_adata = pseudo_spot_generation(
-            sc_adata, idx_to_word_celltype, spot_num=pseudo_spot_simulation_paras['spot_num'],
-            min_cell_number_in_spot=pseudo_spot_simulation_paras['min_cell_num_in_spot'],
-            max_cell_number_in_spot=pseudo_spot_simulation_paras['max_cell_num_in_spot'],
-            max_cell_types_in_spot=pseudo_spot_simulation_paras['max_cell_types_in_spot'],
-            generation_method=pseudo_spot_simulation_paras['generation_method'], n_jobs=n_jobs)
-        data_file = open(output_path + '/pseudo_ST.pkl', 'wb')
-        pickle.dump(pseudo_adata, data_file)
-        data_file.close()
+
+def generate_or_load_pseudo_spots(sc_adata, output_path, generate_new, pseudo_spot_simulation_paras,
+                                  idx_to_word_celltype, n_jobs):
+    """Generates new pseudo-spots or loads them from a pickle file."""
+    pseudo_pickle_file = os.path.join(output_path, 'pseudo_ST.pkl')
+    if generate_new:
+        print("Generating new pseudo-spots...")
+        pseudo_adata = pseudo_spot_generation(sc_adata, idx_to_word_celltype, n_jobs=n_jobs,
+                                              **pseudo_spot_simulation_paras)  # Pass dict directly
+        try:
+            with open(pseudo_pickle_file, 'wb') as f:
+                pickle.dump(pseudo_adata, f)
+            print(f"Saved pseudo-spots to {pseudo_pickle_file}")
+        except OSError as e:
+            print(f"Error saving pseudo-spots: {e}")
     else:
-        data_file = open(output_path + '/pseudo_ST.pkl', 'rb')
-        pseudo_adata = pickle.load(data_file)
-        data_file.close()
-
-    ST_adata = sc.read_csv(ST_path + "/ST_data.tsv", delimiter='\t')
-    ST_coor = pd.read_table(ST_path + "/coordinates.csv", sep=',', header=0, index_col=0, encoding="utf-8")
-    ST_adata.obs['coor_X'] = ST_coor['x']
-    ST_adata.obs['coor_Y'] = ST_coor['y']
-    if load_test_groundtruth == True:
-        ST_groundtruth = pd.read_table(ST_path + "/ST_ground_truth.tsv", sep='\t', header=0, index_col=0,
-                                       encoding="utf-8")
-        for i in cell_types:
-            ST_adata.obs[i] = ST_groundtruth[i]
-
-    ST_genes = ST_adata.var.index.values
-    pseudo_genes = pseudo_adata.var.index.values
-    common_genes = set(ST_genes).intersection(set(pseudo_genes))
-    ST_adata_filter = ST_adata[:, list(common_genes)]
-    pseudo_adata_filter = pseudo_adata[:, list(common_genes)]
-
-    ST_adata_filter_norm = ST_preprocess(
-        ST_adata_filter,
-        normalize=data_normalization_paras['normalize'],
-        log=data_normalization_paras['log'],
-        scale=data_normalization_paras['scale'],
-    )[:, selected_genes]
-
-    try:
+        print(f"Attempting to load pseudo-spots from {pseudo_pickle_file}...")
         try:
-            ST_adata_filter_norm.obs.insert(0, 'cell_num', ST_adata_filter.obs['cell_num'])
-        except:
-            ST_adata_filter_norm.obs['cell_num'] = ST_adata_filter.obs['cell_num']
-    except:
-        ST_adata_filter_norm.obs.insert(0, 'cell_num', [0] * ST_adata_filter_norm.obs.shape[0])
-    for i in cell_types:
-        try:
-            ST_adata_filter_norm.obs[i] = ST_adata_filter.obs[i]
-        except:
-            ST_adata_filter_norm.obs[i] = [0] * ST_adata_filter_norm.obs.shape[0]
-    try:
-        ST_adata_filter_norm.obs['cell_type_num'] = (ST_adata_filter_norm.obs[cell_types] > 0).sum(axis=1)
-    except:
-        ST_adata_filter_norm.obs['cell_type_num'] = [0] * ST_adata_filter_norm.obs.shape[0]
+            with open(pseudo_pickle_file, 'rb') as f:
+                pseudo_adata = pickle.load(f)
+            print("Loaded pre-generated pseudo-spots.")
+        except FileNotFoundError:
+            print(f"Error: Pre-generated pseudo-spot file not found: {pseudo_pickle_file}")
+            print("Please generate pseudo-spots first or set generate_new_pseudo_spots=True.")
+            raise  # Re-raise the error as this is critical
+        except Exception as e:
+            print(f"Error loading pseudo-spots: {e}")
+            raise  # Re-raise
 
-    pseudo_adata_norm = ST_preprocess(
-        pseudo_adata_filter,
-        normalize=data_normalization_paras['normalize'],
-        log=data_normalization_paras['log'],
-        scale=data_normalization_paras['scale'],
-    )[:, selected_genes]
+    return pseudo_adata
 
-    pseudo_adata_norm.obs['cell_type_num'] = (pseudo_adata_norm.obs[cell_types] > 0).sum(axis=1)
 
-    ST_integration = data_integration(
-        ST_adata_filter_norm, pseudo_adata_norm, batch_removal_method=integration_for_adj_paras['batch_removal_method'],
-        dim=min(integration_for_adj_paras['dim'], int(ST_adata_filter_norm.shape[1] / 2)),
-        dimensionality_reduction_method=integration_for_adj_paras['dimensionality_reduction_method'],
-        scale=integration_for_adj_paras['scale'], cpu_num=n_jobs, AE_device=GCN_device)
+def preprocess_data(st_adata, pseudo_adata, selected_genes, data_normalization_paras, cell_types):
+    """Filters genes, normalizes, and scales ST and pseudo-spot data."""
+    print("Preprocessing ST and pseudo-spot data...")
+    st_genes = st_adata.var_names
+    pseudo_genes = pseudo_adata.var_names
+    common_genes = list(set(st_genes).intersection(set(pseudo_genes)))
 
-    A_inter_exp = inter_adj(
-        ST_integration,
-        find_neighbor_method=inter_exp_adj_paras['find_neighbor_method'],
-        dist_method=inter_exp_adj_paras['dist_method'],
-        corr_dist_neighbors=inter_exp_adj_paras['corr_dist_neighbors'],
-    )
+    # Decide which gene set to use
+    if selected_genes is None:
+        print(f"Using {len(common_genes)} common genes between ST and pseudo-spots.")
+        genes_to_use = common_genes
+    else:
+        # Filter selected_genes to those also present in common_genes
+        genes_to_use = [g for g in selected_genes if g in common_genes]
+        if len(genes_to_use) < len(selected_genes):
+            print(
+                f"Warning: {len(selected_genes) - len(genes_to_use)} selected marker genes not found in common genes.")
+        if not genes_to_use:
+            raise ValueError("No marker genes found in the intersection of ST and pseudo-spot data. Cannot proceed.")
+        print(f"Using {len(genes_to_use)} selected/marker genes found in common data.")
 
-    A_intra_space = intra_dist_adj(
-        ST_adata_filter_norm,
-        link_method=spatial_adj_paras['link_method'],
-        space_dist_threshold=spatial_adj_paras['space_dist_threshold'],
-    )
+    # Filter AnnData objects
+    st_adata_filt = st_adata[:, genes_to_use].copy()
+    pseudo_adata_filt = pseudo_adata[:, genes_to_use].copy()
 
-    A_real_intra_exp = intra_exp_adj(
-        ST_adata_filter_norm,
-        find_neighbor_method=real_intra_exp_adj_paras['find_neighbor_method'],
-        dist_method=real_intra_exp_adj_paras['dist_method'],
-        PCA_dimensionality_reduction=real_intra_exp_adj_paras['PCA_dimensionality_reduction'],
-        corr_dist_neighbors=real_intra_exp_adj_paras['corr_dist_neighbors'],
-    )
+    # Preprocess (Normalize, Log, Scale)
+    st_adata_norm = ST_preprocess(st_adata_filt, **data_normalization_paras)
+    pseudo_adata_norm = ST_preprocess(pseudo_adata_filt, **data_normalization_paras)
 
-    A_pseudo_intra_exp = intra_exp_adj(
-        pseudo_adata_norm,
-        find_neighbor_method=pseudo_intra_exp_adj_paras['find_neighbor_method'],
-        dist_method=pseudo_intra_exp_adj_paras['dist_method'],
-        PCA_dimensionality_reduction=pseudo_intra_exp_adj_paras['PCA_dimensionality_reduction'],
-        corr_dist_neighbors=pseudo_intra_exp_adj_paras['corr_dist_neighbors'],
-    )
+    # Add metadata (careful with potential missing columns)
+    # ST data
+    for meta_col in ['cell_num'] + list(cell_types):
+        if meta_col in st_adata.obs.columns:
+            st_adata_norm.obs[meta_col] = st_adata.obs.loc[st_adata_norm.obs_names, meta_col]
+        elif meta_col != 'cell_num':  # Add cell types as 0 if GT wasn't loaded or missing
+            st_adata_norm.obs[meta_col] = 0
+    if 'cell_num' not in st_adata_norm.obs:
+        st_adata_norm.obs['cell_num'] = 0  # Default if not present
+    st_adata_norm.obs['cell_type_num'] = (st_adata_norm.obs[list(cell_types)] > 0).sum(axis=1)
 
-    real_num = ST_adata_filter.shape[0]
-    pseudo_num = pseudo_adata.shape[0]
+    # Pseudo data (already has cell type fractions)
+    pseudo_adata_norm.obs['cell_type_num'] = (pseudo_adata_norm.obs[list(cell_types)] > 0).sum(axis=1)
 
-    adj_inter_exp = A_inter_exp.values
+    return st_adata_norm, pseudo_adata_norm
+
+
+def prepare_adjacency_matrices(st_adata_norm, pseudo_adata_norm, integration_adj_paras, inter_exp_adj_paras,
+                               real_intra_exp_adj_paras, pseudo_intra_exp_adj_paras, spatial_adj_paras, n_jobs, device):
+    """Computes all adjacency matrices."""
+    print("Preparing adjacency matrices...")
+    # 1. Integration for Adjacency
+    st_integration_adj = data_integration(st_adata_norm, pseudo_adata_norm, cpu_num=n_jobs, AE_device=device,
+                                          **integration_adj_paras)  # Pass dict
+
+    # 2. Inter-Expression Adjacency (Real <-> Pseudo)
+    A_inter_exp = inter_adj(st_integration_adj, **inter_exp_adj_paras)  # Pass dict
+
+    # 3. Intra-Spatial Adjacency (Real <-> Real based on coordinates)
+    A_intra_space = intra_dist_adj(st_adata_norm, **spatial_adj_paras)  # Pass dict
+
+    # 4. Intra-Expression Adjacency (Real <-> Real based on expression)
+    A_real_intra_exp = intra_exp_adj(st_adata_norm, **real_intra_exp_adj_paras)  # Pass dict
+
+    # 5. Intra-Expression Adjacency (Pseudo <-> Pseudo based on expression)
+    A_pseudo_intra_exp = intra_exp_adj(pseudo_adata_norm, **pseudo_intra_exp_adj_paras)  # Pass dict
+
+    return A_inter_exp, A_intra_space, A_real_intra_exp, A_pseudo_intra_exp
+
+
+def combine_and_normalize_adj(A_inter_exp, A_real_intra_exp, A_pseudo_intra_exp, A_intra_space, real_num, pseudo_num,
+                              adj_alpha=1, adj_beta=1, diag_power=20, normalize=True):
+    """Combines individual adjacency matrices into final expression and spatial
+    matrices, applies normalization."""
+    print("Combining and normalizing adjacency matrices...")
+    total_num = real_num + pseudo_num
+
+    adj_inter_exp_np = A_inter_exp.values  # Get numpy array from DataFrame if needed
     adj_pseudo_intra_exp = A_intra_transfer(A_pseudo_intra_exp, 'pseudo', real_num, pseudo_num)
     adj_real_intra_exp = A_intra_transfer(A_real_intra_exp, 'real', real_num, pseudo_num)
     adj_intra_space = A_intra_transfer(A_intra_space, 'real', real_num, pseudo_num)
 
-    adj_alpha = 1
-    adj_beta = 1
-    diag_power = 20
+    # Combine expression matrices
     adj_balance = (1 + adj_alpha + adj_beta) * diag_power
-    adj_exp = torch.tensor(adj_inter_exp + adj_alpha * adj_pseudo_intra_exp +
-                           adj_beta * adj_real_intra_exp) / adj_balance + torch.eye(adj_inter_exp.shape[0])
-    adj_sp = torch.tensor(adj_intra_space) / diag_power + torch.eye(adj_intra_space.shape[0])
+    adj_exp_comb = adj_inter_exp_np + adj_alpha * adj_pseudo_intra_exp + adj_beta * adj_real_intra_exp
+    adj_exp_final = torch.tensor(adj_exp_comb / adj_balance) + torch.eye(total_num)
 
-    norm = True
-    if (norm == True):
-        adj_exp = torch.tensor(adj_normalize(adj_exp, symmetry=True))
-        adj_sp = torch.tensor(adj_normalize(adj_sp, symmetry=True))
+    # Prepare spatial matrix
+    adj_sp_final = torch.tensor(adj_intra_space / diag_power) + torch.eye(total_num)
 
-    ST_integration_batch_removed = data_integration(
-        ST_adata_filter_norm, pseudo_adata_norm,
-        batch_removal_method=integration_for_feature_paras['batch_removal_method'],
-        dim=min(int(ST_adata_filter_norm.shape[1] * 1 / 2), integration_for_feature_paras['dim']),
-        dimensionality_reduction_method=integration_for_feature_paras['dimensionality_reduction_method'],
-        scale=integration_for_feature_paras['scale'], cpu_num=n_jobs, AE_device=GCN_device)
-    feature = torch.tensor(ST_integration_batch_removed.iloc[:, 3:].values)
+    # Normalize
+    if normalize:
+        # Ensure adj_normalize returns torch tensors if symmetry=True is expected downstream
+        adj_exp_final = torch.tensor(adj_normalize(adj_exp_final, symmetry=True)).float()
+        adj_sp_final = torch.tensor(adj_normalize(adj_sp_final, symmetry=True)).float()
+    else:
+        adj_exp_final = adj_exp_final.float()
+        adj_sp_final = adj_sp_final.float()
 
-    input_layer = feature.shape[1]
-    hidden_layer = min(int(ST_adata_filter_norm.shape[1] * 1 / 2), GCN_paras['dim'])
-    output_layer1 = len(word_to_idx_celltype)
-    epoch_n = GCN_paras['epoch_n']
-    common_hid_layers_num = GCN_paras['common_hid_layers_num']
-    fcnn_hid_layers_num = GCN_paras['fcnn_hid_layers_num']
-    dropout = GCN_paras['dropout']
-    learning_rate_SGD = GCN_paras['learning_rate_SGD']
-    weight_decay_SGD = GCN_paras['weight_decay_SGD']
-    momentum = GCN_paras['momentum']
-    dampening = GCN_paras['dampening']
-    nesterov = GCN_paras['nesterov']
-    early_stopping_patience = GCN_paras['early_stopping_patience']
-    clip_grad_max_norm = GCN_paras['clip_grad_max_norm']
-    LambdaLR_scheduler_coefficient = 0.997
+    return adj_exp_final, adj_sp_final
+
+
+def prepare_feature_matrix(st_adata_norm, pseudo_adata_norm, integration_feature_paras, n_jobs, device):
+    """Integrates data for the final GCN feature matrix."""
+    print("Preparing feature matrix...")
+    st_integration_feat = data_integration(st_adata_norm, pseudo_adata_norm, cpu_num=n_jobs, AE_device=device,
+                                           **integration_feature_paras)  # Pass dict
+
+    # Assuming data_integration returns a pandas DataFrame where first columns might be metadata
+    # The original code selects [:, 3:]. Adapt if the structure is different.
+    if isinstance(st_integration_feat, pd.DataFrame):
+        # Check if the DataFrame has enough columns to slice from the 4th one
+        if st_integration_feat.shape[1] > 3:
+            feature_np = st_integration_feat.iloc[:, 3:].values
+        else:
+            # Handle case where there are 3 or fewer columns (maybe no metadata added)
+            print("Warning: Feature DataFrame has <= 3 columns. Using all columns as features.")
+            feature_np = st_integration_feat.values
+    elif isinstance(st_integration_feat, np.ndarray):
+        # If it's already a numpy array, assume it's the feature matrix
+        feature_np = st_integration_feat
+    else:
+        raise TypeError("Unsupported type returned by data_integration for features.")
+
+    return torch.tensor(feature_np).float()  # Ensure float tensor
+
+
+def setup_gcn_components(feature_dim, hidden_dim, output_dim, GCN_paras):
+    """Initializes GCN model, optimizer, scheduler, and loss function."""
+    print("Setting up GCN components...")
+    model = conGCN(nfeat=feature_dim, nhid=hidden_dim, nout1=output_dim,
+                   common_hid_layers_num=GCN_paras['common_hid_layers_num'],
+                   fcnn_hid_layers_num=GCN_paras['fcnn_hid_layers_num'], dropout=GCN_paras['dropout'])
+
+    optimizer = torch.optim.SGD(model.parameters(), lr=GCN_paras['learning_rate_SGD'], momentum=GCN_paras['momentum'],
+                                weight_decay=GCN_paras['weight_decay_SGD'], dampening=GCN_paras['dampening'],
+                                nesterov=GCN_paras['nesterov'])
+
+    # Define Schedulers (only create the one selected)
+    scheduler_type = 'scheduler_ReduceLROnPlateau'  # Default or make configurable
+    LambdaLR_scheduler_coefficient = 0.997  # Hardcoded, could be in GCN_paras
     ReduceLROnPlateau_factor = 0.1
     ReduceLROnPlateau_patience = 5
-    scheduler = 'scheduler_ReduceLROnPlateau'
-    print_epoch_step = GCN_paras['print_loss_epoch_step']
-    cpu_num = n_jobs
 
-    model = conGCN(nfeat=input_layer, nhid=hidden_layer, common_hid_layers_num=common_hid_layers_num,
-                   fcnn_hid_layers_num=fcnn_hid_layers_num, dropout=dropout, nout1=output_layer1)
+    scheduler = None
+    if scheduler_type == 'scheduler_LambdaLR':
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
+                                                      lr_lambda=lambda epoch: LambdaLR_scheduler_coefficient**epoch)
+    elif scheduler_type == 'scheduler_ReduceLROnPlateau':
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode='min',  # Usually for validation loss
+            factor=ReduceLROnPlateau_factor,
+            patience=ReduceLROnPlateau_patience,
+            threshold=0.0001,
+            threshold_mode='rel',
+            cooldown=0,
+            min_lr=0)
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate_SGD, momentum=momentum,
-                                weight_decay=weight_decay_SGD, dampening=dampening, nesterov=nesterov)
+    loss_fn = nn.KLDivLoss(reduction='mean')  # KL divergence loss
 
-    scheduler_LambdaLR = torch.optim.lr_scheduler.LambdaLR(
-        optimizer, lr_lambda=lambda epoch: LambdaLR_scheduler_coefficient**epoch)
-    scheduler_ReduceLROnPlateau = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min',
-                                                                             factor=ReduceLROnPlateau_factor,
-                                                                             patience=ReduceLROnPlateau_patience,
-                                                                             threshold=0.0001, threshold_mode='rel',
-                                                                             cooldown=0, min_lr=0)
-    if scheduler == 'scheduler_LambdaLR':
-        scheduler = scheduler_LambdaLR
-    elif scheduler == 'scheduler_ReduceLROnPlateau':
-        scheduler = scheduler_ReduceLROnPlateau
-    else:
-        scheduler = None
+    return model, optimizer, scheduler, loss_fn
 
-    loss_fn1 = nn.KLDivLoss(reduction='mean')
 
-    train_valid_len = pseudo_adata.shape[0]
-    test_len = ST_adata_filter.shape[0]
+def save_and_plot_results(output_path, st_adata_norm, trained_model, loss_history, predictions_raw, cell_types,
+                          pseudo_adata_obs_cols, load_test_groundtruth, fraction_pie_plot, cell_type_distribution_plot):
+    """Saves model, predictions, loss plot, and generates visualization plots."""
+    print("Saving results and plotting...")
 
-    table1 = ST_adata_filter_norm.obs.copy()
-    label1 = table1[pseudo_adata.obs.iloc[:, :-1].columns].append(pseudo_adata.obs.iloc[:, :-1])
-    label1 = torch.tensor(label1.values)
-
-    adjs = [adj_exp.float(), adj_sp.float()]
-
-    output1, loss, trained_model = conGCN_train(
-        model=model, train_valid_len=train_valid_len, train_valid_ratio=0.9, test_len=test_len, feature=feature,
-        adjs=adjs, label=label1, epoch_n=epoch_n, loss_fn=loss_fn1, optimizer=optimizer, scheduler=scheduler,
-        early_stopping_patience=early_stopping_patience, clip_grad_max_norm=clip_grad_max_norm,
-        load_test_groundtruth=load_test_groundtruth, print_epoch_step=print_epoch_step, cpu_num=cpu_num,
-        GCN_device=GCN_device)
-
-    loss_table = pd.DataFrame(loss, columns=['train', 'valid', 'test'])
-
+    # 1. Save Loss Plot
+    loss_table = pd.DataFrame(loss_history, columns=['train', 'valid', 'test'])  # Assuming order from conGCN_train
     fig, ax = plt.subplots(figsize=(7, 7))
-    ax.plot(loss_table.index, loss_table['train'], label='train')
-    ax.plot(loss_table.index, loss_table['valid'], label='valid')
-    if load_test_groundtruth == True:
-        ax.plot(loss_table.index, loss_table['test'], label='test')
+    ax.plot(loss_table.index, loss_table['train'], label='Train Loss')
+    ax.plot(loss_table.index, loss_table['valid'], label='Validation Loss')
+    if load_test_groundtruth and 'test' in loss_table.columns:
+        ax.plot(loss_table.index, loss_table['test'], label='Test Loss (if GT loaded)')
     ax.set_xlabel('Epoch', fontsize=20)
-    ax.set_ylabel('Loss', fontsize=20)
-    ax.set_title('Loss function curve', fontsize=20)
+    ax.set_ylabel('Loss (KLDiv)', fontsize=20)
+    ax.set_title('Loss Curve', fontsize=20)
     ax.legend(fontsize=15)
     plt.tight_layout()
-    plt.savefig(output_path + '/Loss_function.jpg', dpi=300)
-    plt.close('all')
+    loss_fig_path = os.path.join(output_path, 'Loss_function.jpg')
+    plt.savefig(loss_fig_path, dpi=300)
+    print(f"Saved loss plot to {loss_fig_path}")
+    plt.close(fig)
 
-    predict_table = pd.DataFrame(
-        np.exp(output1[:test_len].detach().numpy()).tolist(), index=ST_adata_filter_norm.obs.index,
-        columns=pseudo_adata_norm.obs.columns[:-2])
-    predict_table.to_csv(output_path + '/predict_result.csv', index=True, header=True)
+    # 2. Save Prediction Table
+    # Ensure predictions are detached, moved to cpu, converted to numpy, and exponentiated
+    predictions_np = np.exp(predictions_raw.detach().cpu().numpy())
+    # Use cell_types derived from scRNA-seq data for columns
+    # Ensure the number of columns in predictions matches the number of cell types
+    if predictions_np.shape[1] != len(cell_types):
+        print(
+            f"Warning: Number of prediction columns ({predictions_np.shape[1]}) does not match number of cell types ({len(cell_types)}). Using pseudo_adata columns derived during preprocessing."
+        )
+        # Fallback to columns used during label creation (might be safer)
+        predict_cols = pseudo_adata_obs_cols
+        if predictions_np.shape[1] != len(predict_cols):
+            raise ValueError(
+                f"Prediction column count ({predictions_np.shape[1]}) doesn't match expected columns ({len(predict_cols)})."
+            )
+    else:
+        predict_cols = cell_types
 
-    torch.save(trained_model, output_path + '/model_parameters')
+    predict_table = pd.DataFrame(predictions_np, index=st_adata_norm.obs_names, columns=predict_cols)
+    pred_file_path = os.path.join(output_path, 'predict_result.csv')
+    predict_table.to_csv(pred_file_path, index=True, header=True)
+    print(f"Saved prediction table to {pred_file_path}")
 
-    pred_use = np.round_(output1.exp().detach()[:test_len], decimals=4)
-    cell_type_list = cell_types
-    coordinates = ST_adata_filter_norm.obs[['coor_X', 'coor_Y']]
+    # 3. Save Model Parameters
+    model_path = os.path.join(output_path, 'model_parameters.pth')  # Use .pth extension
+    torch.save(trained_model.state_dict(), model_path)  # Save state_dict is generally preferred
+    print(f"Saved trained model state_dict to {model_path}")
 
-    if fraction_pie_plot == True:
-        plot_frac_results(pred_use, cell_type_list, coordinates, point_size=300, size_coefficient=0.0009,
-                          file_name=output_path + '/predict_results_pie_plot.jpg', if_show=False)
+    # 4. Generate Plots (if requested)
+    coordinates = st_adata_norm.obs[['coor_X', 'coor_Y']]
+    pred_use_for_plot = np.round_(predictions_np, decimals=4)  # Use already processed predictions
 
-    if cell_type_distribution_plot == True:
-        plot_scatter_by_type(pred_use, cell_type_list, coordinates, point_size=300, file_path=output_path,
-                             if_show=False)
+    if fraction_pie_plot:
+        print("Generating fraction pie plot...")
+        try:
+            plot_frac_results(pred_use_for_plot, predict_cols, coordinates, point_size=300, size_coefficient=0.0009,
+                              file_name=os.path.join(output_path, 'predict_results_pie_plot.jpg'), if_show=False)
+            print("Saved fraction pie plot.")
+        except Exception as e:
+            print(f"Error generating fraction pie plot: {e}")
 
-    ST_adata_filter_norm.obsm['predict_result'] = np.exp(output1[:test_len].detach().numpy())
-
-    torch.cuda.empty_cache()
-
-    return ST_adata_filter_norm
+    if cell_type_distribution_plot:
+        print("Generating cell type distribution plots...")
+        try:
+            plot_scatter_by_type(pred_use_for_plot, predict_cols, coordinates, point_size=300, file_path=output_path,
+                                 if_show=False)
+            print("Saved cell type distribution plots.")
+        except Exception as e:
+            print(f"Error generating cell type distribution plots: {e}")
 
 
 import numpy as np

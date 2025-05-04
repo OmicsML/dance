@@ -37,13 +37,14 @@ class WeightedFeaturePCA(BaseTransform):
     _DISPLAY_ATTRS = ("n_components", "split_name", "feat_norm_mode", "feat_norm_axis")
 
     def __init__(self, n_components: Union[float, int] = 400, split_name: Optional[str] = None,
-                 feat_norm_mode: Optional[str] = None, feat_norm_axis: int = 0, **kwargs):
+                 feat_norm_mode: Optional[str] = None, feat_norm_axis: int = 0, save_info=False, **kwargs):
         super().__init__(**kwargs)
 
         self.n_components = n_components
         self.split_name = split_name
         self.feat_norm_mode = feat_norm_mode
         self.feat_norm_axis = feat_norm_axis
+        self.save_info = save_info
 
     def __call__(self, data):
         feat = data.get_x(self.split_name)  # cell x genes
@@ -56,17 +57,21 @@ class WeightedFeaturePCA(BaseTransform):
                 f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='full'"
             )
             self.n_components = min(feat.shape)
-        gene_pca = PCA(n_components=self.n_components)
+        gene_pca = PCA(n_components=self.n_components)  # genes x components
 
         gene_feat = gene_pca.fit_transform(feat.T)  # decompose into gene features
         self.logger.info(f"Decomposing {self.split_name} features {feat.shape} (k={gene_pca.n_components_})")
         self.logger.info(f"Total explained variance: {gene_pca.explained_variance_ratio_.sum():.2%}")
 
         x = data.get_x()
-        cell_feat = normalize(x, mode="normalize", axis=1) @ gene_feat
+        cell_feat = normalize(x, mode="normalize", axis=1) @ gene_feat  # cells x components
         data.data.obsm[self.out] = cell_feat.astype(np.float32)
         data.data.varm[self.out] = gene_feat.astype(np.float32)
-
+        if self.save_info:
+            data.data.uns["pca_components"] = gene_pca.components_
+            data.data.uns["pca_mean"] = gene_pca.mean_
+            data.data.uns["pca_explained_variance"] = gene_pca.explained_variance_
+            data.data.uns["pca_explained_variance_ratio"] = gene_pca.explained_variance_ratio_
         return data
 
 
@@ -93,13 +98,14 @@ class WeightedFeatureSVD(BaseTransform):
     _DISPLAY_ATTRS = ("n_components", "split_name", "feat_norm_mode", "feat_norm_axis")
 
     def __init__(self, n_components: Union[float, int] = 400, split_name: Optional[str] = None,
-                 feat_norm_mode: Optional[str] = None, feat_norm_axis: int = 0, **kwargs):
+                 feat_norm_mode: Optional[str] = None, feat_norm_axis: int = 0, save_info: bool = False, **kwargs):
         super().__init__(**kwargs)
 
         self.n_components = n_components
         self.split_name = split_name
         self.feat_norm_mode = feat_norm_mode
         self.feat_norm_axis = feat_norm_axis
+        self.save_info = save_info
 
     def __call__(self, data):
         feat = data.get_x(self.split_name)  # cell x genes
@@ -128,7 +134,10 @@ class WeightedFeatureSVD(BaseTransform):
         cell_feat = normalize(x, mode="normalize", axis=1) @ gene_feat
         data.data.obsm[self.out] = cell_feat.astype(np.float32)
         data.data.varm[self.out] = gene_feat.astype(np.float32)
-
+        if self.save_info:
+            data.data.uns["svd_components"] = gene_svd.components_
+            data.data.uns["svd_explained_variance"] = gene_svd.explained_variance_
+            data.data.uns["svd_explained_variance_ratio"] = gene_svd.explained_variance_ratio_
         return data
 
 

@@ -132,7 +132,8 @@ class FilterScanpy(BaseTransform):
             subset_func = getattr(data.data, self._subsetting_func_name)
             self.logger.info(f"Subsetting {self._FILTER_TARGET} ({~subset_ind.sum():,} removed) due to {self}")
             if self.inplace:
-                subset_func(subset_ind)
+                data.filter_by_mask(subset_ind)
+                # subset_func(subset_ind)
             else:
                 if self._FILTER_TARGET == "genes":
                     data.data.obsm[self.out] = x[:, subset_ind]
@@ -1502,6 +1503,7 @@ class FilterCellsType(BaseTransform):  #TODO not in search
         else:
             print("No cell types below threshold. Keeping all cells.")
             keep_mask = pd.Series(True, index=adata.obs_names)
+        # adata = adata[keep_mask, :]
         data.filter_by_mask(keep_mask)
         return data
 
