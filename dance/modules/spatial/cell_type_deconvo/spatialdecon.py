@@ -8,6 +8,8 @@ Danaher, Kim, Nelson, et al. "Advances in mixed cell deconvolution enable quanti
 transcriptomic data." Nature Communications (2022)
 
 """
+from typing import Mapping, Tuple, Union
+
 import torch
 import torch.nn as nn
 from torch import optim
@@ -17,6 +19,7 @@ from dance.modules.base import BaseRegressionMethod
 from dance.transforms import CellTopicProfile, Compose, SetConfig
 from dance.typing import Any, LogLevel, Optional
 from dance.utils import get_device
+from dance.utils.metrics import resolve_score_func
 
 
 class MSLELoss(nn.Module):
@@ -140,3 +143,34 @@ class SpatialDecon(BaseRegressionMethod):
                 self.model.weight.copy_(self.model.weight.data.clamp(min=0))
             if iteration % print_period == 0:
                 logger.info(f"Epoch: {iteration:02}/{max_iter} Loss: {loss.item():.5e}")
+
+    def score(self, x, y, *, score_func: Optional[Union[str, Mapping[Any, float]]] = None, return_pred: bool = False,
+              valid_idx=None, test_idx=None) -> Union[float, Tuple[float, Any]]:
+        y_pred = self.predict(x)
+        func = resolve_score_func(score_func or self._DEFAULT_METRIC)
+        if valid_idx is None:
+            score = func(y, y_pred)
+            return (score, y_pred) if return_pred else score
+        else:
+            valid_score = func(y[valid_idx], y_pred[valid_idx])
+            test_score = func(y[test_idx], y_pred[test_idx])
+            return ({
+                "valid_score": valid_score,
+                "test_score": test_score
+            }, y_pred) if return_pred else {
+                "valid_score": valid_score,
+                "test_score": test_score
+            }
+
+    def fit_score(self, x, y, *, score_func: Optional[Union[str, Mapping[Any,
+                                                                         float]]] = None, return_pred: bool = False,
+                  valid_idx=None, test_idx=None, **fit_kwargs) -> Union[float, Tuple[float, Any]]:
+        """Shortcut for fitting data using the input feature and return eval.
+
+        Note
+        ----
+        Only work for models where the fitting does not require labeled data, i.e. unsupervised methods.
+
+        """
+        self.fit(x, **fit_kwargs)
+        return self.score(x, y, score_func=score_func, return_pred=return_pred, valid_idx=valid_idx, test_idx=test_idx)

@@ -5,8 +5,11 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import wandb
+from sklearn.model_selection import train_test_split
+from torch import mode
+from traitlets import default
 
+import wandb
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.spagcn import SpaGCN, refine
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
@@ -61,6 +64,8 @@ if __name__ == "__main__":
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
+        total_idx = data.get_split_idx("train")
+        valid_idx, test_idx = train_test_split(total_idx, test_size=0.9, random_state=args.seed)
         (x, adj, adj_2d), y = data.get_train_data()
 
         # Train and evaluate model
@@ -71,11 +76,19 @@ if __name__ == "__main__":
 
         pred = model.fit_predict((x, adj), init_spa=True, init="louvain", tol=args.tol, lr=args.lr, epochs=args.epochs,
                                  res=res)
-        score = model.default_score_func(y, pred)
-
+        # score = model.default_score_func(y, pred)
+        valid_score = model.default_score_func(y[valid_idx], pred[valid_idx])
+        test_score = model.default_score_func(y[test_idx], pred[test_idx])
         refined_pred = refine(sample_id=data.data.obs_names.tolist(), pred=pred.tolist(), dis=adj_2d, shape="hexagon")
-        score_refined = model.default_score_func(y, refined_pred)
-        wandb.log({"ARI": score, "ARI (refined)": score_refined})
+        # score_refined = model.default_score_func(y, refined_pred)
+        valid_score_refined = model.default_score_func(y[valid_idx], refined_pred[valid_idx])
+        test_score_refined = model.default_score_func(y[test_idx], refined_pred[test_idx])
+        wandb.log({
+            "ARI": valid_score,
+            "ARI (refined)": valid_score_refined,
+            "test_ARI": test_score,
+            "test_ARI_refined": test_score_refined
+        })
         gc.collect()
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(

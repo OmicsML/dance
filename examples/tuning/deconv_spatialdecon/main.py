@@ -5,8 +5,9 @@ from pathlib import Path
 from pprint import pprint
 
 import numpy as np
-import wandb
+from sklearn.model_selection import train_test_split
 
+import wandb
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.spatialdecon import SpatialDecon
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
@@ -47,6 +48,8 @@ def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer)
     preprocessing_pipeline = pipeline_planer.generate(**kwargs)
     print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
     preprocessing_pipeline(data)
+    total_idx = data.get_split_idx("test")
+    valid_idx, test_idx = train_test_split(total_idx, test_size=0.9, random_state=args.seed)
     cell_types = data.data.obsm["cell_type_portion"].columns.tolist()
 
     x, y = data.get_data(split_name="test", return_type="torch")
@@ -54,8 +57,9 @@ def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer)
 
     # Train and evaluate model
     spaDecon = SpatialDecon(ct_profile, ct_select=cell_types, bias=args.bias, device=args.device)
-    score = spaDecon.fit_score(x, y, lr=args.lr, max_iter=args.max_iter, print_period=100)
-    wandb.log({"MSE": score})
+    valid_score, test_score = spaDecon.fit_score(x, y, lr=args.lr, max_iter=args.max_iter, print_period=100,
+                                                 valid_idx=valid_idx, test_idx=test_idx)
+    wandb.log({"MSE": valid_score, "test_MSE": test_score})
 
 
 entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(evaluate_pipeline, sweep_id=args.sweep_id,

@@ -28,6 +28,7 @@ from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.transforms.cell_feature import CellPCA
 from dance.transforms.filter import (
+    FilterCellsScanpy,
     FilterCellsType,
     HighlyVariableGenesLogarithmizedByMeanAndDisp,
     HighlyVariableGenesLogarithmizedByTopGenes,
@@ -585,7 +586,7 @@ class scHeteroNet(nn.Module, BaseClassificationMethod):
         transforms = []
         transforms.append(FilterCellsType())
         transforms.append(AnnDataTransform(sc.pp.filter_genes, min_counts=3))
-        transforms.append(AnnDataTransform(sc.pp.filter_cells, min_counts=1))
+        transforms.append(FilterCellsScanpy(min_counts=1))
         transforms.append(HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=4000, flavor="cell_ranger"))
         transforms.append(SaveRaw())
         transforms.append(NormalizeTotal())

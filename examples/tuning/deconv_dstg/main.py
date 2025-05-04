@@ -6,8 +6,9 @@ from pprint import pprint
 
 import numpy as np
 import torch
-import wandb
+from sklearn.model_selection import train_test_split
 
+import wandb
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo import DSTG
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
@@ -54,19 +55,23 @@ if __name__ == "__main__":
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
+        ref_idx = data.get_split_idx("ref")
+        valid_idx, test_idx = train_test_split(ref_idx, test_size=0.9, random_state=args.seed)
         (adj, x), y = data.get_data(return_type="default")
         x, y = torch.FloatTensor(x), torch.FloatTensor(y.values)
         adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
                                        torch.FloatTensor(adj.data.astype(np.int32)))
         train_mask = data.get_split_mask("pseudo", return_type="torch")
+        train_mask, valid_mask = train_test_split(train_mask, test_size=0.25, random_state=args.seed)
         inputs = (adj, x, train_mask)
 
         # Train and evaluate model
         model = DSTG(nhid=args.nhid, bias=args.bias, dropout=args.dropout, device=args.device)
         pred = model.fit_predict(inputs, y, lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
-        test_mask = data.get_split_mask("test", return_type="torch")
-        score = model.default_score_func(y[test_mask], pred[test_mask])
-        wandb.log({"MSE": score})
+        test_mask = data.get_split_mask("test", return_type="torch")  #TODO 进行修改
+        valid_score = model.default_score_func(y[valid_mask], pred[valid_mask])
+        test_score = model.default_score_func(y[test_mask], pred[test_mask])
+        wandb.log({"MSE": valid_score, "test_MSE": test_score})
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch

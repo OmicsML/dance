@@ -76,29 +76,6 @@ from dance.typing import Literal, Optional
 #         return data
 
 
-# Assuming BaseTransform and register_preprocessor are defined elsewhere
-# For demonstration, let's define dummy versions:
-class BaseTransform:
-
-    def __init__(self, **kwargs):
-        self.logger = logging.getLogger(self.__class__.__name__)
-        # Process remaining kwargs if needed by the base class
-        pass
-
-
-def register_preprocessor(name, stage):
-
-    def decorator(cls):
-        # In a real scenario, this would register the class
-        # For now, it just returns the class unmodified
-        return cls
-
-    return decorator
-
-
-# --- Modified Class ---
-
-
 @register_preprocessor("split", "entry")
 class CellwiseMaskData(BaseTransform):
     """Randomly mask data in a cell-wise approach.
