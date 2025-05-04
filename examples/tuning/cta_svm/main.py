@@ -21,25 +21,25 @@ from dance.typing import LogLevel
 from dance.utils import set_seed
 
 
-@register_preprocessor("feature", "cell")  # NOTE: register any custom preprocessing function to be used for tuning
-class GaussRandProjFeature(BaseTransform):
-    """Custom preprocessing to extract cell feature via Gaussian random projection."""
+# @register_preprocessor("feature", "cell")  # NOTE: register any custom preprocessing function to be used for tuning
+# class GaussRandProjFeature(BaseTransform):
+#     """Custom preprocessing to extract cell feature via Gaussian random projection."""
 
-    _DISPLAY_ATTRS = ("n_components", "eps")
+#     _DISPLAY_ATTRS = ("n_components", "eps")
 
-    def __init__(self, n_components: int = 400, eps: float = 0.1, **kwargs):
-        super().__init__(**kwargs)
-        self.n_components = n_components
-        self.eps = eps
+#     def __init__(self, n_components: int = 400, eps: float = 0.1, **kwargs):
+#         super().__init__(**kwargs)
+#         self.n_components = n_components
+#         self.eps = eps
 
-    def __call__(self, data):
-        feat = data.get_feature(return_type="numpy")
-        grp = GaussianRandomProjection(n_components=self.n_components, eps=self.eps)
+#     def __call__(self, data):
+#         feat = data.get_feature(return_type="numpy")
+#         grp = GaussianRandomProjection(n_components=self.n_components, eps=self.eps)
 
-        self.logger.info(f"Start generateing cell feature via Gaussian random projection (d={self.n_components}).")
-        data.data.obsm[self.out] = grp.fit_transform(feat)
+#         self.logger.info(f"Start generateing cell feature via Gaussian random projection (d={self.n_components}).")
+#         data.data.obsm[self.out] = grp.fit_transform(feat)
 
-        return data
+#         return data
 
 
 if __name__ == "__main__":
@@ -59,6 +59,7 @@ if __name__ == "__main__":
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
+    parser.add_argument('--additional_sweep_ids', action='append', type=str, help='get prior runs')
     args = parser.parse_args()
     logger.setLevel(args.log_level)
     logger.info(f"\n{pprint.pformat(vars(args))}")
