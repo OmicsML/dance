@@ -40,4 +40,6 @@ def list_files(directory, file_name="out.log", save_path="summary_file.csv"):
 
 
 if __name__ == "__main__":
-    list_files("/home/zyxing/dance/examples/tuning")
+    # list_files("/home/zyxing/dance/examples/tuning")
+
+    print(read_log("/home/zyxing/dance/examples/tuning/deconv_dstg/SPOTLight_synthetic/out.log"))
