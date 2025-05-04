@@ -26,3 +26,4 @@ examples/tuning/**/*.tar.gz
 examples/tuning/**/*.tif
 examples/tuning/**/*.txt
 examples/atlas/config/run_config.csv
+examples/tuning/figures
