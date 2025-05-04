@@ -14,11 +14,11 @@ from dance.settings import DANCEDIR, SIMILARITYDIR
 sys.path.append(str(DANCEDIR))
 import ast
 
-from get_result_web import get_sweep_url, spilt_web
+from get_result_web import get_sweep_url
 
 from dance import logger
 from dance.settings import entity, project
-from dance.utils import try_import
+from dance.utils import spilt_web, try_import
 
 file_root = str(Path(__file__).resolve().parent.parent)
 

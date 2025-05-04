@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from dance.settings import ATLASDIR, SIMILARITYDIR
-from dance.utils import set_seed, try_import
+from dance.utils import set_seed, spilt_web, try_import
 
 sys.path.append(str(SIMILARITYDIR))
 sys.path.append(str(ATLASDIR))
@@ -16,7 +16,6 @@ import json
 
 import matplotlib.pyplot as plt
 import seaborn as sns
-from get_result_web import spilt_web
 from similarity.process_tissue_similarity_matrices import convert_to_complex
 
 wandb = try_import("wandb")
@@ -130,12 +129,12 @@ def vis(data, target_value, title, ax):
     data_df = pd.DataFrame({'test_acc': data})
     sns.violinplot(y='test_acc', data=data_df, inner=None, color='skyblue', ax=ax)
     median = np.median(data)
-    ax.axhline(median, color='gray', linestyle='--', label=f'Median: {median:.1f}')
+    ax.axhline(median, color='gray', linestyle='--', label=f'Median: {median:.4f}')
     if np.isnan(target_value):
         target_value = -0.01
     percentile = (np.sum(data < float(target_value)) / len(data)) * 100
     ax.scatter(0, float(target_value), color='red', s=100, zorder=5,
-               label=f'Specific Value: {target_value}\n({percentile:.1f} percentile)')
+               label=f'Specific Value: {target_value:.4f}\n({percentile:.1f} percentile)')
     ax.set_title(str(title))
     ax.set_ylabel('test_acc')
     ax.title.set_size(16)
