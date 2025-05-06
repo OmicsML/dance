@@ -137,7 +137,7 @@ class FilterScanpy(BaseTransform):
                 else:
                     data.filter_by_mask(subset_ind)
                     # subset_func(subset_ind)
-                
+
             else:
                 if self._FILTER_TARGET == "genes":
                     data.data.obsm[self.out] = x[:, subset_ind]
