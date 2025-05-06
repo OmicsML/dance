@@ -241,7 +241,7 @@ class CellwiseMaskData(BaseTransform):
                     if n_total_masked_in_cell > 0:
                         # Calculate the number of validation samples (approx 10%)
                         # Use rounding, ensure at least 1 if possible (unless total is 0)
-                        n_valid = int(np.round(n_total_masked_in_cell * 0.1))
+                        n_valid = int(np.round(n_total_masked_in_cell * 0.1))#TODO 改为0.7
                         n_valid = max(
                             1, n_valid
                         ) if n_total_masked_in_cell > 1 else n_total_masked_in_cell  # Ensure at least 1 unless only 1 total

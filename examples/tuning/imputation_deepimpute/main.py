@@ -18,7 +18,7 @@ from dance.utils import set_seed
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dropout", type=float, default=0.1, help="dropout probability")
-    parser.add_argument("--gpu", type=int, default=0, help="GPU id, -1 for cpu")
+    parser.add_argument("--gpu", type=int, default=1, help="GPU id, -1 for cpu")
     parser.add_argument("--lr", type=float, default=1e-5, help="learning rate")
     parser.add_argument("--n_epochs", type=int, default=500, help="number of training epochs")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size.")
@@ -84,15 +84,15 @@ if __name__ == '__main__':
 
         model.fit(X_train, X_train, mask, params.batch_size, params.lr, params.n_epochs, params.patience)
         imputed_data = model.predict(X_train, mask)
-        train_RMSE = model.score(X, imputed_data, ~mask, "RMSE")
-        train_pcc = model.score(X, imputed_data, ~mask, "PCC")
-        train_mre = model.score(X, imputed_data, ~mask, metric="MRE")
-        val_RMSE = model.score(X, imputed_data, ~valid_mask, "RMSE")
-        val_pcc = model.score(X, imputed_data, ~valid_mask, "PCC")
-        val_mre = model.score(X, imputed_data, ~valid_mask, metric="MRE")
-        test_RMSE = model.score(X, imputed_data, ~test_mask, "RMSE")
-        test_pcc = model.score(X, imputed_data, ~test_mask, "PCC")
-        test_mre = model.score(X, imputed_data, ~test_mask, metric="MRE")
+        train_RMSE = model.score(X, imputed_data.clone(), ~mask, "RMSE")
+        train_pcc = model.score(X, imputed_data.clone(), ~mask, "PCC")
+        train_mre = model.score(X, imputed_data.clone(), ~mask, metric="MRE")
+        val_RMSE = model.score(X, imputed_data.clone(), ~valid_mask, "RMSE")
+        val_pcc = model.score(X, imputed_data.clone(), ~valid_mask, "PCC")
+        val_mre = model.score(X, imputed_data.clone(), ~valid_mask, metric="MRE")
+        test_RMSE = model.score(X, imputed_data.clone(), ~test_mask, "RMSE")
+        test_pcc = model.score(X, imputed_data.clone(), ~test_mask, "PCC")
+        test_mre = model.score(X, imputed_data.clone(), ~test_mask, metric="MRE")
         # wandb.log({"RMSE": score, "PCC": pcc, "MRE": mre})
         wandb.log({
             "train_RMSE": train_RMSE,
