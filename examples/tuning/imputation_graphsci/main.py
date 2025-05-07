@@ -103,15 +103,15 @@ if __name__ == '__main__':
         # score = model.score(X, processed_imputed_data, mask, metric='RMSE', log1p=False)
         # pcc = model.score(X, processed_imputed_data, mask, metric='PCC', log1p=False)
         # mre = model.score(X, processed_imputed_data, mask, metric='MRE', log1p=False)
-        train_RMSE = model.score(X, imputed_data, mask, "RMSE", log1p=False)
-        train_pcc = model.score(X, imputed_data, mask, "PCC", log1p=False)
-        train_mre = model.score(X, imputed_data, mask, metric="MRE", log1p=False)
-        val_RMSE = model.score(X, imputed_data, ~valid_mask, "RMSE", log1p=False)
-        val_pcc = model.score(X, imputed_data, ~valid_mask, "PCC", log1p=False)
-        val_mre = model.score(X, imputed_data, ~valid_mask, metric="MRE", log1p=False)
-        test_RMSE = model.score(X, imputed_data, ~test_mask, "RMSE", log1p=False)
-        test_pcc = model.score(X, imputed_data, ~test_mask, "PCC", log1p=False)
-        test_mre = model.score(X, imputed_data, ~test_mask, metric="MRE")
+        train_RMSE = model.score(X, imputed_data.clone(), ~mask, "RMSE", log1p=False)
+        train_pcc = model.score(X, imputed_data.clone(), ~mask, "PCC", log1p=False)
+        train_mre = model.score(X, imputed_data.clone(), ~mask, metric="MRE", log1p=False)
+        val_RMSE = model.score(X, imputed_data.clone(), ~valid_mask, "RMSE", log1p=False)
+        val_pcc = model.score(X, imputed_data.clone(), ~valid_mask, "PCC", log1p=False)
+        val_mre = model.score(X, imputed_data.clone(), ~valid_mask, metric="MRE", log1p=False)
+        test_RMSE = model.score(X, imputed_data.clone(), ~test_mask, "RMSE", log1p=False)
+        test_pcc = model.score(X, imputed_data.clone(), ~test_mask, "PCC", log1p=False)
+        test_mre = model.score(X, imputed_data.clone(), ~test_mask, metric="MRE", log1p=False)
         wandb.log({
             "train_RMSE": train_RMSE,
             "train_PCC": train_pcc,
@@ -136,12 +136,14 @@ if __name__ == '__main__':
         evaluate_pipeline, sweep_id=params.sweep_id, count=params.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=params.summary_file_path, root_path=file_root_path)
     if params.tune_mode == "pipeline" or params.tune_mode == "pipeline_params":
-        get_step3_yaml(result_load_path=f"{params.summary_file_path}", step2_pipeline_planer=pipeline_planer,
-                       conf_load_path=f"{Path(params.root_path).resolve().parent}/step3_default_params.yaml",
-                       root_path=file_root_path,
-                       required_funs=["SaveRaw", "UpdateRaw", "FeatureFeatureGraph", "CellwiseMaskData", "SetConfig"],
-                       required_indexes=[2, 6, sys.maxsize - 2, sys.maxsize - 1,
-                                         sys.maxsize], metric="MRE", ascending=True)
+        get_step3_yaml(
+            result_load_path=f"{params.summary_file_path}", step2_pipeline_planer=pipeline_planer,
+            conf_load_path=f"{Path(params.root_path).resolve().parent}/step3_default_params.yaml",
+            root_path=file_root_path, required_funs=[
+                "FilterCellTransform", "FilterGenesScanpyOrder", "ScrubletTransform", "SaveRaw", "UpdateRaw",
+                "FeatureFeatureGraph", "CellwiseMaskData", "SetConfig"
+            ], required_indexes=[0, 1, 2, 3, 7, sys.maxsize - 2, sys.maxsize - 1,
+                                 sys.maxsize], metric="MRE", ascending=True)
         if params.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """To reproduce GraphSCI benchmarks, please refer to command lines belows:

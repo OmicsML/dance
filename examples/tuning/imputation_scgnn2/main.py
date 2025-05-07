@@ -5,6 +5,8 @@ from pathlib import Path
 from pprint import pformat
 
 import numpy as np
+import pandas as pd
+import torch
 import wandb
 
 from dance import logger
@@ -205,41 +207,37 @@ if __name__ == "__main__":
         train_mask, valid_mask, test_mask = data.get_x(return_type="default")
         if not isinstance(data.data.X, np.ndarray):
             x_train = data.data.X.A * train_mask
-            x_valid = data.data.X.A[valid_mask]
-            x_test = data.data.X.A[test_mask]
+            X = data.data.X.A
+            # x_valid = data.data.X.A * valid_mask
+            # x_test = data.data.X.A * test_mask
         else:
             x_train = data.data.X * train_mask
-            x_valid = data.data.X[valid_mask]
-            x_test = data.data.X[test_mask]
+            X = data.data.X
+            # x_valid = data.data.X * valid_mask
+            # x_test = data.data.X * test_mask
         model = ScGNN2(args, device=device)
 
         model.fit(x_train)
-        test_rmse = np.sqrt(((x_test - model.predict()[test_mask])**2).mean())
-        test_pcc = np.corrcoef(x_test, model.predict()[test_mask])[0, 1]
-        test_actual = x_test
-        test_actual[test_actual < 1e-10] = 1e-10
-        test_mre = abs((test_actual - model.predict()[test_mask]) / test_actual).mean()
-
-        train_rmse = np.sqrt(((x_train - model.predict()[train_mask])**2).mean())
-        train_pcc = np.corrcoef(x_train, model.predict()[train_mask])[0, 1]
-        train_actual = x_train
-        train_actual[train_actual < 1e-10] = 1e-10
-        train_mre = abs((train_actual - model.predict()[train_mask]) / train_actual).mean()
-
-        val_rmse = np.sqrt(((x_valid - model.predict()[valid_mask])**2).mean())
-        val_pcc = np.corrcoef(x_valid, model.predict()[valid_mask])[0, 1]
-        val_actual = x_valid
-        val_actual[val_actual < 1e-10] = 1e-10
-        val_mre = abs((val_actual - model.predict()[valid_mask]) / val_actual).mean()
-
+        imputed_data = model.predict()
+        X = torch.from_numpy(X)
+        imputed_data = torch.from_numpy(imputed_data)
+        train_RMSE = model.score(X, imputed_data.clone(), ~train_mask, "RMSE", log1p=False)
+        train_pcc = model.score(X, imputed_data.clone(), ~train_mask, "PCC", log1p=False)
+        train_mre = model.score(X, imputed_data.clone(), ~train_mask, metric="MRE", log1p=False)
+        val_RMSE = model.score(X, imputed_data.clone(), ~valid_mask, "RMSE", log1p=False)
+        val_pcc = model.score(X, imputed_data.clone(), ~valid_mask, "PCC", log1p=False)
+        val_mre = model.score(X, imputed_data.clone(), ~valid_mask, metric="MRE", log1p=False)
+        test_RMSE = model.score(X, imputed_data.clone(), ~test_mask, "RMSE", log1p=False)
+        test_pcc = model.score(X, imputed_data.clone(), ~test_mask, "PCC", log1p=False)
+        test_mre = model.score(X, imputed_data.clone(), ~test_mask, metric="MRE", log1p=False)
         wandb.log({
-            "train_RMSE": train_rmse,
+            "train_RMSE": train_RMSE,
             "train_PCC": train_pcc,
             "train_MRE": train_mre,
-            "val_RMSE": val_rmse,
+            "val_RMSE": val_RMSE,
             "val_PCC": val_pcc,
             "MRE": val_mre,
-            "test_RMSE": test_rmse,
+            "test_RMSE": test_RMSE,
             "test_PCC": test_pcc,
             "test_MRE": test_mre
         })
@@ -254,10 +252,12 @@ if __name__ == "__main__":
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
-        get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
-                       conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
-                       root_path=file_root_path, required_funs=["CellwiseMaskData", "SetConfig"],
-                       required_indexes=[sys.maxsize - 1, sys.maxsize], metric="MRE", ascending=True)
+        get_step3_yaml(
+            result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
+            conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
+            root_path=file_root_path, required_funs=[
+                "FilterCellTransform", "FilterGenesScanpyOrder", "ScrubletTransform", "CellwiseMaskData", "SetConfig"
+            ], required_indexes=[0, 1, 2, 4, sys.maxsize], metric="MRE", ascending=True)
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """
