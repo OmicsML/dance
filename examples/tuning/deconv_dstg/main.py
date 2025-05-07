@@ -6,11 +6,12 @@ from pprint import pprint
 
 import numpy as np
 import torch
-import wandb
 from sklearn.model_selection import train_test_split
 
+import wandb
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo import DSTG
+from dance.modules.spatial.cell_type_deconvo.dstg import split_mask_for_validation
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
 from dance.utils import set_seed
 
@@ -55,14 +56,14 @@ if __name__ == "__main__":
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
-        ref_idx = data.get_split_idx("ref")
-        valid_idx, test_idx = train_test_split(ref_idx, test_size=0.9, random_state=args.seed)
+        # ref_idx = data.get_split_idx("ref")
+        # valid_idx, test_idx = train_test_split(ref_idx, test_size=0.9, random_state=args.seed)
         (adj, x), y = data.get_data(return_type="default")
         x, y = torch.FloatTensor(x), torch.FloatTensor(y.values)
         adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
                                        torch.FloatTensor(adj.data.astype(np.int32)))
         train_mask = data.get_split_mask("pseudo", return_type="torch")
-        train_mask, valid_mask = train_test_split(train_mask, test_size=0.3, random_state=args.seed)
+        train_mask, valid_mask = split_mask_for_validation(train_mask, random_seed=args.seed)
         inputs = (adj, x, train_mask)
 
         # Train and evaluate model

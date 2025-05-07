@@ -337,3 +337,99 @@ def masked_softmax_cross_entropy(preds, labels, mask):
     else:
         loss = (loss * mask.float()).sum() / mask.sum()
     return loss
+
+
+def split_mask_for_validation(pseudo_train_mask: torch.Tensor, valid_ratio: float = 0.3,
+                              random_seed: int | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+    """Splits a boolean mask into training and validation masks with reproducibility.
+
+    Takes a pseudo training mask (1D boolean tensor) and splits the True
+    entries into a final training mask and a validation mask.
+    Specifically, `valid_ratio` (e.g., 0.3 for 30%) of the original True
+    entries are randomly selected to form the validation mask (True in
+    `valid_mask`, False in `final_train_mask`). The remaining original True
+    entries stay True in the `final_train_mask`. All original False entries
+    remain False in both output masks.
+
+    Args:
+        pseudo_train_mask: The input 1D boolean tensor mask.
+        valid_ratio: The fraction (between 0.0 and 1.0) of True entries
+                     to allocate to the validation set. Defaults to 0.3.
+        random_seed: An optional integer seed for the random number generator
+                     to ensure reproducible splits. If None, the split will
+                     be random based on the current RNG state. Defaults to None.
+
+    Returns:
+        A tuple containing:
+        - final_train_mask (torch.Tensor): Boolean tensor, True for training samples.
+        - valid_mask (torch.Tensor): Boolean tensor, True for validation samples.
+
+    Raises:
+        ValueError: If valid_ratio is not between 0.0 and 1.0.
+        TypeError: If pseudo_train_mask is not a PyTorch tensor or not boolean.
+
+    """
+    # --- Input Validation ---
+    if not isinstance(pseudo_train_mask, torch.Tensor):
+        raise TypeError("pseudo_train_mask must be a PyTorch Tensor.")
+    if pseudo_train_mask.dtype != torch.bool:
+        raise TypeError("pseudo_train_mask must be a boolean tensor (dtype=torch.bool).")
+    if not 0.0 <= valid_ratio <= 1.0:
+        raise ValueError("valid_ratio must be between 0.0 and 1.0.")
+    if random_seed is not None and not isinstance(random_seed, int):
+        raise TypeError("random_seed must be an integer or None.")
+
+    # --- Seed Management ---
+    rng_state = None
+    if random_seed is not None:
+        # Store current RNG state to restore later, preventing side effects
+        rng_state = torch.get_rng_state()
+        torch.manual_seed(random_seed)
+        # Optionally, set numpy and python random seeds too for full environment control,
+        # though torch.randperm primarily relies on torch's RNG.
+        # np.random.seed(random_seed)
+        # random.seed(random_seed)
+
+    # --- Core Logic ---
+    try:
+        # Find indices of True values
+        true_indices = torch.where(pseudo_train_mask)[0]
+        num_true = true_indices.numel()
+
+        final_train_mask = pseudo_train_mask.clone()
+        valid_mask = torch.zeros_like(pseudo_train_mask, dtype=torch.bool)
+
+        # Handle cases with few or no True values
+        if num_true == 0 or valid_ratio == 0.0:
+            return final_train_mask, valid_mask
+        elif valid_ratio == 1.0:
+            valid_mask = pseudo_train_mask.clone()
+            final_train_mask.fill_(False)
+            return final_train_mask, valid_mask
+
+        # Calculate the number of validation samples
+        num_valid = int(num_true * valid_ratio)
+        num_valid = max(0, min(num_valid, num_true))
+
+        if num_valid == 0:
+            print(f"Warning: Calculated number of validation samples is 0 for "
+                  f"num_true={num_true} and valid_ratio={valid_ratio}. "
+                  f"Validation mask will be empty.")
+            return final_train_mask, valid_mask
+
+        # Randomly select indices for the validation set from the true indices
+        # Ensure randperm runs on the same device as the input tensor
+        perm = torch.randperm(num_true, device=pseudo_train_mask.device)
+        valid_indices_in_true = perm[:num_valid]
+        valid_original_indices = true_indices[valid_indices_in_true]
+
+        # Update the masks
+        final_train_mask[valid_original_indices] = False
+        valid_mask[valid_original_indices] = True
+
+        return final_train_mask, valid_mask
+
+    finally:
+        # --- Restore RNG State ---
+        if rng_state is not None:
+            torch.set_rng_state(rng_state)
