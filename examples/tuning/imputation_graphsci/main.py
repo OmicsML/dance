@@ -8,9 +8,9 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import torch
+import wandb
 
 import dance.transforms.normalize as NormFuncs
-import wandb
 from dance import logger
 from dance.data import Data
 from dance.datasets.singlemodality import ImputationDataset
