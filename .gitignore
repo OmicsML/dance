@@ -43,3 +43,10 @@ examples/tuning/result.md
 examples/tuning/figures
 examples/single_modality/imputation/data
 examples/tuning/imputation_magic/data
+results - cell type deconvolution.csv
+results - spatial domain.csv
+temp_ans.csv
+temp_ans.json
+check_time.py
+t.py
+examples/heart_ans.csv
