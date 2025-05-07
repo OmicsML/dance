@@ -6,9 +6,9 @@ from pprint import pprint
 
 import numpy as np
 import torch
+import wandb
 from sklearn.model_selection import train_test_split
 
-import wandb
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo import DSTG
 from dance.modules.spatial.cell_type_deconvo.dstg import split_mask_for_validation
