@@ -22,6 +22,7 @@ pipeline:
       - Log1P
       - NormalizeTotal
       - NormalizePlaceHolder
+      - NormalizeTotalLog1P
     default_params:
       ScTransform:
         processes_num: 8
