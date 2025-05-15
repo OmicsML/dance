@@ -4,7 +4,10 @@ import math
 import multiprocessing
 import pickle
 import random
+import select
 import time
+from re import split
+from typing import List, Literal, Optional, Union
 
 # Third-party libraries
 import anndata as ad
@@ -19,9 +22,11 @@ import scipy.sparse as sp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from igraph import split_join_distance
 from sklearn.decomposition import NMF
+from sklearn.metrics import DistanceMetric
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.neighbors import DistanceMetric, KDTree, NearestNeighbors  # 合并了来自 sklearn.neighbors 的导入
+from sklearn.neighbors import KDTree, NearestNeighbors  # 合并了来自 sklearn.neighbors 的导入
 from torch.autograd import Variable
 from torch.nn.modules.module import Module  # 注意: 通常直接使用 nn.Module
 from torch.nn.parameter import Parameter  # 注意: 通常直接使用 nn.Parameter
@@ -29,11 +34,17 @@ from torch.nn.parameter import Parameter  # 注意: 通常直接使用 nn.Parame
 # tqdm
 from tqdm.notebook import tqdm
 
+from dance.data.base import Data
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.base import BaseRegressionMethod
 from dance.modules.spatial.cell_type_deconvo.dstg import GCN
-from dance.transforms.misc import Compose, SetConfig
+from dance.registry import register_preprocessor
+from dance.transforms.base import BaseTransform
+from dance.transforms.filter import FilterGenesCommon
+from dance.transforms.misc import Compose, RemoveSplit, SaveRaw, SetConfig
 from dance.typing import LogLevel
+from dance.utils.status import deprecated
+from dance.utils.wrappers import add_mod_and_transform
 
 
 class conGraphConvolutionlayer(Module):
@@ -543,110 +554,60 @@ def auto_train(model, epoch_n, loss_fn, optimizer, data, cpu_num=-1, device='GPU
     return en.cpu()
 
 
-def ST_preprocess(ST_exp, normalize=True, log=True, highly_variable_genes=False, regress_out=False, scale=False,
-                  scale_max_value=None, scale_zero_center=True, hvg_min_mean=0.0125, hvg_max_mean=3, hvg_min_disp=0.5,
-                  highly_variable_gene_num=None):
+@register_preprocessor("normalize")
+@add_mod_and_transform
+@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+class STPreprocessTransform(BaseTransform):
+    """Used as a placeholder to skip the process."""
 
-    adata = ST_exp.copy()
+    def __init__(self, normalize=True, log=True, highly_variable_genes=False, regress_out=False, scale=False,
+                 scale_max_value=None, scale_zero_center=True, hvg_min_mean=0.0125, hvg_max_mean=3, hvg_min_disp=0.5,
+                 highly_variable_gene_num=None, split="ref", **kwargs):
+        super().__init__(**kwargs)
+        self.normalize = normalize
+        self.log = log
+        self.highly_variable_genes = highly_variable_genes
+        self.regress_out = regress_out
+        self.scale = scale
+        self.scale_max_value = scale_max_value
+        self.scale_zero_center = scale_zero_center
+        self.hvg_min_mean = hvg_min_mean
+        self.hvg_max_mean = hvg_max_mean
+        self.hvg_min_disp = hvg_min_disp
+        self.highly_variable_gene_num = highly_variable_gene_num
+        self.split = split
 
-    if normalize == True:
-        sc.pp.normalize_total(adata, target_sum=1e4)
+    def __call__(self, data: Data) -> Data:
+        ST_exp = data.get_data(split_name=self.split)
+        adata = ST_exp
+        if self.normalize == True:
+            sc.pp.normalize_total(adata, target_sum=1e4)
 
-    if log == True:
-        sc.pp.log1p(adata)
+        if self.log == True:
+            sc.pp.log1p(adata)
 
-    adata.layers['scale.data'] = adata.X.copy()
+        adata.layers['scale.data'] = adata.X.copy()
 
-    if highly_variable_genes == True:
-        sc.pp.highly_variable_genes(
-            adata,
-            min_mean=hvg_min_mean,
-            max_mean=hvg_max_mean,
-            min_disp=hvg_min_disp,
-            n_top_genes=highly_variable_gene_num,
-        )
-        adata = adata[:, adata.var.highly_variable]
+        if self.highly_variable_genes == True:
+            sc.pp.highly_variable_genes(
+                adata,
+                min_mean=self.hvg_min_mean,
+                max_mean=self.hvg_max_mean,
+                min_disp=self.hvg_min_disp,
+                n_top_genes=self.highly_variable_gene_num,
+            )
+            adata = adata[:, adata.var.highly_variable]
 
-    if regress_out == True:
-        mito_genes = adata.var_names.str.startswith('MT-')
-        adata.obs['percent_mito'] = np.sum(adata[:, mito_genes].X, axis=1) / np.sum(adata.X, axis=1)
-        sc.pp.filter_cells(adata, min_counts=0)
-        sc.pp.regress_out(adata, ['n_counts', 'percent_mito'])
+        if self.regress_out == True:
+            mito_genes = adata.var_names.str.startswith('MT-')
+            adata.obs['percent_mito'] = np.sum(adata[:, mito_genes].X, axis=1) / np.sum(adata.X, axis=1)
+            sc.pp.filter_cells(adata, min_counts=0)
+            sc.pp.regress_out(adata, ['n_counts', 'percent_mito'])
 
-    if scale == True:
-        sc.pp.scale(adata, max_value=scale_max_value, zero_center=scale_zero_center)
-
-    return adata
-
-
-def find_marker_genes(
-    sc_exp,
-    preprocess=True,
-    highly_variable_genes=True,
-    regress_out=False,
-    scale=False,
-    PCA_components=50,
-    marker_gene_method='wilcoxon',
-    filter_wilcoxon_marker_genes=True,
-    top_gene_per_type=20,
-    pvals_adj_threshold=0.10,
-    log_fold_change_threshold=1,
-    min_within_group_fraction_threshold=0.7,
-    max_between_group_fraction_threshold=0.3,
-):
-
-    if preprocess == True:
-        sc_adata_marker_gene = ST_preprocess(
-            sc_exp.copy(),
-            normalize=True,
-            log=True,
-            highly_variable_genes=highly_variable_genes,
-            regress_out=regress_out,
-            scale=scale,
-        )
-    else:
-        sc_adata_marker_gene = sc_exp.copy()
-
-    sc.tl.pca(sc_adata_marker_gene, n_comps=PCA_components, svd_solver='arpack', random_state=None)
-
-    layer = 'scale.data'
-    sc.tl.rank_genes_groups(sc_adata_marker_gene, 'cell_type', layer=layer, use_raw=False, pts=True,
-                            method=marker_gene_method, corr_method='benjamini-hochberg', key_added=marker_gene_method)
-
-    if marker_gene_method == 'wilcoxon':
-        if filter_wilcoxon_marker_genes == True:
-            gene_dict = {}
-            gene_list = []
-            for name in sc_adata_marker_gene.obs['cell_type'].unique():
-                data = sc.get.rank_genes_groups_df(sc_adata_marker_gene, group=name,
-                                                   key=marker_gene_method).sort_values('pvals_adj')
-                if pvals_adj_threshold != None:
-                    data = data[data['pvals_adj'] < pvals_adj_threshold]
-                if log_fold_change_threshold != None:
-                    data = data[data['logfoldchanges'] >= log_fold_change_threshold]
-                if min_within_group_fraction_threshold != None:
-                    data = data[data['pct_nz_group'] >= min_within_group_fraction_threshold]
-                if max_between_group_fraction_threshold != None:
-                    data = data[data['pct_nz_reference'] < max_between_group_fraction_threshold]
-                gene_dict[name] = data['names'].values[:top_gene_per_type].tolist()
-                gene_list = gene_list + data['names'].values[:top_gene_per_type].tolist()
-                gene_list = list(set(gene_list))
-        else:
-            gene_table = pd.DataFrame(sc_adata_marker_gene.uns[marker_gene_method]['names'][:top_gene_per_type])
-            gene_dict = {}
-            for i in gene_table.columns:
-                gene_dict[i] = gene_table[i].values.tolist()
-            gene_list = list({item for sublist in gene_table.values.tolist() for item in sublist})
-    elif marker_gene_method == 'logreg':
-        gene_table = pd.DataFrame(sc_adata_marker_gene.uns[marker_gene_method]['names'][:top_gene_per_type])
-        gene_dict = {}
-        for i in gene_table.columns:
-            gene_dict[i] = gene_table[i].values.tolist()
-        gene_list = list({item for sublist in gene_table.values.tolist() for item in sublist})
-    else:
-        print("marker_gene_method should be 'logreg' or 'wilcoxon'")
-
-    return gene_list, gene_dict
+        if self.scale == True:
+            sc.pp.scale(adata, max_value=self.scale_max_value, zero_center=self.scale_zero_center)
+        selected_genes = adata.uns['gene_list']
+        data.data = adata[:, selected_genes]
 
 
 def generate_a_spot(
@@ -664,19 +625,19 @@ def generate_a_spot(
         return sc_exp[picked_cells]
     elif generation_method == 'celltype':
         cell_num = random.randint(min_cell_number_in_spot, max_cell_number_in_spot)
-        cell_type_list = list(sc_exp.obs['cell_type'].unique())
+        cell_type_list = list(sc_exp.obs['cellType'].unique())
         cell_type_num = random.randint(1, max_cell_types_in_spot)
 
         while (True):
-            cell_type_list_selected = random.choices(sc_exp.obs['cell_type'].value_counts().keys(), k=cell_type_num)
+            cell_type_list_selected = random.choices(sc_exp.obs['cellType'].value_counts().keys(), k=cell_type_num)
             if len(set(cell_type_list_selected)) == cell_type_num:
                 break
-        sc_exp_filter = sc_exp[sc_exp.obs['cell_type'].isin(cell_type_list_selected)]
+        sc_exp_filter = sc_exp[sc_exp.obs['cellType'].isin(cell_type_list_selected)]
 
         picked_cell_type = random.choices(cell_type_list_selected, k=cell_num)
         picked_cells = []
         for i in picked_cell_type:
-            data = sc_exp[sc_exp.obs['cell_type'] == i]
+            data = sc_exp[sc_exp.obs['cellType'] == i]
             cell_list = list(data.obs.index.values)
             picked_cells.append(random.sample(cell_list, 1)[0])
 
@@ -685,44 +646,59 @@ def generate_a_spot(
         print('generation_method should be "cell" or "celltype" ')
 
 
-def pseudo_spot_generation(sc_exp, idx_to_word_celltype, spot_num, min_cell_number_in_spot, max_cell_number_in_spot,
-                           max_cell_types_in_spot, generation_method, n_jobs=-1):
+class pseudoSpotGen(BaseTransform):
 
-    cell_type_num = len(sc_exp.obs['cell_type'].unique())
+    def __init__(self, spot_num, min_cell_number_in_spot, max_cell_number_in_spot, max_cell_types_in_spot,
+                 generation_method, n_jobs=-1, in_split_name: str = "ref", out_split_name: Optional[str] = "pseudo",
+                 **kwargs):
+        super().__init__(**kwargs)
+        self.spot_num = spot_num
+        self.min_cell_number_in_spot = min_cell_number_in_spot
+        self.max_cell_number_in_spot = max_cell_number_in_spot
+        self.max_cell_types_in_spot = max_cell_types_in_spot
+        self.generation_method = generation_method
+        self.n_jobs = n_jobs
+        self.in_split_name = in_split_name
+        self.out_split_name = out_split_name
 
-    cores = multiprocessing.cpu_count()
-    if n_jobs == -1:
-        pool = multiprocessing.Pool(processes=cores)
-    else:
-        pool = multiprocessing.Pool(processes=n_jobs)
-    args = [(sc_exp, min_cell_number_in_spot, max_cell_number_in_spot, max_cell_types_in_spot, generation_method)
-            for i in range(spot_num)]
-    generated_spots = pool.starmap(generate_a_spot, tqdm(args, desc='Generating pseudo-spots'))
+    def __call__(self, data: Data) -> Data:
+        sc_exp = data.get_split_data(self.in_split_name)
+        idx_to_word_celltype = data.data.uns['idx_to_word_celltype']
+        cell_type_num = len(sc_exp.obs['cellType'].unique())
+        n_jobs = self.n_jobs
+        cores = multiprocessing.cpu_count()
+        if n_jobs == -1:
+            pool = multiprocessing.Pool(processes=cores)
+        else:
+            pool = multiprocessing.Pool(processes=n_jobs)
+        args = [(sc_exp, self.min_cell_number_in_spot, self.max_cell_number_in_spot, self.max_cell_types_in_spot,
+                 self.generation_method) for i in range(self.spot_num)]
+        generated_spots = pool.starmap(generate_a_spot, tqdm(args, desc='Generating pseudo-spots'))
 
-    pseudo_spots = []
-    pseudo_spots_table = np.zeros((spot_num, sc_exp.shape[1]), dtype=float)
-    pseudo_fraction_table = np.zeros((spot_num, cell_type_num), dtype=float)
-    for i in range(spot_num):
-        one_spot = generated_spots[i]
-        pseudo_spots.append(one_spot)
-        pseudo_spots_table[i] = one_spot.X.sum(axis=0)
-        for j in one_spot.obs.index:
-            type_idx = one_spot.obs.loc[j, 'cell_type_idx']
-            pseudo_fraction_table[i, type_idx] += 1
-    pseudo_spots_table = pd.DataFrame(pseudo_spots_table, columns=sc_exp.var.index.values)
-    pseudo_spots = ad.AnnData(X=pseudo_spots_table.iloc[:, :].values)
-    pseudo_spots.obs.index = pseudo_spots_table.index[:]
-    pseudo_spots.var.index = pseudo_spots_table.columns[:]
-    type_list = [idx_to_word_celltype[i] for i in range(cell_type_num)]
-    pseudo_fraction_table = pd.DataFrame(pseudo_fraction_table, columns=type_list)
-    pseudo_fraction_table['cell_num'] = pseudo_fraction_table.sum(axis=1)
-    for i in pseudo_fraction_table.columns[:-1]:
-        pseudo_fraction_table[i] = pseudo_fraction_table[i] / pseudo_fraction_table['cell_num']
-    pseudo_spots.obs = pseudo_spots.obs.join(pseudo_fraction_table)
+        pseudo_spots = []
+        pseudo_spots_table = np.zeros((self.spot_num, sc_exp.shape[1]), dtype=float)
+        pseudo_fraction_table = np.zeros((self.spot_num, cell_type_num), dtype=float)
+        for i in range(self.spot_num):
+            one_spot = generated_spots[i]
+            pseudo_spots.append(one_spot)
+            pseudo_spots_table[i] = one_spot.X.sum(axis=0)
+            for j in one_spot.obs.index:
+                type_idx = one_spot.obs.loc[j, 'cell_type_idx']
+                pseudo_fraction_table[i, int(type_idx)] += 1
+        pseudo_spots_table = pd.DataFrame(pseudo_spots_table, columns=sc_exp.var.index.values)
+        pseudo_spots = ad.AnnData(X=pseudo_spots_table.iloc[:, :].values)
+        pseudo_spots.obs.index = pseudo_spots_table.index[:]
+        pseudo_spots.var.index = pseudo_spots_table.columns[:]
+        type_list = [idx_to_word_celltype[i] for i in range(cell_type_num)]
+        pseudo_fraction_table = pd.DataFrame(pseudo_fraction_table, columns=type_list)
+        pseudo_fraction_table['cell_num'] = pseudo_fraction_table.sum(axis=1)
+        for i in pseudo_fraction_table.columns[:-1]:
+            pseudo_fraction_table[i] = pseudo_fraction_table[i] / pseudo_fraction_table['cell_num']
+        pseudo_spots.obs = pseudo_spots.obs.join(pseudo_fraction_table)
+        data.append(pseudo_spots, join="outer", mode="new_split", new_split_name=self.out_split_name)
 
-    return pseudo_spots
 
-
+#remove split ref
 def data_integration(real, pseudo, batch_removal_method="combat", dimensionality_reduction_method='PCA', dim=50,
                      scale=True, autoencoder_epoches=2000, autoencoder_LR=1e-3, autoencoder_drop=0, cpu_num=-1,
                      AE_device='GPU'):
@@ -1096,171 +1072,237 @@ number of threads used for intraop parallelism on CPU. 'n_jobs=-1' represents us
 CPUs. 'GCN_device': ['GPU', 'CPU']. Select the device used to run GCN networks.
 
 """
-dataset = CellTypeDeconvoDataset(data_dir=paths['datadir'], data_id=paths['dataset'])
-data = dataset.load_data(
-    transform=Compose([
-        SetConfig({
-            "feature_channel": [None, "spatial"],
-            "feature_channel_type": ["X", "obsm"],
-            "label_channel": "cell_type_portion",
-        })
-    ]), cache=False)
 
 # sc_path = paths['sc_path']
 # ST_path = paths['ST_path']
 # output_path = paths['output_path']
-inputs, y = data.get_data(split_name="test", return_type="torch")
-x, spatial = inputs
-ref_count = data.get_feature(split_name="ref", return_type="numpy")
-ref_annot = data.get_feature(split_name="ref", return_type="numpy", channel="cellType", channel_type="obs")
-# sc_adata = sc.read_csv(sc_path+"/sc_data.tsv", delimiter='\t')
-# sc_label = pd.read_table(sc_path+"/sc_label.tsv", sep = '\t', header = 0, index_col = 0, encoding = "utf-8")
-# sc_label.columns = ['cell_type']
-# sc_adata.obs['cell_type'] = sc_label['cell_type'].values
-sc_adata = ad.AnnData(X=ref_count)
-sc_adata.obs['cell_type'] = ref_annot
-cell_type_num = len(sc_adata.obs['cell_type'].unique())
-cell_types = sc_adata.obs['cell_type'].unique()
-
-word_to_idx_celltype = {word: i for i, word in enumerate(cell_types)}
-idx_to_word_celltype = {i: word for i, word in enumerate(cell_types)}
-
-celltype_idx = [word_to_idx_celltype[w] for w in sc_adata.obs['cell_type']]
-sc_adata.obs['cell_type_idx'] = celltype_idx
-sc_adata.obs['cell_type'].value_counts()
-
-selected_genes, cell_type_marker_genes = find_marker_genes(
-    sc_adata, preprocess=find_marker_genes_paras['preprocess'],
-    highly_variable_genes=find_marker_genes_paras['highly_variable_genes'],
-    PCA_components=find_marker_genes_paras['PCA_components'],
-    filter_wilcoxon_marker_genes=find_marker_genes_paras['filter_wilcoxon_marker_genes'],
-    marker_gene_method=find_marker_genes_paras['marker_gene_method'],
-    pvals_adj_threshold=find_marker_genes_paras['pvals_adj_threshold'],
-    log_fold_change_threshold=find_marker_genes_paras['log_fold_change_threshold'],
-    min_within_group_fraction_threshold=find_marker_genes_paras['min_within_group_fraction_threshold'],
-    max_between_group_fraction_threshold=find_marker_genes_paras['max_between_group_fraction_threshold'],
-    top_gene_per_type=find_marker_genes_paras['top_gene_per_type'])
-# with open(output_path+"/marker_genes.tsv", 'w') as f:
-#     for gene in selected_genes:
-#         f.write(str(gene) + '\n')
-
-print("{} genes have been selected as marker genes.".format(len(selected_genes)))
-n_jobs = -1
-pseudo_adata = pseudo_spot_generation(sc_adata, idx_to_word_celltype, spot_num=pseudo_spot_simulation_paras['spot_num'],
-                                      min_cell_number_in_spot=pseudo_spot_simulation_paras['min_cell_num_in_spot'],
-                                      max_cell_number_in_spot=pseudo_spot_simulation_paras['max_cell_num_in_spot'],
-                                      max_cell_types_in_spot=pseudo_spot_simulation_paras['max_cell_types_in_spot'],
-                                      generation_method=pseudo_spot_simulation_paras['generation_method'],
-                                      n_jobs=n_jobs)
-# data_file = open(output_path+'/pseudo_ST.pkl','wb')
-# pickle.dump(pseudo_adata, data_file)
-# data_file.close()
-
-# ST_adata = sc.read_csv(ST_path+"/ST_data.tsv", delimiter='\t')
-# ST_coor = pd.read_table(ST_path+"/coordinates.csv", sep = ',', header = 0, index_col = 0, encoding = "utf-8")
-ST_adata = ad.AnnData(X=x)
-ST_adata.obs['coor_X'] = spatial['x']
-ST_adata.obs['coor_Y'] = spatial['y']
-ST_groundtruth = y
-assert y.columns == cell_types
-for i in cell_types:
-    ST_adata.obs[i] = ST_groundtruth[i]
-
-ST_genes = ST_adata.var.index.values
-pseudo_genes = pseudo_adata.var.index.values
-common_genes = set(ST_genes).intersection(set(pseudo_genes))
-ST_adata_filter = ST_adata[:, list(common_genes)]
-pseudo_adata_filter = pseudo_adata[:, list(common_genes)]
-pseudo_adata_norm = ST_preprocess(
-    pseudo_adata_filter,
-    normalize=data_normalization_paras['normalize'],
-    log=data_normalization_paras['log'],
-    scale=data_normalization_paras['scale'],
-)[:, selected_genes]
-
-ST_adata_filter_norm = ST_preprocess(
-    ST_adata_filter,
-    normalize=data_normalization_paras['normalize'],
-    log=data_normalization_paras['log'],
-    scale=data_normalization_paras['scale'],
-)[:, selected_genes]
 
 
-def update_anndata_obs(target_adata: ad.AnnData, source_adata: Optional[ad.AnnData] = None,
-                       cell_types_list: Optional[List[str]] = None) -> None:
-    if target_adata is None:
-        raise ValueError("target_adata cannot be None.")
+@register_preprocessor("pseudobulk")
+class CelltypeTransform(BaseTransform):
+    """Cell topic profile."""
 
-    num_obs_target = target_adata.shape[0]
-    try:
-        if source_adata is not None and 'cell_num' in source_adata.obs:
-            source_cell_num_data = source_adata.obs['cell_num']
-            try:
-                target_adata.obs.insert(0, 'cell_num', source_cell_num_data)
-                print("Info: 'cell_num' inserted from source_adata.")
-            except (ValueError, Exception) as e_insert:  # ValueError if column exists
-                target_adata.obs['cell_num'] = source_cell_num_data
-                print(f"Info: 'cell_num' assigned from source_adata (insertion failed: {e_insert}).")
+    _DISPLAY_ATTRS = ("ct_select", "ct_key", "split_name", "method")
+
+    def __init__(
+        self,
+        *,
+        ct_select: Union[Literal["auto"], List[str]] = "auto",
+        ct_key: str = "cellType",
+        batch_key: Optional[str] = None,
+        split_name: Optional[str] = "ref",
+        channel: Optional[str] = None,
+        channel_type: str = "X",
+        method: Literal["median", "mean"] = "median",
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        self.ct_select = ct_select
+        self.ct_key = ct_key
+        self.split_name = split_name
+
+        self.channel = channel
+        self.channel_type = channel_type
+        self.method = method
+
+    def __call__(self, data):
+        x = data.get_feature(split_name=self.split_name, channel=self.channel, channel_type=self.channel_type,
+                             return_type="numpy")
+        annot = data.get_feature(split_name=self.split_name, channel=self.ct_key, channel_type="obs",
+                                 return_type="numpy")
+
+        # sc_adata = ad.AnnData(X=x)
+        # sc_adata.obs['cell_type'] = annot
+        # data.
+        # cell_type_num = len(annot.unique())
+        # print(annot)
+        cell_types = np.unique(annot)
+
+        word_to_idx_celltype = {word: i for i, word in enumerate(cell_types)}
+        idx_to_word_celltype = {i: word for i, word in enumerate(cell_types)}
+        split_idx = data.get_split_idx(self.split_name)
+        celltype_idx = [word_to_idx_celltype[w] for w in annot]
+        # Initialize the column first if it doesn't exist
+        if 'cell_type_idx' not in data.data.obs.columns:
+            data.data.obs['cell_type_idx'] = pd.Series(index=data.data.obs_names, dtype=int)  # or float, or object
+
+        # This might still give a SettingWithCopyWarning from pandas itself
+        # if adata.obs itself is somehow a view, but less likely for adata.obs.
+        data.data.obs['cell_type_idx'].iloc[split_idx] = celltype_idx
+
+        # sc_adata.obs['cell_type'].value_counts()
+        # data.data=sc_adata
+        data.data.uns['idx_to_word_celltype'] = idx_to_word_celltype
+
+
+class stdGCNMarkGenes(BaseTransform):
+
+    def __init__(self, preprocess=True, highly_variable_genes=True, regress_out=False, scale=False, PCA_components=50,
+                 marker_gene_method='wilcoxon', filter_wilcoxon_marker_genes=True, top_gene_per_type=20,
+                 pvals_adj_threshold=0.10, log_fold_change_threshold=1, min_within_group_fraction_threshold=0.7,
+                 max_between_group_fraction_threshold=0.3, split="ref", **kwargs):
+        super().__init__(**kwargs)
+        self.preprocess = preprocess
+        self.highly_variable_genes = highly_variable_genes
+        self.regress_out = regress_out
+        self.scale = scale
+        self.PCA_components = PCA_components
+        self.marker_gene_method = marker_gene_method
+        self.filter_wilcoxon_marker_genes = filter_wilcoxon_marker_genes
+        self.top_gene_per_type = top_gene_per_type
+        self.pvals_adj_threshold = pvals_adj_threshold
+        self.log_fold_change_threshold = log_fold_change_threshold
+        self.min_within_group_fraction_threshold = min_within_group_fraction_threshold
+        self.max_between_group_fraction_threshold = max_between_group_fraction_threshold
+        self.split = split
+
+    def __call__(self, data: Data) -> Data:
+        sc_exp = data.get_split_data(self.split)
+        # if preprocess == True:
+        #     sc_adata_marker_gene = ST_preprocess(
+        #         sc_exp.copy(),
+        #         normalize=True,
+        #         log=True,
+        #         highly_variable_genes=highly_variable_genes,
+        #         regress_out=regress_out,
+        #         scale=scale,
+        #     )
+        # else:
+        #     sc_adata_marker_gene = sc_exp.copy()
+        sc_adata_marker_gene = sc_exp
+        sc.tl.pca(sc_adata_marker_gene, n_comps=self.PCA_components, svd_solver='arpack', random_state=None)
+
+        # layer = 'scale.data'
+        layer = None
+        sc.tl.rank_genes_groups(sc_adata_marker_gene, 'cellType', layer=layer, use_raw=False, pts=True,
+                                method=self.marker_gene_method, corr_method='benjamini-hochberg',
+                                key_added=self.marker_gene_method)
+
+        if self.marker_gene_method == 'wilcoxon':
+            if self.filter_wilcoxon_marker_genes == True:
+                gene_dict = {}
+                gene_list = []
+                for name in sc_adata_marker_gene.obs['cellType'].unique():
+                    data = sc.get.rank_genes_groups_df(sc_adata_marker_gene, group=name,
+                                                       key=self.marker_gene_method).sort_values('pvals_adj')
+                    if self.pvals_adj_threshold != None:
+                        data = data[data['pvals_adj'] < self.pvals_adj_threshold]
+                    if self.log_fold_change_threshold != None:
+                        data = data[data['logfoldchanges'] >= self.log_fold_change_threshold]
+                    if self.min_within_group_fraction_threshold != None:
+                        data = data[data['pct_nz_group'] >= self.min_within_group_fraction_threshold]
+                    if self.max_between_group_fraction_threshold != None:
+                        data = data[data['pct_nz_reference'] < self.max_between_group_fraction_threshold]
+                    gene_dict[name] = data['names'].values[:self.top_gene_per_type].tolist()
+                    gene_list = gene_list + data['names'].values[:self.top_gene_per_type].tolist()
+                    gene_list = list(set(gene_list))
+            else:
+                gene_table = pd.DataFrame(
+                    sc_adata_marker_gene.uns[self.marker_gene_method]['names'][:self.top_gene_per_type])
+                gene_dict = {}
+                for i in gene_table.columns:
+                    gene_dict[i] = gene_table[i].values.tolist()
+                gene_list = list({item for sublist in gene_table.values.tolist() for item in sublist})
+        elif self.marker_gene_method == 'logreg':
+            gene_table = pd.DataFrame(
+                sc_adata_marker_gene.uns[self.marker_gene_method]['names'][:self.top_gene_per_type])
+            gene_dict = {}
+            for i in gene_table.columns:
+                gene_dict[i] = gene_table[i].values.tolist()
+            gene_list = list({item for sublist in gene_table.values.tolist() for item in sublist})
         else:
-            raise KeyError("'cell_num' not in source_adata or source_adata is None.")
-    except (KeyError, AttributeError) as e_source:  # AttributeError if source_adata is None
-        print(f"Warning: Could not get 'cell_num' from source_adata ({e_source}). Initializing with zeros.")
-        default_cell_num = [0] * num_obs_target
+            print("marker_gene_method should be 'logreg' or 'wilcoxon'")
+        data.data.uns['gene_list'] = gene_list
+        data.data.uns['gene_dict'] = gene_dict
+
+
+class updateAnndataObsTransform(BaseTransform):
+
+    def __init__(self, split, **kwargs):
+        self.split = split
+        super().__init__(**kwargs)
+
+    def __call__(self, data: Data):
+        # target_adata: ad.AnnData, source_adata: Optional[ad.AnnData] = None,
+        #                 cell_types_list: Optional[List[str]] = None
+        cell_types_list = data.data.uns['cell_types_list']
+        target_adata = data.get_split_data(self.split)
+        source_adata = target_adata.raw
+        if target_adata is None:
+            raise ValueError("target_adata cannot be None.")
+
+        num_obs_target = target_adata.shape[0]
         try:
-            target_adata.obs.insert(0, 'cell_num', default_cell_num)
-            print("Info: 'cell_num' inserted with default zeros.")
-        except (ValueError, Exception) as e_insert_default:
-            target_adata.obs['cell_num'] = default_cell_num
-            print(f"Info: 'cell_num' assigned with default zeros (insertion failed: {e_insert_default}).")
-    if cell_types_list:
-        for ct_col in cell_types_list:
+            if source_adata is not None and 'cell_num' in source_adata.obs:
+                source_cell_num_data = source_adata.obs['cell_num']
+                try:
+                    target_adata.obs.insert(0, 'cell_num', source_cell_num_data)
+                    print("Info: 'cell_num' inserted from source_adata.")
+                except (ValueError, Exception) as e_insert:  # ValueError if column exists
+                    target_adata.obs['cell_num'] = source_cell_num_data
+                    print(f"Info: 'cell_num' assigned from source_adata (insertion failed: {e_insert}).")
+            else:
+                raise KeyError("'cell_num' not in source_adata or source_adata is None.")
+        except (KeyError, AttributeError) as e_source:  # AttributeError if source_adata is None
+            print(f"Warning: Could not get 'cell_num' from source_adata ({e_source}). Initializing with zeros.")
+            default_cell_num = [0] * num_obs_target
             try:
-                if source_adata is not None and ct_col in source_adata.obs:
-                    target_adata.obs[ct_col] = source_adata.obs[ct_col]
-                    print(f"Info: Column '{ct_col}' copied from source_adata.")
-                else:
-                    raise KeyError(f"'{ct_col}' not in source_adata or source_adata is None.")
-            except (KeyError, AttributeError) as e_source_ct:
-                print(f"Warning: Could not get '{ct_col}' from source_adata ({e_source_ct}). Initializing with zeros.")
-                target_adata.obs[ct_col] = [0] * num_obs_target
-            except Exception as e_assign:
-                print(f"Error: Failed to assign '{ct_col}'. Initializing with zeros. Details: {e_assign}")
-                target_adata.obs[ct_col] = [0] * num_obs_target
-    else:
-        print("Info: cell_types_list is None or empty. Skipping cell type column processing.")
-    if cell_types_list:
-        try:
+                target_adata.obs.insert(0, 'cell_num', default_cell_num)
+                print("Info: 'cell_num' inserted with default zeros.")
+            except (ValueError, Exception) as e_insert_default:
+                target_adata.obs['cell_num'] = default_cell_num
+                print(f"Info: 'cell_num' assigned with default zeros (insertion failed: {e_insert_default}).")
+        if cell_types_list:
+            for ct_col in cell_types_list:
+                try:
+                    if source_adata is not None and ct_col in source_adata.obs:
+                        target_adata.obs[ct_col] = source_adata.obs[ct_col]
+                        print(f"Info: Column '{ct_col}' copied from source_adata.")
+                    else:
+                        raise KeyError(f"'{ct_col}' not in source_adata or source_adata is None.")
+                except (KeyError, AttributeError) as e_source_ct:
+                    print(
+                        f"Warning: Could not get '{ct_col}' from source_adata ({e_source_ct}). Initializing with zeros."
+                    )
+                    target_adata.obs[ct_col] = [0] * num_obs_target
+                except Exception as e_assign:
+                    print(f"Error: Failed to assign '{ct_col}'. Initializing with zeros. Details: {e_assign}")
+                    target_adata.obs[ct_col] = [0] * num_obs_target
+        else:
+            print("Info: cell_types_list is None or empty. Skipping cell type column processing.")
+        if cell_types_list:
+            try:
 
-            existing_ct_cols = [col for col in cell_types_list if col in target_adata.obs.columns]
-            if not existing_ct_cols:
-                raise ValueError("None of the specified cell_types_list columns exist in target_adata.obs.")
+                existing_ct_cols = [col for col in cell_types_list if col in target_adata.obs.columns]
+                if not existing_ct_cols:
+                    raise ValueError("None of the specified cell_types_list columns exist in target_adata.obs.")
 
-            target_adata.obs['cell_type_num'] = (target_adata.obs[existing_ct_cols] > 0).sum(axis=1)
-            print("Info: 'cell_type_num' calculated.")
-        except Exception as e_calc:
-            print(f"Warning: Could not calculate 'cell_type_num' ({e_calc}). Initializing with zeros.")
+                target_adata.obs['cell_type_num'] = (target_adata.obs[existing_ct_cols] > 0).sum(axis=1)
+                print("Info: 'cell_type_num' calculated.")
+            except Exception as e_calc:
+                print(f"Warning: Could not calculate 'cell_type_num' ({e_calc}). Initializing with zeros.")
+                target_adata.obs['cell_type_num'] = [0] * num_obs_target
+        else:
+            print("Info: cell_types_list is None or empty. Initializing 'cell_type_num' with zeros.")
             target_adata.obs['cell_type_num'] = [0] * num_obs_target
-    else:
-        print("Info: cell_types_list is None or empty. Initializing 'cell_type_num' with zeros.")
-        target_adata.obs['cell_type_num'] = [0] * num_obs_target
 
 
-update_anndata_obs(ST_adata_filter_norm, ST_adata_filter, cell_types)
+# update_anndata_obs(ST_adata_filter_norm, ST_adata_filter, cell_types)
+class CellTypeNum(BaseTransform):
 
-pseudo_adata_norm.obs['cell_type_num'] = (pseudo_adata_norm.obs[cell_types] > 0).sum(axis=1)
-# results =  run_STdGCN(
-#                       integration_for_adj_paras = integration_for_adj_paras,
-#                       inter_exp_adj_paras = inter_exp_adj_paras,
-#                       spatial_adj_paras = spatial_adj_paras,
-#                       real_intra_exp_adj_paras = real_intra_exp_adj_paras,
-#                       pseudo_intra_exp_adj_paras = pseudo_intra_exp_adj_paras,
-#                       integration_for_feature_paras = integration_for_feature_paras,
-#                       GCN_paras = GCN_paras,
-#                       n_jobs = n_jobs,
-#                       GCN_device = 'GPU'
-#                      )
+    def __init__(self, split="pseudo", **kwargs):
+        self.split = split
+        super().__init__(**kwargs)
 
-from typing import Any, List, Mapping, Optional, Tuple, Union
+    def __call__(self, data: Data) -> Data:
+        pseudo_adata_norm = data.get_split_data(split_name=self.split)
+        cell_types = data.data.uns['cellType']
+        pseudo_adata_norm.obs['cell_type_num'] = (pseudo_adata_norm.obs[cell_types] > 0).sum(axis=1)
+        return super().__call__(data)
+
+
+from typing import Any, List, Literal, Mapping, Optional, Tuple, Union
 
 
 class stdGCNWrapper(BaseRegressionMethod):
@@ -1303,10 +1345,10 @@ class stdGCNWrapper(BaseRegressionMethod):
 
     def fit(
         self,
-        inputs: Tuple[np.ndarray, np.ndarray],
+        inputs: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
         y: Optional[Any] = None,
     ):
-        x, spatial = inputs
+        ST_adata_filter_norm, pseudo_adata_norm, ST_adata_filter, pseudo_adata_filter, word_to_idx_celltype = inputs
         ST_integration = data_integration(
             ST_adata_filter_norm, pseudo_adata_norm,
             batch_removal_method=self.integration_for_adj_paras['batch_removal_method'],
@@ -1344,7 +1386,7 @@ class stdGCNWrapper(BaseRegressionMethod):
         )
 
         real_num = ST_adata_filter.shape[0]
-        pseudo_num = pseudo_adata.shape[0]
+        pseudo_num = pseudo_adata_filter.shape[0]
 
         adj_inter_exp = A_inter_exp.values
         adj_pseudo_intra_exp = A_intra_transfer(A_pseudo_intra_exp, 'pseudo', real_num, pseudo_num)
@@ -1415,11 +1457,11 @@ class stdGCNWrapper(BaseRegressionMethod):
 
         loss_fn1 = nn.KLDivLoss(reduction='mean')
 
-        train_valid_len = pseudo_adata.shape[0]
+        train_valid_len = pseudo_adata_filter.shape[0]
         test_len = ST_adata_filter.shape[0]
 
         table1 = ST_adata_filter_norm.obs.copy()
-        label1 = table1[pseudo_adata.obs.iloc[:, :-1].columns].append(pseudo_adata.obs.iloc[:, :-1])
+        label1 = table1[pseudo_adata_filter.obs.iloc[:, :-1].columns].append(pseudo_adata_filter.obs.iloc[:, :-1])
         label1 = torch.tensor(label1.values)
 
         adjs = [adj_exp.float(), adj_sp.float()]
@@ -1440,7 +1482,7 @@ class stdGCNWrapper(BaseRegressionMethod):
         # torch.save(trained_model, output_path+'/model_parameters')
 
         pred_use = np.round_(output1.exp().detach()[:test_len], decimals=4)
-        cell_type_list = cell_types
+        # cell_type_list = cell_types
         coordinates = ST_adata_filter_norm.obs[['coor_X', 'coor_Y']]
 
         # ST_adata_filter_norm.obsm['predict_result'] = np.exp(output1[:test_len].detach().numpy())
@@ -1455,12 +1497,99 @@ class stdGCNWrapper(BaseRegressionMethod):
         return self.all_predict_result
 
 
+# inputs, y = data.get_data(split_name="test", return_type="torch")
+# x, spatial = inputs
+# ref_count = data.get_feature(split_name="ref", return_type="numpy")
+# ref_annot = data.get_feature(split_name="ref", return_type="numpy", channel="cellType", channel_type="obs")
+# sc_adata = sc.read_csv(sc_path+"/sc_data.tsv", delimiter='\t')
+# sc_label = pd.read_table(sc_path+"/sc_label.tsv", sep = '\t', header = 0, index_col = 0, encoding = "utf-8")
+# sc_label.columns = ['cell_type']
+# sc_adata.obs['cell_type'] = sc_label['cell_type'].values
+
+# sc_adata_data=Data(data=sc_adata)
+stdgcn_mark_genes = stdGCNMarkGenes(
+    preprocess=find_marker_genes_paras['preprocess'],
+    highly_variable_genes=find_marker_genes_paras['highly_variable_genes'],
+    PCA_components=find_marker_genes_paras['PCA_components'],
+    filter_wilcoxon_marker_genes=find_marker_genes_paras['filter_wilcoxon_marker_genes'],
+    marker_gene_method=find_marker_genes_paras['marker_gene_method'],
+    pvals_adj_threshold=find_marker_genes_paras['pvals_adj_threshold'],
+    log_fold_change_threshold=find_marker_genes_paras['log_fold_change_threshold'],
+    min_within_group_fraction_threshold=find_marker_genes_paras['min_within_group_fraction_threshold'],
+    max_between_group_fraction_threshold=find_marker_genes_paras['max_between_group_fraction_threshold'],
+    top_gene_per_type=find_marker_genes_paras['top_gene_per_type'])
+# stdGCNMarkGenes(sc_adata_data)
+# selected_genes, cell_type_marker_genes=sc_adata_data.uns['gene_list'],sc_adata_data.uns['gene_dict']
+
+# with open(output_path+"/marker_genes.tsv", 'w') as f:
+#     for gene in selected_genes:
+#         f.write(str(gene) + '\n')
+
+# print("{} genes have been selected as marker genes.".format(len(selected_genes)))
+n_jobs = -1
+# sc_adata_data=Data(data=sc_adata)
+pseudospotgen = pseudoSpotGen(spot_num=pseudo_spot_simulation_paras['spot_num'],
+                              min_cell_number_in_spot=pseudo_spot_simulation_paras['min_cell_num_in_spot'],
+                              max_cell_number_in_spot=pseudo_spot_simulation_paras['max_cell_num_in_spot'],
+                              max_cell_types_in_spot=pseudo_spot_simulation_paras['max_cell_types_in_spot'],
+                              generation_method=pseudo_spot_simulation_paras['generation_method'], n_jobs=n_jobs)
+# pseudospotgen(sc_adata_data)
+# pseudo_adata=sc_adata_data.uns['pseudoSpotGen']
+
+# ST_adata = sc.read_csv(ST_path+"/ST_data.tsv", delimiter='\t')
+# ST_coor = pd.read_table(ST_path+"/coordinates.csv", sep = ',', header = 0, index_col = 0, encoding = "utf-8")
+
+# ST_adata = ad.AnnData(X=x)
+# ST_adata.obs['coor_X'] = spatial['x']
+# ST_adata.obs['coor_Y'] = spatial['y']
+# ST_groundtruth = y
+# assert y.columns == cell_types
+# for i in cell_types:
+#     ST_adata.obs[i] = ST_groundtruth[i]
+
+# ST_genes = ST_adata.var.index.values
+# pseudo_genes = pseudo_adata.var.index.values
+# common_genes = set(ST_genes).intersection(set(pseudo_genes))
+# ST_adata_filter = ST_adata[:, list(common_genes)]
+# pseudo_adata_filter = pseudo_adata[:, list(common_genes)]
+
+st_preprocess_1 = STPreprocessTransform(normalize=data_normalization_paras['normalize'],
+                                        log=data_normalization_paras['log'], scale=data_normalization_paras['scale'],
+                                        split="pseudo")
+# pseudo_adata_filter_data=Data(data=pseudo_adata_filter)
+# st_preprocess_1(pseudo_adata_filter_data)
+# pseudo_adata_norm=pseudo_adata_filter_data.data
+
+st_preprocess_2 = STPreprocessTransform(normalize=data_normalization_paras['normalize'],
+                                        log=data_normalization_paras['log'], scale=data_normalization_paras['scale'],
+                                        split="test")
+# ST_adata_filter_data=Data(data=ST_adata_filter)
+# st_preprocess_2(ST_adata_filter_data)
+# ST_adata_filter_norm=ST_adata_filter_data.data[:, ]
+
 stdgcnwrapper = stdGCNWrapper(integration_for_adj_paras=integration_for_adj_paras,
                               inter_exp_adj_paras=inter_exp_adj_paras, spatial_adj_paras=spatial_adj_paras,
                               real_intra_exp_adj_paras=real_intra_exp_adj_paras,
                               pseudo_intra_exp_adj_paras=pseudo_intra_exp_adj_paras,
                               integration_for_feature_paras=integration_for_feature_paras, GCN_paras=GCN_paras,
                               n_jobs=n_jobs, GCN_device='GPU')
-stdgcnwrapper.fit()
+dataset = CellTypeDeconvoDataset(data_dir=paths['datadir'], data_id=paths['dataset'])
+
+data = dataset.load_data(
+    transform=Compose(CelltypeTransform(), stdgcn_mark_genes, pseudospotgen,
+                      RemoveSplit(split_name="ref", log_level="INFO"), SaveRaw(),
+                      FilterGenesCommon(split_keys=["ref", "test"]), st_preprocess_1,
+                      updateAnndataObsTransform(split="test"), st_preprocess_2, CellTypeNum(),
+                      SetConfig({"label_channel": "cell_type_portion"})), cache=False)
+_, y = data.get_data(split_name="test", return_type="torch")
+ST_adata_filter_norm = data.get_split_data(split_name="test")
+pseudo_adata_norm = data.get_split_data(split_name="pseudo")
+ST_adata_filter = data.get_split_data(split_name="test").raw
+pseudo_adata_filter = data.get_split_data(split_name="pseudo").raw
+word_to_idx_celltype = data.data.uns['word_to_idx_celltype']
+inputs = (ST_adata_filter_norm, pseudo_adata_norm, ST_adata_filter, pseudo_adata_filter, word_to_idx_celltype)
+# ref_count = data.get_feature(split_name="ref", return_type="numpy")
+# ref_annot = data.get_feature(split_name="ref", return_type="numpy", channel="cellType", channel_type="obs")
+stdgcnwrapper.fit(inputs, y)
 results = stdgcnwrapper.predict()
 # results.write_h5ad(paths['output_path']+'/results.h5ad')
