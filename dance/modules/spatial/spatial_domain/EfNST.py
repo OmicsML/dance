@@ -3,14 +3,65 @@
 @author: lenovo
 
 """
-import math
+# -*- coding: utf-8 -*-
 
+# Standard library imports
+import math
+import os
+import random
+from pathlib import Path
+
+from sympy import false
+
+from dance.datasets.spatial import SpatialLIBDDataset
+
+# typing.Literal for compatibility
+try:
+    from typing import Literal
+except ImportError:
+    try:
+        from typing_extensions import Literal
+    except ImportError:
+
+        class LiteralMeta(type):
+
+            def __getitem__(cls, values):
+                if not isinstance(values, tuple):
+                    values = (values, )
+                return type("Literal_", (Literal, ), dict(__args__=values))
+
+        class Literal(metaclass=LiteralMeta):
+            pass
+
+
+import igraph as ig
+import leidenalg
+import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import pandas as pd
+import scanpy as sc
+import scipy.sparse as sp
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.nn.modules.loss
+import torchvision.transforms as transforms
+
+# Third-party library imports
+from efficientnet_pytorch import EfficientNet
+from PIL import Image
 from scipy.sparse import csr_matrix
+from scipy.spatial import distance
+from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import pairwise_distances
+from sklearn.metrics import calinski_harabasz_score, pairwise_distances
+from torch.autograd import Variable
+from torch.nn.parameter import Parameter
+from torch_geometric.nn import BatchNorm, Sequential
+from torch_sparse import SparseTensor
+from tqdm import tqdm
 
 
 #class Aug:
@@ -175,36 +226,6 @@ def augment_adata(adata, platform="Visium", pd_dist_type="euclidean", md_dist_ty
     return adata
 
 
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Jan 22 15:28:11 2024
-
-@author: lenovo
-"""
-
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import scanpy as sc
-
-try:
-    from typing import Literal
-except ImportError:
-    try:
-        from typing_extensions import Literal
-    except ImportError:
-
-        class LiteralMeta(type):
-
-            def __getitem__(cls, values):
-                if not isinstance(values, tuple):
-                    values = (values, )
-                return type("Literal_", (Literal, ), dict(__args__=values))
-
-        class Literal(metaclass=LiteralMeta):
-            pass
-
-
 _QUALITY = Literal["fulres", "hires", "lowres"]
 _background = ["black", "white"]
 
@@ -274,23 +295,6 @@ class Refiner:
             else:
                 refined_pred.append(self_pred)
         return refined_pred
-
-
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Jan 23 20:36:44 2024
-
-@author: lenovo
-"""
-import networkx as nx
-import numpy as np
-import scipy.sparse as sp
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.nn.parameter import Parameter
-from torch_geometric.nn import BatchNorm, Sequential
-from torch_sparse import SparseTensor
 
 
 class graph:
@@ -510,27 +514,6 @@ class GradientReverseLayer(torch.autograd.Function):
         return (grad_output * -1 * ctx.weight), None
 
 
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Jan 22 21:03:53 2024
-
-@author: lenovo
-"""
-import random
-from pathlib import Path
-
-import numpy as np
-import pandas as pd
-import torch
-import torch.nn
-import torchvision.transforms as transforms
-from efficientnet_pytorch import EfficientNet
-from PIL import Image
-from sklearn.decomposition import PCA
-from torch.autograd import Variable
-from tqdm import tqdm
-
-
 class Image_Feature:
 
     def __init__(
@@ -639,27 +622,6 @@ def image_crop(adata, save_path, library_id=None, crop_size=50, target_size=224,
     return adata
 
 
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Jan 24 15:27:06 2024
-
-@author: lenovo
-"""
-import os
-from pathlib import Path
-
-import numpy as np
-import pandas as pd
-import scanpy as sc
-from AUG import augment_adata
-from Defining import Refiner, read_Visium
-from EfNST import AdversarialNetwork, EFNST_model, graph
-from Image import Image_Feature, image_crop
-from scipy.spatial import distance
-from sklearn.metrics import calinski_harabasz_score
-from Train import TrainingConfig
-
-
 class run():
 
     def __init__(
@@ -716,7 +678,8 @@ class run():
         verbose=True,
     ):
         if self.platform == 'Visium':
-            adata = read_Visium(os.path.join(data_path, data_name))
+            adata = read_Visium(os.path.join(data_path, data_name), count_file='raw_feature_bc_matrix.h5',
+                                quality='fulres')
         save_path_image_crop = Path(os.path.join(self.save_path, 'Image_crop', f'{data_name}'))
         save_path_image_crop.mkdir(parents=True, exist_ok=True)
         adata = image_crop(adata, save_path=save_path_image_crop)
@@ -879,24 +842,6 @@ class run():
         return adata
 
 
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Jan 22 16:10:01 2024
-
-@author: lenovo
-"""
-
-import igraph as ig
-import leidenalg
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.nn.modules.loss
-from sklearn.cluster import KMeans
-from torch.autograd import Variable
-
-
 class TrainingConfig:
 
     def __init__(self, pro_data, G_dict, model, pre_epochs, epochs, corrupt=0.001, lr=5e-4, weight_decay=1e-4,
@@ -1049,3 +994,49 @@ class TrainingConfig:
                 loss = self.KL_WT * loss_KL + loss_EfNST + Domain_loss
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), 5)
+
+
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Jan 24 20:58:58 2024
+
+@author: lenovo
+"""
+
+import matplotlib.pyplot as plt
+import scanpy as sc
+
+data_path = "./"
+#data_path = "D:/科研/ST数据/DLPFC12切片"
+save_path = "./1515"  #### save path
+#data_name="V1_Breast_Cancer_Block_A_Section_1"
+# data_name="151507"
+# quality='hires'
+
+n_domains = 5
+EfNST = run(
+    save_path=save_path,
+    platform="Visium",
+    pca_n_comps=200,
+    pre_epochs=800,  #### According to your own hardware, choose the number of training
+    epochs=1000,
+    Conv_type="ResGatedGraphConv")
+dataloader = SpatialLIBDDataset(data_id='151507')
+data = dataloader.load_data(transform=None, cache=False)
+adata = data.data
+# adata= EfNST._get_adata(data_path, data_name)
+adata = EfNST._get_augment(
+    adata,
+    neighbour_k=4,
+)
+graph_dict = EfNST._get_graph(adata.obsm["spatial"], distType="KDTree", k=12)
+adata = EfNST._fit(adata, graph_dict, pretrain=False)
+adata = EfNST._get_cluster_data(adata, n_domains=n_domains, priori=True)
+plt.rcParams["figure.figsize"] = (3, 3)
+sc.pl.spatial(
+    adata,
+    img_key="hires",
+    color=["EfNST"],
+    title='EfNST',
+    show=False,
+)
