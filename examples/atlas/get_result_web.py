@@ -400,10 +400,11 @@ methods = ["cta_actinn", "cta_celltypist", "cta_scdeepsort", "cta_singlecellnet"
 if __name__ == "__main__":
     # Initialize wandb and set global configuration
     # Load dataset configuration and process results for tissue
-    all_datasets = pd.read_csv(METADIR / "scdeepsort.csv", header=0, skiprows=[i for i in range(1, 68)])
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--tissue", type=str, default="Blood")
-    args = parser.parse_args()
-    tissue = args.tissue.capitalize()
-    new_df = get_new_ans(tissue)
-    write_ans(tissue, new_df)
+    for tissue in tissues:
+        all_datasets = pd.read_csv(METADIR / "scdeepsort.csv", header=0, skiprows=[i for i in range(1, 68)])
+        parser = argparse.ArgumentParser()
+        # parser.add_argument("--tissue", type=str, default="Blood")
+        # args = parser.parse_args()
+        # tissue = args.tissue.capitalize()
+        new_df = get_new_ans(tissue)
+        write_ans(tissue, new_df)
