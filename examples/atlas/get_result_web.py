@@ -219,7 +219,7 @@ def get_best_yaml(step_name, best_run, file_path):
             del fun["default_params"]
     else:
         step3_number = step_name.split("_")[1]
-        conf = OmegaConf.load(f"{file_path}/config_yamls/params/{step3_number}_test_acc_params_tuning_config.yaml")
+        conf = OmegaConf.load(f"{file_path}/config_yamls/params/{step3_number}_params_tuning_config.yaml")
         for i, fun in enumerate(conf['pipeline']):
             if 'params_to_tune' not in fun:
                 continue
