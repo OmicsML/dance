@@ -56,7 +56,7 @@ from scipy.spatial import distance
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import calinski_harabasz_score, pairwise_distances
+from sklearn.metrics import adjusted_rand_score, calinski_harabasz_score, pairwise_distances
 from torch.autograd import Variable
 from torch.nn.parameter import Parameter
 from torch_geometric.nn import BatchNorm, Sequential
@@ -123,14 +123,18 @@ def cal_weight_matrix(adata, platform="Visium", pd_dist_type="euclidean", md_dis
                       gb_dist_type="correlation", n_components=50, no_morphological=True, spatial_k=30,
                       spatial_type="KDTree", verbose=False):
     if platform == "Visium":
-        img_row = adata.obs["imagerow"]
-        img_col = adata.obs["imagecol"]
-        array_row = adata.obs["array_row"]
-        array_col = adata.obs["array_col"]
+        img_row = adata.obsm['spatial_pixel']['x_pixel']
+        img_col = adata.obsm['spatial_pixel']['y_pixel']
+        array_row = adata.obsm["spatial"]['x']
+        array_col = adata.obsm["spatial"]['y']
+        # img_row = adata.obs["imagerow"]
+        # img_col = adata.obs["imagecol"]
+        # array_row = adata.obs["array_row"]
+        # array_col = adata.obs["array_col"]
         rate = 3
         reg_row = LinearRegression().fit(array_row.values.reshape(-1, 1), img_row)
         reg_col = LinearRegression().fit(array_col.values.reshape(-1, 1), img_col)
-        physical_distance = pairwise_distances(adata.obs[["imagecol", "imagerow"]], metric=pd_dist_type)
+        physical_distance = pairwise_distances(adata.obsm['spatial_pixel'][["y_pixel", "x_pixel"]], metric=pd_dist_type)
         unit = math.sqrt(reg_row.coef_**2 + reg_col.coef_**2)
         physical_distance = np.where(physical_distance >= rate * unit, 0, 1)
     else:
@@ -422,16 +426,17 @@ class EFNST_model(nn.Module):
                                 buildNetwork(self.linear_decoder_hidden[-1], self.input_dim, "sigmoid", p_drop))
         if self.Conv_type == "ResGatedGraphConv":
             from torch_geometric.nn import ResGatedGraphConv
-            self.conv = Sequential('x, edge_index', [
-                (ResGatedGraphConv(linear_encoder_hidden[-1], conv_hidden[0] * 2), 'x, edge_index -> x1'),
+            self.conv = Sequential('x, edge_index, edge_attr', [
+                (ResGatedGraphConv(linear_encoder_hidden[-1], conv_hidden[0] * 2,
+                                   edge_dim=1), 'x, edge_index, edge_attr -> x1'),
                 BatchNorm(conv_hidden[0] * 2),
                 nn.ReLU(inplace=True),
             ])
-            self.conv_mean = Sequential('x, edge_index', [
-                (ResGatedGraphConv(conv_hidden[0] * 2, conv_hidden[-1]), 'x, edge_index -> x1'),
+            self.conv_mean = Sequential('x, edge_index, edge_attr', [
+                (ResGatedGraphConv(conv_hidden[0] * 2, conv_hidden[-1], edge_dim=1), 'x, edge_index, edge_attr -> x1'),
             ])
-            self.conv_logvar = Sequential('x, edge_index', [
-                (ResGatedGraphConv(conv_hidden[0] * 2, conv_hidden[-1]), 'x, edge_index -> x1'),
+            self.conv_logvar = Sequential('x, edge_index, edge_attr', [
+                (ResGatedGraphConv(conv_hidden[0] * 2, conv_hidden[-1], edge_dim=1), 'x, edge_index, edge_attr -> x1'),
             ])
         self.dc = InnerProductDecoder(p_drop)
         self.cluster_layer = Parameter(
@@ -440,8 +445,14 @@ class EFNST_model(nn.Module):
 
     def encode(self, x, adj):
         feat_x = self.encoder(x)
-        conv_x = self.conv(feat_x, adj)
-        return self.conv_mean(conv_x, adj), self.conv_logvar(conv_x, adj), feat_x
+        edge_index_tensor = torch.stack([adj.storage.row(), adj.storage.col()], dim=0)
+        edge_values = adj.storage.value()  # 形状是 [num_edges]
+        if edge_values is not None:
+            edge_attr_prepared = edge_values.unsqueeze(-1)
+        conv_x = self.conv(feat_x, edge_index_tensor, edge_attr_prepared)
+        return self.conv_mean(conv_x, edge_index_tensor,
+                              edge_attr_prepared), self.conv_logvar(conv_x, edge_index_tensor,
+                                                                    edge_attr_prepared), feat_x
 
     def reparameterize(self, mu, logvar):
         if self.training:
@@ -591,23 +602,20 @@ class Image_Feature:
         return self.adata
 
 
-def image_crop(adata, save_path, library_id=None, crop_size=50, target_size=224, verbose=False, quality='hires'):
-    if library_id is None:
-        library_id = list(adata.uns["spatial"].keys())[0]
-        adata.uns["spatial"][library_id]["use_quality"] = quality
-    image = adata.uns["spatial"][library_id]["images"][adata.uns["spatial"][library_id]["use_quality"]]
+def image_crop(adata, save_path, crop_size=50, target_size=224, verbose=False, quality='hires'):
+    image = adata.uns["image"]
     if image.dtype == np.float32 or image.dtype == np.float64:
         image = (image * 255).astype(np.uint8)
     img_pillow = Image.fromarray(image)
     tile_names = []
     with tqdm(total=len(adata), desc="Tiling image", bar_format="{l_bar}{bar} [ time left: {remaining} ]") as pbar:
-        for imagerow, imagecol in zip(adata.obs["imagerow"], adata.obs["imagecol"]):
+        for imagerow, imagecol in zip(adata.obsm["spatial_pixel"]['x_pixel'], adata.obsm["spatial_pixel"]['y_pixel']):
             imagerow_down = imagerow - crop_size / 2
             imagerow_up = imagerow + crop_size / 2
             imagecol_left = imagecol - crop_size / 2
             imagecol_right = imagecol + crop_size / 2
             tile = img_pillow.crop((imagecol_left, imagerow_down, imagecol_right, imagerow_up))
-            tile.thumbnail((target_size, target_size), Image.ANTIALIAS)  #####
+            tile.thumbnail((target_size, target_size), Image.LANCZOS)  #####
             tile.resize((target_size, target_size))  ######
             tile_name = str(imagecol) + "-" + str(imagerow) + "-" + str(crop_size)
             out_tile = Path(save_path) / (tile_name + ".png")
@@ -673,16 +681,16 @@ class run():
 
     def _get_adata(
         self,
-        data_path,
+        adata,
         data_name,
         verbose=True,
     ):
-        if self.platform == 'Visium':
-            adata = read_Visium(os.path.join(data_path, data_name), count_file='raw_feature_bc_matrix.h5',
-                                quality='fulres')
+        # if self.platform == 'Visium':
+        #     adata = read_Visium(os.path.join(data_path, data_name), count_file='raw_feature_bc_matrix.h5',
+        #                         quality='fulres')
         save_path_image_crop = Path(os.path.join(self.save_path, 'Image_crop', f'{data_name}'))
         save_path_image_crop.mkdir(parents=True, exist_ok=True)
-        adata = image_crop(adata, save_path=save_path_image_crop)
+        adata = image_crop(adata, save_path=save_path_image_crop, quality='fulres')
         adata = Image_Feature(adata, pca_components=self.pca_n_comps, cnnType=self.cnnType).Extract_Image_Feature()
         if verbose:
             save_data_path = Path(os.path.join(self.save_path, f'{data_name}'))
@@ -841,6 +849,10 @@ class run():
         adata.obs["EfNST"] = refined_pred
         return adata
 
+    def delete(self, adata):
+        for spot, slice_path in adata.obs['slices_path'].items():
+            os.remove(slice_path)
+
 
 class TrainingConfig:
 
@@ -996,24 +1008,13 @@ class TrainingConfig:
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), 5)
 
 
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Jan 24 20:58:58 2024
-
-@author: lenovo
-"""
-
-import matplotlib.pyplot as plt
-import scanpy as sc
-
 data_path = "./"
 #data_path = "D:/科研/ST数据/DLPFC12切片"
 save_path = "./1515"  #### save path
 #data_name="V1_Breast_Cancer_Block_A_Section_1"
-# data_name="151507"
+data_name = "151507"
 # quality='hires'
 
-n_domains = 5
 EfNST = run(
     save_path=save_path,
     platform="Visium",
@@ -1021,22 +1022,33 @@ EfNST = run(
     pre_epochs=800,  #### According to your own hardware, choose the number of training
     epochs=1000,
     Conv_type="ResGatedGraphConv")
-dataloader = SpatialLIBDDataset(data_id='151507')
+dataloader = SpatialLIBDDataset(data_id=data_name)
 data = dataloader.load_data(transform=None, cache=False)
 adata = data.data
-# adata= EfNST._get_adata(data_path, data_name)
+adata = EfNST._get_adata(adata, data_name, verbose=False)
 adata = EfNST._get_augment(
     adata,
     neighbour_k=4,
 )
 graph_dict = EfNST._get_graph(adata.obsm["spatial"], distType="KDTree", k=12)
 adata = EfNST._fit(adata, graph_dict, pretrain=False)
+y_true = adata.obs["label"]
+n_domains = len(np.unique(y_true))
 adata = EfNST._get_cluster_data(adata, n_domains=n_domains, priori=True)
+EfNST.delete(adata)
 plt.rcParams["figure.figsize"] = (3, 3)
-sc.pl.spatial(
-    adata,
-    img_key="hires",
-    color=["EfNST"],
-    title='EfNST',
-    show=False,
-)
+# sc.pl.spatial(
+#     adata,
+#     img_key="fulres",
+#     color=["EfNST"],
+#     title='EfNST',
+#     show=False,
+#     spot_size=0.5
+# )
+
+y_pred = adata.obs["EfNST"]
+print("y_true:", y_true)
+print("y_pred:", y_pred)
+print("Adjusted Rand Index (ARI):", adjusted_rand_score(y_true, y_pred))
+
+import os
