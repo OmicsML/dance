@@ -16,6 +16,7 @@ from dance.settings import ATLASDIR, DANCEDIR, METADIR
 from dance.utils import spilt_web, try_import
 
 # get yaml of best method
+method_num = {"cta_actinn": 648, "cta_celltypist": 540, "cta_scdeepsort": 180, "cta_singlecellnet": 108}
 
 
 def check_identical_strings(string_list):
@@ -235,7 +236,7 @@ def get_best_yaml(step_name, best_run, file_path):
     return OmegaConf.to_yaml(conf["pipeline"])
 
 
-def check_exist(file_path):
+def check_exist(file_path, check_params=False):
     """Check if results directory exists and contains multiple result files.
 
     Parameters
@@ -249,12 +250,15 @@ def check_exist(file_path):
         True if valid results exist (directory exists and contains >1 file)
 
     """
-    file_path = f"{file_path}/results/params/"
-    if os.path.exists(file_path) and os.path.isdir(file_path):
-        file_num = len(os.listdir(file_path))
-        return file_num > 1
+    if check_params:
+        file_path = f"{file_path}/results/params/"
+        if os.path.exists(file_path) and os.path.isdir(file_path):
+            file_num = len(os.listdir(file_path))
+            return file_num > 1
+        else:
+            return False
     else:
-        return False
+        return os.path.exists(f"{file_path}/results/pipeline/best_acc.csv")
 
 
 def get_new_ans(tissue):
@@ -268,15 +272,20 @@ def get_new_ans(tissue):
 
     for method_folder in tqdm(methods):
         for dataset_id in collect_datasets:
-            if dataset_id == "0b4a15a7-4e9e-4555-9733-2423e5c66469":  #f72958f5-7f42-4ebb-98da-445b0c6de516
-                pass
             file_path = DANCEDIR / f"examples/tuning/{method_folder}/{dataset_id}"
+            print(f"{file_path}/results/pipeline/best_acc.csv")
             if not check_exist(file_path):
                 continue
-            step2_url = get_sweep_url(pd.read_csv(f"{file_path}/results/pipeline/best_test_acc.csv"))
+            step2_data = pd.read_csv(f"{file_path}/results/pipeline/best_acc.csv")
+            if len(step2_data) != method_num[method_folder]:
+                print(
+                    f"File {file_path}/results/pipeline/best_acc.csv has {len(step2_data)} rows, expected {method_num[method_folder]}."
+                )
+                continue
+            step2_url = get_sweep_url(step2_data)
             step3_urls = []
             for i in range(3):
-                file_csv = f"{file_path}/results/params/{i}_best_test_acc.csv"
+                file_csv = f"{file_path}/results/params/{i}_best.csv"
                 if not os.path.exists(file_csv):
                     print(f"File {file_csv} does not exist, skipping.")
                     continue
@@ -386,13 +395,14 @@ def write_ans(tissue, new_df, output_file=None):
 wandb = try_import("wandb")
 entity = "xzy11632"
 project = "dance-dev"
+tissues = ["Blood", "Brain", "Heart", "Intestine", "Kidney", "Lung", "Pancreas"]
 methods = ["cta_actinn", "cta_celltypist", "cta_scdeepsort", "cta_singlecellnet"]
 if __name__ == "__main__":
     # Initialize wandb and set global configuration
     # Load dataset configuration and process results for tissue
     all_datasets = pd.read_csv(METADIR / "scdeepsort.csv", header=0, skiprows=[i for i in range(1, 68)])
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tissue", type=str, default="Lung")
+    parser.add_argument("--tissue", type=str, default="Blood")
     args = parser.parse_args()
     tissue = args.tissue.capitalize()
     new_df = get_new_ans(tissue)
