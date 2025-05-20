@@ -35,7 +35,6 @@ trash
 examples/sc_similarity_examples
 *.pth
 .vscode
-examples/atlas
 result_analysis
 readme.txt
 examples/tuning/check_sweep.py
