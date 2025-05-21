@@ -263,6 +263,7 @@ def check_exist(file_path, check_params=False):
         if os.path.exists(f"{file_path}/results/pipeline/best_acc.csv"):
             return f"{file_path}/results/pipeline/best_acc.csv"
         elif os.path.exists(f"{file_path}/results/pipeline/best_test_acc.csv"):
+        elif os.path.exists(f"{file_path}/results/pipeline/best_test_acc.csv"):
             return f"{file_path}/results/pipeline/best_test_acc.csv"
         else:
             return None
@@ -283,7 +284,7 @@ def get_new_ans(tissue):
             result_path = check_exist(file_path)
             if result_path is None:
                 continue
-            
+
             step2_data = pd.read_csv(result_path)
             if abs(len(step2_data) - method_num[method_folder])>3:
                 print(
