@@ -179,6 +179,8 @@ def get_best_method(urls, metric_col="test_acc"):
     run_states["finished_rate"] = f"{num:.2%}"
     need_to_check = num < 0.6
     runs_states_str = "|".join([f"{k}:{v}" for k, v in run_states.items()])
+    if all_best_run is None:
+        return None
     return all_best_step_name, all_best_run, all_best_run.summary[
         metric_col], runs_states_str, need_to_check, step2_best_run, step2_best_run.summary[metric_col]
 
@@ -258,8 +260,12 @@ def check_exist(file_path, check_params=False):
         else:
             return False
     else:
-        return os.path.exists(f"{file_path}/results/pipeline/best_acc.csv")
-
+        if os.path.exists(f"{file_path}/results/pipeline/best_acc.csv"):
+            return f"{file_path}/results/pipeline/best_acc.csv"
+        elif  os.path.exists(f"{file_path}/results/pipeline/best_test_acc.csv"):
+            return f"{file_path}/results/pipeline/best_test_acc.csv"
+        else:
+            return None
 
 def get_new_ans(tissue):
     ans = []
@@ -273,13 +279,14 @@ def get_new_ans(tissue):
     for method_folder in tqdm(methods):
         for dataset_id in collect_datasets:
             file_path = DANCEDIR / f"examples/tuning/{method_folder}/{dataset_id}"
-            print(f"{file_path}/results/pipeline/best_acc.csv")
-            if not check_exist(file_path):
+            result_path=check_exist(file_path)
+            if result_path is None:
                 continue
-            step2_data = pd.read_csv(f"{file_path}/results/pipeline/best_acc.csv")
-            if len(step2_data) != method_num[method_folder]:
+            
+            step2_data = pd.read_csv(result_path)
+            if abs(len(step2_data) != method_num[method_folder])>3:
                 print(
-                    f"File {file_path}/results/pipeline/best_acc.csv has {len(step2_data)} rows, expected {method_num[method_folder]}."
+                    f"File {result_path} has {len(step2_data)} rows, expected {method_num[method_folder]}."
                 )
                 continue
             step2_url = get_sweep_url(step2_data)
@@ -292,8 +299,11 @@ def get_new_ans(tissue):
                 step3_urls.append(get_sweep_url(pd.read_csv(file_csv)))
             step3_str = ",".join(step3_urls)
             step_str = f"step2:{step2_url}|step3:{step3_str}"
-            step_name, best_run, best_res, run_stats_str, need_to_check, step2_best_run, step2_best_res = get_best_method(
+            best_method=get_best_method(
                 [step2_url] + step3_urls)
+            if best_method is None:
+                continue
+            step_name, best_run, best_res, run_stats_str, need_to_check, step2_best_run, step2_best_res = best_method
             best_yaml = get_best_yaml(step_name, best_run, file_path)
             step2_best_yaml = get_best_yaml("step2", step2_best_run, file_path)
             ans.append({
