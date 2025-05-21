@@ -285,7 +285,7 @@ def get_new_ans(tissue):
                 continue
 
             step2_data = pd.read_csv(result_path)
-            if abs(len(step2_data) != method_num[method_folder]) > 3:
+            if abs(len(step2_data) - method_num[method_folder]) > 3:
                 print(f"File {result_path} has {len(step2_data)} rows, expected {method_num[method_folder]}.")
                 continue
             step2_url = get_sweep_url(step2_data)
