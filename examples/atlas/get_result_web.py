@@ -262,10 +262,11 @@ def check_exist(file_path, check_params=False):
     else:
         if os.path.exists(f"{file_path}/results/pipeline/best_acc.csv"):
             return f"{file_path}/results/pipeline/best_acc.csv"
-        elif  os.path.exists(f"{file_path}/results/pipeline/best_test_acc.csv"):
+        elif os.path.exists(f"{file_path}/results/pipeline/best_test_acc.csv"):
             return f"{file_path}/results/pipeline/best_test_acc.csv"
         else:
             return None
+
 
 def get_new_ans(tissue):
     ans = []
@@ -279,15 +280,13 @@ def get_new_ans(tissue):
     for method_folder in tqdm(methods):
         for dataset_id in collect_datasets:
             file_path = DANCEDIR / f"examples/tuning/{method_folder}/{dataset_id}"
-            result_path=check_exist(file_path)
+            result_path = check_exist(file_path)
             if result_path is None:
                 continue
-            
+
             step2_data = pd.read_csv(result_path)
-            if abs(len(step2_data) != method_num[method_folder])>3:
-                print(
-                    f"File {result_path} has {len(step2_data)} rows, expected {method_num[method_folder]}."
-                )
+            if abs(len(step2_data) != method_num[method_folder]) > 3:
+                print(f"File {result_path} has {len(step2_data)} rows, expected {method_num[method_folder]}.")
                 continue
             step2_url = get_sweep_url(step2_data)
             step3_urls = []
@@ -299,8 +298,7 @@ def get_new_ans(tissue):
                 step3_urls.append(get_sweep_url(pd.read_csv(file_csv)))
             step3_str = ",".join(step3_urls)
             step_str = f"step2:{step2_url}|step3:{step3_str}"
-            best_method=get_best_method(
-                [step2_url] + step3_urls)
+            best_method = get_best_method([step2_url] + step3_urls)
             if best_method is None:
                 continue
             step_name, best_run, best_res, run_stats_str, need_to_check, step2_best_run, step2_best_res = best_method
