@@ -66,7 +66,7 @@ Dataset_id,cta_celltypist,cta_celltypist_best_yaml,cta_celltypist_best_res,cta_c
     config_dict:
       feature_channel: feature.cell
       label_channel: cell_type
-",0.2764999866485595
+",0.27649998664855957
 4ed927e9-c099-49af-b8ce-a2652d069333,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/r228ys13|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/1knys93l,https://wandb.ai/xzy11632/dance-dev/sweeps/v8r3h7eh,https://wandb.ai/xzy11632/dance-dev/sweeps/e93x8a3d","- type: filter.gene
   target: FilterGenesPercentile
   params:
@@ -450,7 +450,7 @@ d4e69e01-3ba2-4d6b-a15d-e7048f78f22e,"step2:https://wandb.ai/xzy11632/dance-dev/
     config_dict:
       feature_channel: feature.cell
       label_channel: cell_type
-",0.2115000039339065
+",0.21150000393390656
 d567b692-c374-4628-a508-8008f6778f22,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/cbeaq6gy|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/xgbk719k,https://wandb.ai/xzy11632/dance-dev/sweeps/k4ycha4z,https://wandb.ai/xzy11632/dance-dev/sweeps/1i955fwx","- type: filter.gene
   target: FilterGenesPlaceHolder
 - type: normalize
