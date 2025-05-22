@@ -1642,7 +1642,7 @@ dea717d4-7bc0-4e46-950f-fd7e1cc8df7d,"step2:https://wandb.ai/xzy11632/dance-dev/
     config_dict:
       feature_channel: feature.cell
       label_channel: cell_type
-",0.23600000143051147,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/v62fnoun|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/tc331nw2,https://wandb.ai/xzy11632/dance-dev/sweeps/idormw5w,https://wandb.ai/xzy11632/dance-dev/sweeps/j3ny2754","- type: filter.gene
+",0.2360000014305114,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/v62fnoun|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/tc331nw2,https://wandb.ai/xzy11632/dance-dev/sweeps/idormw5w,https://wandb.ai/xzy11632/dance-dev/sweeps/j3ny2754","- type: filter.gene
   target: FilterGenesPercentile
   params: {}
 - type: normalize

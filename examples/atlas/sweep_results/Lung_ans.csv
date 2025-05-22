@@ -216,7 +216,7 @@ fa27492b-82ff-4ab7-ac61-0e2b184eee67(Lung),"step2:https://wandb.ai/xzy11632/danc
   params:
     config_dict:
       label_channel: cell_type
-",0.47099998593330383
+",0.4709999859333038
 f72958f5-7f42-4ebb-98da-445b0c6de516,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/e7q82re4|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/fd22wlxv,https://wandb.ai/xzy11632/dance-dev/sweeps/ng25xit6,https://wandb.ai/xzy11632/dance-dev/sweeps/c9lkfgtu","- type: filter.gene
   target: FilterGenesScanpyOrder
   params:
@@ -648,7 +648,7 @@ f72958f5-7f42-4ebb-98da-445b0c6de516,"step2:https://wandb.ai/xzy11632/dance-dev/
   params:
     config_dict:
       label_channel: cell_type
-",0.16699999570846558
+",0.1669999957084655
 1e5bd3b8-6a0e-4959-8d69-cafed30fe814,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/0uas297m|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/dkxsef4x,https://wandb.ai/xzy11632/dance-dev/sweeps/8z3cro0t,https://wandb.ai/xzy11632/dance-dev/sweeps/bo10gdd5","- type: filter.gene
   target: FilterGenesPlaceHolder
 - type: normalize
@@ -1367,7 +1367,7 @@ f72958f5-7f42-4ebb-98da-445b0c6de516,"step2:https://wandb.ai/xzy11632/dance-dev/
   params:
     config_dict:
       label_channel: cell_type
-",0.30149999260902405
+",0.301499992609024
 c5d88abe-f23a-45fa-a534-788985e93dad(Lung),"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/ofy2vpdl|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/nvernly0,https://wandb.ai/xzy11632/dance-dev/sweeps/pt39tbd6,https://wandb.ai/xzy11632/dance-dev/sweeps/f3ikqx48","- type: filter.gene
   target: FilterGenesScanpyOrder
   params:
@@ -3682,7 +3682,7 @@ a68b64d8-aee3-4947-81b7-36b8fe5a44d2(Lung),"step2:https://wandb.ai/xzy11632/danc
   params:
     config_dict:
       label_channel: cell_type
-",0.21050000190734863
+",0.2105000019073486
 d8da613f-e681-4c69-b463-e94f5e66847f,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/ur0v7dcm|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/bsbqwlbq,https://wandb.ai/xzy11632/dance-dev/sweeps/5rpfskcm,https://wandb.ai/xzy11632/dance-dev/sweeps/r42t4xmk","- type: filter.gene
   target: FilterGenesPlaceHolder
   params: {}
