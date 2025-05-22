@@ -287,6 +287,7 @@ def get_new_ans(tissue):
             step2_data = pd.read_csv(result_path)
             if abs(len(step2_data) - method_num[method_folder]) > 3:
                 print(f"File {result_path} has {len(step2_data)} rows, expected {method_num[method_folder]}.")
+                continue
             step2_url = get_sweep_url(step2_data)
             step3_urls = []
             for i in range(3):
@@ -403,7 +404,6 @@ wandb = try_import("wandb")
 entity = "xzy11632"
 project = "dance-dev"
 tissues = ["Blood", "Brain", "Heart", "Intestine", "Kidney", "Lung", "Pancreas"]
-tissues = [ "Kidney", "Lung", "Pancreas"]
 methods = ["cta_actinn", "cta_celltypist", "cta_scdeepsort", "cta_singlecellnet"]
 if __name__ == "__main__":
     # Initialize wandb and set global configuration
