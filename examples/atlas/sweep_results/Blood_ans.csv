@@ -4580,7 +4580,69 @@ fe52003e-1460-4a65-a213-2bb1a508332f,"step2:https://wandb.ai/xzy11632/dance-dev/
   params:
     config_dict:
       label_channel: cell_type
-",0.9113029837608336,,,,,,,
+",0.9113029837608336,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/q0vidj8m|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/n9qhbaa4,https://wandb.ai/xzy11632/dance-dev/sweeps/bem8lh28,https://wandb.ai/xzy11632/dance-dev/sweeps/fgx59zhh","- type: filter.gene
+  target: FilterGenesScanpyOrder
+  params:
+    order:
+    - min_counts
+    - min_cells
+    - max_counts
+    - max_cells
+    min_counts: 0.01
+    max_counts: 0.99
+    min_cells: 0.01
+    max_cells: 0.99
+- type: normalize
+  target: NormalizeTotalLog1P
+  params: {}
+- type: filter.gene
+  target: HighlyVariableGenesRawCount
+  params:
+    n_top_genes: 3000
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+    split_name: train
+  target: WeightedFeatureSVD
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.9215070605278016,all_total_runs:140|all_finished_runs:91|step2_total_runs:108|step2_finished_runs:90|step3_0_total_runs:6|step3_0_finished_runs:0|step3_1_total_runs:20|step3_1_finished_runs:1|step3_2_total_runs:6|step3_2_finished_runs:0|finished_rate:65.00%,False,"- type: filter.gene
+  target: FilterGenesScanpyOrder
+  params:
+    order:
+    - min_counts
+    - min_cells
+    - max_counts
+    - max_cells
+    min_counts: 0.01
+    max_counts: 0.99
+    min_cells: 0.01
+    max_cells: 0.99
+- type: normalize
+  target: NormalizeTotalLog1P
+  params: {}
+- type: filter.gene
+  target: HighlyVariableGenesRawCount
+  params:
+    n_top_genes: 3000
+- type: feature.cell
+  params:
+    out: feature.cell
+    log_level: INFO
+    split_name: train
+  target: WeightedFeatureSVD
+- type: misc
+  target: SetConfig
+  params:
+    config_dict:
+      feature_channel: feature.cell
+      label_channel: cell_type
+",0.9215070605278016
 c2a461b1-0c15-4047-9fcb-1f966fe55100,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/2zgrble3|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/qholrxxz,https://wandb.ai/xzy11632/dance-dev/sweeps/zf0l5epz,https://wandb.ai/xzy11632/dance-dev/sweeps/0e3wlmpc","- type: filter.gene
   target: FilterGenesScanpyOrder
   params:
