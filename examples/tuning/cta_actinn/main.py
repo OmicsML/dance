@@ -58,6 +58,7 @@ if __name__ == "__main__":
 
     logger.setLevel(args.log_level)
     logger.info(f"Running ACTINN with the following parameters:\n{pprint.pformat(vars(args))}")
+    os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
 
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
