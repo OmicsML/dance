@@ -7,9 +7,9 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import wandb
 from sklearn.model_selection import train_test_split
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.graphsc import GraphSC
@@ -47,7 +47,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "-data", "--dataset", default="worm_neuron_cell", choices=[
             "10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell", "mouse_kidney_10x",
-            "human_ILCS_cell", "mouse_kidney_drop", "mouse_lung_cell", "mouse_kidney_cell", "mouse_kidney_cl2"
+            "human_ILCS_cell", "mouse_kidney_drop", "mouse_lung_cell", "mouse_kidney_cell", "mouse_kidney_cl2",
+            "human_skin_cell", "human_pbmc2_cell"
         ])
     parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
