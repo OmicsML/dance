@@ -27,7 +27,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset", type=str, default="worm_neuron_cell", choices=[
             "10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell", "human_pbmc2_cell",
-            "mouse_lung_cell", "mouse_kidney_cl2", "mouse_kidney_drop", "mouse_kidney_10x"
+            "mouse_lung_cell", "mouse_kidney_cl2", "mouse_kidney_drop", "mouse_kidney_10x","human_ILCS_cell"
         ])
     # TODO: implement callbacks for "heat_kernel" and "cosine_normalized"
     parser.add_argument("--method", type=str, default="correlation", choices=["cosine", "correlation"])
