@@ -155,13 +155,22 @@ def get_best_method(urls, metric_col="test_acc"):
 
         # Find best run based on optimization goal
         goal = sweep.config["metric"]["goal"]
-        best_run = max(sweep.runs, key=partial(get_metric, metric_col=metric_col)) if goal == "maximize" else \
-                   min(sweep.runs, key=partial(get_metric, metric_col=metric_col)) if goal == "minimize" else \
+        from dance.pipeline import get_additional_sweep, save_summary_data
+        sweep_ids = get_additional_sweep(entity=entity, project=project, sweep_id=sweep_id)
+        sweep_ids.remove(sweep_id)
+        sweep_data = save_summary_data(entity=entity, project=project, sweep_id=sweep_id,
+                                       additional_sweep_ids=sweep_ids, save=False, summary_file_path='', root_path='')
+
+        if metric_col not in sweep_data.columns:
+            continue
+        best_run_id = sweep_data[metric_col].idxmax() if goal == "maximize" else \
+                   sweep_data[metric_col].idxmin() if goal == "minimize" else \
                    None
 
-        if best_run is None:
+        if best_run_id is None:
             raise RuntimeError("Optimization goal must be either 'minimize' or 'maximize'")
-
+        api = wandb.Api(timeout=1000)
+        best_run = api.run(f"/{entity}/{project}/runs/{best_run_id}")
         if metric_col not in best_run.summary:
             continue
         if all_best_run is None:
@@ -285,7 +294,7 @@ def get_new_ans(tissue):
                 continue
 
             step2_data = pd.read_csv(result_path)
-            if abs(len(step2_data) - method_num[method_folder]) > 3:
+            if abs(len(step2_data) - method_num[method_folder]) > 6:
                 print(f"File {result_path} has {len(step2_data)} rows, expected {method_num[method_folder]}.")
                 continue
             step2_url = get_sweep_url(step2_data)
