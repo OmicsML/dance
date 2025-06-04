@@ -256,7 +256,7 @@ def get_forest_model_pattern(step2_data, metric_name):
                                                    ])
     pipeline = Pipeline(steps=[('preprocessor', preprocessor),
                                ('regressor',
-                                RandomForestRegressor(n_estimators=100, max_depth=5, min_samples_split=2,
+                                RandomForestRegressor(n_estimators=100, max_depth=5, min_samples_split=2, n_jobs=-1,
                                                       min_samples_leaf=1, random_state=42))])
 
     param_grid = {
@@ -265,17 +265,17 @@ def get_forest_model_pattern(step2_data, metric_name):
         'regressor__min_samples_split': [2, 5],
         'regressor__min_samples_leaf': [1, 2]
     }
-    loo = LeaveOneOut()
+    # loo = LeaveOneOut()
+    k_fold_cv = KFold(n_splits=5, shuffle=True, random_state=42)  # Or 3, or 10
 
     grid_search = GridSearchCV(
         estimator=pipeline,
         param_grid=param_grid,
-        cv=loo,
+        cv=k_fold_cv,  # Use k_fold_cv instead of loo
         scoring='neg_mean_squared_error',
-        n_jobs=-1,
+        n_jobs=-1,  # Keep n_jobs=-1 for GridSearchCV itself
         verbose=1,
-        refit=True  # Ensure the best model is retrained on all data
-    )
+        refit=True)
     grid_search.fit(X, y)
     best_pipeline = grid_search.best_estimator_
     model = best_pipeline.named_steps['regressor']
@@ -284,12 +284,12 @@ def get_forest_model_pattern(step2_data, metric_name):
     logger.info(f"X.columns={X.columns}")
     logger.info(f"feature_names={feature_names}")
     explainer = shapiq.TreeExplainer(
-        model=model, index="k-SII", max_order=3
+        model=model, index="k-SII", max_order=2
     )  # Consider why there are no negative values, possibly to prevent cancellation of positive and negative values
-    list_of_interaction_values = explainer.explain_X(X_preprocessed.toarray(), n_jobs=96, random_state=42)
+    list_of_interaction_values = explainer.explain_X(X_preprocessed.toarray(), n_jobs=-1, random_state=42)
     plt.cla()
     ax = shapiq.plot.bar_plot(list_of_interaction_values, feature_names=feature_names, max_display=None, show=False,
-                              need_abbreviate=False)
+                              abbreviate=False)
     ax.yaxis.get_major_locator().MAXTICKS = 1000000
     plt.show()
     rects = ax.containers[0]
