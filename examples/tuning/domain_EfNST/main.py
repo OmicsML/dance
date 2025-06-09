@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import wandb
 from sklearn.metrics import adjusted_rand_score
 
-import wandb
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.EfNST import EfNsSTRunner
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
