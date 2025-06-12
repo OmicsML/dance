@@ -7,9 +7,9 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import wandb
 from sklearn.model_selection import train_test_split
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.graphsc import GraphSC
@@ -95,7 +95,7 @@ if __name__ == "__main__":
         model.fit(graph, epochs=args.epochs, lr=args.learning_rate, show_epoch_ari=args.show_epoch_ari,
                   eval_epoch=args.eval_epoch)
         score = model.score(graph, y)
-        wandb.log({"ari": score})
+        wandb.log({"acc": score})
         wandb.finish()
         del model
         torch.cuda.empty_cache()
