@@ -9,9 +9,11 @@ import pandas as pd
 import yaml
 from tqdm import tqdm
 
-from dance.settings import DANCEDIR, SIMILARITYDIR
+from dance.pipeline import get_additional_sweep
+from dance.settings import ATLASDIR, DANCEDIR, SIMILARITYDIR
 
 sys.path.append(str(DANCEDIR))
+sys.path.append(str(ATLASDIR))
 import ast
 
 from get_result_web import get_sweep_url
@@ -164,8 +166,12 @@ def get_ans_from_cache(query_dataset, method):
         return ans
     sweep_url = re.search(r"step2:([^|]+)", step_str).group(1)
     _, _, sweep_id = spilt_web(sweep_url)
-    sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
-    runs = sweep.runs
+    # sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
+    # runs = sweep.runs#!!!! 有问题
+    sweep_ids = get_additional_sweep(entity=entity, project=project, sweep_id=sweep_id)
+    runs = []
+    for sweep_id in sweep_ids:
+        runs.extend(wandb.Api().sweep(f"{entity}/{project}/{sweep_id}").runs)
     for atlas_dataset in tqdm(atlas_datasets):
         best_yaml = conf_data[conf_data["dataset_id"] == atlas_dataset][f"{method}_step2_best_yaml"].iloc[0]
         match_run = None
