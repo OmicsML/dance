@@ -2,6 +2,7 @@ import argparse
 import os
 import pprint
 import sys
+import time
 from cgi import test
 from pathlib import Path
 
@@ -99,6 +100,7 @@ if __name__ == "__main__":
         wandb.finish()
         del model
         torch.cuda.empty_cache()
+        time.sleep(20)
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
