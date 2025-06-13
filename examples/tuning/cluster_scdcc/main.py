@@ -2,6 +2,7 @@ import argparse
 import os
 import pprint
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -102,6 +103,7 @@ if __name__ == "__main__":
                   ml_ind2=ml_ind2, cl_ind1=cl_ind1, cl_ind2=cl_ind2, update_interval=args.update_interval, tol=args.tol,
                   pt_batch_size=args.batch_size, pt_lr=args.pretrain_lr, pt_epochs=args.pretrain_epochs)
 
+        time.sleep(20)
         # Evaluate model predictions
         score = model.score(None, y)
         wandb.log({"acc": score})
