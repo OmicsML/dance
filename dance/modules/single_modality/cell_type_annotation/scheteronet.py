@@ -592,7 +592,6 @@ class scHeteroNet(nn.Module, BaseClassificationMethod):
         transforms.append(NormalizeTotal())
         transforms.append(UpdateSizeFactors())
         transforms.append(Log1P())
-        transforms.append(ScaleFeature())
         transforms.append(HeteronetGraph())
         transforms.append(SetConfig({"label_channel": "cell_type"}))
         return Compose(*transforms, log_level=log_level)

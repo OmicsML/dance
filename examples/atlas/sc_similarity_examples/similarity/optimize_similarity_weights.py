@@ -74,6 +74,8 @@ def get_rank(reduce_error, in_query):
             for method in methods:
                 rank_col = 'rank_' + method
                 runs = get_runs(conf_data, query_dataset, method)
+                if runs is None:
+                    continue
                 data.loc[rank_col, :] = data.loc[method, :].apply(lambda x: query_rank(x, runs, reduce_error))
     else:
         for query_dataset, data in ans.items():

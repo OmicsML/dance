@@ -136,7 +136,15 @@ OOD Test 1 Final AUPR: 99.53
 OOD Test 1 Final FPR: 100.00
 IND Test Score: 81.88
 
-python scheteronet.py --gpu -1 --use_zinb --use_prop --use_2hop --epochs 4
+python scheteronet.py --gpu -1 --use_zinb --use_prop --use_2hop
 
-python scheteronet.py --gpu -1  --species human --tissue Brain --train_dataset 328 --test_dataset 138 --use_zinb --use_prop --use_2hop --epochs 4
+python scheteronet.py --gpu -1  --species human --tissue Brain --train_dataset 328 --test_dataset 138 --use_zinb --use_prop --use_2hop
+
+python scheteronet.py --gpu -1  --species human --tissue CD8 --train_dataset 1027 1357 1641 517 706 777 850 972 --test_dataset 245 332 377 398 405 455 470 492 --use_zinb --use_prop --use_2hop
+
+python scheteronet.py --gpu -1  --species human --tissue CD4 --train_dataset 1013 1247 598 732 767 768 770 784 845 864 --test_dataset 315 340 376 381 390 404 437 490 551 559 --use_zinb --use_prop --use_2hop
+
+python scheteronet.py --gpu -1  --species human --tissue Spleen --train_dataset 3043 3777 4029 4115 4362 4657 --test_dataset 138 --use_zinb --use_prop --use_2hop
+
+python scheteronet.py --gpu -1  --species human --tissue Immune --train_dataset 11407 1519 636 713 9054 9258 --test_dataset 138 --use_zinb --use_prop --use_2hop
 """
