@@ -40,6 +40,7 @@ Both include three modules at present:
 **DANCE Documentation**: https://pydance.readthedocs.io/en/latest/ \
 **DANCE 1.0 Tutorial**: https://github.com/OmicsML/dance-tutorials \
 **DANCE 1.0 Paper (published on Genome Biology)**: [DANCE: a deep learning library and benchmark platform for single-cell analysis](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-024-03211-z) \
+**DANCE 2.0 Paper**: [DANCE 2.0: Transforming single-cell analysis from black box to transparent workflow](https://www.biorxiv.org/content/10.1101/2025.07.17.665427v1) \
 **Survey Paper (published on ACM TIST):** [Deep Learning in Single-cell Analysis](https://dl.acm.org/doi/10.1145/3641284)
 
 ## Join the Community
