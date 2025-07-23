@@ -23,12 +23,11 @@ DANCE is a Python toolkit to support deep learning models for analyzing single-c
 
 ### Useful links
 
-OmicsML Homepage: https://omicsml.ai \
-DANCE Open Source: https://github.com/OmicsML/dance \
-DANCE Documentation: https://pydance.readthedocs.io/en/latest/ \
-DANCE Tutorials: https://github.com/OmicsML/dance-tutorials \
-DANCE Package Paper: https://www.biorxiv.org/content/10.1101/2022.10.19.512741v2 \
-Survey Paper: https://arxiv.org/abs/2210.12385
+**DANCE Open Source**: https://github.com/OmicsML/dance \
+**DANCE Documentation**: https://pydance.readthedocs.io/en/latest/ \
+**DANCE 1.0 Tutorial**: https://github.com/OmicsML/dance-tutorials \
+**DANCE 1.0 Paper (published on Genome Biology)**: [DANCE: a deep learning library and benchmark platform for single-cell analysis](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-024-03211-z) \
+**Survey Paper (published on ACM TIST):** [Deep Learning in Single-cell Analysis](https://dl.acm.org/doi/10.1145/3641284)
 
 ### Join the Community
 
@@ -39,7 +38,7 @@ Email: danceteamgnn@gmail.com
 
 ### Contributing
 
-Community-wide contribution is the key for a sustainable development and
+Community-wide contribution is the key to sustainable development and
 continual growth of the DANCE package. We deeply appreciate any contribution
 made to improve the DANCE code base. If you would like to get started, please
 refer to our brief [guidelines](CONTRIBUTING.md) about our automated quality
