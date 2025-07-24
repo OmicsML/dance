@@ -32,7 +32,7 @@ if __name__ == '__main__':
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--mask", type=bool, default=True, help="Mask data for validation.")
     parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
-    parser.add_argument("--num_runs", type=int, default=1, help="Number of repetitions")
+    parser.add_argument("--num_runs", type=int, default=5, help="Number of repetitions")
     params = parser.parse_args()
     print(vars(params))
     rmses = []
@@ -63,7 +63,7 @@ if __name__ == '__main__':
                   params.weight_decay)
         model.load_model()
         imputed_data = model.predict(X_train, X_raw_train, g, mask)
-        score = model.score(X, imputed_data, mask, metric='RMSE')
+        score = model.score(X, imputed_data, mask, metric='RMSE')  #保留了90%，查看剩余10%的偏差
         print("RMSE: %.4f" % score)
         rmses.append(score)
 

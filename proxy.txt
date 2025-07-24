@@ -1,0 +1,5 @@
+os.environ["http_proxy"] = "http://121.250.209.147:7890"
+os.environ["https_proxy"] = "http://121.250.209.147:7890"
+
+export http_proxy=http://121.250.209.147:7890
+export https_proxy=http://121.250.209.147:7890

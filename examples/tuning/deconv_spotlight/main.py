@@ -1,11 +1,14 @@
 import argparse
 import os
 import sys
+from cgi import test
 from pathlib import Path
 from pprint import pprint
 
 import numpy as np
+import torch
 import wandb
+from sklearn.model_selection import train_test_split
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.spotlight import SPOTlight
@@ -52,11 +55,13 @@ if __name__ == "__main__":
         x, y = data.get_data(split_name="test", return_type="torch")
         ref_count = data.get_feature(split_name="ref", return_type="numpy")
         ref_annot = data.get_feature(split_name="ref", return_type="numpy", channel="cellType", channel_type="obs")
-
         # Train and evaluate model
         model = SPOTlight(ref_count, ref_annot, cell_types, rank=args.rank, bias=args.bias, device=args.device)
-        score = model.fit_score(x, y, lr=args.lr, max_iter=args.max_iter)
-        wandb.log({"MSE": score})
+        valid_idx, test_idx = train_test_split(np.arange(len(x)), test_size=0.3)
+
+        valid_score, test_score = model.fit_score(x, y, lr=args.lr, max_iter=args.max_iter, valid_idx=valid_idx,
+                                                  test_idx=test_idx)
+        wandb.log({"MSE": valid_score, "test_MSE": test_score})
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch

@@ -2,6 +2,7 @@ import argparse
 from pprint import pprint
 
 import numpy as np
+from sklearn.model_selection import train_test_split
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.card import Card
@@ -28,15 +29,18 @@ for seed in range(args.seed, args.seed + args.num_runs):
     dataset = CellTypeDeconvoDataset(data_dir=args.datadir, data_id=args.dataset)
     data = dataset.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
+    total_idx = data.get_split_idx("test")
+    valid_idx, test_idx = train_test_split(total_idx, test_size=0.3, random_state=args.seed)
     # inputs: x_count, x_spatial
     inputs, y = data.get_data(split_name="test", return_type="numpy")
     basis = data.get_feature(return_type="default", channel="CellTopicProfile", channel_type="varm")
 
     # Train and evaluate model
     model = Card(basis, random_state=seed)
-    score = model.fit_score(inputs, y, max_iter=args.max_iter, epsilon=args.epsilon, location_free=args.location_free)
-    scores.append(score)
-    print(f"MSE: {score:7.4f}")
+    valid_score, test_score = model.fit_score(inputs, y, max_iter=args.max_iter, epsilon=args.epsilon,
+                                              location_free=args.location_free, valid_idx=valid_idx, test_idx=test_idx)
+    scores.append(test_score)
+    print(f"MSE: {test_score:7.4f}")
 print(f"CARD {args.dataset}:")
 print(f"{scores}\n{np.mean(scores):.5f} +/- {np.std(scores):.5f}")
 """To reproduce CARD benchmarks, please refer to command lines belows:

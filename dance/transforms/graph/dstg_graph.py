@@ -1,3 +1,5 @@
+from typing import Sequence, Union
+
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -32,17 +34,23 @@ class DSTGraph(BaseTransform):
 
     _DISPLAY_ATTRS = ("k_filter", "num_cc", "ref_split", "inf_split")
 
-    def __init__(self, k_filter=200, num_cc=30, *, ref_split: str = "train", inf_split: str = "test", **kwargs):
+    def __init__(self, k_filter=200, num_cc=30, *, ref_split: str = "train", inf_split: str = "test",
+                 channels: Sequence[Union[str, None]] = (None, None),
+                 channel_types: Sequence[Union[str, None]] = ("obsm", "obsm"), **kwargs):
         super().__init__(**kwargs)
 
         self.k_filter = k_filter
         self.num_cc = num_cc
         self.ref_split = ref_split
         self.inf_split = inf_split
+        self.channels = channels
+        self.channel_types = channel_types
 
     def __call__(self, data):
-        x_ref = data.get_feature(return_type="numpy", split_name=self.ref_split)
-        x_inf = data.get_feature(return_type="numpy", split_name=self.inf_split)
+        x_ref = data.get_feature(return_type="numpy", split_name=self.ref_split, channel=self.channels[0],
+                                 channel_type=self.channel_types[0])
+        x_inf = data.get_feature(return_type="numpy", split_name=self.inf_split, channel=self.channels[1],
+                                 channel_type=self.channel_types[1])
 
         adj = compute_dstg_adj(x_ref, x_inf, k_filter=self.k_filter, num_cc=self.num_cc)
         data.data.obsp[self.out] = adj

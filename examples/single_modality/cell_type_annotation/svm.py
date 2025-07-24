@@ -7,6 +7,14 @@ import numpy as np
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
+from dance.transforms.cell_feature import WeightedFeaturePCA
+from dance.transforms.filter import (
+    FilterGenesPlaceHolder,
+    FilterGenesRegression,
+    HighlyVariableGenesLogarithmizedByMeanAndDisp,
+)
+from dance.transforms.misc import Compose, SetConfig
+from dance.transforms.normalize import Log1P, ScTransform
 from dance.typing import LogLevel
 from dance.utils import set_seed
 
@@ -33,7 +41,17 @@ if __name__ == "__main__":
         # Initialize model and get model specific preprocessing pipeline
         model = SVM(args, random_state=seed)  # TODO: get useful args out
         preprocessing_pipeline = model.preprocessing_pipeline(n_components=args.dense_dim, log_level=args.log_level)
-
+        # preprocessing_pipeline= Compose(
+        #     FilterGenesPlaceHolder(),
+        #     ScTransform(),
+        #     FilterGenesRegression(num_genes=2208),
+        #     WeightedFeaturePCA(out="feature.cell",log_level="INFO",split_name="train"),
+        #     SetConfig({
+        #         "feature_channel": "feature.cell",
+        #         "label_channel": "cell_type"
+        #     }),
+        #     log_level="INFO",
+        # )
         # Load data and perform necessary preprocessing
         dataloader = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
                                                species=args.species, tissue=args.tissue, val_size=args.val_size)

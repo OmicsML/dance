@@ -58,7 +58,7 @@ def normalize(mat, *, mode: NormMode = "normalize", axis: int = 0, eps: float = 
     elif eps == -1:
         denom[denom == 0] = 1
     elif eps > 0:
-        denom += eps
+        denom = denom + eps
     else:
         raise ValueError(f"Invalid {eps=!r}. Must be positive or -1, the later set zero entries to one.")
 

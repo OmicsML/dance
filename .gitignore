@@ -14,3 +14,37 @@ temp_data
 *.egg*
 __pycache__
 build/
+*.log
+
+#ignore example result
+examples/**/*.h5ad
+examples/tuning/**/*.yaml
+examples/tuning/**/*.csv
+examples/tuning/**/*.sh
+examples/tuning/**/*.h5
+examples/tuning/**/*.tar.gz
+examples/tuning/**/*.tif
+examples/tuning/**/*.txt
+examples/atlas/config/run_config.csv
+trash
+*.zip
+*.h5
+*.h5ad
+*.gz
+*.tif
+examples/sc_similarity_examples
+*.pth
+.vscode
+readme.txt
+examples/tuning/check_sweep.py
+examples/tuning/result.md
+examples/tuning/figures
+examples/single_modality/imputation/data
+examples/tuning/imputation_magic/data
+results - cell type deconvolution.csv
+results - spatial domain.csv
+temp_ans.csv
+temp_ans.json
+check_time.py
+t.py
+examples/heart_ans.csv

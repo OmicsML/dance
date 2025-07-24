@@ -1,5 +1,6 @@
 import argparse
 import gc
+import os
 import pprint
 import sys
 from pathlib import Path
@@ -29,10 +30,10 @@ if __name__ == "__main__":
     parser.add_argument("--n_epochs", type=int, default=100, help="number of training epochs")
     parser.add_argument("--n_layers", type=int, default=1, help="number of hidden gcn layers")
     parser.add_argument("--species", default="mouse", type=str)
-    parser.add_argument("--test_dataset", nargs="+", type=int, default=[1759], help="Testing dataset IDs")
+    parser.add_argument("--test_dataset", nargs="+", type=int, default=[], help="Testing dataset IDs")
     parser.add_argument("--test_rate", type=float, default=0.2)
     parser.add_argument("--tissue", default="Spleen", type=str)
-    parser.add_argument("--train_dataset", nargs="+", type=int, default=[1970], help="List of training dataset ids.")
+    parser.add_argument("--train_dataset", nargs="+", default=[1970], help="List of training dataset ids.")
     parser.add_argument("--valid_dataset", nargs="+", default=None, help="List of valid dataset ids.")
     parser.add_argument("--weight_decay", type=float, default=5e-4, help="Weight for L2 loss")
     parser.add_argument("--seed", type=int, default=42)
@@ -42,17 +43,21 @@ if __name__ == "__main__":
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
-
+    parser.add_argument("--filetype", default="csv")
+    parser.add_argument('--additional_sweep_ids', action='append', type=str, help='get prior runs')
     args = parser.parse_args()
     logger.setLevel(args.log_level)
+    os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
     logger.info(f"Running ScDeepSort with the following parameters:\n{pprint.pformat(vars(args))}")
     file_root_path = Path(
         args.root_path, "_".join([
             "-".join([str(num) for num in dataset])
-            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset] if dataset is not None
+            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
+            if (dataset is not None and dataset != [])
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
+    os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
 
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
@@ -61,7 +66,7 @@ if __name__ == "__main__":
         # Load data and perform necessary preprocessing
         data = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
                                          train_dataset=args.train_dataset, valid_dataset=args.valid_dataset,
-                                         data_dir="../temp_data").load_data()
+                                         data_dir="../temp_data", filetype=args.filetype).load_data()
         # Prepare preprocessing pipeline and apply it to data
         kwargs = {tune_mode: dict(wandb.config)}
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
@@ -103,7 +108,8 @@ if __name__ == "__main__":
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
-    save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
+    save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path,
+                      additional_sweep_ids=args.additional_sweep_ids)
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
         get_step3_yaml(
             result_load_path=f"{args.summary_file_path}",
