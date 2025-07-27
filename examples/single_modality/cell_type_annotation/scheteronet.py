@@ -144,7 +144,6 @@ python scheteronet.py --gpu -1  --species human --tissue CD8 --train_dataset 102
 
 python scheteronet.py --gpu -1  --species human --tissue CD4 --train_dataset 1013 1247 598 732 767 768 770 784 845 864 --test_dataset 315 340 376 381 390 404 437 490 551 559 --use_zinb --use_prop --use_2hop
 
-python scheteronet.py --gpu -1  --species human --tissue Spleen --train_dataset 3043 3777 4029 4115 4362 4657 --test_dataset 138 --use_zinb --use_prop --use_2hop
+python scheteronet.py --gpu -1  --species human --tissue Spleen --train_dataset 3043 3777 4029 4115 4362 4657 --test_dataset 1729 2125 2184 2724 2743 --use_zinb --use_prop --use_2hop
 
-python scheteronet.py --gpu -1  --species human --tissue Immune --train_dataset 11407 1519 636 713 9054 9258 --test_dataset 138 --use_zinb --use_prop --use_2hop
 """

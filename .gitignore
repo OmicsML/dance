@@ -48,3 +48,11 @@ temp_ans.json
 check_time.py
 t.py
 examples/heart_ans.csv
+examples/atlas/demos/atlas_patterns
+examples/atlas/demos/atlas_csvs
+examples/result_analysis
+examples/spatial/cell_type_deconvo/data
+examples/spatial/spatial_domain/data
+examples/atlas/sc_similarity_examples
+trash
+temp

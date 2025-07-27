@@ -467,8 +467,8 @@ class ImputationDataset(BaseDataset):
             "mouse_embryo_data": "GSE65525.zip?dl=0",
             "mouse_brain_data": "neuron_10k.zip?dl=0",
             "human_stemcell_data": "GSE75748.zip?dl=0",
-            "human_breast_TGFb_data": "GSE114397.zip?dl=0?rlkey=dleuq5tn66e4lxu2uzvjkq3w0",
-            "human_breast_Dox_data": "GSM3141014.zip?dl=0?rlkey=ntv25p0ex5si8aj21ivhxtzbk",
+            "human_breast_TGFb_data": "GSE114397.zip?dl=0",
+            "human_breast_Dox_data": "GSM3141014.zip?dl=0",
             "human_melanoma_data": "human_melanoma_data.zip?dl=0",
             "mouse_visual_data": "mouse_visual_data.zip?dl=0"
         }

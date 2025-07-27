@@ -66,6 +66,8 @@ class HeteronetGraph(BaseTransform):
         labels_np = np.argmax(adata.obsm['cell_type'].copy(), axis=1)
         labels = torch.as_tensor(labels_np, dtype=torch.long)
 
+        batchs = adata.obs.get('batch_id', None)
+
         if self.ignore_first:
             labels[labels == 0] = -1  # Apply ignore_first logic
 
@@ -87,4 +89,6 @@ class HeteronetGraph(BaseTransform):
         # 5. Add Node Features and Labels
         g.ndata['feat'] = features
         g.ndata['label'] = labels
+        if batchs is not None:
+            g.ndata['batch_id'] = torch.from_numpy(batchs.values.astype(int)).long()
         adata.uns[self.out] = g
