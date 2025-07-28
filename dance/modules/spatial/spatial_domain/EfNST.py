@@ -11,9 +11,22 @@ import os
 import random
 from pathlib import Path
 
-from sympy import false
+from skimage import img_as_ubyte
+from sklearn import preprocessing
+from sklearn.neighbors import NearestNeighbors
+from sympy import E, false
 
+from dance import logger
+from dance.data.base import Data
 from dance.datasets.spatial import SpatialLIBDDataset
+from dance.modules.base import BaseClusteringMethod
+from dance.registry import register_preprocessor
+from dance.transforms.base import BaseTransform
+from dance.transforms.cell_feature import CellPCA
+from dance.transforms.filter import FilterGenesPercentile, HighlyVariableGenesLogarithmizedByTopGenes
+from dance.transforms.misc import Compose, SetConfig
+from dance.transforms.normalize import NormalizeTotalLog1P
+from dance.utils import set_seed
 
 # typing.Literal for compatibility
 try:
@@ -59,10 +72,11 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import adjusted_rand_score, calinski_harabasz_score, pairwise_distances
 from torch.autograd import Variable
 from torch.nn.parameter import Parameter
+from torch.utils.data import DataLoader, Dataset
 from torch_geometric.nn import BatchNorm, Sequential
 from torch_sparse import SparseTensor
+from torchvision import transforms
 from tqdm import tqdm
-
 
 #class Aug:
 # def __init__(self, data,spatial_k=50, spatial_type="KDTree"):
@@ -83,6 +97,96 @@ from tqdm import tqdm
 # 		for j in ind:
 # 			spatial_weight[i][j] = 1
 # 	return spatial_weight
+
+
+class SpatialImageDataset(Dataset):
+
+    def __init__(self, paths, transform=None):
+        self.paths = paths
+        self.spot_names = paths.index.tolist()
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, idx):
+        spot_name = self.spot_names[idx]
+        img_path = self.paths.iloc[idx]
+
+        # Load image
+        image = Image.open(img_path).convert("RGB")  # Ensure 3 channels
+
+        if self.transform:
+            image = self.transform(image)
+
+        return image, spot_name
+
+
+def extract_features_batch(adata, model, device, batch_size=64, num_workers=4):
+    """Extracts features from image slices in an efficient, batched manner.
+
+    Args:
+        adata (anndata.AnnData): AnnData object with 'slices_path' in obs.
+        model (torch.nn.Module): The pre-trained PyTorch model.
+        device (torch.device): The device to run the model on (e.g., torch.device('cuda')).
+        batch_size (int): Number of images to process in one batch.
+        num_workers (int): Number of CPU workers for loading data in parallel.
+
+    Returns:
+        pd.DataFrame: A DataFrame where rows are spots and columns are features.
+
+    """
+    # 1. 设置模型为评估模式，并关闭梯度计算
+    model.eval()
+
+    # 2. 定义图像预处理流程
+    # 和你原来的步骤一致：resize -> to tensor -> convert to float
+    # torchvision.transforms 能够高效地完成这些
+    preprocess = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),  # 这会自动将 [0, 255] 的 PIL Image 转为 [0.0, 1.0] 的 FloatTensor
+        # 如果你的模型需要特定的归一化，请在这里添加
+        # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+
+    # 3. 创建Dataset和DataLoader
+    # shuffle=False is CRITICAL to keep the order of spots
+    dataset = SpatialImageDataset(paths=adata.obs['slices_path'], transform=preprocess)
+    data_loader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=True  # Speeds up CPU to GPU transfer
+    )
+
+    all_features = []
+    all_spot_names = []
+
+    # 4. 高效的批处理循环
+    with torch.no_grad():  # 非常重要！关闭梯度计算，节省内存和计算
+        for image_batch, spot_name_batch in tqdm(data_loader, desc="Extracting features"):
+            # DataLoader已经将一批图像打包成一个(B, C, H, W)的张量
+            # B = batch_size, C=3, H=224, W=224
+
+            # 将整个批次的数据一次性移动到GPU
+            image_batch = image_batch.to(device)
+
+            # 对整个批次进行推理
+            result_batch = model(image_batch)
+
+            # 将结果移回CPU，并存储
+            # .cpu() returns a tensor on CPU, .numpy() converts it to numpy array
+            all_features.append(result_batch.cpu().numpy())
+            all_spot_names.extend(list(spot_name_batch))
+
+    # 5. 合并所有批次的结果并创建DataFrame (只执行一次!)
+    final_features = np.concatenate(all_features, axis=0)
+    feat_df = pd.DataFrame(final_features, index=all_spot_names)
+
+    return adata, feat_df
+
+
 def cal_spatial_weight(
     data,
     spatial_k=50,
@@ -134,9 +238,22 @@ def cal_weight_matrix(adata, platform="Visium", pd_dist_type="euclidean", md_dis
         rate = 3
         reg_row = LinearRegression().fit(array_row.values.reshape(-1, 1), img_row)
         reg_col = LinearRegression().fit(array_col.values.reshape(-1, 1), img_col)
-        physical_distance = pairwise_distances(adata.obsm['spatial_pixel'][["y_pixel", "x_pixel"]], metric=pd_dist_type)
         unit = math.sqrt(reg_row.coef_**2 + reg_col.coef_**2)
-        physical_distance = np.where(physical_distance >= rate * unit, 0, 1)
+
+        #   physical_distance = pairwise_distances(adata.obsm['spatial_pixel'][["y_pixel", "x_pixel"]], metric=pd_dist_type,n_jobs=-1)
+        #   physical_distance = np.where(physical_distance >= rate * unit, 0, 1)
+        coords = adata.obsm['spatial_pixel'][["y_pixel", "x_pixel"]].values
+        n_spots = coords.shape[0]
+        radius = rate * unit
+        nbrs = NearestNeighbors(radius=radius, metric=pd_dist_type, n_jobs=-1).fit(coords)
+        distances, indices = nbrs.radius_neighbors(coords, return_distance=True)
+        row_ind = []
+        col_ind = []
+        for i in range(n_spots):
+            row_ind.extend([i] * len(indices[i]))
+            col_ind.extend(indices[i])
+        data = np.ones(len(row_ind), dtype=np.int8)
+        physical_distance = csr_matrix((data, (row_ind, col_ind)), shape=(n_spots, n_spots))
     else:
         physical_distance = cal_spatial_weight(adata.obsm['spatial'], spatial_k=spatial_k, spatial_type=spatial_type)
 
@@ -579,18 +696,20 @@ class Image_Feature:
         model.eval()
         if "slices_path" not in self.adata.obs.keys():
             raise ValueError("Please run the function image_crop first")
-        for spot, slice_path in self.adata.obs['slices_path'].items():
-            spot_slice = Image.open(slice_path)
-            spot_slice = spot_slice.resize((224, 224))
-            spot_slice = np.asarray(spot_slice, dtype="int32")
-            spot_slice = spot_slice.astype(np.float32)
-            tensor = img_to_tensor(spot_slice)
-            tensor = tensor.resize_(1, 3, 224, 224)
-            tensor = tensor.to(self.device)
-            result = model(Variable(tensor))
-            result_npy = result.data.cpu().numpy().ravel()
-            feat_df[spot] = result_npy
-            feat_df = feat_df.copy()
+        # for spot, slice_path in self.adata.obs['slices_path'].items():
+        #     spot_slice = Image.open(slice_path)
+        #     spot_slice = spot_slice.resize((224, 224))
+        #     spot_slice = np.asarray(spot_slice, dtype="int32")
+        #     spot_slice = spot_slice.astype(np.float32)
+        #     tensor = img_to_tensor(spot_slice)
+        #     tensor = tensor.resize_(1, 3, 224, 224)
+        #     tensor = tensor.to(self.device)
+        #     result = model(Variable(tensor))
+        #     result_npy = result.data.cpu().numpy().ravel()
+        #     feat_df[spot] = result_npy
+        #     feat_df = feat_df.copy()
+        _, feat_df = extract_features_batch(self.adata, model, self.device)
+        feat_df = feat_df.transpose()
         self.adata.obsm["image_feat"] = feat_df.transpose().to_numpy()
         if self.verbose:
             print("The image feature is added to adata.obsm['image_feat'] !")
@@ -606,7 +725,7 @@ def image_crop(adata, save_path, crop_size=50, target_size=224, verbose=False, q
     image = adata.uns["image"]
     if image.dtype == np.float32 or image.dtype == np.float64:
         image = (image * 255).astype(np.uint8)
-    img_pillow = Image.fromarray(image)
+    img_pillow = Image.fromarray(img_as_ubyte(image))
     tile_names = []
     with tqdm(total=len(adata), desc="Tiling image", bar_format="{l_bar}{bar} [ time left: {remaining} ]") as pbar:
         for imagerow, imagecol in zip(adata.obsm["spatial_pixel"]['x_pixel'], adata.obsm["spatial_pixel"]['y_pixel']):
@@ -628,230 +747,6 @@ def image_crop(adata, save_path, crop_size=50, target_size=224, verbose=False, q
     if verbose:
         print("The slice path of image feature is added to adata.obs['slices_path'] !")
     return adata
-
-
-class run():
-
-    def __init__(
-        self,
-        save_path="./",
-        pre_epochs=1000,
-        epochs=500,
-        pca_n_comps=200,
-        linear_encoder_hidden=[32, 20],
-        linear_decoder_hidden=[32],
-        conv_hidden=[32, 8],
-        verbose=True,
-        platform='Visium',
-        cnnType='efficientnet-b0',
-        Conv_type='ResGatedGraphConv',
-        p_drop=0.01,
-        dec_cluster_n=20,
-        n_neighbors=15,
-        min_cells=3,
-        grad_down=5,
-        KL_WT=100,
-        MSE_WT=10,
-        KLD_WT=0.1,
-        Domain_WT=1,
-        use_gpu=True,
-    ):
-        self.save_path = save_path
-        self.pre_epochs = pre_epochs
-        self.epochs = epochs
-        self.pca_n_comps = pca_n_comps
-        self.linear_encoder_hidden = linear_encoder_hidden
-        self.linear_decoder_hidden = linear_decoder_hidden
-        self.conv_hidden = conv_hidden
-        self.verbose = verbose
-        self.platform = platform
-        self.cnnType = cnnType
-        self.Conv_type = Conv_type
-        self.p_drop = p_drop
-        self.dec_cluster_n = dec_cluster_n
-        self.n_neighbors = n_neighbors
-        self.min_cells = min_cells
-        self.platform = platform
-        self.grad_down = grad_down
-        self.KL_WT = KL_WT
-        self.MSE_WT = MSE_WT
-        self.KLD_WT = KLD_WT
-        self.Domain_WT = Domain_WT
-        self.use_gpu = use_gpu
-
-    def _get_adata(
-        self,
-        adata,
-        data_name,
-        verbose=True,
-    ):
-        # if self.platform == 'Visium':
-        #     adata = read_Visium(os.path.join(data_path, data_name), count_file='raw_feature_bc_matrix.h5',
-        #                         quality='fulres')
-        save_path_image_crop = Path(os.path.join(self.save_path, 'Image_crop', f'{data_name}'))
-        save_path_image_crop.mkdir(parents=True, exist_ok=True)
-        adata = image_crop(adata, save_path=save_path_image_crop, quality='fulres')
-        adata = Image_Feature(adata, pca_components=self.pca_n_comps, cnnType=self.cnnType).Extract_Image_Feature()
-        if verbose:
-            save_data_path = Path(os.path.join(self.save_path, f'{data_name}'))
-            save_data_path.mkdir(parents=True, exist_ok=True)
-            adata.write(os.path.join(save_data_path, f'{data_name}.h5ad'), compression="gzip")
-        return adata
-
-    def _get_graph(
-        self,
-        data,
-        distType="Radius",
-        k=12,
-        rad_cutoff=150,
-    ):
-        graph_dict = graph(data, distType=distType, k=k, rad_cutoff=rad_cutoff).main()
-        print("Step 2: Graph computing!")
-        return graph_dict
-
-    def _get_augment(
-        self,
-        adata,
-        Adj_WT=0.2,
-        neighbour_k=4,
-        weights="weights_matrix_all",
-        spatial_k=30,
-    ):
-        adata_augment = augment_adata(
-            adata,
-            Adj_WT=Adj_WT,
-            neighbour_k=neighbour_k,
-            platform=self.platform,
-            weights=weights,
-            spatial_k=spatial_k,
-        )
-        print("Step 1: Augment Gene!")
-        return adata_augment
-
-    def _optimize_cluster(
-            self,
-            adata,
-            resolution_range=(0.1, 2.5, 0.01),
-    ):
-        resolutions = np.arange(*resolution_range)
-        scores = [
-            calinski_harabasz_score(adata.X,
-                                    sc.tl.leiden(adata, resolution=r).obs["leiden"]) for r in resolutions
-        ]
-        cl_opt_df = pd.DataFrame({"resolution": resolutions, "score": scores})
-        best_resolution = cl_opt_df.loc[cl_opt_df["score"].idxmax(), "resolution"]
-        return best_resolution
-
-    def _priori_cluster(self, adata, n_domains=7):
-        for res in sorted(list(np.arange(0.1, 2.5, 0.01)), reverse=True):
-            sc.tl.leiden(adata, random_state=0, resolution=res)
-            count_unique_leiden = len(pd.DataFrame(adata.obs['leiden']).leiden.unique())
-            if count_unique_leiden == n_domains:
-                break
-        return res
-
-    def _get__dataset_adata(
-        self,
-        data_path,
-        data_name,
-        character="spatial",
-        verbose=False,
-        Adj_WT=0.2,
-        neighbour_k=4,
-        weights="weights_matrix_all",
-        spatial_k=30,
-        distType="Radius",
-        k=12,
-        rad_cutoff=150,
-    ):
-        adata = self._get_adata(data_path=data_path, data_name=data_name, verbose=verbose)
-        adata = self._get_augment(adata, Adj_WT=Adj_WT, neighbour_k=neighbour_k, weights=weights, spatial_k=spatial_k)
-        graph_dict = self._get_graph(adata.obsm[character], distType=distType, k=k, rad_cutoff=rad_cutoff)
-        self.data_name = data_name
-        if self.verbose:
-            print("Step 1: Augment Gene !")
-            print("Step 2: Graph computing !")
-        return adata, graph_dict
-
-    def _fit(
-        self,
-        adata,
-        graph_dict,
-        domains=None,
-        dim_reduction=True,
-        pretrain=True,
-        save_data=False,
-    ):
-        print("Task sucessful, please wait")
-        if self.platform == "Visium":
-            adata.X = adata.obsm["augment_gene_data"].astype(float)
-            if dim_reduction:
-                sc.pp.filter_genes(adata, min_cells=self.min_cells)
-                adata_X = sc.pp.normalize_total(adata, target_sum=1, exclude_highly_expressed=True, inplace=False)['X']
-                adata_X = sc.pp.log1p(adata_X)
-                adata_X = sc.pp.scale(adata_X)
-                concat_X = sc.pp.pca(adata_X, n_comps=self.pca_n_comps)
-            else:
-                sc.pp.filter_genes(adata, min_cells=self.min_cells)
-                sc.pp.highly_variable_genes(adata, flavor="seurat_v3", n_top_genes=3000)
-                sc.pp.normalize_total(adata, target_sum=1, exclude_highly_expressed=True, inplace=False)
-                sc.pp.log1p(adata)
-                concat_X = adata[:, adata.var['highly_variable']].X
-        else:
-            concat_X = adata.obsm["augment_gene_data"]
-        EfNST_model = EFNST_model(
-            input_dim=concat_X.shape[1],
-            Conv_type=self.Conv_type,
-            linear_encoder_hidden=self.linear_encoder_hidden,
-            linear_decoder_hidden=self.linear_decoder_hidden,
-            conv_hidden=self.conv_hidden,
-            p_drop=self.p_drop,
-            dec_cluster_n=self.dec_cluster_n,
-        )
-        if domains is None:
-            EfNST_training = TrainingConfig(
-                concat_X,
-                graph_dict,
-                EfNST_model,
-                pre_epochs=self.pre_epochs,
-                epochs=self.epochs,
-                KL_WT=self.KL_WT,
-                MSE_WT=self.MSE_WT,
-                KLD_WT=self.KLD_WT,
-                Domain_WT=self.Domain_WT,
-                use_gpu=self.use_gpu,
-            )
-        if pretrain:
-            EfNST_training.fit()
-        else:
-            EfNST_training.pretrain(grad_down=self.grad_down)
-        EfNST_embedding, _ = EfNST_training.process()
-        if self.verbose:
-            print("Step 3: Training Done!")
-        adata.obsm["EfNST_embedding"] = EfNST_embedding
-        return adata
-
-    def _get_cluster_data(
-        self,
-        adata,
-        n_domains,
-        priori=True,
-    ):
-        sc.pp.neighbors(adata, use_rep='EfNST_embedding', n_neighbors=self.n_neighbors)
-        if priori:
-            res = self._priori_cluster(adata, n_domains=n_domains)
-        else:
-            res = self._optimize_cluster(adata)
-        sc.tl.leiden(adata, key_added="EfNST_domain", resolution=res)
-        adj_2d = distance.cdist(adata.obsm['spatial'], adata.obsm['spatial'], 'euclidean')
-        refined_pred = Refiner.refine(sample_id=adata.obs.index.tolist(), pred=adata.obs["EfNST_domain"].tolist(),
-                                      dis=adj_2d, shape="hexagon")
-        adata.obs["EfNST"] = refined_pred
-        return adata
-
-    def delete(self, adata):
-        for spot, slice_path in adata.obs['slices_path'].items():
-            os.remove(slice_path)
 
 
 class TrainingConfig:
@@ -1008,47 +903,258 @@ class TrainingConfig:
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), 5)
 
 
-data_path = "./"
-#data_path = "D:/科研/ST数据/DLPFC12切片"
-save_path = "./1515"  #### save path
-#data_name="V1_Breast_Cancer_Block_A_Section_1"
-data_name = "151507"
-# quality='hires'
+@register_preprocessor("misc")
+class EfNSTImageTransform(BaseTransform):
 
-EfNST = run(
-    save_path=save_path,
-    platform="Visium",
-    pca_n_comps=200,
-    pre_epochs=800,  #### According to your own hardware, choose the number of training
-    epochs=1000,
-    Conv_type="ResGatedGraphConv")
-dataloader = SpatialLIBDDataset(data_id=data_name)
-data = dataloader.load_data(transform=None, cache=False)
-adata = data.data
-adata = EfNST._get_adata(adata, data_name, verbose=False)
-adata = EfNST._get_augment(
-    adata,
-    neighbour_k=4,
-)
-graph_dict = EfNST._get_graph(adata.obsm["spatial"], distType="KDTree", k=12)
-adata = EfNST._fit(adata, graph_dict, pretrain=False)
-y_true = adata.obs["label"]
-n_domains = len(np.unique(y_true))
-adata = EfNST._get_cluster_data(adata, n_domains=n_domains, priori=True)
-EfNST.delete(adata)
-plt.rcParams["figure.figsize"] = (3, 3)
-# sc.pl.spatial(
-#     adata,
-#     img_key="fulres",
-#     color=["EfNST"],
-#     title='EfNST',
-#     show=False,
-#     spot_size=0.5
-# )
+    def __init__(self, data_name, cnnType='efficientnet-b0', pca_n_comps=200, save_path="./", verbose=False,
+                 crop_size=50, target_size=224, **kwargs):
+        self.data_name = data_name
+        self.verbose = verbose
+        self.save_path = save_path
+        self.pca_n_comps = pca_n_comps
+        self.cnnType = cnnType
+        self.crop_size = crop_size
+        self.target_size = target_size
+        super().__init__(**kwargs)
 
-y_pred = adata.obs["EfNST"]
-print("y_true:", y_true)
-print("y_pred:", y_pred)
-print("Adjusted Rand Index (ARI):", adjusted_rand_score(y_true, y_pred))
+    def __call__(self, data: Data) -> Data:
+        adata = data.data
+        save_path_image_crop = Path(os.path.join(self.save_path, 'Image_crop', f'{self.data_name}'))
+        save_path_image_crop.mkdir(parents=True, exist_ok=True)
+        adata = image_crop(adata, save_path=save_path_image_crop, quality='fulres', crop_size=self.crop_size,
+                           target_size=self.target_size)
+        adata = Image_Feature(adata, pca_components=self.pca_n_comps, cnnType=self.cnnType).Extract_Image_Feature()
+        if self.verbose:
+            save_data_path = Path(os.path.join(self.save_path, f'{self.data_name}'))
+            save_data_path.mkdir(parents=True, exist_ok=True)
+            adata.write(os.path.join(save_data_path, f'{self.data_name}.h5ad'), compression="gzip")
+        return data
 
-import os
+
+@register_preprocessor("misc")
+class EfNSTAugmentTransform(BaseTransform):
+
+    def __init__(self, Adj_WT=0.2, neighbour_k=4, weights="weights_matrix_all", spatial_k=30, platform="Visium",
+                 **kwargs):
+        super().__init__(**kwargs)
+        self.Adj_WT = Adj_WT
+        self.neighbour_k = neighbour_k
+        self.weights = weights
+        self.spatial_k = spatial_k
+        self.platform = platform
+
+    def __call__(self, data: Data) -> Data:
+        adata = data.data
+        adata_augment = augment_adata(
+            adata,
+            Adj_WT=self.Adj_WT,
+            neighbour_k=self.neighbour_k,
+            platform=self.platform,
+            weights=self.weights,
+            spatial_k=self.spatial_k,
+        )
+        assert adata is adata_augment
+        return adata_augment
+
+
+@register_preprocessor("graph", "cell")
+class EfNSTGraphTransform(BaseTransform):
+
+    def __init__(self, distType="Radius", k=12, rad_cutoff=150, **kwargs):
+        self.distType = distType
+        self.k = k
+        self.rad_cutoff = rad_cutoff
+        super().__init__(**kwargs)
+
+    def __call__(self, data: Data) -> Data:
+        adata = data.data
+        graph_dict = graph(adata.obsm['spatial'], distType=self.distType, k=self.k, rad_cutoff=self.rad_cutoff).main()
+        adata.uns['EfNSTGraph'] = graph_dict
+
+
+class EfNSTConcatgTransform(BaseTransform):
+
+    def __init__(self, dim_reduction, min_cells, platform, pca_n_comps, **kwargs):
+        self.dim_reduction = dim_reduction
+        self.min_cells = min_cells
+        self.platform = platform
+        self.pca_n_comps = pca_n_comps
+        super().__init__(**kwargs)
+
+    def __call__(self, data: Data) -> Data:
+        adata = data.data
+        pca_n_comps = self.pca_n_comps
+        print("pca_n_comps", pca_n_comps)
+        if self.platform == "Visium":
+            adata.X = adata.obsm["augment_gene_data"].astype(float)
+            if self.dim_reduction:
+                sc.pp.filter_genes(adata, min_cells=self.min_cells)
+                adata_X = sc.pp.normalize_total(adata, target_sum=1, exclude_highly_expressed=True, inplace=False)['X']
+                adata_X = sc.pp.log1p(adata_X)
+                adata_X = sc.pp.scale(adata_X)
+                concat_X = sc.pp.pca(adata_X, n_comps=pca_n_comps)
+            else:
+                sc.pp.filter_genes(adata, min_cells=self.min_cells)
+                sc.pp.highly_variable_genes(adata, flavor="seurat_v3", n_top_genes=3000)
+                sc.pp.normalize_total(adata, target_sum=1, exclude_highly_expressed=True, inplace=False)
+                sc.pp.log1p(adata)
+                concat_X = adata[:, adata.var['highly_variable']].X
+        else:
+            concat_X = adata.obsm["augment_gene_data"]
+        adata.obsm['feature.cell'] = concat_X
+
+
+class EfNsSTRunner(BaseClusteringMethod):
+
+    def __init__(self, pre_epochs=1000, epochs=500, pca_n_comps=200, linear_encoder_hidden=[32, 20],
+                 linear_decoder_hidden=[32], conv_hidden=[32, 8], verbose=True, platform='Visium',
+                 cnnType='efficientnet-b0', Conv_type='ResGatedGraphConv', p_drop=0.01, dec_cluster_n=20,
+                 n_neighbors=15, min_cells=3, grad_down=5, KL_WT=100, MSE_WT=10, KLD_WT=0.1, Domain_WT=1, use_gpu=True,
+                 random_state=42):
+        set_seed(random_state, extreme_mode=True)
+        self.pre_epochs = pre_epochs
+        self.epochs = epochs
+        self.pca_n_comps = pca_n_comps
+        self.linear_encoder_hidden = linear_encoder_hidden
+        self.linear_decoder_hidden = linear_decoder_hidden
+        self.conv_hidden = conv_hidden
+        self.verbose = verbose
+        self.platform = platform
+        self.cnnType = cnnType
+        self.Conv_type = Conv_type
+        self.p_drop = p_drop
+        self.dec_cluster_n = dec_cluster_n
+        self.n_neighbors = n_neighbors
+        self.min_cells = min_cells
+        self.platform = platform
+        self.grad_down = grad_down
+        self.KL_WT = KL_WT
+        self.MSE_WT = MSE_WT
+        self.KLD_WT = KLD_WT
+        self.Domain_WT = Domain_WT
+        self.use_gpu = use_gpu
+
+    # @staticmethod
+    # def preprocessing_pipeline(data_name,verbose=False,cnnType='efficientnet-b0',pca_n_comps=200,distType="KDTree",k=12,dim_reduction=True,min_cells=3,platform="Visium"):
+    #     return Compose(
+    #     EfNSTImageTransform(data_name=data_name,verbose=verbose,cnnType=cnnType),
+    #     EfNSTAugmentTransform(),
+    #     EfNSTGraphTransform(distType=distType, k=k),
+    #     FilterGenesPercentile(),
+    #     NormalizeTotalLog1P(),
+    #     HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=1000),
+    #     CellPCA(out="feature.cell"),
+    #     SetConfig({
+    #             "feature_channel": ["feature.cell","EfNSTGraph"],
+    #             "feature_channel_type": ["obsm","uns"],
+    #             "label_channel": "label",
+    #             "label_channel_type": "obs"
+    #         })
+    #     )
+
+    @staticmethod
+    def preprocessing_pipeline(data_name, verbose=False, cnnType='efficientnet-b0', pca_n_comps=200, distType="KDTree",
+                               k=12, dim_reduction=True, min_cells=3, platform="Visium"):
+        return Compose(
+            EfNSTImageTransform(data_name=data_name, verbose=verbose, cnnType=cnnType),
+            EfNSTAugmentTransform(),
+            EfNSTGraphTransform(distType=distType, k=k),
+            EfNSTConcatgTransform(dim_reduction=dim_reduction, min_cells=min_cells, platform=platform,
+                                  pca_n_comps=pca_n_comps),  #xenium也可以用Visium的方式处理
+            SetConfig({
+                "feature_channel": ["feature.cell", "EfNSTGraph"],
+                "feature_channel_type": ["obsm", "uns"],
+                "label_channel": "label",
+                "label_channel_type": "obs"
+            }))
+
+    def _optimize_cluster(
+            self,
+            adata,
+            resolution_range=(0.1, 2.5, 0.01),
+    ):
+        resolutions = np.arange(*resolution_range)
+        scores = [
+            calinski_harabasz_score(adata.X,
+                                    sc.tl.leiden(adata, resolution=r).obs["leiden"]) for r in resolutions
+        ]
+        cl_opt_df = pd.DataFrame({"resolution": resolutions, "score": scores})
+        best_resolution = cl_opt_df.loc[cl_opt_df["score"].idxmax(), "resolution"]
+        return best_resolution
+
+    def _priori_cluster(self, adata, n_domains=7):
+        for res in sorted(list(np.arange(0.1, 2.5, 0.01)), reverse=True):
+            sc.tl.leiden(adata, random_state=0, resolution=res)
+            count_unique_leiden = len(pd.DataFrame(adata.obs['leiden']).leiden.unique())
+            if count_unique_leiden == n_domains:
+                break
+        return res
+
+    def fit(self, adata, concat_X, graph_dict, domains=None, pretrain=True):
+        return self._fit(adata=adata, concat_X=concat_X, graph_dict=graph_dict, domains=domains, pretrain=pretrain)
+
+    def predict(self, x):
+        return self.refined_pred
+
+    def _fit(
+        self,
+        adata,
+        concat_X,
+        graph_dict,
+        domains=None,
+        pretrain=True,
+    ):
+        EfNST_model = EFNST_model(
+            input_dim=concat_X.shape[1],
+            Conv_type=self.Conv_type,
+            linear_encoder_hidden=self.linear_encoder_hidden,
+            linear_decoder_hidden=self.linear_decoder_hidden,
+            conv_hidden=self.conv_hidden,
+            p_drop=self.p_drop,
+            dec_cluster_n=self.dec_cluster_n,
+        )
+        if domains is None:
+            EfNST_training = TrainingConfig(
+                concat_X,
+                graph_dict,
+                EfNST_model,
+                pre_epochs=self.pre_epochs,
+                epochs=self.epochs,
+                KL_WT=self.KL_WT,
+                MSE_WT=self.MSE_WT,
+                KLD_WT=self.KLD_WT,
+                Domain_WT=self.Domain_WT,
+                use_gpu=self.use_gpu,
+            )
+        if pretrain:
+            EfNST_training.fit()
+        else:
+            EfNST_training.pretrain(grad_down=self.grad_down)
+        EfNST_embedding, _ = EfNST_training.process()
+        if self.verbose:
+            print("Step 3: Training Done!")
+        adata.obsm["EfNST_embedding"] = EfNST_embedding
+        return adata
+
+    def _get_cluster_data(
+        self,
+        adata,
+        n_domains,
+        priori=True,
+    ):
+        sc.pp.neighbors(adata, use_rep='EfNST_embedding', n_neighbors=self.n_neighbors)
+        if priori:
+            res = self._priori_cluster(adata, n_domains=n_domains)
+        else:
+            res = self._optimize_cluster(adata)
+        sc.tl.leiden(adata, key_added="EfNST_domain", resolution=res)
+        adj_2d = distance.cdist(adata.obsm['spatial'], adata.obsm['spatial'], 'euclidean')
+        refined_pred = Refiner.refine(sample_id=adata.obs.index.tolist(), pred=adata.obs["EfNST_domain"].tolist(),
+                                      dis=adj_2d, shape="hexagon")
+        adata.obs["EfNST"] = refined_pred
+        self.refined_pred = refined_pred
+        return adata
+
+    def delete_imgs(self, adata):
+        for spot, slice_path in adata.obs['slices_path'].items():
+            os.remove(slice_path)

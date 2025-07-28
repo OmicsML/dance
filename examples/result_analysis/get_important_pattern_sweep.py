@@ -1,5 +1,7 @@
 import argparse
 import json
+import os
+import pickle
 import sys
 from pathlib import Path
 from turtle import pos
@@ -9,12 +11,18 @@ import requests
 from get_important_pattern import get_com_all, get_forest_model_pattern, get_frequent_itemsets
 from numpy import choose
 
-from dance.pipeline import flatten_dict, get_additional_sweep
+from dance.pipeline import flatten_dict, get_additional_sweep, save_summary_data
+from dance.settings import EXAMPLESDIR
 from dance.utils import spilt_web, try_import
 
 # Define basic configuration parameters
 entity = "xzy11632"
 project = "dance-dev"
+if os.path.exists('migration/cache/sweep_cache_data.pkl'):
+    with open("migration/cache/sweep_cache_data.pkl", 'rb') as file:
+        sweep_cache_data = pickle.load(file)
+else:
+    sweep_cache_data = {}
 # # List of tasks to analyze
 # # tasks = ["cell type annotation new", "clustering", "imputation_new", "spatial domain", "cell type deconvolution"]
 # tasks = ['joint embedding']
@@ -24,31 +32,38 @@ project = "dance-dev"
 # ascendings = [False]
 # # Whether higher values are better for each metric
 # # ascendings = [False, False, True, False, True]
-metrics_dict = [{
-    "task": "cell type annotation",
-    "metric": "test_acc",
-    "ascending": False
-}, {
-    "task": "cluster",
-    "metric": "acc",
-    "ascending": False
-}, {
-    "task": "imputation",
-    "metric": "MRE",
-    "ascending": True
-}, {
-    "task": "spatial domain",
-    "metric": "ARI",
-    "ascending": False
-}, {
-    "task": "cell type deconvolution",
-    "metric": "MSE",
-    "ascending": True
-}, {
-    "task": "joint embedding",
-    "metric": "ARI",
-    "ascending": False
-}]
+metrics_dict = [
+    {
+        "task": "celltype annotation",
+        "metric": "test_acc",
+        "ascending": False
+    },
+    {
+        "task": "cluster",
+        "metric": "acc",
+        "ascending": False
+    },
+    {
+        "task": "imputation",
+        "metric": "test_MRE",
+        "ascending": True
+    },
+    {
+        "task": "spatial domain",
+        "metric": "ARI",
+        "ascending": False
+    },
+    {
+        "task": "celltype deconvolution",
+        "metric": "test_MSE",
+        "ascending": True
+    },
+    # {
+    #     "task": "joint embedding",
+    #     "metric": "ARI",
+    #     "ascending": False
+    # }
+]
 tasks = [d["task"] for d in metrics_dict]
 mertic_names = [d["metric"] for d in metrics_dict]
 ascendings = [d["ascending"] for d in metrics_dict]
@@ -145,8 +160,10 @@ if __name__ == "__main__":
             continue
 
         # Read and preprocess results from Excel file
-        data = pd.read_excel(file_root / "results.xlsx", sheet_name=task, dtype=str)
-        data = data.ffill().set_index(['Methods'])
+        data = pd.read_excel(EXAMPLESDIR / "result_analysis/results.xlsx", sheet_name=task, dtype=str)
+        data['Methods'] = data['Methods'].fillna(method='ffill')
+        data['step name'] = data['step name'].fillna(method='ffill')
+        data = data.set_index(['Methods'])
 
         # Iterate through each method and dataset combination
         for row_idx in range(data.shape[0]):
@@ -155,9 +172,9 @@ if __name__ == "__main__":
                 method = data.index[row_idx]
                 dataset = data.columns[col_idx]
                 value = data.iloc[row_idx, col_idx]
-                step_name = data.iloc[row_idx]["Unnamed: 1"]
-                if not start:
-                    continue
+                step_name = data.iloc[row_idx]["step name"]
+                # if not start:
+                #     continue
                 # if method != "Scgnn2":
                 #     continue
                 if isinstance(value, str) and value.startswith(prefix) and (
@@ -166,29 +183,50 @@ if __name__ == "__main__":
                 else:
                     continue
                 _, _, sweep_id = spilt_web(sweep_url)
-                sweep_ids = get_additional_sweep(entity, project, sweep_id)
-                summary_data = []
-                for sweep_id in sweep_ids:
-                    sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
-                    for run in sweep.runs:
-                        result = dict(run.summary._json_dict).copy()
-                        result.update(run.config)
-                        result.update({"id": run.id})
-                        summary_data.append(flatten_dict(result))  # get result and config
-                ans = pd.DataFrame(summary_data).set_index(["id"])
-                ans.sort_index(axis=1, inplace=True)
-                ans_single = {
-                    "task": task,
-                    "dataset": dataset,
-                    "method": method,
-                    "pattern": summary_pattern(ans, mertic_names[i], ascendings[i])
-                }
-                with open(
-                        f"dance_auto_preprocess/patterns/{'only_apr_' if only_apr else ''}{'neg_' if not positive else ''}{task}_{dataset}_{method}_pattern.json",
-                        "w") as f:
-                    json.dump(ans_single, f, indent=2)
-                ans_all.append(ans_single)
-                print(dataset)
-                print(method)
+                if sweep_id in sweep_cache_data:
+                    summary_data = sweep_cache_data[sweep_id]
+                else:
+                    summary_data = None
+                    sweep_ids = get_additional_sweep(entity=entity, project=project, sweep_id=sweep_id)
+                    try:
+                        sweep_ids.remove(sweep_id)
+                        summary_data = save_summary_data(entity, project, sweep_id=sweep_id, summary_file_path="",
+                                                         root_path="", save=False, additional_sweep_ids=sweep_ids)
+                        sweep_cache_data[sweep_id] = summary_data
+                        with open('migration/cache/sweep_cache_data.pkl', 'wb') as f:
+                            pickle.dump(sweep_cache_data, f)
+                    except Exception as e:
+                        print(e)
+
+                # sweep_ids = get_additional_sweep(entity, project, sweep_id)
+                # summary_data = []
+                # for sweep_id in sweep_ids:
+                #     sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
+                #     for run in sweep.runs:
+                #         result = dict(run.summary._json_dict).copy()
+                #         result.update(run.config)
+                #         result.update({"id": run.id})
+                #         summary_data.append(flatten_dict(result))  # get result and config
+                # ans = pd.DataFrame(summary_data).set_index(["id"])
+                # ans.sort_index(axis=1, inplace=True)
+                try:
+                    ans = summary_data
+                    ans_single = {
+                        "task": task,
+                        "dataset": dataset,
+                        "method": method,
+                        "pattern": summary_pattern(ans, mertic_names[i], ascendings[i])
+                    }
+                    with open(
+                            EXAMPLESDIR /
+                            f"dance_auto_preprocess/patterns/{'only_apr_' if only_apr else ''}{'neg_' if not positive else ''}{task}_{dataset}_{method}_pattern.json",
+                            "w") as f:
+                        json.dump(ans_single, f, indent=2)
+                    ans_all.append(ans_single)
+                    print(dataset)
+                    print(method)
+                except Exception as e:
+                    print(f"Error processing {task}, {dataset}, {method}: {e}")
+
     with open(f"pattern.json", "w") as f:
         json.dump(ans_all, f, indent=2)

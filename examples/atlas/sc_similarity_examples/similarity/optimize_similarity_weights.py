@@ -22,11 +22,11 @@ import sys
 
 import numpy as np
 import pandas as pd
+from sympy import N
 
 from dance.settings import SIMILARITYDIR
 
 sys.path.append(str(SIMILARITYDIR))
-print(sys.path)
 from similarity.process_tissue_similarity_matrices import convert_to_complex
 from visualization.visualize_atlas_performance import get_runs
 
@@ -73,8 +73,10 @@ def get_rank(reduce_error, in_query):
         for query_dataset, data in ans.items():
             for method in methods:
                 rank_col = 'rank_' + method
-                data.loc[rank_col, :] = data.loc[method, :].apply(
-                    lambda x: query_rank(x, get_runs(conf_data, query_dataset, method), reduce_error))
+                runs = get_runs(conf_data, query_dataset, method)
+                if runs is None:
+                    continue
+                data.loc[rank_col, :] = data.loc[method, :].apply(lambda x: query_rank(x, runs, reduce_error))
     else:
         for query_dataset, data in ans.items():
             for method in methods:
@@ -117,9 +119,19 @@ def objective(w1, feature_name):
         if df_A.loc['score_similarity', :].isna().any():
             pass
         df_A.loc['score_similarity', :] = df_A.loc['score_similarity', :].fillna(0)
-        max_idx = df_A.loc['score_similarity', :].idxmax()
+        max_idx = df_A.loc['score_similarity', :].astype(float).idxmax()
         max_B = df_A.loc[:, max_idx]
         ranks = []
+        # runs_none=False
+        # for method in methods:
+        #     if ('rank_' + method) not in max_B.index:
+        #         runs_none=True
+        #         break
+        #     if pd.isna(max_B.loc[('rank_' + method)]):
+        #         runs_none=True
+        #         break
+        # if runs_none:
+        #     continue
         for method in methods:
             ranks.append(max_B.loc['rank_' + method])
         total_rank += np.sum(ranks)
@@ -127,7 +139,7 @@ def objective(w1, feature_name):
 
 
 if __name__ == "__main__":
-    pd.set_option('future.no_silent_downcasting', True)
+    # pd.set_option('future.no_silent_downcasting', True)
     wandb = try_import("wandb")
     entity = "xzy11632"
     project = "dance-dev"

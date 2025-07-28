@@ -1,4 +1,5 @@
 # Python Standard Library
+import argparse
 import copy
 import math
 import multiprocessing
@@ -6,6 +7,7 @@ import pickle
 import random
 import select
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from re import split
 from typing import List, Literal, Optional, Union
 
@@ -17,15 +19,17 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import scipy.sparse as sp
-
-# PyTorch related
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from igraph import split_join_distance
+
+# PyTorch related
+from sklearn import preprocessing
 from sklearn.decomposition import NMF
 from sklearn.metrics import DistanceMetric
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KDTree, NearestNeighbors  # 合并了来自 sklearn.neighbors 的导入
 from torch.autograd import Variable
 from torch.nn.modules.module import Module  # 注意: 通常直接使用 nn.Module
@@ -40,9 +44,18 @@ from dance.modules.base import BaseRegressionMethod
 from dance.modules.spatial.cell_type_deconvo.dstg import GCN
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
-from dance.transforms.filter import FilterGenesCommon
+from dance.transforms.cell_feature import CellPCA, FeatureCellPlaceHolder
+from dance.transforms.filter import (
+    FilterCellsPlaceHolder,
+    FilterGenesCommon,
+    FilterGenesPlaceHolder,
+    FilterGenesTopK,
+    HighlyVariableGenesLogarithmizedByTopGenes,
+)
 from dance.transforms.misc import Compose, RemoveSplit, SaveRaw, SetConfig
+from dance.transforms.normalize import NormalizeTotalLog1P
 from dance.typing import LogLevel
+from dance.utils.metrics import resolve_score_func
 from dance.utils.status import deprecated
 from dance.utils.wrappers import add_mod_and_transform
 
@@ -178,9 +191,16 @@ class conGCN(nn.Module):
         return F.log_softmax(self.x1, dim=1), gc_list
 
 
-def conGCN_train(model, train_valid_len, test_len, feature, adjs, label, epoch_n, loss_fn, optimizer,
-                 train_valid_ratio=0.9, scheduler=None, early_stopping_patience=5, clip_grad_max_norm=1,
-                 load_test_groundtruth=False, print_epoch_step=1, cpu_num=-1, GCN_device='CPU'):
+def get_idx(train_valid_len, test_len, train_valid_ratio=0.9):
+    train_idx = range(int(train_valid_len * train_valid_ratio))
+    valid_idx = range(len(train_idx), train_valid_len)
+    test_idx = range(test_len)
+    return train_idx, valid_idx, test_idx
+
+
+def conGCN_train(model, train_idx, valid_idx, test_idx, feature, adjs, label, epoch_n, loss_fn, optimizer,
+                 scheduler=None, early_stopping_patience=5, clip_grad_max_norm=1, load_test_groundtruth=False,
+                 print_epoch_step=1, cpu_num=-1, GCN_device='CPU'):
 
     if GCN_device == 'CPU':
         device = torch.device("cpu")
@@ -206,9 +226,6 @@ def conGCN_train(model, train_valid_len, test_len, feature, adjs, label, epoch_n
 
     time_open = time.time()
 
-    train_idx = range(int(train_valid_len * train_valid_ratio))
-    valid_idx = range(len(train_idx), train_valid_len)
-
     best_val = np.inf
     clip = 0
     loss = []
@@ -222,12 +239,10 @@ def conGCN_train(model, train_valid_len, test_len, feature, adjs, label, epoch_n
         optimizer.zero_grad()
         output1, paras = model(feature.float(), adjs)
 
-        loss_train1 = loss_fn(output1[list(np.array(train_idx) + test_len)],
-                              label[list(np.array(train_idx) + test_len)].float())
-        loss_val1 = loss_fn(output1[list(np.array(valid_idx) + test_len)],
-                            label[list(np.array(valid_idx) + test_len)].float())
+        loss_train1 = loss_fn(output1[train_idx], label[train_idx].float())
+        loss_val1 = loss_fn(output1[valid_idx], label[valid_idx].float())
         if load_test_groundtruth == True:
-            loss_test1 = loss_fn(output1[:test_len], label[:test_len].float())
+            loss_test1 = loss_fn(output1[test_idx], label[test_idx].float())
             loss.append([loss_train1.item(), loss_val1.item(), loss_test1.item()])
         else:
             loss.append([loss_train1.item(), loss_val1.item(), None])
@@ -362,7 +377,8 @@ def intra_dist_adj(ST_exp, link_method='soft', space_dist_neighbors=27, space_di
 
     knn = NearestNeighbors(n_neighbors=space_dist_neighbors, metric='minkowski')
 
-    knn.fit(ST_exp.obs[['coor_X', 'coor_Y']])
+    # knn.fit(ST_exp.obs[['coor_X', 'coor_Y']])
+    knn.fit(ST_exp.obsm['spatial'][['x', 'y']])
     dist, ind = knn.kneighbors()
 
     if link_method == 'hard':
@@ -400,11 +416,13 @@ def intra_exp_adj(
     PCA_dimensionality_reduction=True,
     dim=50,
     corr_dist_neighbors=10,
+    channel: Optional[str] = "feature.cell",
+    channel_type: str = "obsm",
 ):
 
     ST_exp = adata.copy()
 
-    sc.pp.scale(ST_exp, max_value=None, zero_center=True)
+    # sc.pp.scale(ST_exp, max_value=None, zero_center=True)
     if PCA_dimensionality_reduction == True:
         sc.tl.pca(ST_exp, n_comps=dim, svd_solver='arpack', random_state=None)
         input_data = ST_exp.obsm['X_pca']
@@ -434,8 +452,11 @@ def intra_exp_adj(
             A_exp = A_exp - np.eye(A_exp.shape[0])
             A_exp = pd.DataFrame(A_exp, index=ST_exp.obs.index.values, columns=ST_exp.obs.index.values)
     else:
-        sc.pp.scale(ST_exp, max_value=None, zero_center=True)
-        input_data = ST_exp.X
+        # sc.pp.scale(ST_exp, max_value=None, zero_center=True)
+        if channel_type is None:
+            input_data = ST_exp.X
+        else:
+            input_data = ST_exp.obsm[channel]
         if find_neighbor_method == 'KNN':
             if dist_method == 'cosine':
                 cos_sim = cosine_similarity(input_data, input_data)
@@ -680,6 +701,67 @@ def generate_a_spot_optimized(
     return picked_cell_indices, picked_cell_type_names
 
 
+import numpy as np
+
+# from scipy.sparse import csr_matrix # 如果 sc_exp.X 可能不是csr但仍是稀疏的
+
+
+def process_single_spot(i, spot_data_item, sc_exp, word_to_idx_celltype, generation_method):
+    """Processes a single spot's data.
+
+    Returns the index i, the expression sum array, and a dictionary of type_idx counts
+    for this spot.
+
+    """
+    spot_cell_indices, spot_cell_type_names = spot_data_item
+
+    if not spot_cell_indices:
+        return i, None, {}  # Return None for expression, empty dict for counts
+
+    spot_expression_sum = None
+    # Sum expression for the spot
+    if len(spot_cell_indices) > 0:
+        # Ensure spot_cell_indices are valid if using sparse X
+        valid_indices = [idx for idx in spot_cell_indices if idx < sc_exp.shape[0]]
+
+        if not valid_indices:  # If all indices were invalid
+            return i, None, {}
+
+        if hasattr(sc_exp.X, "tocsr"):  # Check if sparse (issparse is more general)
+            # It's generally better to check `scipy.sparse.issparse(sc_exp.X)`
+            # .A1 flattens to 1D array. If sc_exp.X is already 1D per cell, .A1 might not be needed after sum.
+            spot_expression_sum = sc_exp.X[valid_indices, :].sum(axis=0)
+            if hasattr(spot_expression_sum, 'A1'):  # If it's a matrix, convert to array
+                spot_expression_sum = spot_expression_sum.A1
+        else:  # Dense
+            spot_expression_sum = sc_exp.X[valid_indices, :].sum(axis=0)
+
+    # Calculate fractions for this spot
+    spot_fraction_counts = {}  # Store counts for type_idx for *this* spot
+    for cell_type_name in spot_cell_type_names:
+        if cell_type_name is None and generation_method == 'cell':
+            # This logic needs to be fully implemented if 'cell' method types aren't pre-fetched.
+            # For example, if you need to look up sc_exp.obs['cellType'] based on an index in spot_cell_indices:
+            # You'd need to iterate through spot_cell_indices as well, not just spot_cell_type_names,
+            # or ensure spot_cell_type_names is correctly populated *before* this stage.
+            # For now, we'll assume spot_cell_type_names is what we should use.
+            # print(f"Warning (Spot {i}): 'cell' method with None cell_type_name encountered. Requires specific handling to fetch type from sc_exp.obs.")
+            pass
+
+        if cell_type_name is not None:
+            type_idx = word_to_idx_celltype.get(cell_type_name)
+            if type_idx is not None:
+                spot_fraction_counts[type_idx] = spot_fraction_counts.get(type_idx, 0) + 1
+            else:
+                # Be careful with print statements in threads, they can be messy.
+                # Consider logging or collecting warnings.
+                # print(f"Warning (Spot {i}): Cell type '{cell_type_name}' not found in word_to_idx_celltype map.")
+                pass  # Or collect these warnings
+
+    return i, spot_expression_sum, spot_fraction_counts
+
+
+@register_preprocessor("pseudobulk")
 class pseudoSpotGen(BaseTransform):
 
     def __init__(self, spot_num, min_cell_number_in_spot, max_cell_number_in_spot, max_cell_types_in_spot,
@@ -773,39 +855,131 @@ class pseudoSpotGen(BaseTransform):
                                         dtype=np.float32)  # Use float32 to save memory if precision allows
         pseudo_fraction_table_counts = np.zeros((self.spot_num, num_distinct_cell_types_in_sc), dtype=int)
 
-        for i in tqdm(range(self.spot_num)):
-            spot_cell_indices, spot_cell_type_names = generated_spot_data[i]
+        # To pass large objects like sc_exp efficiently, ensure they are shared correctly.
+        # For threads, direct access to self.sc_exp is fine.
+        # If sc_exp.X is extremely large and you were using multiprocessing,
+        # you might investigate shared memory, but for threading this is not an issue.
 
-            if not spot_cell_indices:  # Handle cases where a spot might be empty
+        # --- Part 1: Expression Summation Vectorization ---
+        print("Preparing data for expression summation...")
+        spot_indices_for_S_matrix = []
+        cell_indices_for_S_matrix = []
+
+        valid_spot_indices_for_expr = []  # Keep track of spots that are not empty for expression
+
+        for i in range(self.spot_num):
+            spot_cell_indices, _ = generated_spot_data[i]
+            if not spot_cell_indices:
                 continue
 
-            # Sum expression for the spot
-            # Accessing sc_exp.X by a list of integer indices is efficient
-            if len(spot_cell_indices) > 0:
-                # Ensure spot_cell_indices are valid if using sparse X
-                valid_indices = [idx for idx in spot_cell_indices if idx < sc_exp.shape[0]]
-                if hasattr(sc_exp.X, "tocsr"):  # Check if sparse
-                    pseudo_spots_table_X[i] = sc_exp.X[valid_indices, :].sum(axis=0).A1  # .A1 to flatten if matrix
-                else:  # Dense
-                    pseudo_spots_table_X[i] = sc_exp.X[valid_indices, :].sum(axis=0)
+            # Filter for valid cell indices (within sc_exp.shape[0])
+            valid_indices_in_spot = [idx for idx in spot_cell_indices if idx < sc_exp.shape[0]]
 
-            # Calculate fractions
-            for cell_type_name in spot_cell_type_names:
-                if cell_type_name is None and self.generation_method == 'cell':
-                    # For 'cell' method, if types weren't returned by worker, get them now
-                    # This would require re-fetching cell_type_name based on spot_cell_indices[j]
-                    # This part highlights that 'cell' method might need more info passed to/from worker
-                    # or handled differently. For 'celltype' method, cell_type_name is already correct.
-                    # Example: cell_type_name_from_idx = sc_exp.obs['cellType'].iloc[spot_cell_indices[j]]
-                    # For now, assuming cell_type_name is valid if not None
-                    pass  # Needs implementation if 'cell' method types are not pre-fetched
+            if not valid_indices_in_spot:
+                continue
 
-                if cell_type_name is not None:  # Ensure cell_type_name is available
-                    type_idx = word_to_idx_celltype.get(cell_type_name)
-                    if type_idx is not None:
-                        pseudo_fraction_table_counts[i, type_idx] += 1
-                    else:
-                        print(f"Warning: Cell type '{cell_type_name}' not found in word_to_idx_celltype map.")
+            valid_spot_indices_for_expr.append(i)
+            spot_indices_for_S_matrix.extend([i] * len(valid_indices_in_spot))
+            cell_indices_for_S_matrix.extend(valid_indices_in_spot)
+
+        if spot_indices_for_S_matrix:  # Only proceed if there's data
+            data_for_S_matrix = np.ones(len(cell_indices_for_S_matrix), dtype=int)
+
+            # Ensure S_matrix has self.spot_num rows, even if some are empty
+            S_matrix = sp.csr_matrix((data_for_S_matrix, (spot_indices_for_S_matrix, cell_indices_for_S_matrix)),
+                                     shape=(self.spot_num, sc_exp.shape[0]))
+
+            print("Calculating expression sums via sparse matrix multiplication...")
+            # This is the core vectorized operation for expression
+            summed_expressions = S_matrix @ sc_exp.X
+
+            # If summed_expressions is sparse, convert to dense for assignment
+            # or assign row by row if memory is an issue for full dense conversion
+            if sp.issparse(summed_expressions):
+                # pseudo_spots_table_X[valid_spot_indices_for_expr] = summed_expressions[valid_spot_indices_for_expr].toarray() # This might not work directly if S_matrix had all spot_num rows
+                # A safer way if S_matrix was built with self.spot_num rows:
+                for i_idx, original_spot_idx in enumerate(
+                        np.unique(spot_indices_for_S_matrix)):  # Iterate over spots that actually had cells
+                    # Find rows in summed_expressions that correspond to original_spot_idx
+                    # This can be tricky if S_matrix was built with fewer rows and then padded.
+                    # Assuming S_matrix was built with shape (self.spot_num, sc_exp.shape[0])
+                    if summed_expressions[original_spot_idx].nnz > 0:  # check if the row is not all zero
+                        pseudo_spots_table_X[original_spot_idx] = summed_expressions[original_spot_idx].toarray().ravel(
+                        )
+                    # else it remains zero, which is correct for empty or invalid spots
+            else:  # If sc_exp.X was dense, summed_expressions is dense
+                # pseudo_spots_table_X[valid_spot_indices_for_expr] = summed_expressions[valid_spot_indices_for_expr]
+                # Simpler:
+                pseudo_spots_table_X = summed_expressions  # if S_matrix already has self.spot_num rows
+        else:
+            print("No valid cells found across all spots for expression summation.")
+
+        # --- Part 2: Fraction Calculation Vectorization ---
+        print("Preparing data for fraction calculation...")
+        spot_indices_flat_for_fractions = []
+        cell_type_indices_flat_for_fractions = []
+
+        # Handling for generation_method == 'cell' and None cell_type_name
+        # This part needs careful consideration if types are not pre-fetched.
+        # For now, assuming spot_cell_type_names is mostly usable.
+        # If lookups are needed, this pre-processing step might need its own loop,
+        # potentially parallelized if it's slow.
+
+        for i in range(self.spot_num):
+            spot_cell_indices, spot_cell_type_names = generated_spot_data[i]
+
+            if not spot_cell_indices:  # or not spot_cell_type_names, depending on logic
+                continue
+
+            processed_cell_type_names_for_spot = []
+            if self.generation_method == 'cell':
+                # Example: If spot_cell_type_names can be None and needs lookup
+                # This is a placeholder for the complex logic mentioned in your original code.
+                # You might need to iterate 'spot_cell_indices' and use 'sc_exp.obs'
+                # For simplicity here, we assume spot_cell_type_names is populated.
+                # If a cell type is None, it will be skipped by .get() later.
+                for j, cell_type_name in enumerate(spot_cell_type_names):
+                    if cell_type_name is None:
+                        # Lookup logic: e.g. cell_type_name = self.sc_exp.obs['cellType'].iloc[spot_cell_indices[j]]
+                        # This lookup can be slow if done cell by cell.
+                        # print(f"Warning (Spot {i}): 'cell' method with None cell_type_name. Implement lookup.")
+                        pass  # Placeholder for actual lookup
+                    if cell_type_name is not None:
+                        processed_cell_type_names_for_spot.append(cell_type_name)
+            else:  # 'celltype' method or types are already good
+                processed_cell_type_names_for_spot = [ctn for ctn in spot_cell_type_names if ctn is not None]
+
+            current_spot_type_indices = []
+            for cell_type_name in processed_cell_type_names_for_spot:
+                type_idx = word_to_idx_celltype.get(cell_type_name)
+                if type_idx is not None:
+                    current_spot_type_indices.append(type_idx)
+                else:
+                    print(f"Warning: Cell type '{cell_type_name}' not found in word_to_idx_celltype map for spot {i}.")
+
+            if current_spot_type_indices:
+                spot_indices_flat_for_fractions.extend([i] * len(current_spot_type_indices))
+                cell_type_indices_flat_for_fractions.extend(current_spot_type_indices)
+
+        if spot_indices_flat_for_fractions:
+            print("Calculating fractions using np.add.at...")
+            # Convert to numpy arrays for np.add.at
+            spot_indices_np = np.array(spot_indices_flat_for_fractions, dtype=int)
+            cell_type_indices_np = np.array(cell_type_indices_flat_for_fractions, dtype=int)
+
+            # Ensure indices are within bounds for pseudo_fraction_table_counts
+            valid_fraction_mask = (spot_indices_np < pseudo_fraction_table_counts.shape[0]) & \
+                                  (cell_type_indices_np < pseudo_fraction_table_counts.shape[1])
+
+            if not np.all(valid_fraction_mask):
+                print("Warning: Some indices for fraction calculation are out of bounds and will be skipped.")
+                spot_indices_np = spot_indices_np[valid_fraction_mask]
+                cell_type_indices_np = cell_type_indices_np[valid_fraction_mask]
+
+            if spot_indices_np.size > 0:
+                np.add.at(pseudo_fraction_table_counts, (spot_indices_np, cell_type_indices_np), 1)
+        else:
+            print("No valid cell types found across all spots for fraction calculation.")
 
         pseudo_spots_adata = ad.AnnData(X=pseudo_spots_table_X, var=sc_exp.var.copy())  # Keep var names
         pseudo_spots_adata.obs.index = [f"pseudo_spot_{j}" for j in range(self.spot_num)]  # Meaningful spot names
@@ -829,133 +1003,132 @@ class pseudoSpotGen(BaseTransform):
         return data
 
 
-#remove split ref
-def data_integration(real, pseudo, batch_removal_method="combat", dimensionality_reduction_method='PCA', dim=50,
-                     scale=True, autoencoder_epoches=2000, autoencoder_LR=1e-3, autoencoder_drop=0, cpu_num=-1,
-                     AE_device='GPU'):
+# #remove split ref
+# def data_integration(real, pseudo, batch_removal_method="combat", dimensionality_reduction_method='PCA', dim=50,
+#                      scale=True, autoencoder_epoches=2000, autoencoder_LR=1e-3, autoencoder_drop=0, cpu_num=-1,
+#                      AE_device='GPU'):
 
-    if batch_removal_method == 'mnn':
-        mnn = sc.external.pp.mnn_correct(pseudo, real, svd_dim=dim, k=50, batch_key='real_pseudo', save_raw=True,
-                                         var_subset=None)
-        adata = mnn[0]
-        if dimensionality_reduction_method == 'PCA':
-            if scale == True:
-                sc.pp.scale(adata, max_value=None, zero_center=True)
-            sc.tl.pca(adata, n_comps=dim, svd_solver='arpack', random_state=None)
-            table = pd.DataFrame(adata.obsm['X_pca'], index=[str(i)[:-2] for i in adata.obs.index])
-        elif dimensionality_reduction_method == 'autoencoder':
-            data = torch.tensor(adata.X)
-            x_size = data.shape[1]
-            latent_size = dim
-            hidden_size = int((x_size + latent_size) / 2)
-            nets = autoencoder(x_size=x_size, hidden_size=hidden_size, embedding_size=latent_size,
-                               p_drop=autoencoder_drop)
-            optimizer_ae = torch.optim.Adam(nets.parameters(), lr=autoencoder_LR)
-            loss_ae = nn.MSELoss(reduction='mean')
-            embedding = auto_train(model=nets, epoch_n=autoencoder_epoches, loss_fn=loss_ae, optimizer=optimizer_ae,
-                                   data=data, cpu_num=cpu_num, device=AE_device).detach().numpy()
-            if scale == True:
-                embedding = (embedding - embedding.mean(axis=0)) / embedding.std(axis=0)
-            table = pd.DataFrame(embedding, index=[str(i)[:-2] for i in adata.obs.index])
-        elif dimensionality_reduction_method == 'nmf':
-            nmf = NMF(n_components=dim).fit_transform(adata.X)
-            if scale == True:
-                nmf = (nmf - nmf.mean(axis=0)) / nmf.std(axis=0)
-            table = pd.DataFrame(nmf, index=[str(i)[:-2] for i in adata.obs.index])
-        elif dimensionality_reduction_method == None:
-            if scale == True:
-                sc.pp.scale(adata, max_value=None, zero_center=True)
-            table = pd.DataFrame(adata.X, index=[str(i)[:-2] for i in adata.obs.index], columns=adata.var.index.values)
-        table = table.iloc[pseudo.shape[0]:, :].append(table.iloc[:pseudo.shape[0], :])
-        table.insert(0, 'ST_type', ['real'] * real.shape[0] + ['pseudo'] * pseudo.shape[0])
+#     if batch_removal_method == 'mnn':
+#         mnn = sc.external.pp.mnn_correct(pseudo, real, svd_dim=dim, k=50, batch_key='real_pseudo', save_raw=True,
+#                                          var_subset=None)
+#         adata = mnn[0]
+#         if dimensionality_reduction_method == 'PCA':
+#             if scale == True:
+#                 sc.pp.scale(adata, max_value=None, zero_center=True)
+#             sc.tl.pca(adata, n_comps=dim, svd_solver='arpack', random_state=None)
+#             table = pd.DataFrame(adata.obsm['X_pca'], index=[str(i)[:-2] for i in adata.obs.index])
+#         elif dimensionality_reduction_method == 'autoencoder':
+#             data = torch.tensor(adata.X)
+#             x_size = data.shape[1]
+#             latent_size = dim
+#             hidden_size = int((x_size + latent_size) / 2)
+#             nets = autoencoder(x_size=x_size, hidden_size=hidden_size, embedding_size=latent_size,
+#                                p_drop=autoencoder_drop)
+#             optimizer_ae = torch.optim.Adam(nets.parameters(), lr=autoencoder_LR)
+#             loss_ae = nn.MSELoss(reduction='mean')
+#             embedding = auto_train(model=nets, epoch_n=autoencoder_epoches, loss_fn=loss_ae, optimizer=optimizer_ae,
+#                                    data=data, cpu_num=cpu_num, device=AE_device).detach().numpy()
+#             if scale == True:
+#                 embedding = (embedding - embedding.mean(axis=0)) / embedding.std(axis=0)
+#             table = pd.DataFrame(embedding, index=[str(i)[:-2] for i in adata.obs.index])
+#         elif dimensionality_reduction_method == 'nmf':
+#             nmf = NMF(n_components=dim).fit_transform(adata.X)
+#             if scale == True:
+#                 nmf = (nmf - nmf.mean(axis=0)) / nmf.std(axis=0)
+#             table = pd.DataFrame(nmf, index=[str(i)[:-2] for i in adata.obs.index])
+#         elif dimensionality_reduction_method == None:
+#             if scale == True:
+#                 sc.pp.scale(adata, max_value=None, zero_center=True)
+#             table = pd.DataFrame(adata.X, index=[str(i)[:-2] for i in adata.obs.index], columns=adata.var.index.values)
+#         table = table.iloc[pseudo.shape[0]:, :].append(table.iloc[:pseudo.shape[0], :])
+#         table.insert(0, 'ST_type', ['real'] * real.shape[0] + ['pseudo'] * pseudo.shape[0])
 
-    elif batch_removal_method == 'scanorama':
-        import scanorama
-        scanorama.integrate_scanpy([real, pseudo], dimred=dim)
-        table1 = pd.DataFrame(real.obsm['X_scanorama'], index=real.obs.index.values)
-        table2 = pd.DataFrame(pseudo.obsm['X_scanorama'], index=pseudo.obs.index.values)
-        table = table1.append(table2)
-        table.insert(0, 'ST_type', ['real'] * real.shape[0] + ['pseudo'] * pseudo.shape[0])
+#     elif batch_removal_method == 'scanorama':
+#         import scanorama
+#         scanorama.integrate_scanpy([real, pseudo], dimred=dim)
+#         table1 = pd.DataFrame(real.obsm['X_scanorama'], index=real.obs.index.values)
+#         table2 = pd.DataFrame(pseudo.obsm['X_scanorama'], index=pseudo.obs.index.values)
+#         table = table1.append(table2)
+#         table.insert(0, 'ST_type', ['real'] * real.shape[0] + ['pseudo'] * pseudo.shape[0])
 
-    elif batch_removal_method == 'combat':
-        aaa = real.copy()
-        aaa.obs = pd.DataFrame(index=aaa.obs.index)
-        bbb = pseudo.copy()
-        bbb.obs = pd.DataFrame(index=bbb.obs.index)
-        adata = aaa.concatenate(bbb, batch_key='real_pseudo')
-        sc.pp.combat(adata, key='real_pseudo')
-        if dimensionality_reduction_method == 'PCA':
-            if scale == True:
-                sc.pp.scale(adata, max_value=None, zero_center=True)
-            sc.tl.pca(adata, n_comps=dim, svd_solver='arpack', random_state=None)
-            table = pd.DataFrame(adata.obsm['X_pca'], index=[str(i)[:-2] for i in adata.obs.index])
-        elif dimensionality_reduction_method == 'autoencoder':
-            data = torch.tensor(adata.X)
-            x_size = data.shape[1]
-            latent_size = dim
-            hidden_size = int((x_size + latent_size) / 2)
-            nets = autoencoder(x_size=x_size, hidden_size=hidden_size, embedding_size=latent_size,
-                               p_drop=autoencoder_drop)
-            optimizer_ae = torch.optim.Adam(nets.parameters(), lr=autoencoder_LR)
-            loss_ae = nn.MSELoss(reduction='mean')
-            embedding = auto_train(model=nets, epoch_n=autoencoder_epoches, loss_fn=loss_ae, optimizer=optimizer_ae,
-                                   data=data, cpu_num=cpu_num, device=AE_device).detach().numpy()
-            if scale == True:
-                embedding = (embedding - embedding.mean(axis=0)) / embedding.std(axis=0)
-            table = pd.DataFrame(embedding, index=[str(i)[:-2] for i in adata.obs.index])
-        elif dimensionality_reduction_method == 'nmf':
-            nmf = NMF(n_components=dim).fit_transform(adata.X)
-            if scale == True:
-                nmf = (nmf - nmf.mean(axis=0)) / nmf.std(axis=0)
-            table = pd.DataFrame(nmf, index=[str(i)[:-2] for i in adata.obs.index])
-        elif dimensionality_reduction_method == None:
-            if scale == True:
-                sc.pp.scale(adata, max_value=None, zero_center=True)
-            table = pd.DataFrame(adata.X, index=[str(i)[:-2] for i in adata.obs.index], columns=adata.var.index.values)
-        table.insert(0, 'ST_type', ['real'] * real.shape[0] + ['pseudo'] * pseudo.shape[0])
+#     elif batch_removal_method == 'combat':
+#         aaa = real.copy()
+#         aaa.obs = pd.DataFrame(index=aaa.obs.index)
+#         bbb = pseudo.copy()
+#         bbb.obs = pd.DataFrame(index=bbb.obs.index)
+#         adata = aaa.concatenate(bbb, batch_key='real_pseudo')
+#         sc.pp.combat(adata, key='real_pseudo')
+#         if dimensionality_reduction_method == 'PCA':
+#             if scale == True:
+#                 sc.pp.scale(adata, max_value=None, zero_center=True)
+#             sc.tl.pca(adata, n_comps=dim, svd_solver='arpack', random_state=None)
+#             table = pd.DataFrame(adata.obsm['X_pca'], index=[str(i)[:-2] for i in adata.obs.index])
+#         elif dimensionality_reduction_method == 'autoencoder':
+#             data = torch.tensor(adata.X)
+#             x_size = data.shape[1]
+#             latent_size = dim
+#             hidden_size = int((x_size + latent_size) / 2)
+#             nets = autoencoder(x_size=x_size, hidden_size=hidden_size, embedding_size=latent_size,
+#                                p_drop=autoencoder_drop)
+#             optimizer_ae = torch.optim.Adam(nets.parameters(), lr=autoencoder_LR)
+#             loss_ae = nn.MSELoss(reduction='mean')
+#             embedding = auto_train(model=nets, epoch_n=autoencoder_epoches, loss_fn=loss_ae, optimizer=optimizer_ae,
+#                                    data=data, cpu_num=cpu_num, device=AE_device).detach().numpy()
+#             if scale == True:
+#                 embedding = (embedding - embedding.mean(axis=0)) / embedding.std(axis=0)
+#             table = pd.DataFrame(embedding, index=[str(i)[:-2] for i in adata.obs.index])
+#         elif dimensionality_reduction_method == 'nmf':
+#             nmf = NMF(n_components=dim).fit_transform(adata.X)
+#             if scale == True:
+#                 nmf = (nmf - nmf.mean(axis=0)) / nmf.std(axis=0)
+#             table = pd.DataFrame(nmf, index=[str(i)[:-2] for i in adata.obs.index])
+#         elif dimensionality_reduction_method == None:
+#             if scale == True:
+#                 sc.pp.scale(adata, max_value=None, zero_center=True)
+#             table = pd.DataFrame(adata.X, index=[str(i)[:-2] for i in adata.obs.index], columns=adata.var.index.values)
+#         table.insert(0, 'ST_type', ['real'] * real.shape[0] + ['pseudo'] * pseudo.shape[0])
 
-    else:
-        aaa = real.copy()
-        aaa.obs = pd.DataFrame(index=aaa.obs.index)
-        bbb = pseudo.copy()
-        bbb.obs = pd.DataFrame(index=bbb.obs.index)
-        adata = aaa.concatenate(bbb, batch_key='real_pseudo')
-        if dimensionality_reduction_method == 'PCA':
-            if scale == True:
-                sc.pp.scale(adata, max_value=None, zero_center=True)
-            sc.tl.pca(adata, n_comps=dim, svd_solver='arpack', random_state=None)
-            table = pd.DataFrame(adata.obsm['X_pca'], index=[str(i)[:-2] for i in adata.obs.index])
-        elif dimensionality_reduction_method == 'autoencoder':
-            data = torch.tensor(adata.X)
-            x_size = data.shape[1]
-            latent_size = dim
-            hidden_size = int((x_size + latent_size) / 2)
-            nets = autoencoder(x_size=x_size, hidden_size=hidden_size, embedding_size=latent_size,
-                               p_drop=autoencoder_drop)
-            optimizer_ae = torch.optim.Adam(nets.parameters(), lr=autoencoder_LR)
-            loss_ae = nn.MSELoss(reduction='mean')
-            embedding = auto_train(model=nets, epoch_n=autoencoder_epoches, loss_fn=loss_ae, optimizer=optimizer_ae,
-                                   data=data, cpu_num=cpu_num, device=AE_device).detach().numpy()
-            if scale == True:
-                embedding = (embedding - embedding.mean(axis=0)) / embedding.std(axis=0)
-            table = pd.DataFrame(embedding, index=[str(i)[:-2] for i in adata.obs.index])
-        elif dimensionality_reduction_method == 'nmf':
-            nmf = NMF(n_components=dim).fit_transform(adata.X)
-            if scale == True:
-                nmf = (nmf - nmf.mean(axis=0)) / nmf.std(axis=0)
-            table = pd.DataFrame(nmf, index=[str(i)[:-2] for i in adata.obs.index])
-        elif dimensionality_reduction_method == None:
-            if scale == True:
-                sc.pp.scale(adata, max_value=None, zero_center=False)
-            table = pd.DataFrame(adata.X, index=[str(i)[:-2] for i in adata.obs.index], columns=adata.var.index.values)
-        table.insert(0, 'ST_type', ['real'] * real.shape[0] + ['pseudo'] * pseudo.shape[0])
+#     else:
+#         aaa = real.copy()
+#         aaa.obs = pd.DataFrame(index=aaa.obs.index)
+#         bbb = pseudo.copy()
+#         bbb.obs = pd.DataFrame(index=bbb.obs.index)
+#         adata = aaa.concatenate(bbb, batch_key='real_pseudo')
+#         if dimensionality_reduction_method == 'PCA':
+#             if scale == True:
+#                 sc.pp.scale(adata, max_value=None, zero_center=True)
+#             sc.tl.pca(adata, n_comps=dim, svd_solver='arpack', random_state=None)
+#             table = pd.DataFrame(adata.obsm['X_pca'], index=[str(i)[:-2] for i in adata.obs.index])
+#         elif dimensionality_reduction_method == 'autoencoder':
+#             data = torch.tensor(adata.X)
+#             x_size = data.shape[1]
+#             latent_size = dim
+#             hidden_size = int((x_size + latent_size) / 2)
+#             nets = autoencoder(x_size=x_size, hidden_size=hidden_size, embedding_size=latent_size,
+#                                p_drop=autoencoder_drop)
+#             optimizer_ae = torch.optim.Adam(nets.parameters(), lr=autoencoder_LR)
+#             loss_ae = nn.MSELoss(reduction='mean')
+#             embedding = auto_train(model=nets, epoch_n=autoencoder_epoches, loss_fn=loss_ae, optimizer=optimizer_ae,
+#                                    data=data, cpu_num=cpu_num, device=AE_device).detach().numpy()
+#             if scale == True:
+#                 embedding = (embedding - embedding.mean(axis=0)) / embedding.std(axis=0)
+#             table = pd.DataFrame(embedding, index=[str(i)[:-2] for i in adata.obs.index])
+#         elif dimensionality_reduction_method == 'nmf':
+#             nmf = NMF(n_components=dim).fit_transform(adata.X)
+#             if scale == True:
+#                 nmf = (nmf - nmf.mean(axis=0)) / nmf.std(axis=0)
+#             table = pd.DataFrame(nmf, index=[str(i)[:-2] for i in adata.obs.index])
+#         elif dimensionality_reduction_method == None:
+#             if scale == True:
+#                 sc.pp.scale(adata, max_value=None, zero_center=False)
+#             table = pd.DataFrame(adata.X, index=[str(i)[:-2] for i in adata.obs.index], columns=adata.var.index.values)
+#         table.insert(0, 'ST_type', ['real'] * real.shape[0] + ['pseudo'] * pseudo.shape[0])
 
-    table.insert(1, 'cell_num', real.obs['cell_num'].values.tolist() + pseudo.obs['cell_num'].values.tolist())
-    table.insert(2, 'cell_type_num',
-                 real.obs['cell_type_num'].values.tolist() + pseudo.obs['cell_type_num'].values.tolist())
+#     table.insert(1, 'cell_num', real.obs['cell_num'].values.tolist() + pseudo.obs['cell_num'].values.tolist())
+#     table.insert(2, 'cell_type_num',
+#                  real.obs['cell_type_num'].values.tolist() + pseudo.obs['cell_type_num'].values.tolist())
 
-    return table
-
+#     return table
 
 # !/usr/bin/env python
 # coding: utf-8
@@ -966,251 +1139,9 @@ import warnings
 
 warnings.filterwarnings("ignore")
 sys.path.append(os.getcwd())
-"""This module is used to provide the path of the loading data and saving data.
-
-Parameters:
-sc_path: The path for loading single cell reference data.
-ST_path: The path for loading spatial transcriptomics data.
-output_path: The path for saving output files.
-
-The relevant file name and data format for loading:
-sc_data.tsv: The expression matrix of the single cell reference data with cells as rows and genes as columns. This file should be saved in "sc_path".
-sc_label.tsv: The cell-type annotation of sincle cell data. The table should have two columns: The cell barcode/name and the cell-type annotation information.
-            This file should be saved in "sc_path".
-ST_data.tsv: The expression matrix of the spatial transcriptomics data with spots as rows and genes as columns. This file should be saved in "ST_path".
-coordinates.csv: The coordinates of the spatial transcriptomics data. The table should have three columns: Spot barcode/name, X axis (column name 'x'), and Y axis (column name 'y').
-            This file should be saved in "ST_path".
-marker_genes.tsv [optional]: The gene list used to run STdGCN. Each row is a gene and no table header is permitted. This file should be saved in "sc_path".
-ST_ground_truth.tsv [optional]: The ground truth of ST data. The data should be transformed into the cell type proportions. This file should be saved in "ST_path".
-
-"""
-# paths = {
-#     'sc_path': './data/sc_data',
-#     'ST_path': './data/ST_data',
-#     'output_path': './output',
-# }
-paths = {"dataset": "CARD_synthetic", "datadir": "data/spatial"}
-"""This module is used to preprocess the input data and identify marker genes
-[optional].
-
-Parameters:
-'preprocess': [bool]. Select whether the input expression data needs to be preprocessed. This step includes normalization, logarithmization, selecting highly variable genes,
-                    regressing out mitochondrial genes, and scaling data.
-'normalize': [bool]. When 'preprocess'=True, select whether you need to normalize each cell/spot by total counts = 10,000, so that every cell/spot has the same total
-                    count after normalization.
-'log': [bool]. When 'preprocess'=True, select whether you need to logarithmize (X=log(X+1)) the expression matrix.
-'highly_variable_genes': [bool]. When 'preprocess'=True, select whether you need to filter the highly variable genes.
-'highly_variable_gene_num': [int or None]. When 'preprocess'=True and 'highly_variable_genes'=True, select the number of highly-variable genes to keep.
-'regress_out': [bool]. When 'preprocess'=True, select whether you need to regress out mitochondrial genes.
-'scale': [bool]. When 'preprocess'=True, select whether you need to scale each gene to unit variance and zero mean.
-'PCA_components': [int]. Number of principal components to compute for principal component analysis (PCA).
-'marker_gene_method': ['logreg', 'wilcoxon']. We used "scanpy.tl.rank_genes_groups" (https://scanpy.readthedocs.io/en/stable/generated/scanpy.tl.rank_genes_groups.html)
-                    to identify cell type marker genes. For marker gene selection, STdGCN provides two methods, 'wilcoxon' (Wilcoxon rank-sum) and 'logreg' (uses
-                    logistic regression).
-'top_gene_per_type': [int]. The number of genes for each cell type that can be used to train STdGCN.
-'filter_wilcoxon_marker_genes': [bool]. When 'marker_gene_method'='wilcoxon', select whether you need additional steps for gene filtering.
-'pvals_adj_threshold': [float or None]. When 'marker_gene_method'='wilcoxon' and 'rank_gene_filter'=True, only genes with corrected p-values < 'pvals_adj_threshold' were kept.
-'log_fold_change_threshold': [float or None]. When 'marker_gene_method'='wilcoxon' and 'rank_gene_filter'=True, only genes with log fold change > 'log_fold_change_threshold' were kept.
-'min_within_group_fraction_threshold': [float or None]. When 'marker_gene_method'='wilcoxon' and 'rank_gene_filter'=True, only genes expressed with fraction at least
-                    'min_within_group_fraction_threshold' in the cell type were kept.
-'max_between_group_fraction_threshold': [float or None]. When 'marker_gene_method'='wilcoxon' and 'rank_gene_filter'=True, only genes expressed with fraction at most
-                    'max_between_group_fraction_threshold' in the union of the rest of cell types were kept.
-
-"""
-find_marker_genes_paras = {
-    'preprocess': True,
-    'normalize': True,
-    'log': True,
-    'highly_variable_genes': False,
-    'highly_variable_gene_num': None,
-    'regress_out': False,
-    'PCA_components': 30,
-    'marker_gene_method': 'logreg',
-    'top_gene_per_type': 100,
-    'filter_wilcoxon_marker_genes': True,
-    'pvals_adj_threshold': 0.10,
-    'log_fold_change_threshold': 1,
-    'min_within_group_fraction_threshold': None,
-    'max_between_group_fraction_threshold': None,
-}
-"""This module is used to simulate pseudo-spots.
-
-Parameters:
-'spot_num': [int]. The number of pseudo-spots.
-'min_cell_num_in_spot': [int]. The minimum number of cells in a pseudo-spot.
-'max_cell_num_in_spot': [int]. The maximum number of cells in a pseudo-spot.
-'generation_method': ['cell' or 'celltype']. STdGCN provides two pseudo-spot simulation methods. When 'generation_method'='cell', each cell is equally selected. When
-                    'generation_method'='celltype', each cell type is equally selected. See manuscript for more details.
-'max_cell_types_in_spot': [int]. When 'generation_method'='celltype', choose the maximum number of cell types in a pseudo-spot.
-
-"""
-pseudo_spot_simulation_paras = {
-    # 'spot_num': 30000,
-    'spot_num': 100,  #TODO only for test
-    'min_cell_num_in_spot': 8,
-    'max_cell_num_in_spot': 12,
-    'generation_method': 'celltype',
-    'max_cell_types_in_spot': 4,
-}
-"""This module is used for real- and pseudo- spots normalization.
-
-Parameters:
-'normalize': [bool]. Select whether you need to normalize each cell/spot by total counts = 10,000, so that every cell/spot has the same total count after normalization.
-'log': [bool]. Select whether you need to logarithmize (X=log(X+1)) the expression matrix.
-'scale': [bool]. Select whether you need to scale each gene to unit variance and zero mean.
-
-"""
-data_normalization_paras = {
-    'normalize': True,
-    'log': True,
-    'scale': False,
-}
-"""This module is used to integrate the normalized real- and pseudo- spots together to
-construct the real-to-pseudo-spot link graph.
-
-Parameters:
-'batch_removal_method': ['mnn', 'scanorama', 'combat', None]. Considering batch effects, STdGCN provides four integration methods: mnn (mnnpy, DOI:10.1038/nbt.4091),
-                    scanorama (Scanorama, DOI: 10.1038/s41587-019-0113-3), combat (Combat, DOI: 10.1093/biostatistics/kxj037), None (concatenation with no batch removal).
-'dimensionality_reduction_method': ['PCA', 'autoencoder', 'nmf', None]. When 'batch_removal_method' is not 'scanorama', select whether the data needs dimensionality reduction, and which
-                    dimensionality reduction method is applied.
-'dim': [int]. When 'batch_removal_method'='scanorama', select the dimension for this method. When 'batch_removal_method' is not 'scanorama' and 'dimensionality_reduction_method' is
-                    not None, select the dimension of the dimensionality reduction.
-'scale': [bool]. When 'batch_removal_method' is not 'scanorama', select whether you need to scale each gene to unit variance and zero mean.
-
-"""
-integration_for_adj_paras = {
-    'batch_removal_method': None,
-    'dim': 30,
-    'dimensionality_reduction_method': 'PCA',
-    'scale': True,
-}
-"""The module is used to construct the adjacency matrix of the expression graph, which
-contains three subgraphs: a real-to-pseudo-spot graph, a pseudo-spots internal graph,
-and a real-spots internal graph.
-
-Parameters:
-'find_neighbor_method' ['MNN', 'KNN']. STdGCN provides two methods for link graph construction, KNN (K-nearest neighbors) and MNN (mutual nearest neighbors, DOI: 10.1038/nbt.4091).
-'dist_method': ['euclidean', 'cosine']. The metrics used for computing paired distances between spots.
-'corr_dist_neighbors': [int]. The number of nearest neighbors.
-'PCA_dimensionality_reduction': [bool]. For pseudo-spots internal graph and real-spots internal graph construction, select if the data needs to use PCA dimensionality reduction before
-                    computing paired distances between spots.
-'dim': [int]. When 'PCA_dimensionality_reduction'=True, select the dimension of the PCA.
-
-"""
-inter_exp_adj_paras = {
-    'find_neighbor_method': 'MNN',
-    'dist_method': 'cosine',
-    'corr_dist_neighbors': 20,
-}
-real_intra_exp_adj_paras = {
-    'find_neighbor_method': 'MNN',
-    'dist_method': 'cosine',
-    'corr_dist_neighbors': 10,
-    'PCA_dimensionality_reduction': False,
-    'dim': 50,
-}
-pseudo_intra_exp_adj_paras = {
-    'find_neighbor_method': 'MNN',
-    'dist_method': 'cosine',
-    'corr_dist_neighbors': 20,
-    'PCA_dimensionality_reduction': False,
-    'dim': 50,
-}
-"""The module is used to construct the adjacency matrix of the spatial graph.
-
-Parameters:
-'space_dist_threshold': [float or None]. Only the distance between two spots smaller than 'space_dist_threshold' can be linked.
-'link_method' ['soft', 'hard']. If spot i and j linked, A(i,j)=1 if 'link_method'='hard', while A(i,j)=1/distance(i,j) if 'link_method'='soft'. See manuscript for more details.
-
-"""
-spatial_adj_paras = {
-    'link_method': 'soft',
-    'space_dist_threshold': 2,
-}
-"""This module is used to integrate the normalized real- and pseudo- spots as the input
-feature for STdGCN.
-
-Parameters:
-'batch_removal_method': ['mnn', 'scanorama', 'combat', None]. Considering batch effects, STdGCN provides four integration methods: mnn (mnnpy, DOI:10.1038/nbt.4091),
-                    scanorama (Scanorama, DOI: 10.1038/s41587-019-0113-3), combat (Combat, DOI: 10.1093/biostatistics/kxj037), None (concatenation with no batch removal).
-'dimensionality_reduction_method': ['PCA', 'autoencoder', 'nmf', None]. When 'batch_removal_method' is not 'scanorama', select whether the data needs dimensionality reduction, and which
-                    dimensionality reduction method is applied.
-'dim': [int]. When 'batch_removal_method'='scanorama', select the dimension for this method. When 'batch_removal_method' is not 'scanorama' and 'dimensionality_reduction_method' is
-                    not None, select the dimension of the dimensionality reduction.
-'scale': [bool]. When 'batch_removal_method' is not 'scanorama', select whether you need to scale each gene to unit variance and zero mean.
-
-"""
-integration_for_feature_paras = {
-    'batch_removal_method': None,
-    'dimensionality_reduction_method': None,
-    'dim': 80,
-    'scale': True,
-}
-"""This module is used for setting the deep learning parameters for STdGCN.
-
-Parameters:
-'epoch_n': [int]. The maximum number of epochs.
-'dim': [int]. The dimension of the hidden layers.
-'common_hid_layers_num': [int]. The number of GCN layers = 'common_hid_layers_num'+1.
-'fcnn_hid_layers_num': [int]. The number of fully connected neural network layers = 'fcnn_hid_layers_num'+2.
-'dropout': [float]. The probability of an element to be zeroed.
-'learning_rate_SGD': [float]. Initial learning rate.
-'weight_decay_SGD': [float]. L2 penalty.
-'momentum': [float]. Momentum factor.
-'dampening': [float]. Dampening for momentum.
-'nesterov': [bool]. Enables Nesterov momentum.
-'early_stopping_patience': [int]. Early stopping epochs.
-'clip_grad_max_norm': [float]. Clips gradient norm of an iterable of parameters.
-#'LambdaLR_scheduler_coefficient': [float]. The coefficent of the LambdaLR scheduler fucntion:  lr(epoch) = [LambdaLR_scheduler_coefficient] ^ epoch_n × learning_rate_SGD.
-'print_loss_epoch_step': [int]. Print the loss value at every 'print_epoch_step' epoch.
-
-"""
-GCN_paras = {
-    'epoch_n': 3000,
-    'dim': 80,
-    'common_hid_layers_num': 1,
-    'fcnn_hid_layers_num': 1,
-    'dropout': 0,
-    'learning_rate_SGD': 2e-1,
-    'weight_decay_SGD': 3e-4,
-    'momentum': 0.9,
-    'dampening': 0,
-    'nesterov': True,
-    'early_stopping_patience': 20,
-    'clip_grad_max_norm': 1,
-    'print_loss_epoch_step': 20,
-}
-"""## run STdGCN
-
-Parameters 'load_test_groundtruth': [bool]. Select whether you need to upload the ground
-truth file (ST_ground_truth.tsv) of the spatial transcriptomics data to track the
-performance of STdGCN. 'use_marker_genes': [bool]. Select whether you need the gene
-selection process before running STdGCN. Otherwise use common genes from single cell and
-spatial transcriptomics data. 'external_genes': [bool]. When "use_marker_genes"=True,
-you can upload your specified gene list (marker_genes.tsv) to run STdGCN.
-'generate_new_pseudo_spots': [bool]. STdGCN will save the simulated pseudo-spots to
-"pseudo_ST.pkl". If you want to run multiple deconvolutions with the same single cell
-reference data,                     you don't need to simulate new pseudo-spots and set
-'generate_new_pseudo_spots'=False. When 'generate_new_pseudo_spots'=False, you need to
-pre-move the "pseudo_ST.pkl"                     to the 'output_path' so that STdGCN can
-directly load the pre-simulated pseudo-spots. 'fraction_pie_plot': [bool]. Select
-whether you need to draw the pie plot of the predicted results. Based on our experience,
-we do not recommend to draw the pie plot when the predicted                     spot
-number is very large. For 1,000 spots, the plotting time is less than 2 minutes; for
-2,000 spots, the plotting time is about 10 minutes; for 3,000 spots, it takes about 30
-minutes. 'cell_type_distribution_plot': [bool]. Select whether you need to draw the
-scatter plot of the predicted results for each cell type. 'n_jobs': [int]. Set the
-number of threads used for intraop parallelism on CPU. 'n_jobs=-1' represents using all
-CPUs. 'GCN_device': ['GPU', 'CPU']. Select the device used to run GCN networks.
-
-"""
-
-# sc_path = paths['sc_path']
-# ST_path = paths['ST_path']
-# output_path = paths['output_path']
 
 
-@register_preprocessor("pseudobulk")
+@register_preprocessor("misc")
 class CelltypeTransform(BaseTransform):
     """Cell topic profile."""
 
@@ -1351,6 +1282,7 @@ class stdGCNMarkGenes(BaseTransform):
         data.data.uns['gene_dict'] = gene_dict
 
 
+@register_preprocessor("misc")
 class updateAnndataObsTransform(BaseTransform):
 
     def __init__(self, split, **kwargs):
@@ -1424,6 +1356,7 @@ class updateAnndataObsTransform(BaseTransform):
 
 
 # update_anndata_obs(ST_adata_filter_norm, ST_adata_filter, cell_types)
+@register_preprocessor("misc")
 class CellTypeNum(BaseTransform):
 
     def __init__(self, split="pseudo", **kwargs):
@@ -1436,61 +1369,56 @@ class CellTypeNum(BaseTransform):
         pseudo_adata_norm.obs['cell_type_num'] = (pseudo_adata_norm.obs[cell_types] > 0).sum(axis=1)
 
 
-from typing import Any, List, Literal, Mapping, Optional, Tuple, Union
+@register_preprocessor("graph.cell")
+class stdgcnGraph(BaseTransform):
 
+    def __init__(self, inter_find_neighbor_method, inter_dist_method, inter_corr_dist_neighbors, spatial_link_method,
+                 space_dist_threshold, real_intra_find_neighbor_method, real_intra_dist_method,
+                 real_intra_pca_dimensionality_reduction, real_intra_corr_dist_neighbors, real_intra_dim,
+                 pseudo_intra_find_neighbor_method, pseudo_intra_dist_method, pseudo_intra_corr_dist_neighbors,
+                 pseudo_intra_pca_dimensionality_reduction, pseudo_intra_dim, real_split_name="test",
+                 pseudo_split_name="pseudo", channel: Optional[str] = "feature.cell", channel_type: str = "obsm",
+                 **kwargs):
+        self.real_split_name = real_split_name
+        self.pseudo_split_name = pseudo_split_name
+        # 从 cli_args 构建 inter_exp_adj_paras
+        self.inter_exp_adj_paras = {
+            'find_neighbor_method': inter_find_neighbor_method,
+            'dist_method': inter_dist_method,
+            'corr_dist_neighbors': inter_corr_dist_neighbors,
+        }
+        # 从 cli_args 构建 spatial_adj_paras
+        self.spatial_adj_paras = {
+            'link_method': spatial_link_method,
+            'space_dist_threshold': space_dist_threshold,
+        }
+        # 从 cli_args 构建 real_intra_exp_adj_paras
+        self.real_intra_exp_adj_paras = {
+            'find_neighbor_method': real_intra_find_neighbor_method,
+            'dist_method': real_intra_dist_method,
+            'corr_dist_neighbors': real_intra_corr_dist_neighbors,
+            'PCA_dimensionality_reduction': real_intra_pca_dimensionality_reduction,
+            'dim': real_intra_dim,
+        }
+        # 从 cli_args 构建 pseudo_intra_exp_adj_paras
+        self.pseudo_intra_exp_adj_paras = {
+            'find_neighbor_method': pseudo_intra_find_neighbor_method,
+            'dist_method': pseudo_intra_dist_method,
+            'corr_dist_neighbors': pseudo_intra_corr_dist_neighbors,
+            'PCA_dimensionality_reduction': pseudo_intra_pca_dimensionality_reduction,
+            'dim': pseudo_intra_dim,
+        }
+        self.channel = channel
+        self.channel_type = channel_type
 
-class stdGCNWrapper(BaseRegressionMethod):
+        super().__init__(**kwargs)
 
-    def __init__(self, integration_for_adj_paras, inter_exp_adj_paras, spatial_adj_paras, real_intra_exp_adj_paras,
-                 pseudo_intra_exp_adj_paras, integration_for_feature_paras, GCN_paras, GCN_device='CPU', n_jobs=-1):
-        self.integration_for_adj_paras = integration_for_adj_paras
-        self.inter_exp_adj_paras = inter_exp_adj_paras
-        self.spatial_adj_paras = spatial_adj_paras
-        self.real_intra_exp_adj_paras = real_intra_exp_adj_paras
-        self.pseudo_intra_exp_adj_paras = pseudo_intra_exp_adj_paras
-        self.integration_for_feature_paras = integration_for_feature_paras
-        self.GCN_paras = GCN_paras
-        self.GCN_device = GCN_device
-        self.n_jobs = n_jobs
-
-    @staticmethod
-    def preprocessing_pipeline(log_level: LogLevel = "INFO"):
-        pass
-
-    def _init_model():
-        pass
-
-    def score(self, x, y, *, score_func: Optional[Union[str, Mapping[Any, float]]] = None, return_pred: bool = False,
-              valid_idx=None, test_idx=None) -> Union[float, Tuple[float, Any]]:
-        pass
-
-    def fit_score(self, x, y, *, score_func: Optional[Union[str, Mapping[Any,
-                                                                         float]]] = None, return_pred: bool = False,
-                  valid_idx=None, test_idx=None, **fit_kwargs) -> Union[float, Tuple[float, Any]]:
-        """Shortcut for fitting data using the input feature and return eval.
-
-        Note
-        ----
-        Only work for models where the fitting does not require labeled data, i.e. unsupervised methods.
-
-        """
-        self.fit(x, **fit_kwargs)
-        return self.score(x, y, score_func=score_func, return_pred=return_pred, valid_idx=valid_idx, test_idx=test_idx)
-
-    def fit(
-        self,
-        inputs: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
-        y: Optional[Any] = None,
-    ):
-        ST_adata_filter_norm, pseudo_adata_norm, ST_adata_filter, pseudo_adata_filter, word_to_idx_celltype, spatial = inputs
-        ST_adata_filter_norm.obs['coor_X'] = spatial['x']
-        ST_adata_filter_norm.obs['coor_Y'] = spatial['y']
-        ST_integration = data_integration(
-            ST_adata_filter_norm, pseudo_adata_norm,
-            batch_removal_method=self.integration_for_adj_paras['batch_removal_method'],
-            dim=min(self.integration_for_adj_paras['dim'], int(ST_adata_filter_norm.shape[1] / 2)),
-            dimensionality_reduction_method=self.integration_for_adj_paras['dimensionality_reduction_method'],
-            scale=self.integration_for_adj_paras['scale'], cpu_num=self.n_jobs, AE_device=self.GCN_device)
+    def __call__(self, data: Data):
+        ST_integration = data.data.obsm['DataInteragraionTransform']
+        ST_adata_filter_norm = data.get_split_data(split_name=self.real_split_name)
+        pseudo_adata_norm = data.get_split_data(split_name=self.pseudo_split_name)
+        ST_adata_filter = data.data.raw.to_adata()[data.get_split_idx(self.real_split_name)]
+        pseudo_adata_filter = data.data.raw.to_adata()[data.get_split_idx(self.pseudo_split_name)]
 
         A_inter_exp = inter_adj(
             ST_integration,
@@ -1506,20 +1434,18 @@ class stdGCNWrapper(BaseRegressionMethod):
         )
 
         A_real_intra_exp = intra_exp_adj(
-            ST_adata_filter_norm,
-            find_neighbor_method=self.real_intra_exp_adj_paras['find_neighbor_method'],
+            ST_adata_filter_norm, find_neighbor_method=self.real_intra_exp_adj_paras['find_neighbor_method'],
             dist_method=self.real_intra_exp_adj_paras['dist_method'],
             PCA_dimensionality_reduction=self.real_intra_exp_adj_paras['PCA_dimensionality_reduction'],
-            corr_dist_neighbors=self.real_intra_exp_adj_paras['corr_dist_neighbors'],
-        )
+            corr_dist_neighbors=self.real_intra_exp_adj_paras['corr_dist_neighbors'], channel=self.channel,
+            channel_type=self.channel_type)
 
         A_pseudo_intra_exp = intra_exp_adj(
-            pseudo_adata_norm,
-            find_neighbor_method=self.pseudo_intra_exp_adj_paras['find_neighbor_method'],
+            pseudo_adata_norm, find_neighbor_method=self.pseudo_intra_exp_adj_paras['find_neighbor_method'],
             dist_method=self.pseudo_intra_exp_adj_paras['dist_method'],
             PCA_dimensionality_reduction=self.pseudo_intra_exp_adj_paras['PCA_dimensionality_reduction'],
-            corr_dist_neighbors=self.pseudo_intra_exp_adj_paras['corr_dist_neighbors'],
-        )
+            corr_dist_neighbors=self.pseudo_intra_exp_adj_paras['corr_dist_neighbors'], channel=self.channel,
+            channel_type=self.channel_type)
 
         real_num = ST_adata_filter.shape[0]
         pseudo_num = pseudo_adata_filter.shape[0]
@@ -1541,13 +1467,361 @@ class stdGCNWrapper(BaseRegressionMethod):
         if (norm == True):
             adj_exp = torch.tensor(adj_normalize(adj_exp, symmetry=True))
             adj_sp = torch.tensor(adj_normalize(adj_sp, symmetry=True))
+        data.data.uns['adj_exp'] = adj_exp
+        data.data.uns['adj_sp'] = adj_sp
 
-        ST_integration_batch_removed = data_integration(
-            ST_adata_filter_norm, pseudo_adata_norm,
-            batch_removal_method=self.integration_for_feature_paras['batch_removal_method'],
-            dim=min(int(ST_adata_filter_norm.shape[1] * 1 / 2), self.integration_for_feature_paras['dim']),
-            dimensionality_reduction_method=self.integration_for_feature_paras['dimensionality_reduction_method'],
-            scale=self.integration_for_feature_paras['scale'], cpu_num=self.n_jobs, AE_device=self.GCN_device)
+
+@register_preprocessor("data", "interagration")
+class DataInteragraionTransform(BaseTransform):
+
+    def __init__(self, real_split_name="test", pseudo_split_name="pseudo", batch_removal_method="combat",
+                 dimensionality_reduction_method='PCA', min_dim=50, scale=True, autoencoder_epoches=2000,
+                 autoencoder_LR=1e-3, autoencoder_drop=0, cpu_num=-1, AE_device='GPU',
+                 channel: Optional[str] = "feature.cell", channel_type: str = "obsm", **kwargs):
+        self.real_split_name = real_split_name
+        self.pseudo_split_name = pseudo_split_name
+        self.batch_removal_method = batch_removal_method
+        self.dimensionality_reduction_method = dimensionality_reduction_method
+        self.min_dim = min_dim
+        self.scale = scale
+        self.autoencoder_epoches = autoencoder_epoches
+        self.autoencoder_LR = autoencoder_LR
+        self.autoencoder_drop = autoencoder_drop
+        self.cpu_num = cpu_num
+        self.AE_device = AE_device
+        self.channel = channel
+        self.channel_type = channel_type
+        super().__init__(**kwargs)
+
+    def __call__(self, data: Data) -> Data:
+        real = data.get_split_data(split_name=self.real_split_name)
+        pseudo = data.get_split_data(split_name=self.pseudo_split_name)
+        dim = min(self.min_dim, int(real.shape[1] / 2))
+        #remove split ref
+        if self.batch_removal_method == 'mnn':
+            mnn = sc.external.pp.mnn_correct(pseudo, real, svd_dim=dim, k=50, batch_key='real_pseudo', save_raw=True,
+                                             var_subset=None)
+            adata = mnn[0]
+            if self.dimensionality_reduction_method == 'PCA':
+                if self.scale == True:
+                    sc.pp.scale(adata, max_value=None, zero_center=True)
+                sc.tl.pca(adata, n_comps=dim, svd_solver='arpack', random_state=None)
+                table = pd.DataFrame(adata.obsm['X_pca'], index=[str(i)[:-2] for i in adata.obs.index])
+            elif self.dimensionality_reduction_method == 'autoencoder':
+                data = torch.tensor(adata.X)
+                x_size = data.shape[1]
+                latent_size = dim
+                hidden_size = int((x_size + latent_size) / 2)
+                nets = autoencoder(x_size=x_size, hidden_size=hidden_size, embedding_size=latent_size,
+                                   p_drop=self.autoencoder_drop)
+                optimizer_ae = torch.optim.Adam(nets.parameters(), lr=self.autoencoder_LR)
+                loss_ae = nn.MSELoss(reduction='mean')
+                embedding = auto_train(model=nets, epoch_n=self.autoencoder_epoches, loss_fn=loss_ae,
+                                       optimizer=optimizer_ae, data=data, cpu_num=self.cpu_num,
+                                       device=self.AE_device).detach().numpy()
+                if self.scale == True:
+                    embedding = (embedding - embedding.mean(axis=0)) / embedding.std(axis=0)
+                table = pd.DataFrame(embedding, index=[str(i)[:-2] for i in adata.obs.index])
+            elif self.dimensionality_reduction_method == 'nmf':
+                nmf = NMF(n_components=dim).fit_transform(adata.X)
+                if self.scale == True:
+                    nmf = (nmf - nmf.mean(axis=0)) / nmf.std(axis=0)
+                table = pd.DataFrame(nmf, index=[str(i)[:-2] for i in adata.obs.index])
+            elif self.dimensionality_reduction_method == None:
+                if self.scale == True:
+                    sc.pp.scale(adata, max_value=None, zero_center=True)
+                table = pd.DataFrame(adata.X, index=[str(i)[:-2] for i in adata.obs.index],
+                                     columns=adata.var.index.values)
+            table = table.iloc[pseudo.shape[0]:, :].append(table.iloc[:pseudo.shape[0], :])
+            table.insert(0, 'ST_type', ['real'] * real.shape[0] + ['pseudo'] * pseudo.shape[0])
+
+        elif self.batch_removal_method == 'scanorama':
+            import scanorama
+            scanorama.integrate_scanpy([real, pseudo], dimred=dim)
+            table1 = pd.DataFrame(real.obsm['X_scanorama'], index=real.obs.index.values)
+            table2 = pd.DataFrame(pseudo.obsm['X_scanorama'], index=pseudo.obs.index.values)
+            table = table1.append(table2)
+            table.insert(0, 'ST_type', ['real'] * real.shape[0] + ['pseudo'] * pseudo.shape[0])
+
+        elif self.batch_removal_method == 'combat':
+            aaa = real.copy()
+            aaa.obs = pd.DataFrame(index=aaa.obs.index)
+            bbb = pseudo.copy()
+            bbb.obs = pd.DataFrame(index=bbb.obs.index)
+            adata = aaa.concatenate(bbb, batch_key='real_pseudo')
+            sc.pp.combat(adata, key='real_pseudo')
+            if self.dimensionality_reduction_method == 'PCA':
+                if self.scale == True:
+                    sc.pp.scale(adata, max_value=None, zero_center=True)
+                sc.tl.pca(adata, n_comps=dim, svd_solver='arpack', random_state=None)
+                table = pd.DataFrame(adata.obsm['X_pca'], index=[str(i)[:-2] for i in adata.obs.index])
+            elif self.dimensionality_reduction_method == 'autoencoder':
+                data = torch.tensor(adata.X)
+                x_size = data.shape[1]
+                latent_size = dim
+                hidden_size = int((x_size + latent_size) / 2)
+                nets = autoencoder(x_size=x_size, hidden_size=hidden_size, embedding_size=latent_size,
+                                   p_drop=self.autoencoder_drop)
+                optimizer_ae = torch.optim.Adam(nets.parameters(), lr=self.autoencoder_LR)
+                loss_ae = nn.MSELoss(reduction='mean')
+                embedding = auto_train(model=nets, epoch_n=self.autoencoder_epoches, loss_fn=loss_ae,
+                                       optimizer=optimizer_ae, data=data, cpu_num=self.cpu_num,
+                                       device=self.AE_device).detach().numpy()
+                if self.scale == True:
+                    embedding = (embedding - embedding.mean(axis=0)) / embedding.std(axis=0)
+                table = pd.DataFrame(embedding, index=[str(i)[:-2] for i in adata.obs.index])
+            elif self.dimensionality_reduction_method == 'nmf':
+                nmf = NMF(n_components=dim).fit_transform(adata.X)
+                if self.scale == True:
+                    nmf = (nmf - nmf.mean(axis=0)) / nmf.std(axis=0)
+                table = pd.DataFrame(nmf, index=[str(i)[:-2] for i in adata.obs.index])
+            elif self.dimensionality_reduction_method == None:
+                if self.scale == True:
+                    sc.pp.scale(adata, max_value=None, zero_center=True)
+                table = pd.DataFrame(adata.X, index=[str(i)[:-2] for i in adata.obs.index],
+                                     columns=adata.var.index.values)
+            table.insert(0, 'ST_type', ['real'] * real.shape[0] + ['pseudo'] * pseudo.shape[0])
+
+        else:
+            aaa = real.copy()
+            aaa.obs = pd.DataFrame(index=aaa.obs.index)
+            bbb = pseudo.copy()
+            bbb.obs = pd.DataFrame(index=bbb.obs.index)
+            adata = aaa.concatenate(bbb, batch_key='real_pseudo')
+            if self.dimensionality_reduction_method == 'PCA':
+                if self.scale == True:
+                    sc.pp.scale(adata, max_value=None, zero_center=True)
+                sc.tl.pca(adata, n_comps=dim, svd_solver='arpack', random_state=None)
+                table = pd.DataFrame(adata.obsm['X_pca'], index=[str(i)[:-2] for i in adata.obs.index])
+            elif self.dimensionality_reduction_method == 'autoencoder':
+                data = torch.tensor(adata.X)
+                x_size = data.shape[1]
+                latent_size = dim
+                hidden_size = int((x_size + latent_size) / 2)
+                nets = autoencoder(x_size=x_size, hidden_size=hidden_size, embedding_size=latent_size,
+                                   p_drop=self.autoencoder_drop)
+                optimizer_ae = torch.optim.Adam(nets.parameters(), lr=self.autoencoder_LR)
+                loss_ae = nn.MSELoss(reduction='mean')
+                embedding = auto_train(model=nets, epoch_n=self.autoencoder_epoches, loss_fn=loss_ae,
+                                       optimizer=optimizer_ae, data=data, cpu_num=self.cpu_num,
+                                       device=self.AE_device).detach().numpy()
+                if self.scale == True:
+                    embedding = (embedding - embedding.mean(axis=0)) / embedding.std(axis=0)
+                table = pd.DataFrame(embedding, index=[str(i)[:-2] for i in adata.obs.index])
+            elif self.dimensionality_reduction_method == 'nmf':
+                nmf = NMF(n_components=dim).fit_transform(adata.X)
+                if self.scale == True:
+                    nmf = (nmf - nmf.mean(axis=0)) / nmf.std(axis=0)
+                table = pd.DataFrame(nmf, index=[str(i)[:-2] for i in adata.obs.index])
+            elif self.dimensionality_reduction_method == None:
+                if self.scale == True:
+                    sc.pp.scale(adata, max_value=None, zero_center=False)
+                x = data.get_feature(return_type="numpy", channel=self.channel, channel_type=self.channel_type)
+                # table = pd.DataFrame(adata.X, index=[str(i)[:-2] for i in adata.obs.index], columns=adata.var.index.values)
+                # table = pd.DataFrame(x, index=[str(i)[:-2] for i in adata.obs.index], columns=adata.var.index.values)
+                table = pd.DataFrame(x, index=[str(i)[:-2] for i in adata.obs.index])
+            table.insert(0, 'ST_type', ['real'] * real.shape[0] + ['pseudo'] * pseudo.shape[0])
+
+        table.insert(1, 'cell_num', real.obs['cell_num'].values.tolist() + pseudo.obs['cell_num'].values.tolist())
+        table.insert(2, 'cell_type_num',
+                     real.obs['cell_type_num'].values.tolist() + pseudo.obs['cell_type_num'].values.tolist())
+
+        data.data.obsm[self.out] = table
+
+
+from typing import Any, List, Literal, Mapping, Optional, Tuple, Union
+
+
+class stdGCNWrapper(BaseRegressionMethod):
+
+    def __init__(self, cli_args):
+        # 从 cli_args 构建 integration_for_adj_paras
+
+        # 从 cli_args 构建 GCN_paras
+        self.GCN_paras = {
+            'epoch_n': cli_args.epoch_n,
+            'dim': cli_args.gcn_dim,  # 假设 GCN_paras 内部期望的键是 'dim'
+            'common_hid_layers_num': cli_args.common_hid_layers_num,
+            'fcnn_hid_layers_num': cli_args.fcnn_hid_layers_num,
+            'dropout': cli_args.dropout,
+            'learning_rate_SGD': cli_args.learning_rate_sgd,  # 假设 GCN_paras 内部期望的键是 'learning_rate_SGD'
+            'weight_decay_SGD': cli_args.weight_decay_sgd,  # 假设 GCN_paras 内部期望的键是 'weight_decay_SGD'
+            'momentum': cli_args.momentum,
+            'dampening': cli_args.dampening,
+            'nesterov': cli_args.nesterov,
+            'early_stopping_patience': cli_args.early_stopping_patience,
+            'clip_grad_max_norm': cli_args.clip_grad_max_norm,
+            'print_loss_epoch_step': cli_args.print_loss_epoch_step,
+        }
+        self.GCN_device = cli_args.gcn_device  # 直接从 cli_args 获取
+        self.n_jobs = cli_args.n_jobs  # 直接从 cli_args 获取
+
+    # @staticmethod
+    # def preprocessing_pipeline(args,log_level: LogLevel = "INFO"):
+    #     return Compose(
+    #     CelltypeTransform(),
+    #     pseudoSpotGen(
+    #         spot_num=args.spot_num,  # 从 pseudo_spot_simulation_paras 映射过来
+    #         min_cell_number_in_spot=args.min_cell_num_in_spot, # 从 pseudo_spot_simulation_paras 映射过来 (注意原始key是 min_cell_num_in_spot)
+    #         max_cell_number_in_spot=args.max_cell_num_in_spot, # 从 pseudo_spot_simulation_paras 映射过来 (注意原始key是 max_cell_num_in_spot)
+    #         max_cell_types_in_spot=args.max_cell_types_in_spot, # 从 pseudo_spot_simulation_paras 映射过来
+    #         generation_method=args.generation_method,  # 从 pseudo_spot_simulation_paras 映射过来
+    #         n_jobs=args.n_jobs  # 直接从 args 获取
+    #     ),
+    #     RemoveSplit(split_name="ref", log_level="INFO"), # 无变化
+    #     FilterGenesCommon(split_keys=["pseudo", "test"]), # 无变化
+    #     FilterGenesPlaceHolder(),
+    #     SaveRaw(), # 无变化
+    #     NormalizeTotalLog1P(),
+    #     FilterGenesTopK(num_genes=4000),
+    #     updateAnndataObsTransform(split="test"), # 无变化
+    #     CellTypeNum(), # 无变化
+    #     CellPCA(out="feature.cell"),
+    #     DataInteragraionTransform(batch_removal_method=args.adj_batch_removal_method if args.adj_batch_removal_method and args.adj_batch_removal_method.lower() != 'none' else None,
+    #         min_dim=args.adj_dim,
+    #         dimensionality_reduction_method=args.adj_dimensionality_reduction_method if args.adj_dimensionality_reduction_method and args.adj_dimensionality_reduction_method.lower() != 'none' else None,
+    #         scale=args.adj_scale, cpu_num=args.n_jobs , AE_device=args.gcn_device),
+    #     stdgcnGraph(
+    #         inter_find_neighbor_method=args.inter_find_neighbor_method,
+    #         inter_dist_method=args.inter_dist_method,
+    #         inter_corr_dist_neighbors=args.inter_corr_dist_neighbors,
+    #         spatial_link_method=args.spatial_link_method,
+    #         space_dist_threshold=args.space_dist_threshold,
+    #         real_intra_find_neighbor_method=args.real_intra_find_neighbor_method,
+    #         real_intra_dist_method=args.real_intra_dist_method,
+    #         real_intra_pca_dimensionality_reduction=args.real_intra_pca_dimensionality_reduction,
+    #         real_intra_corr_dist_neighbors=args.real_intra_corr_dist_neighbors,
+    #         real_intra_dim=args.real_intra_dim,
+    #         pseudo_intra_find_neighbor_method=args.pseudo_intra_find_neighbor_method,
+    #         pseudo_intra_dist_method=args.pseudo_intra_dist_method,
+    #         pseudo_intra_corr_dist_neighbors=args.pseudo_intra_corr_dist_neighbors,
+    #         pseudo_intra_pca_dimensionality_reduction=args.pseudo_intra_pca_dimensionality_reduction,
+    #         pseudo_intra_dim=args.pseudo_intra_dim,
+    #         ),
+    #     DataInteragraionTransform(batch_removal_method=args.feat_batch_removal_method if args.feat_batch_removal_method and args.feat_batch_removal_method.lower() != 'none' else None,
+    #         min_dim=args.feat_dim,
+    #         dimensionality_reduction_method=args.feat_dimensionality_reduction_method if args.feat_dimensionality_reduction_method and args.feat_dimensionality_reduction_method.lower() != 'none' else None,
+    #         scale=args.feat_scale, cpu_num=args.n_jobs , AE_device=args.gcn_device),
+    #     SetConfig({"label_channel": "cell_type_portion"}))
+    @staticmethod
+    def preprocessing_pipeline(args, log_level: LogLevel = "INFO"):
+        return Compose(
+            CelltypeTransform(),
+            stdGCNMarkGenes(
+                preprocess=args.fmg_preprocess,
+                highly_variable_genes=args.fmg_highly_variable_genes,
+                PCA_components=args.fmg_pca_components,
+                filter_wilcoxon_marker_genes=args.fmg_filter_wilcoxon_marker_genes,
+                marker_gene_method=args.marker_gene_method,
+                pvals_adj_threshold=args.pvals_adj_threshold,
+                log_fold_change_threshold=args.log_fold_change_threshold,
+                min_within_group_fraction_threshold=args.
+                min_within_group_fraction_threshold,  # 从 find_marker_genes_paras 映射过来
+                max_between_group_fraction_threshold=args.
+                max_between_group_fraction_threshold,  # 从 find_marker_genes_paras 映射过来
+                top_gene_per_type=args.top_gene_per_type  # 从 find_marker_genes_paras 映射过来
+            ),
+            pseudoSpotGen(
+                spot_num=args.spot_num,  # 从 pseudo_spot_simulation_paras 映射过来
+                min_cell_number_in_spot=args.
+                min_cell_num_in_spot,  # 从 pseudo_spot_simulation_paras 映射过来 (注意原始key是 min_cell_num_in_spot)
+                max_cell_number_in_spot=args.
+                max_cell_num_in_spot,  # 从 pseudo_spot_simulation_paras 映射过来 (注意原始key是 max_cell_num_in_spot)
+                max_cell_types_in_spot=args.max_cell_types_in_spot,  # 从 pseudo_spot_simulation_paras 映射过来
+                generation_method=args.generation_method,  # 从 pseudo_spot_simulation_paras 映射过来
+                n_jobs=args.n_jobs  # 直接从 args 获取
+            ),
+            RemoveSplit(split_name="ref", log_level="INFO"),  # 无变化
+            FilterGenesCommon(split_keys=["pseudo", "test"]),  # 无变化
+            SaveRaw(),  # 无变化
+            STPreprocessTransform(
+                normalize=args.dn_normalize,  # 从 data_normalization_paras 映射过来
+                log=args.dn_log,  # 从 data_normalization_paras 映射过来
+                scale=args.dn_scale,  # 从 data_normalization_paras 映射过来
+                split="pseudo"),
+            updateAnndataObsTransform(split="test"),  # 无变化
+            STPreprocessTransform(
+                normalize=args.dn_normalize,  # 从 data_normalization_paras 映射过来
+                log=args.dn_log,  # 从 data_normalization_paras 映射过来
+                scale=args.dn_scale,  # 从 data_normalization_paras 映射过来
+                split="test"),
+            CellTypeNum(),  # 无变化
+            FeatureCellPlaceHolder(out="feature.cell"),
+            DataInteragraionTransform(
+                batch_removal_method=args.adj_batch_removal_method
+                if args.adj_batch_removal_method and args.adj_batch_removal_method.lower() != 'none' else None,
+                min_dim=args.adj_dim, dimensionality_reduction_method=args.adj_dimensionality_reduction_method if
+                args.adj_dimensionality_reduction_method and args.adj_dimensionality_reduction_method.lower() != 'none'
+                else None, scale=args.adj_scale, cpu_num=args.n_jobs, AE_device=args.gcn_device),
+            stdgcnGraph(
+                inter_find_neighbor_method=args.inter_find_neighbor_method,
+                inter_dist_method=args.inter_dist_method,
+                inter_corr_dist_neighbors=args.inter_corr_dist_neighbors,
+                spatial_link_method=args.spatial_link_method,
+                space_dist_threshold=args.space_dist_threshold,
+                real_intra_find_neighbor_method=args.real_intra_find_neighbor_method,
+                real_intra_dist_method=args.real_intra_dist_method,
+                real_intra_pca_dimensionality_reduction=args.real_intra_pca_dimensionality_reduction,
+                real_intra_corr_dist_neighbors=args.real_intra_corr_dist_neighbors,
+                real_intra_dim=args.real_intra_dim,
+                pseudo_intra_find_neighbor_method=args.pseudo_intra_find_neighbor_method,
+                pseudo_intra_dist_method=args.pseudo_intra_dist_method,
+                pseudo_intra_corr_dist_neighbors=args.pseudo_intra_corr_dist_neighbors,
+                pseudo_intra_pca_dimensionality_reduction=args.pseudo_intra_pca_dimensionality_reduction,
+                pseudo_intra_dim=args.pseudo_intra_dim,
+            ),
+            DataInteragraionTransform(
+                batch_removal_method=args.feat_batch_removal_method
+                if args.feat_batch_removal_method and args.feat_batch_removal_method.lower() != 'none' else None,
+                min_dim=args.feat_dim, dimensionality_reduction_method=args.feat_dimensionality_reduction_method
+                if args.feat_dimensionality_reduction_method
+                and args.feat_dimensionality_reduction_method.lower() != 'none' else None, scale=args.feat_scale,
+                cpu_num=args.n_jobs, AE_device=args.gcn_device),
+            SetConfig({"label_channel": "cell_type_portion"}))
+
+    def fit_score(self, x, y, *, score_func: Optional[Union[str, Mapping[Any,
+                                                                         float]]] = None, return_pred: bool = False,
+                  valid_idx=None, test_idx=None, **fit_kwargs) -> Union[float, Tuple[float, Any]]:
+        """Shortcut for fitting data using the input feature and return eval.
+
+        Note
+        ----
+        Only work for models where the fitting does not require labeled data, i.e. unsupervised methods.
+
+        """
+        self.fit(x, y, **fit_kwargs)
+        return self.score(x, y, score_func=score_func, return_pred=return_pred, valid_idx=valid_idx, test_idx=test_idx)
+
+    def score(self, x, y, *, score_func: Optional[Union[str, Mapping[Any, float]]] = None, return_pred: bool = False,
+              valid_idx=None, test_idx=None) -> Union[float, Tuple[float, Any]]:
+        y_pred = self.predict(x)
+        func = resolve_score_func(score_func or self._DEFAULT_METRIC)
+        if valid_idx is None:
+            score = func(y, y_pred)
+            return (score, y_pred) if return_pred else score
+        else:
+            valid_score = func(y[valid_idx], y_pred[valid_idx])
+            test_score = func(y[test_idx], y_pred[test_idx])
+            return (valid_score, test_score, y_pred) if return_pred else (valid_score, test_score)
+
+    def fit(
+        self,
+        inputs: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        y: Optional[Any] = None,
+    ):
+        ST_adata_filter_norm, ST_integration_batch_removed, adj_exp, adj_sp, word_to_idx_celltype, train_idx, valid_idx, test_idx = inputs
+        # ST_adata_filter_norm.obs['coor_X'] = spatial['x']
+        # ST_adata_filter_norm.obs['coor_Y'] = spatial['y']
+        # ST_integration = data_integration(
+        #     ST_adata_filter_norm, pseudo_adata_norm,
+        #    )
+
+        # ST_integration_batch_removed = data_integration(
+        #     ST_adata_filter_norm, pseudo_adata_norm,
+        #     batch_removal_method=self.integration_for_feature_paras['batch_removal_method'],
+        #     dim=min(int(ST_adata_filter_norm.shape[1] * 1 / 2), self.integration_for_feature_paras['dim']),
+        #     dimensionality_reduction_method=self.integration_for_feature_paras['dimensionality_reduction_method'],
+        #     scale=self.integration_for_feature_paras['scale'], cpu_num=self.n_jobs, AE_device=self.GCN_device)
         feature = torch.tensor(ST_integration_batch_removed.iloc[:, 3:].values)
 
         input_layer = feature.shape[1]
@@ -1593,20 +1867,11 @@ class stdGCNWrapper(BaseRegressionMethod):
 
         loss_fn1 = nn.KLDivLoss(reduction='mean')
 
-        train_valid_len = pseudo_adata_filter.shape[0]
-        test_len = ST_adata_filter.shape[0]
-
-        table1 = ST_adata_filter_norm.obs.copy()
-        label1 = pd.concat([table1[pseudo_adata_filter.obs.iloc[:, :-1].columns],
-                            pseudo_adata_filter.obs.iloc[:, :-1]])[pseudo_adata_filter.uns['cell_types_list']]
-        # label1 = table1[pseudo_adata_filter.obs.iloc[:, :-1].columns].append(pseudo_adata_filter.obs.iloc[:, :-1])
-        label1 = torch.tensor(label1.values.astype(float))
-
         adjs = [adj_exp.float(), adj_sp.float()]
 
         output1, loss, trained_model = conGCN_train(
-            model=model, train_valid_len=train_valid_len, train_valid_ratio=0.9, test_len=test_len, feature=feature,
-            adjs=adjs, label=label1, epoch_n=epoch_n, loss_fn=loss_fn1, optimizer=optimizer, scheduler=scheduler,
+            model=model, train_idx=train_idx, valid_idx=valid_idx, test_idx=test_idx, feature=feature, adjs=adjs,
+            label=y, epoch_n=epoch_n, loss_fn=loss_fn1, optimizer=optimizer, scheduler=scheduler,
             early_stopping_patience=early_stopping_patience, clip_grad_max_norm=clip_grad_max_norm,
             print_epoch_step=print_epoch_step, cpu_num=cpu_num, GCN_device=self.GCN_device)
 
@@ -1654,7 +1919,7 @@ class stdGCNWrapper(BaseRegressionMethod):
 #         f.write(str(gene) + '\n')
 
 # print("{} genes have been selected as marker genes.".format(len(selected_genes)))
-n_jobs = 10
+# n_jobs = 10
 # sc_adata_data=Data(data=sc_adata)
 # pseudospotgen =
 # pseudospotgen(sc_adata_data)
@@ -1686,51 +1951,3 @@ n_jobs = 10
 # ST_adata_filter_data=Data(data=ST_adata_filter)
 # st_preprocess_2(ST_adata_filter_data)
 # ST_adata_filter_norm=ST_adata_filter_data.data[:, ]
-
-stdgcnwrapper = stdGCNWrapper(integration_for_adj_paras=integration_for_adj_paras,
-                              inter_exp_adj_paras=inter_exp_adj_paras, spatial_adj_paras=spatial_adj_paras,
-                              real_intra_exp_adj_paras=real_intra_exp_adj_paras,
-                              pseudo_intra_exp_adj_paras=pseudo_intra_exp_adj_paras,
-                              integration_for_feature_paras=integration_for_feature_paras, GCN_paras=GCN_paras,
-                              n_jobs=n_jobs, GCN_device='GPU')
-dataset = CellTypeDeconvoDataset(data_dir=paths['datadir'], data_id=paths['dataset'])
-
-data = dataset.load_data(
-    transform=Compose(
-        CelltypeTransform(),
-        stdGCNMarkGenes(
-            preprocess=find_marker_genes_paras['preprocess'],
-            highly_variable_genes=find_marker_genes_paras['highly_variable_genes'],
-            PCA_components=find_marker_genes_paras['PCA_components'],
-            filter_wilcoxon_marker_genes=find_marker_genes_paras['filter_wilcoxon_marker_genes'],
-            marker_gene_method=find_marker_genes_paras['marker_gene_method'],
-            pvals_adj_threshold=find_marker_genes_paras['pvals_adj_threshold'],
-            log_fold_change_threshold=find_marker_genes_paras['log_fold_change_threshold'],
-            min_within_group_fraction_threshold=find_marker_genes_paras['min_within_group_fraction_threshold'],
-            max_between_group_fraction_threshold=find_marker_genes_paras['max_between_group_fraction_threshold'],
-            top_gene_per_type=find_marker_genes_paras['top_gene_per_type']),
-        pseudoSpotGen(spot_num=pseudo_spot_simulation_paras['spot_num'],
-                      min_cell_number_in_spot=pseudo_spot_simulation_paras['min_cell_num_in_spot'],
-                      max_cell_number_in_spot=pseudo_spot_simulation_paras['max_cell_num_in_spot'],
-                      max_cell_types_in_spot=pseudo_spot_simulation_paras['max_cell_types_in_spot'],
-                      generation_method=pseudo_spot_simulation_paras['generation_method'], n_jobs=n_jobs),
-        RemoveSplit(split_name="ref", log_level="INFO"), FilterGenesCommon(split_keys=["pseudo", "test"]), SaveRaw(),
-        STPreprocessTransform(normalize=data_normalization_paras['normalize'], log=data_normalization_paras['log'],
-                              scale=data_normalization_paras['scale'], split="pseudo"),
-        updateAnndataObsTransform(split="test"),
-        STPreprocessTransform(normalize=data_normalization_paras['normalize'], log=data_normalization_paras['log'],
-                              scale=data_normalization_paras['scale'], split="test"), CellTypeNum(),
-        SetConfig({"label_channel": "cell_type_portion"})), cache=False)
-_, y = data.get_data(split_name="test", return_type="torch")
-ST_adata_filter_norm = data.get_split_data(split_name="test")
-pseudo_adata_norm = data.get_split_data(split_name="pseudo")
-ST_adata_filter = data.data.raw.to_adata()[data.get_split_idx("test")]
-pseudo_adata_filter = data.data.raw.to_adata()[data.get_split_idx("pseudo")]
-word_to_idx_celltype = data.data.uns['word_to_idx_celltype']
-spatial = data.get_split_data(split_name="test").obsm['spatial']
-inputs = (ST_adata_filter_norm, pseudo_adata_norm, ST_adata_filter, pseudo_adata_filter, word_to_idx_celltype, spatial)
-# ref_count = data.get_feature(split_name="ref", return_type="numpy")
-# ref_annot = data.get_feature(split_name="ref", return_type="numpy", channel="cellType", channel_type="obs")
-stdgcnwrapper.fit(inputs, y)
-results = stdgcnwrapper.predict()
-# results.write_h5ad(paths['output_path']+'/results.h5ad')

@@ -380,7 +380,7 @@ class AnnDataSimilarity:
             return intersection / union
 
         def get_con_sim(con_data_1, con_data_2):
-            return abs(con_data_1 - con_data_2) / max(con_data_1, con_data_2)
+            return 1 - (abs(con_data_1 - con_data_2) / max(con_data_1, con_data_2))
 
         def get_dataset_info(data: ad.AnnData):
             con_sim = {}
@@ -458,11 +458,9 @@ class AnnDataSimilarity:
         sim_targets.append((sum(x for x, y in sim_targets), sum(y for x, y in sim_targets)))
         return sim_targets
 
-    def compute_similarity(
-        self, random_state: int, methods: List[str] = [
-            'cosine', 'pearson', 'jaccard', 'js_distance', 'otdd', 'common_genes_num', "ground_truth", "metadata_sim"
-        ]
-    ) -> Dict[str, float]:
+    def compute_similarity(self, random_state: int, methods: List[str] = [
+        'cosine', 'pearson', 'jaccard', 'js_distance', 'otdd', 'common_genes_num', "ground_truth", "metadata_sim"
+    ], origin=False) -> Dict[str, float]:
         """Compute multiple similarity metrics between datasets.
 
         Parameters
@@ -480,9 +478,13 @@ class AnnDataSimilarity:
         """
         self.adata1 = self.origin_adata1.copy()
         self.adata2 = self.origin_adata2.copy()
-        self.normalize_data()
-        self.sample_cells(random_state)
-        self.set_prob_data()
+        if origin:
+            self.X = np.nan_to_num(self.adata1.X).toarray()
+            self.Y = np.nan_to_num(self.adata2.X).toarray()
+        else:
+            self.normalize_data()
+            self.sample_cells(random_state)
+            self.set_prob_data()
 
         results = {}
         for method in methods:

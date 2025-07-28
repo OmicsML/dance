@@ -2,6 +2,7 @@ import argparse
 import os
 import pprint
 import sys
+import time
 from cgi import test
 from pathlib import Path
 
@@ -95,10 +96,11 @@ if __name__ == "__main__":
         model.fit(graph, epochs=args.epochs, lr=args.learning_rate, show_epoch_ari=args.show_epoch_ari,
                   eval_epoch=args.eval_epoch)
         score = model.score(graph, y)
-        wandb.log({"ari": score})
+        wandb.log({"acc": score})
         wandb.finish()
         del model
         torch.cuda.empty_cache()
+        time.sleep(20)
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch

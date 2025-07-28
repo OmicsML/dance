@@ -6,3 +6,5 @@
 #run_similarity_optimization.sh
 \[data/new_sim\]+\[similarity/optimize_similarity_weights.py\]+\[cache/sweep_cache.json\]->\[data/similarity_weights_results\]
 \[data/similarity_weights_results\]+\[similarity/visualize_atlas_performance.py\]+\[cache/sweep_cache.json\]->\[data/imgs\]
+
+#注意additional sweep_id的问题

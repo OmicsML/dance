@@ -16,8 +16,9 @@ if __name__ == "__main__":
     parser.add_argument("--n_pairwise_error", default=0, type=float)
     parser.add_argument("--batch_size", default=256, type=int)
     parser.add_argument("--data_dir", default="./data")
-    parser.add_argument("--dataset", default="mouse_ES_cell", type=str,
-                        choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell"])
+    parser.add_argument(
+        "--dataset", default="mouse_ES_cell", type=str,
+        choices=["10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell", "human_pbmc2_cell"])
     parser.add_argument("--epochs", default=500, type=int)
     parser.add_argument("--pretrain_epochs", default=50, type=int)
     parser.add_argument("--lr", default=0.01, type=float)

@@ -133,8 +133,13 @@ def run_test_case(source_file):
 
         # Calculate similarity using multiple methods
         ans[target_file] = similarity_calculator.get_similarity_matrix_A2B(methods=[
-            "wasserstein", "Hausdorff", "chamfer", "energy", "sinkhorn2", "bures", "spectral", "common_genes_num",
-            "ground_truth", "mmd", "metadata_sim"
+            # "wasserstein",
+            # "Hausdorff",
+            # "chamfer", "energy", "sinkhorn2", "bures", "spectral",
+            "common_genes_num",
+            "ground_truth",
+            # "mmd",
+            # "metadata_sim"
         ])
 
     # Convert results to DataFrame and save
@@ -172,7 +177,17 @@ for source_file in query_datasets:
                                         sheet_name=source_file[:4], engine="openpyxl", index_col=0)
             # Find rows that exist in the new dataframe but not in the existing table
             merged_df = pd.concat([existing_df, merged_df])
-            merged_df = merged_df.applymap(lambda x: tuple(x) if isinstance(x, list) else x)
+
+            def process_value(val):
+                if isinstance(val, list):
+                    return tuple(process_value(item) for item in val)
+                elif isinstance(val, complex):
+                    return val.real  # 或者 np.real(val)
+                else:
+                    return val
+
+            merged_df_recursive = merged_df.applymap(process_value)
+            # merged_df = merged_df.applymap(lambda x: tuple(x) if isinstance(x, list) else x)
             # Then deduplicate, using keep='last' instead of subset parameter
             merged_df = merged_df[~merged_df.index.duplicated(keep='last')]
             # merged_df = merged_df.drop_duplicates(subset=merged_df.index.name, keep='last')

@@ -850,7 +850,8 @@ class PipelinePlaner(Pipeline):
         return entity, project, sweep_id
 
 
-def save_summary_data(entity, project, sweep_id, summary_file_path, root_path, additional_sweep_ids=None, save=True):
+def save_summary_data(entity, project, sweep_id, summary_file_path, root_path, additional_sweep_ids=None,
+                      save=True) -> pd.DataFrame:
     """Download sweep summary data from wandb and save to file.
 
     The returned dataframe includes running time, results and corresponding hyperparameters, etc.
@@ -870,7 +871,6 @@ def save_summary_data(entity, project, sweep_id, summary_file_path, root_path, a
 
     summary_data = []
 
-    summary_file_path = os.path.join(root_path, summary_file_path)
     additional_sweep_ids = (additional_sweep_ids if additional_sweep_ids is not None else [])
     additional_sweep_ids.append(sweep_id)
     for sweep_id in additional_sweep_ids:
@@ -884,6 +884,7 @@ def save_summary_data(entity, project, sweep_id, summary_file_path, root_path, a
     ans.sort_index(axis=1, inplace=True)
 
     if save:
+        summary_file_path = os.path.join(root_path, summary_file_path)
         os.makedirs(os.path.dirname(summary_file_path), exist_ok=True)
         ans.to_csv(summary_file_path)  # save file
 
@@ -1056,10 +1057,19 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
                 if k["target"] == x:
                     pipeline.append(deepcopy(k))
         for i, f in zip(required_indexes, required_funs):
-            for k in step2_pipeline_planer.config.pipeline:
-                if "target" in k and k["target"] == f:
-                    pipeline.insert(i, deepcopy(k))
-                    break
+            if i == sys.maxsize:
+                i = len(step2_pipeline_planer.config.pipeline) - 1
+            elif i == sys.maxsize - 1:
+                i = len(step2_pipeline_planer.config.pipeline) - 2
+            elif i == sys.maxsize - 2:
+                i = len(step2_pipeline_planer.config.pipeline) - 3
+            k = step2_pipeline_planer.config.pipeline[i]
+            assert k["target"] == f
+            pipeline.insert(i, deepcopy(k))
+            # for k in step2_pipeline_planer.config.pipeline:
+            #     if "target" in k and k["target"] == f:
+            #         pipeline.insert(i, deepcopy(k))
+            #         break
         for p1 in step2_pipeline_planer.config.pipeline:
             if "step3_frozen" in p1 and p1["step3_frozen"]:
                 for p2 in pipeline:
