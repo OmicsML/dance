@@ -3,7 +3,7 @@ import os
 import pprint
 import sys
 from pathlib import Path
-
+import torch
 import numpy as np
 import wandb
 
@@ -86,6 +86,7 @@ if __name__ == "__main__":
         score = model.score(None, y)
         wandb.log({"acc": score})
         wandb.finish()
+        torch.cuda.empty_cache()
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch

@@ -33,6 +33,7 @@ if __name__ == '__main__':
     params = parser.parse_args()
     print(vars(params))
     rmses = []
+    mres=[]
     for seed in range(params.seed, params.seed + params.num_runs):
         set_seed(seed)
 
@@ -43,27 +44,40 @@ if __name__ == '__main__':
         data = dataloader.load_data(transform=preprocessing_pipeline, cache=params.cache)
 
         if params.mask:
-            X, X_raw, targets, predictors, mask = data.get_x(return_type="default")
+            X, X_raw, targets, predictors, mask, valid_mask, test_mask = data.get_x(return_type="default")
         else:
             mask = None
             X, X_raw, targets, predictors = data.get_x(return_type="default")
-        X = torch.tensor(X.toarray()).float()
-        X_raw = torch.tensor(X_raw.toarray()).float()
+        if not isinstance(X, np.ndarray):
+            X = X.toarray()
+        if not isinstance(X_raw, np.ndarray):
+            X_raw = X_raw.toarray()
+        X = torch.tensor(X).float()
+        X_raw = torch.tensor(X_raw).float()
         X_train = X * mask
-        X_raw_train = X_raw * mask
         model = DeepImpute(predictors, targets, params.dataset, params.sub_outputdim, params.hidden_dim, params.dropout,
                            seed, params.gpu)
 
         model.fit(X_train, X_train, mask, params.batch_size, params.lr, params.n_epochs, params.patience)
         imputed_data = model.predict(X_train, mask)
-        score = model.score(X, imputed_data, mask, metric='RMSE')
-        print("RMSE: %.4f" % score)
-        rmses.append(score)
+        train_RMSE = model.score(X, imputed_data.clone(), ~mask, "RMSE")
+        train_pcc = model.score(X, imputed_data.clone(), ~mask, "PCC")
+        train_mre = model.score(X, imputed_data.clone(), ~mask, metric="MRE")
+        val_RMSE = model.score(X, imputed_data.clone(), ~valid_mask, "RMSE")
+        val_pcc = model.score(X, imputed_data.clone(), ~valid_mask, "PCC")
+        val_mre = model.score(X, imputed_data.clone(), ~valid_mask, metric="MRE")
+        test_RMSE = model.score(X, imputed_data.clone(), ~test_mask, "RMSE")
+        test_pcc = model.score(X, imputed_data.clone(), ~test_mask, "PCC")
+        test_mre = model.score(X, imputed_data.clone(), ~test_mask, metric="MRE")
+        rmses.append(test_RMSE)
+        mres.append(test_mre)
 
     print('deepimpute')
     print(params.dataset)
     print(f'rmses: {rmses}')
     print(f'rmses: {np.mean(rmses)} +/- {np.std(rmses)}')
+    print(f'mres: {mres}')
+    print(f'mres: {np.mean(mres)} +/- {np.std(mres)}')
 """To reproduce deepimpute benchmarks, please refer to command lines belows:
 
 Mouse Brain
