@@ -3,6 +3,7 @@
 This code is based on https://github.com/NVlabs/MUNIT.
 
 """
+
 import argparse
 import os
 
@@ -109,6 +110,7 @@ if __name__ == "__main__":
                 'method': 'cmae',
             }, ignore_index=True)
     print(res)
+\
 """To reproduce CMAE on other samples, please refer to command lines belows:
 
 GEX to ADT (subset):
@@ -127,3 +129,4 @@ ATAC to GEX:
 $ python cmae.py --subtask openproblems_bmmc_multiome_phase2_mod2 --device cuda
 
 """
+

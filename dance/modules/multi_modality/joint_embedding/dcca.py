@@ -748,7 +748,6 @@ class DCCA(nn.Module):
         None.
 
         """
-
         used_cycle = 0
 
         if self.ground_truth1 is not None:
@@ -844,7 +843,6 @@ class DCCA(nn.Module):
             Metric eval score for VAE2.
 
         """
-
         if metric == 'clustering':
             self.model1.eval()
             self.model2.eval()
@@ -915,7 +913,6 @@ class DCCA(nn.Module):
             Reconstruction result of modality 2.
 
         """
-
         # processing large-scale datasets
         latent_z1 = []
         latent_z2 = []
@@ -953,30 +950,30 @@ class DCCA(nn.Module):
         return latent_z1, latent_z2, norm_x1, recon_x1, norm_x2, recon_x2
 
     def forward(self, total_loader):
-        """Forward function for torch.nn.Module. An alias of encode_Batch function.
+        """Forward function for torch.nn.Module.
 
-        Parameters
-        ----------
-        total_loader : torch.utils.data.DataLoader
-            Dataloader for dataset.
+        An alias of encode_Batch function.
+                Parameters
+                ----------
+                total_loader : torch.utils.data.DataLoader
+                    Dataloader for dataset.
 
-        Returns
-        -------
-        latent_z1 : numpy.ndarray
-            Latent representation of modality 1.
-        latent_z2 : numpy.ndarray
-            Latent representation of modality 2.
-        norm_x1 : numpy.ndarray
-            Normalized representation of modality 1.
-        recon_x1 : numpy.ndarray
-            Reconstruction result of modality 1.
-        norm_x2 : numpy.ndarray
-            Normalized representation of modality 2.
-        recon_x2 : numpy.ndarray
-            Reconstruction result of modality 2.
+                Returns
+                -------
+                latent_z1 : numpy.ndarray
+                    Latent representation of modality 1.
+                latent_z2 : numpy.ndarray
+                    Latent representation of modality 2.
+                norm_x1 : numpy.ndarray
+                    Normalized representation of modality 1.
+                recon_x1 : numpy.ndarray
+                    Reconstruction result of modality 1.
+                norm_x2 : numpy.ndarray
+                    Normalized representation of modality 2.
+                recon_x2 : numpy.ndarray
+                    Reconstruction result of modality 2.
 
         """
-
         latent_z1, latent_z2, norm_x1, recon_x1, norm_x2, recon_x2 = self._encodeBatch(total_loader)
 
         return latent_z1, latent_z2, norm_x1, recon_x1, norm_x2, recon_x2

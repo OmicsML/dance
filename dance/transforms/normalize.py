@@ -105,17 +105,12 @@ class ScaleFeature(BaseTransform):
 class ScTransformR(BaseTransform):
     """ScTransform normalization and variance stabiliation.
 
-    Note
-    ----
-    This is a wrapper for the original R implementation.
+    Note ---- This is a wrapper for the original R implementation.
 
-    Parameters
-    ----------
-    min_cells
-        Minimum number of cells the gene has to express in, below which that gene will be discarded.
+    Parameters ---------- min_cells     Minimum number of cells the gene has to express
+    in, below which that gene will be discarded.
 
-    Reference
-    ---------
+    Reference ---------
     https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1874-1
 
     """

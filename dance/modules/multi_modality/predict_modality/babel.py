@@ -8,6 +8,7 @@ Wu, Kevin E., Kathryn E. Yost, Howard Y. Chang, and James Zou. "BABEL enables cr
 multiomic profiles at single-cell resolution." Proceedings of the National Academy of Sciences 118, no. 15 (2021).
 
 """
+
 import math
 from copy import deepcopy
 from typing import Callable, List, Tuple, Union

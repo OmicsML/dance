@@ -8,6 +8,7 @@ Gan, Yanglan, et al. "Deep structural clustering for single-cell RNA-seq data jo
 neural network." Briefings in Bioinformatics 23.2 (2022): bbac018.
 
 """
+
 import numpy as np
 import pandas as pd
 import scanpy as sc
@@ -213,25 +214,12 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
     ):
         """Train model.
 
-        Parameters
-        ----------
-        inputs
-            A tuple containing (1) the adjacency matrix, (2) the input features, (3) the raw input features, and (4)
-            the total counts for each cell.
-        y
-            Label.
-        lr
-            Learning rate.
-        epochs
-            Number of epochs.
-        bcl
-            Parameter of binary crossentropy loss.
-        cl
-            Parameter of Kullback–Leibler divergence loss.
-        rl
-            Parameter of reconstruction loss.
-        zl
-            Parameter of ZINB loss.
+        Parameters ---------- inputs     A tuple containing (1) the adjacency matrix,
+        (2) the input features, (3) the raw input features, and (4)     the total counts
+        for each cell. y     Label. lr     Learning rate. epochs     Number of epochs.
+        bcl     Parameter of binary crossentropy loss. cl     Parameter of
+        Kullback–Leibler divergence loss. rl     Parameter of reconstruction loss. zl
+        Parameter of ZINB loss.
 
         """
         adj, x, x_raw, n_counts = inputs
@@ -293,15 +281,10 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
     def predict_proba(self, x: Optional[Any] = None) -> np.ndarray:
         """Get the predicted propabilities for each cell.
 
-        Parameters
-        ----------
-        x
-            Not used, for compatibility with the BaseClusteringMethod class.
+        Parameters ---------- x     Not used, for compatibility with the
+        BaseClusteringMethod class.
 
-        Returns
-        -------
-        pred_prop
-            Predicted probability for each cell.
+        Returns ------- pred_prop     Predicted probability for each cell.
 
         """
         pred_prob = self.q.detach().clone().cpu().numpy()
@@ -310,15 +293,10 @@ class ScDSC(TorchNNPretrain, BaseClusteringMethod):
     def predict(self, x: Optional[Any] = None) -> np.ndarray:
         """Get predictions from the trained model.
 
-        Parameters
-        ----------
-        x
-            Not used, for compatibility with the BaseClusteringMethod class.
+        Parameters ---------- x     Not used, for compatibility with the
+        BaseClusteringMethod class.
 
-        Returns
-        -------
-        pred
-            Predicted clustering assignment for each cell.
+        Returns ------- pred     Predicted clustering assignment for each cell.
 
         """
         pred = self.predict_proba().argmax(1)
@@ -473,14 +451,11 @@ class ScDSCModel(nn.Module):
 
 
 class GNNLayer(nn.Module):
-    """GNN layer class. Construct a GNN layer with corresponding dimensions.
+    """GNN layer class.
 
-    Parameters
-    ----------
-    in_features
-        Input dimension of GNN layer.
-    out_features
-        Output dimension of GNN layer.
+    Construct a GNN layer with corresponding dimensions.     Parameters     ----------
+    in_features         Input dimension of GNN layer.     out_features         Output
+    dimension of GNN layer.
 
     """
 

@@ -161,11 +161,9 @@ class SpatialLIBDDataset(BaseDataset):
 class CellTypeDeconvoDataset(BaseDataset):
     """Load raw data.
 
-    Parameters
-    ----------
-    subset_common_celltypes
-        If set to True, then subset both the reference and the real data to contain only cell types that are
-        present in both reference and real.
+    Parameters ---------- subset_common_celltypes     If set to True, then subset both
+    the reference and the real data to contain only cell types that are     present in
+    both reference and real.
 
     """
 

@@ -42,9 +42,10 @@ if __name__ == "__main__":
         print(f"ARI: {score:.4f}")
     print(f"STAGATE {args.sample_number}:")
     print(f"{scores}\n{np.mean(scores):.5f} +/- {np.std(scores):.5f}")
-""" To reproduce Stagate on other samples, please refer to command lines belows:
-NOTE: since the stagate method is unstable, you have to run at least 5 times to get
-      best performance. (same with original Stagate paper)
+\
+"""To reproduce Stagate on other samples, please refer to command lines belows: NOTE:
+since the stagate method is unstable, you have to run at least 5 times to get best
+performance. (same with original Stagate paper)
 
 human dorsolateral prefrontal cortex sample 151673:
 $ python stagate.py --sample_number 151673
@@ -54,4 +55,6 @@ $ python stagate.py --sample_number 151676
 
 human dorsolateral prefrontal cortex sample 151507:
 $ python stagate.py --sample_number 151507
+
 """
+

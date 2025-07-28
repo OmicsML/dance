@@ -18,12 +18,8 @@ class SpaGCNGraph(BaseTransform):
                  channel_types: Sequence[str] = ("obsm", "obsm", "uns"), **kwargs):
         """Initialize SpaGCNGraph.
 
-        Parameters
-        ----------
-        alpha
-            Controls the color scale.
-        beta
-            Controls the range of the neighborhood when calculating grey values for one spot.
+        Parameters ---------- alpha     Controls the color scale. beta     Controls the
+        range of the neighborhood when calculating grey values for one spot.
 
         """
         super().__init__(**kwargs)

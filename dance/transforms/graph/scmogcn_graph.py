@@ -69,7 +69,6 @@ def create_pathway_graph(gex_features: scipy.sparse.spmatrix, gene_names: Union[
         Edge weight of each edge.
 
     """
-
     uu = []
     vv = []
     ee = []
@@ -186,7 +185,6 @@ def construct_enhanced_feature_graph(u, v, e, train_size, feature_size, cell_nod
         The generated graph.
 
     """
-
     if enhance_graph is None:
 
         graph_data = {
@@ -302,10 +300,10 @@ class ScMoGNNGraph(BaseTransform):
             g = construct_enhanced_feature_graph(u, v, e, train_size, feature_size, cell_node_features, self.inductive,
                                                  enhance_graph, _test_graph=False)
 
-            u = torch.from_numpy(np.concatenate([np.array(t.nonzero()[0] + i) for i, t in enumerate(x_train_sparse)] + \
+            u = torch.from_numpy(np.concatenate([np.array(t.nonzero()[0] + i) for i, t in enumerate(x_train_sparse)] +\
                                                 [np.array(t.nonzero()[0] + i + train_size) for i, t in
                                                  enumerate(x_test_sparse)], axis=0))
-            v = torch.from_numpy(np.concatenate([np.array(t.nonzero()[1]) for t in x_train_sparse] + \
+            v = torch.from_numpy(np.concatenate([np.array(t.nonzero()[1]) for t in x_train_sparse] +\
                                                 [np.array(t.nonzero()[1]) for t in x_test_sparse], axis=0))
             e = torch.from_numpy(np.concatenate(
                 [x_train_sparse.tocsr().data, x_test_sparse.tocsr().data], axis=0)).float()
@@ -315,10 +313,10 @@ class ScMoGNNGraph(BaseTransform):
             data.data.uns['gtest'] = gtest
 
         else:
-            u = torch.from_numpy(np.concatenate([np.array(t.nonzero()[0] + i) for i, t in enumerate(x_train_sparse)] + \
+            u = torch.from_numpy(np.concatenate([np.array(t.nonzero()[0] + i) for i, t in enumerate(x_train_sparse)] +\
                                                 [np.array(t.nonzero()[0] + i + train_size) for i, t in
                                                  enumerate(x_test_sparse)], axis=0))
-            v = torch.from_numpy(np.concatenate([np.array(t.nonzero()[1]) for t in x_train_sparse] + \
+            v = torch.from_numpy(np.concatenate([np.array(t.nonzero()[1]) for t in x_train_sparse] +\
                                                 [np.array(t.nonzero()[1]) for t in x_test_sparse], axis=0))
             e = torch.from_numpy(np.concatenate(
                 [x_train_sparse.tocsr().data, x_test_sparse.tocsr().data], axis=0)).float()

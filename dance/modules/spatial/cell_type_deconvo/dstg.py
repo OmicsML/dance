@@ -8,6 +8,7 @@ Song, and Su. "DSTG: deconvoluting spatial transcriptomics data through graph-ba
 Briefings in Bioinformatics (2021)
 
 """
+
 import time
 
 import numpy as np
@@ -119,17 +120,9 @@ class GCN(nn.Module):
     def forward(self, x, adj):
         """Forward function.
 
-        Parameters
-        ----------
-        x
-            Node features.
-        adj
-            Adjacency matrix.
+        Parameters ---------- x     Node features. adj     Adjacency matrix.
 
-        Returns
-        -------
-        output
-            Output of graph convolution network.
+        Returns ------- output     Output of graph convolution network.
 
         """
         # Dropout + convolution
@@ -145,16 +138,9 @@ class GCN(nn.Module):
 class DSTG(BaseRegressionMethod):
     """DSTG cell-type deconvolution model.
 
-    Parameters
-    ----------
-    nhid
-        Number of units in the hidden layer (graph convolution).
-    bias
-        Include bias term, default False.
-    dropout
-        Dropout rate, default 0.
-    device
-        Computation device.
+    Parameters ---------- nhid     Number of units in the hidden layer (graph
+    convolution). bias     Include bias term, default False. dropout     Dropout rate,
+    default 0. device     Computation device.
 
     """
 
@@ -205,19 +191,11 @@ class DSTG(BaseRegressionMethod):
     ):
         """Fit function for model training.
 
-        Parameters
-        ----------
-        inputs
-            A tuple containing (1) the DSTG adjacency matrix, (2) the gene expression feature matrix, (3) the
-            training mask indicating the training samples.
-        y
-            Cell type portions label.
-        lr
-            Learning rate.
-        max_epochs
-            Maximum number of epochs to train.
-        weight_decay
-            Weight decay parameter for optimization (Adam).
+        Parameters ---------- inputs     A tuple containing (1) the DSTG adjacency
+        matrix, (2) the gene expression feature matrix, (3) the     training mask
+        indicating the training samples. y     Cell type portions label. lr     Learning
+        rate. max_epochs     Maximum number of epochs to train. weight_decay     Weight
+        decay parameter for optimization (Adam).
 
         """
         adj, x, train_mask = inputs
@@ -250,15 +228,10 @@ class DSTG(BaseRegressionMethod):
     def predict(self, x: Optional[Any]):
         """Prediction function.
 
-        Parameters
-        ----------
-        x
-            Not used, for compatibility with the BaseRegressionMethod class.
+        Parameters ---------- x     Not used, for compatibility with the
+        BaseRegressionMethod class.
 
-        Returns
-        -------
-        pred
-            Predictions of cell-type proportions.
+        Returns ------- pred     Predictions of cell-type proportions.
 
         """
         return self.pred
@@ -267,17 +240,10 @@ class DSTG(BaseRegressionMethod):
 def dropout_layer(x, dropout):
     """Dropout layer.
 
-    Parameters
-    ----------
-    x
-        input to dropout layer.
-    dropout
-        dropout rate (between 0 and 1).
+    Parameters ---------- x     input to dropout layer. dropout     dropout rate
+    (between 0 and 1).
 
-    Returns
-    -------
-    out
-        dropout output.
+    Returns ------- out     dropout output.
 
     """
     if x.is_sparse:  # sparse input features
@@ -291,15 +257,10 @@ def dropout_layer(x, dropout):
 def sparse_dropout(x, dropout):
     """Sparse dropout.
 
-    Parameters
-    ----------
-    x
-        Input to dropout layer.
-    dropout
-        Dropout rate (between 0 and 1).
+    Parameters ---------- x     Input to dropout layer. dropout     Dropout rate
+    (between 0 and 1).
 
     """
-
     noise_shape = x._nnz()
     random_tensor = (1 - dropout) + torch.rand(noise_shape).to(x.device)
     dropout_mask = torch.floor(random_tensor).type(torch.bool)

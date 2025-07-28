@@ -33,24 +33,19 @@ def resolve_score_func(score_func: Optional[Union[str, Mapping[Any, float]]]) ->
 def acc(true: Union[torch.Tensor, np.ndarray], pred: Union[torch.Tensor, np.ndarray]) -> float:
     """Accuracy score.
 
-    This specific implementation of accuracy score accounts for the possibility where the true label for an instance
-    may contain multiple positives. This happens because in some cases of cell type annotation tasks, some cells in
-    the test set have slightly more ambiguous cell-type annotations than the training set.
+    This specific implementation of accuracy score accounts for the possibility where
+    the true label for an instance may contain multiple positives. This happens because
+    in some cases of cell type annotation tasks, some cells in the test set have
+    slightly more ambiguous cell-type annotations than the training set.
 
-    Parameters
-    ----------
-    pred
-        Predicted labels.
-    true
-        True labels. Can be either a maxtrix of size (samples x labels) with ones indicating positives, or a
-        vector of size (sameples x 1) where each element is the index of the corresponding label for the sample.
-        The first option provides flexibility to cases where a sample could be associated with multiple labels
-        at test time while the model was trained as a multi-class classifier.
+    Parameters ---------- pred     Predicted labels. true     True labels. Can be either
+    a maxtrix of size (samples x labels) with ones indicating positives, or a     vector
+    of size (sameples x 1) where each element is the index of the corresponding label
+    for the sample.     The first option provides flexibility to cases where a sample
+    could be associated with multiple labels     at test time while the model was
+    trained as a multi-class classifier.
 
-    Returns
-    -------
-    float
-        Accuracy score.
+    Returns ------- float     Accuracy score.
 
     """
     return true[np.arange(pred.shape[0]), pred.ravel()].mean()
@@ -162,7 +157,7 @@ def integration_openproblems_evaluate(adata: ad.AnnData):
     scib.cl.opt_louvain(adata, label_key='cell_type', cluster_key='cluster', plot=False, inplace=True, force=True)
     score['nmi'] = scib.me.nmi(adata, group1='cluster', group2='cell_type')
     # cc_cons
-    recompute_cc = 'S_score' not in adata.obs_keys() or \
+    recompute_cc = 'S_score' not in adata.obs_keys() or\
                     'G2M_score' not in adata.obs_keys()
     score['cc_cons'] = scib.me.cell_cycle(adata_pre=adata, adata_post=adata, batch_key='batch', embed='X_emb',
                                           recompute_cc=recompute_cc, organism=adata.uns['organism'])

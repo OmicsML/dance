@@ -10,18 +10,9 @@ from dance.typing import Optional, Tuple
 class VanillaMLP(nn.Module):
     """Vanilla multilayer perceptron with ReLU activation.
 
-    Parameters
-    ----------
-    input_dim
-        Input feature dimension.
-    output_dim
-        Output dimension.
-    hidden_dims
-        Hidden layer dimensions.
-    device
-        Computation device.
-    random_seed
-        Random seed controlling the model weights initialization.
+    Parameters ---------- input_dim     Input feature dimension. output_dim     Output
+    dimension. hidden_dims     Hidden layer dimensions. device     Computation device.
+    random_seed     Random seed controlling the model weights initialization.
 
     """
 
