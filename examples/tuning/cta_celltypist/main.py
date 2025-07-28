@@ -3,6 +3,7 @@ import gc
 import os
 import pprint
 from pathlib import Path
+from time import sleep
 from typing import get_args
 
 import numpy as np
@@ -58,6 +59,7 @@ if __name__ == "__main__":
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
         set_seed(args.seed)
+        sleep(60)
         if "run_kwargs" in pipeline_planer.config and tune_mode == "params":
             wandb_config = dict(wandb.config)
             config = {'pipeline': wandb_config["run_kwargs"], "type": "preprocessor"}

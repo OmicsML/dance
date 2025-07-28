@@ -25,7 +25,7 @@ def parse_arguments():
     wandb_group.add_argument("--seed", type=int, default=42)
     wandb_group.add_argument("--tune_mode", default="pipeline_params",
                              choices=["pipeline", "params", "pipeline_params"])
-    wandb_group.add_argument("--count", type=int, default=2)
+    wandb_group.add_argument("--count", type=int, default=1000)
     wandb_group.add_argument("--sweep_id", type=str, default=None)
     wandb_group.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     wandb_group.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
