@@ -379,9 +379,9 @@ class HetConv(nn.Module):
         pass
 
     def forward(self, x, adj_t, adj_t2):
-        x1 = matmul(adj_t, x)
-        x2 = matmul(adj_t2, x)
-        return torch.cat([x1, x2], dim=1)
+        x1 = matmul(adj_t.cpu(), x.cpu())
+        x2 = matmul(adj_t2.cpu(), x.cpu())
+        return torch.cat([x1, x2], dim=1).to(x.device)
 
 
 class ZINBDecoder(nn.Module):
@@ -574,7 +574,9 @@ class scHeteroNet(nn.Module, BaseClassificationMethod):
         super().__init__()
         self.device = device
         self.encoder = HeteroNet(d, hidden_channels, c, edge_index=edge_index, num_nodes=num_nodes,
-                                 num_layers=num_layers, dropout=dropout, use_bn=use_bn, dec_dim=[32, 64, 128])
+                                 num_layers=num_layers, dropout=dropout, use_bn=use_bn, dec_dim=[32, 64,
+                                                                                                 128], device=device)
+        self.encoder.to(device)
         self.to(device)
         self.min_loss = min_loss
 
@@ -659,7 +661,7 @@ class scHeteroNet(nn.Module, BaseClassificationMethod):
         logits_out = self.encoder(x_out, edge_index_out)
         # compute supervised training loss
         pred_in = F.log_softmax(logits_in, dim=1)
-        sup_loss = criterion(pred_in, dataset_ind.y[train_in_idx].squeeze(1).to(device))
+        sup_loss = criterion(pred_in, (dataset_ind.y.to(device))[train_in_idx].squeeze(1))
         loss = sup_loss
 
         return loss, _mean, _disp, _pi, train_in_idx, logits_in
@@ -675,9 +677,10 @@ class scHeteroNet(nn.Module, BaseClassificationMethod):
             x_raw = adata.raw.X
             if scipy.sparse.issparse(x_raw):
                 x_raw = x_raw.toarray()
-            x_raw = torch.Tensor(x_raw)[train_idx].to(self.device)
+            # print(adata.obs.size_factors)
+            x_raw = torch.Tensor(x_raw).to(self.device)[train_idx]
             zinb_loss = zinb_loss(x_raw, _mean, _disp, _pi,
-                                  torch.tensor(adata.obs.size_factors)[train_idx].to(self.device))
+                                  torch.tensor(adata.obs.size_factors, device=self.device)[train_idx])
             loss += zinb_weight * zinb_loss
         if cl_weight != 0:
             X = dataset_ind.x.to(self.device)

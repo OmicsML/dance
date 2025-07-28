@@ -62,3 +62,9 @@ if __name__ == "__main__":
         print(f"ARI: {score:.4f}")
     print(f"EfNST {args.sample_number}:")
     print(f"{scores}\n{np.mean(scores):.5f} +/- {np.std(scores):.5f}")
+"""
+python EfNST.py --sample_number 151507
+python EfNST.py --sample_number 151673
+python EfNST.py --sample_number 151676
+
+"""
