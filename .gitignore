@@ -50,10 +50,4 @@ check_time.py
 t.py
 examples/heart_ans.csv
 examples/atlas/generate_method.ipynb
-examples/spatial/cell_type_deconvo/data/spatial/CARD_synthetic/ref_sc_annot.csv
-examples/spatial/cell_type_deconvo/data/spatial/CARD_synthetic/spatial_location.csv
-examples/spatial/cell_type_deconvo/data/spatial/CARD_synthetic/true_p.csv
-examples/spatial/cell_type_deconvo/data/spatial/SPOTLight_synthetic/mix_count.csv
-examples/spatial/cell_type_deconvo/data/spatial/SPOTLight_synthetic/ref_sc_annot.csv
-examples/spatial/cell_type_deconvo/data/spatial/SPOTLight_synthetic/ref_sc_count.csv
-examples/spatial/cell_type_deconvo/data/spatial/SPOTLight_synthetic/true_p.csv
+examples/spatial/cell_type_deconvo/data/spatial
