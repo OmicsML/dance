@@ -8,7 +8,6 @@ from dance.utils import Color, default
 
 def deprecated(func=None, *, msg=None, version_removed=None):
     """Wrap a function that is to be deprecated with a deprecation warning message."""
-
     if func is None:
         return functools.partial(deprecated, msg=msg, version_removed=version_removed)
 

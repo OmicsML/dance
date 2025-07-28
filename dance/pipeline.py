@@ -1003,26 +1003,14 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
                    root_path=None):
     """Generate the configuration file of step 3 based on the results of step 2.
 
-    Parameters
-    ----------
-    conf_save_path
-        Directory to save the configuration file generated in step 3.
-    conf_load_path
-        Parameter search range of all preprocessing functions under a specific algorithm task.
-    result_load_path
-        Path for the result of step 2.
-    metric
-        Evaluation criteria.
-    ascending
-        The order of the results of step 2.
-    top_k
-        The number of steps 2 selected.
-    required_funs
-        Required functions in step 3.
-    required_indexes
-        Location of required functions in step 3.
-    root_path
-        root path of all paths, defaults to the directory where the script is called.
+    Parameters ---------- conf_save_path     Directory to save the configuration file
+    generated in step 3. conf_load_path     Parameter search range of all preprocessing
+    functions under a specific algorithm task. result_load_path     Path for the result
+    of step 2. metric     Evaluation criteria. ascending     The order of the results of
+    step 2. top_k     The number of steps 2 selected. required_funs     Required
+    functions in step 3. required_indexes     Location of required functions in step 3.
+    root_path     root path of all paths, defaults to the directory where the script is
+    called.
 
     """
     root_path = default(root_path, CURDIR)
@@ -1068,16 +1056,10 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
 def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlaner, tune_mode="params"):
     """Run step 3 by default.
 
-    Parameters
-    ----------
-    root_path
-        root path of all paths, defaults to the directory where the script is called.
-    evaluate_pipeline
-        Evaluation function
-    step2_pipeline_planer
-        Pipeline_planer of step2
-    tune_mode
-        tune_mode can only be set to params
+    Parameters ---------- root_path     root path of all paths, defaults to the
+    directory where the script is called. evaluate_pipeline     Evaluation function
+    step2_pipeline_planer     Pipeline_planer of step2 tune_mode     tune_mode can only
+    be set to params
 
     """
     wandb = try_import("wandb")

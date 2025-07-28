@@ -10,10 +10,7 @@ from dance.typing import LogLevel, Optional
 class SingleCellNet(BaseClassificationMethod):
     """The SingleCellNet model.
 
-    Parameters
-    ----------
-    num_trees
-        Number of trees in the random forest model.
+    Parameters ---------- num_trees     Number of trees in the random forest model.
 
     """
 
@@ -37,12 +34,8 @@ class SingleCellNet(BaseClassificationMethod):
     def randomize(self, exp, num: int = 50):
         """Return randomized features.
 
-        Parameters
-        ----------
-        exp
-            Data to be shuffled.
-        num
-            Number of samples to return.
+        Parameters ---------- exp     Data to be shuffled. num     Number of samples to
+        return.
 
         """
         rand = np.array([np.random.choice(x, len(x), replace=False) for x in exp]).T
@@ -52,16 +45,9 @@ class SingleCellNet(BaseClassificationMethod):
     def fit(self, x, y, num_rand: int = 100, stratify: bool = True, random_state: Optional[int] = 100):
         """Train the SingleCellNet random forest model.
 
-        Parameters
-        ----------
-        x
-            Input features.
-        y
-            Labels.
-        stratify
-            Whether we select balanced class weight in the random forest model.
-        random_state
-            Random state.
+        Parameters ---------- x     Input features. y     Labels. stratify     Whether
+        we select balanced class weight in the random forest model. random_state
+        Random state.
 
         """
         x_rand = self.randomize(x, num=num_rand)
@@ -77,17 +63,13 @@ class SingleCellNet(BaseClassificationMethod):
     def predict_proba(self, x):
         """Calculate predicted probabilities.
 
-        Parameters
-        ----------
-        x
-            Input featurex.
+        Parameters ---------- x     Input featurex.
 
-        Returns
-        -------
-        np.ndarray
-            Cell-type probability matrix where each row is a cell and each column is a cell-type. The values in the
-            matrix indicate the predicted probability that the cell is a particular cell-type. The last column
-            corresponds to the probability that the model could not confidently identify the cell type of the cell.
+        Returns ------- np.ndarray     Cell-type probability matrix where each row is a
+        cell and each column is a cell-type. The values in the     matrix indicate the
+        predicted probability that the cell is a particular cell-type. The last column
+        corresponds to the probability that the model could not confidently identify the
+        cell type of the cell.
 
         """
         return self.model.predict_proba(x)
@@ -95,15 +77,9 @@ class SingleCellNet(BaseClassificationMethod):
     def predict(self, x):
         """Predict cell type label.
 
-        Parameters
-        ----------
-        x
-            Input features.
+        Parameters ---------- x     Input features.
 
-        Returns
-        -------
-        np.ndarray
-            The most likely cell-type label of each sample.
+        Returns ------- np.ndarray     The most likely cell-type label of each sample.
 
         """
         pred_prob = self.predict_proba(x)

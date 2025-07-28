@@ -45,9 +45,10 @@ if __name__ == "__main__":
         print(f"ARI: {score:.4f}")
     print(f"stLearn {args.sample_number}:")
     print(f"{scores}\n{np.mean(scores):.5f} +/- {np.std(scores):.5f}")
-""" To reproduce stlearn on other samples, please refer to command lines belows:
-NOTE: since the stlearn method is unstable, you have to run multiple times to get
-      best performance.
+\
+"""To reproduce stlearn on other samples, please refer to command lines belows: NOTE:
+since the stlearn method is unstable, you have to run multiple times to get best
+performance.
 
 human dorsolateral prefrontal cortex sample 151673:
 $ python stlearn.py --n_clusters 20 --sample_number 151673
@@ -57,4 +58,6 @@ $ python stlearn.py --n_clusters 20 --sample_number 151676
 
 human dorsolateral prefrontal cortex sample 151507:
 $ python stlearn.py --n_clusters 20 --sample_number 151507
+
 """
+

@@ -8,6 +8,7 @@ Hu, Jian, et al. "SpaGCN: Integrating gene expression, spatial location and hist
 spatially variable genes by graph convolutional network." Nature methods 18.11 (2021): 1342-1351.
 
 """
+
 import numpy as np
 import pandas as pd
 import scanpy as sc
@@ -67,8 +68,8 @@ def search_l(p, adj, start=0.01, end=1000, tol=0.01, max_run=100):
 
 
 def refine(sample_id, pred, dis, shape="hexagon"):
-    """An optional refinement step for the clustering result. In this step, SpaGCN
-    examines the domain assignment of each spot and its surrounding spots. For a given
+    """An optional refinement step for the clustering result. examines the domain
+    assignment of each spot and its surrounding spots. For a given In this step, SpaGCN
     spot, if more than half of its surrounding spots are assigned to a different domain,
     this spot will be relabeled to the same domain as the major label of its surrounding
     spots.
@@ -178,6 +179,7 @@ class SimpleGCDEC(nn.Module):
     def loss_function(self, p, q):
         """Objective function as a Kullback–Leibler (KL) divergence loss."""
 
+
         def kld(target, pred):
             return torch.mean(torch.sum(target * torch.log(target / (pred + 1e-6)), dim=1))
 
@@ -188,15 +190,9 @@ class SimpleGCDEC(nn.Module):
         """Generate an auxiliary target distribution based on q the probability of
         assigning cell i to cluster j.
 
-        Parameters
-        ----------
-        q
-            The probability of assigning cell i to cluster j.
+        Parameters ---------- q     The probability of assigning cell i to cluster j.
 
-        Returns
-        -------
-        p
-            Target distribution.
+        Returns ------- p     Target distribution.
 
         """
         p = q**2 / torch.sum(q, dim=0)
@@ -646,10 +642,8 @@ class SpaGCN(BaseClusteringMethod):
     def predict_proba(self, x):
         """Prediction function.
 
-        Returns
-        -------
-        Tuple[np.ndarray, np.ndarray]
-            The predicted labels and the predicted probabilities.
+        Returns ------- Tuple[np.ndarray, np.ndarray]     The predicted labels and the
+        predicted probabilities.
 
         """
         embed, adj = x
@@ -660,10 +654,8 @@ class SpaGCN(BaseClusteringMethod):
     def predict(self, x):
         """Prediction function.
 
-        Returns
-        -------
-        Tuple[np.ndarray, np.ndarray]
-            The predicted labels and the predicted probabilities.
+        Returns ------- Tuple[np.ndarray, np.ndarray]     The predicted labels and the
+        predicted probabilities.
 
         """
         pred_prob = self.predict_proba(x)

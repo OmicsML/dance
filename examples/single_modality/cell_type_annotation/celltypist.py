@@ -56,15 +56,17 @@ if __name__ == "__main__":
         print(f"{score=:.4f}")
     print(f"CellTypist {args.species} {args.tissue} {args.test_dataset}:")
     print(f"{scores}\n{np.mean(scores):.5f} +/- {np.std(scores):.5f}")
+\
 """To reproduce CellTypist benchmarks, please refer to command lines below:
 
-Mouse Brain
-$ python celltypist.py --species mouse --tissue Brain --train_dataset 753 3285 --test_dataset 2695
+Mouse Brain $ python celltypist.py --species mouse --tissue Brain --train_dataset 753
+3285 --test_dataset 2695
 
-Mouse Spleen
-$ python celltypist.py --species mouse --tissue Spleen --train_dataset 1970 --test_dataset 1759
+Mouse Spleen $ python celltypist.py --species mouse --tissue Spleen --train_dataset 1970
+--test_dataset 1759
 
-Mouse Kidney
-$ python celltypist.py --species mouse --tissue Kidney --train_dataset 4682 --test_dataset 203
+Mouse Kidney $ python celltypist.py --species mouse --tissue Kidney --train_dataset 4682
+--test_dataset 203
 
 """
+

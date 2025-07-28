@@ -1,11 +1,10 @@
 """Official release of scMoGNN method.
 
-Reference
----------
-Wen, Hongzhi, et al. "Graph Neural Networks for Multimodal Single-Cell Data Integration." arXiv preprint
-arXiv:2203.01884 (2022).
+Reference --------- Wen, Hongzhi, et al. "Graph Neural Networks for Multimodal Single-
+Cell Data Integration." arXiv preprint arXiv:2203.01884 (2022).
 
 """
+
 import math
 import os
 from copy import deepcopy
@@ -175,7 +174,6 @@ class ScMoGCNWrapper:
         None.
 
         """
-
         device = self.args.device
         wt = self.wt
         hcell_mod1 = cell_feature_propagation(g_mod1, layers=self.args.layers, device=self.args.device)
@@ -341,7 +339,6 @@ class ScMoGCNWrapper:
             Accuracy of predicted matching between two modalities.
 
         """
-
         if not enhance:
 
             logits = self.predict(idx, enhance, batch1, batch2)

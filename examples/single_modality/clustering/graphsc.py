@@ -70,11 +70,11 @@ if __name__ == "__main__":
         score = model.score(None, y)
         print(f"{score=:.4f}")
         aris.append(score)
-
     print('graphsc')
     print(args.dataset)
     print(f'aris: {aris}')
     print(f'aris: {np.mean(aris)} +/- {np.std(aris)}')
+\
 """ Reproduction information
 10X PBMC:
 python graphsc.py --dataset 10X_PBMC --dropout 0.5
@@ -88,3 +88,4 @@ python graphsc.py --dataset worm_neuron_cell
 Mouse Bladder:
 python graphsc.py --dataset mouse_bladder_cell
 """
+

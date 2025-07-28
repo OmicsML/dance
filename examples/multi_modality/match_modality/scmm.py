@@ -77,6 +77,7 @@ if __name__ == "__main__":
                 'method': 'scmm',
             }, ignore_index=True)
     print(res)
+\
 """To reproduce scMM on other samples, please refer to command lines belows:
 
 GEX-ADT (subset):
@@ -89,3 +90,4 @@ GEX-ATAC:
 $ python scmm.py --subtask openproblems_bmmc_multiome_phase2_rna --device cuda
 
 """
+

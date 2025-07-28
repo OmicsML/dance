@@ -90,11 +90,11 @@ if __name__ == "__main__":
         score = model.score(None, y)
         print(f"{score=:.4f}")
         aris.append(score)
-
     print('scdsc')
     print(args.dataset)
     print(f'aris: {aris}')
     print(f'aris: {np.mean(aris)} +/- {np.std(aris)}')
+\
 """Reproduction information
 10X PBMC:
 python scdsc.py --dataset 10X_PBMC --sigma 0.5 --topk 10 --pretrain_epochs 100 --v 3 --n_enc_1 1024 --n_enc_3 64 --n_dec_1 64 --n_z1 64
@@ -108,3 +108,4 @@ python scdsc.py --dataset mouse_ES_cell --sigma 0.1 --topk 10 --pretrain_epochs 
 Worm Neuron:
 python scdsc.py --dataset worm_neuron_cell --sigma 0.5 --topk 10 --pretrain_epochs 100 --v 3 --n_enc_3 64 --n_dec_1 64 --n_z1 64 --n_z2 64
 """
+

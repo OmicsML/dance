@@ -8,6 +8,7 @@ Danaher, Kim, Nelson, et al. "Advances in mixed cell deconvolution enable quanti
 transcriptomic data." Nature Communications (2022)
 
 """
+
 import torch
 import torch.nn as nn
 from torch import optim
@@ -49,14 +50,9 @@ class MSLELoss(nn.Module):
 class SpatialDecon(BaseRegressionMethod):
     """SpatialDecon.
 
-    Parameters
-    ----------
-    ct_profile
-        Cell type characteristic profiles (cell-type x gene).
-    ct_select
-        Selected cell-types to be considered for deconvolution.
-    bias
-        Include bias term, default False.
+    Parameters ---------- ct_profile     Cell type characteristic profiles (cell-type x
+    gene). ct_select     Selected cell-types to be considered for deconvolution. bias
+    Include bias term, default False.
 
     """
 
@@ -82,15 +78,11 @@ class SpatialDecon(BaseRegressionMethod):
     def predict(self, x: Optional[Any] = None):
         """Return fiited parameters as cell-type portion predictions.
 
-        Parameters
-        ----------
-        x
-            Not used, for compatibility with the BaseRegressionMethod class.
+        Parameters ---------- x     Not used, for compatibility with the
+        BaseRegressionMethod class.
 
-        Returns
-        -------
-        proportion_preds
-            Predictions of cell-type proportions (cell x cell-type).
+        Returns ------- proportion_preds     Predictions of cell-type proportions (cell
+        x cell-type).
 
         """
         weights = self.model.weight.clone().detach().cpu()
@@ -105,16 +97,9 @@ class SpatialDecon(BaseRegressionMethod):
     ):
         """Fit function for model training.
 
-        Parameters
-        ----------
-        x
-            Input expression matrix (cell x gene).
-        lr
-            Learning rate.
-        max_iter
-            Maximum number of iterations for optimizat.
-        print_period
-            Indicates number of iterations until training results print.
+        Parameters ---------- x     Input expression matrix (cell x gene). lr
+        Learning rate. max_iter     Maximum number of iterations for optimizat.
+        print_period     Indicates number of iterations until training results print.
 
         """
         ref_ct_profile = self.ct_profile.to(self.device)
