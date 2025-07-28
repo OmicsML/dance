@@ -189,7 +189,7 @@ class CellPCA(BaseTransform):
             data.data.uns["pca_mean"] = pca.mean_
             data.data.uns["pca_explained_variance"] = pca.explained_variance_
             data.data.uns["pca_explained_variance_ratio"] = pca.explained_variance_ratio_
-            data.data.uns["pca"] = pca
+            # data.data.uns["pca"] = pca
 
         return data
 

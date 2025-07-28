@@ -24,8 +24,8 @@ if __name__ == "__main__":
         "--normalize", action="store_true", help="Whether to perform the normalization for SingleCellNet. "
         "Disabled by default since the CellTypeAnnotation data is already normalized")
     parser.add_argument("--num_rand", type=int, default=100)
-    parser.add_argument("--num_top_gene_pairs", type=int, default=250)
-    parser.add_argument("--num_top_genes", type=int, default=100)
+    parser.add_argument("--num_top_gene_pairs", type=int, default=250)  #25
+    parser.add_argument("--num_top_genes", type=int, default=100)  #10
     parser.add_argument("--num_trees", type=int, default=1000)
     parser.add_argument("--species", default="mouse", type=str)
     parser.add_argument("--stratify", type=bool, default=True)

@@ -29,3 +29,4 @@ torchnmf==0.3.5
 tqdm==4.66.2
 anndata==0.10.8
 wandb==0.16.3
+uvicorn== 0.34.3

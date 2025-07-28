@@ -28,7 +28,7 @@ if __name__ == "__main__":
         "--dataset", default="human_pbmc2_cell", type=str, choices=[
             "10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell", "human_pbmc2_cell",
             "mouse_kidney_cell", "human_skin_cell", "mouse_kidney_drop", "mouse_kidney_cl2", "mouse_kidney_10x",
-            "mouse_lung_cell"
+            "mouse_lung_cell", "human_ILCS_cell"
         ])
     parser.add_argument("--epochs", default=500, type=int)
     parser.add_argument("--pretrain_epochs", default=50, type=int)

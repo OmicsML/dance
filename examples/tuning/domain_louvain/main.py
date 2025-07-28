@@ -3,9 +3,9 @@ import os
 import sys
 from pathlib import Path
 
-import wandb
 from sklearn.model_selection import train_test_split
 
+import wandb
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.louvain import Louvain
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
@@ -55,8 +55,8 @@ if __name__ == "__main__":
 
         # Train and evaluate model
         model = Louvain(resolution=1)
-        test_score = model.fit_score(adj, y.values.ravel())
-        wandb.log({"ARI": test_score})
+        score = model.fit_score(adj, y.values.ravel())
+        wandb.log({"ARI": score})
         wandb.finish()
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(

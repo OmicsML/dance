@@ -26,12 +26,12 @@ if __name__ == "__main__":
     parser.add_argument("--val_size", type=float, default=0.2, help="val size")
     parser.add_argument("--species", default="mouse", type=str)
 
-    parser.add_argument('--data_dir', type=str, default='../temp_data')
+    parser.add_argument('--data_dir', type=str, default='../../temp_data')
 
     parser.add_argument('--gpu', type=int, default=0, help='which gpu to use if any (default: 0)')
     parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--eval_step', type=int, default=1, help='how often to print')
-    parser.add_argument("--num_runs", type=int, default=1, help="Number of repetitions")
+    parser.add_argument("--num_runs", type=int, default=5, help="Number of repetitions")
     parser.add_argument('--train_prop', type=float, default=.6, help='training label proportion')
     parser.add_argument('--valid_prop', type=float, default=.2, help='validation label proportion')
     parser.add_argument('--metric', type=str, default='acc', choices=['acc', 'rocauc', 'f1'], help='evaluation metric')
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
     runs = args.num_runs
-    results = [[] for _ in range(runs)]
+    results = []
     if args.gpu == -1:
         device = torch.device("cpu")
     else:
@@ -119,6 +119,8 @@ if __name__ == "__main__":
             # test_idx=dataset_ind.splits['test']
             test_score = model.score(dataset_ind, dataset_ind.y, data.test_idx)
             print(test_score)
+        results.append(test_score)
+    print(f"mean score:{np.mean(results)} std score{np.std(results)}")
 
 #TODO test_score is true delete odd test以及其他评估方法，再次测试，然后将valid等和其他算法保持一致。
 """
@@ -136,7 +138,13 @@ OOD Test 1 Final AUPR: 99.53
 OOD Test 1 Final FPR: 100.00
 IND Test Score: 81.88
 
-python scheteronet.py --gpu -1 --use_zinb --use_prop --use_2hop --epochs 4
+python scheteronet.py --gpu -1 --use_zinb --use_prop --use_2hop
 
-python scheteronet.py --gpu -1  --species human --tissue Brain --train_dataset 328 --test_dataset 138 --use_zinb --use_prop --use_2hop --epochs 4
+python scheteronet.py --gpu -1  --species human --tissue Brain --train_dataset 328 --test_dataset 138 --use_zinb --use_prop --use_2hop
+python scheteronet.py --gpu -1  --species human --tissue CD8 --train_dataset 1027 1357 1641 517 706 777 850 972 --test_dataset 245 332 377 398 405 455 470 492 --use_zinb --use_prop --use_2hop
+python scheteronet.py --gpu 0  --species human --tissue CD4 --train_dataset 1013 1247 598 732 767 768 770 784 845 864 --test_dataset 315 340 376 381 390 404 437 490 551 559 --use_zinb --use_prop --use_2hop
+
+python scheteronet.py --gpu 0  --species human --tissue Spleen --train_dataset 3043 3777 4029 4115 4362 4657 --test_dataset 1729 2125 2184 2724 2743 --use_zinb --use_prop --use_2hop
+
+python scheteronet.py --gpu 0  --species human --tissue Immune --train_dataset 11407 1519 636 713 9054 9258 --test_dataset 1925 205 3323 6509 7572 --use_zinb --use_prop --use_2hop
 """

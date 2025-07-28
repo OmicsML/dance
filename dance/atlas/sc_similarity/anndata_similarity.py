@@ -460,7 +460,7 @@ class AnnDataSimilarity:
 
     def compute_similarity(self, random_state: int, methods: List[str] = [
         'cosine', 'pearson', 'jaccard', 'js_distance', 'otdd', 'common_genes_num', "ground_truth", "metadata_sim"
-    ], origin=True) -> Dict[str, float]:
+    ], origin=False) -> Dict[str, float]:
         """Compute multiple similarity metrics between datasets.
 
         Parameters
