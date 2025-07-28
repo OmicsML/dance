@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.stdgcn import stdGCNWrapper
+from dance.utils import set_seed
 
 
 def parse_arguments():
@@ -306,6 +307,7 @@ feature for STdGCN."""
 if __name__ == "__main__":
     arg_parser = parse_arguments()
     args = arg_parser.parse_args()
+    set_seed(42)
     stdgcnwrapper = stdGCNWrapper(cli_args=args)
     dataset = CellTypeDeconvoDataset(data_dir=args.datadir, data_id=args.dataset)
     preprocessing_pipeline = stdGCNWrapper.preprocessing_pipeline(args)

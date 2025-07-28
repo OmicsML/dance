@@ -1746,13 +1746,30 @@ class stdGCNWrapper(BaseRegressionMethod):
                 scale=args.dn_scale,  # 从 data_normalization_paras 映射过来
                 split="test"),
             CellTypeNum(),  # 无变化
+            FeatureCellPlaceHolder(out="feature.cell"),
             DataInteragraionTransform(
                 batch_removal_method=args.adj_batch_removal_method
                 if args.adj_batch_removal_method and args.adj_batch_removal_method.lower() != 'none' else None,
                 min_dim=args.adj_dim, dimensionality_reduction_method=args.adj_dimensionality_reduction_method if
                 args.adj_dimensionality_reduction_method and args.adj_dimensionality_reduction_method.lower() != 'none'
                 else None, scale=args.adj_scale, cpu_num=args.n_jobs, AE_device=args.gcn_device),
-            stdgcnGraph(args),
+            stdgcnGraph(
+                inter_find_neighbor_method=args.inter_find_neighbor_method,
+                inter_dist_method=args.inter_dist_method,
+                inter_corr_dist_neighbors=args.inter_corr_dist_neighbors,
+                spatial_link_method=args.spatial_link_method,
+                space_dist_threshold=args.space_dist_threshold,
+                real_intra_find_neighbor_method=args.real_intra_find_neighbor_method,
+                real_intra_dist_method=args.real_intra_dist_method,
+                real_intra_pca_dimensionality_reduction=args.real_intra_pca_dimensionality_reduction,
+                real_intra_corr_dist_neighbors=args.real_intra_corr_dist_neighbors,
+                real_intra_dim=args.real_intra_dim,
+                pseudo_intra_find_neighbor_method=args.pseudo_intra_find_neighbor_method,
+                pseudo_intra_dist_method=args.pseudo_intra_dist_method,
+                pseudo_intra_corr_dist_neighbors=args.pseudo_intra_corr_dist_neighbors,
+                pseudo_intra_pca_dimensionality_reduction=args.pseudo_intra_pca_dimensionality_reduction,
+                pseudo_intra_dim=args.pseudo_intra_dim,
+            ),
             DataInteragraionTransform(
                 batch_removal_method=args.feat_batch_removal_method
                 if args.feat_batch_removal_method and args.feat_batch_removal_method.lower() != 'none' else None,

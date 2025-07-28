@@ -62,3 +62,11 @@ examples/tuning/imputation_graphsci/tsne_visualization.png
 examples/tuning/joint_embedding_scmvae/openproblems_2022_multi_atac2gex/config.png
 examples/tuning/joint_embedding_scmvae/get_run_kwargs.py
 data.yaml
+examples/atlas/demos/atlas_patterns
+examples/atlas/demos/atlas_csvs
+examples/result_analysis
+examples/spatial/cell_type_deconvo/data
+examples/spatial/spatial_domain/data
+examples/atlas/sc_similarity_examples
+trash
+temp

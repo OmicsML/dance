@@ -170,10 +170,11 @@ def convert_dgl_to_original_format(g: dgl.DGLGraph, adata: sc.AnnData, ref_adata
     # 1. Extract data from DGL graph
     features = g.ndata['feat']
     labels = g.ndata['label']
+    batchs = g.ndata.get('batch_id', None)
     num_nodes = g.num_nodes()
     src, dst = g.edges()
     edge_index = torch.stack([src, dst], dim=0)
-    train_idx = adata.uns['train_idx']  #严格来说，g进行了过滤，和train_idx不见得能对齐了
+    train_idx = adata.uns['train_idx']
     val_idx = adata.uns['val_idx']
     test_idx = adata.uns['test_idx']
     id_idx = adata.uns['id_idx']
@@ -199,6 +200,7 @@ def convert_dgl_to_original_format(g: dgl.DGLGraph, adata: sc.AnnData, ref_adata
     dataset_ind.edge_index = edge_index
     dataset_ind.x = features
     dataset_ind.y = labels  # Add y attribute consistent with original usage
+    dataset_ind.batch = batchs  # Add batch information if available
     dataset_ind.node_idx = id_idx  # Set node_idx to the ID indices
     dataset_ind.splits = {'train': train_idx, 'valid': val_idx, 'test': test_idx}
 
@@ -464,7 +466,7 @@ class HeteroNet(nn.Module):
     """Our implementation with ZINB."""
 
     def __init__(self, in_channels, hidden_channels, out_channels, edge_index, num_nodes, num_layers=2, dropout=0.5,
-                 save_mem=False, num_mlp_layers=1, use_bn=True, conv_dropout=True, dec_dim=[], device="cpu"):
+                 num_mlp_layers=1, use_bn=True, conv_dropout=True, dec_dim=[], device="cpu"):
         super().__init__()
 
         self.feature_embed = MLP(in_channels, hidden_channels, hidden_channels, num_layers=num_mlp_layers,
@@ -536,7 +538,7 @@ class HeteroNet(nn.Module):
         self.adj_t = adj_t.to(edge_index.device)
         self.adj_t2 = adj_t2.to(edge_index.device)
 
-    def forward(self, x, edge_index, decoder=False):
+    def forward(self, x, edge_index, decoder=False, save_path=None):
 
         adj_t = self.adj_t
         adj_t2 = self.adj_t2
@@ -560,6 +562,9 @@ class HeteroNet(nn.Module):
         x = self.jump(xs)
         if not self.conv_dropout:
             x = F.dropout(x, p=self.dropout, training=self.training)
+        if save_path is not None:
+            torch.save(x, save_path + '_embeddings.pt')
+            logger.info(f"Saved embeddings to {save_path}_embeddings.pt")
         if decoder:
             _mean, _disp, _pi = self.ZINB(x)
             h = self.final_project(x)
@@ -598,10 +603,10 @@ class scHeteroNet(nn.Module, BaseClassificationMethod):
         transforms.append(SetConfig({"label_channel": "cell_type"}))
         return Compose(*transforms, log_level=log_level)
 
-    def forward(self, dataset):
+    def forward(self, dataset, save_path=None):
         """Return predicted logits."""
         x, edge_index = dataset.x.to(self.device), dataset.edge_index.to(self.device)
-        return self.encoder(x, edge_index)
+        return self.encoder(x, edge_index, save_path=save_path)
 
     def propagation(self, e, edge_index, prop_layers=1, alpha=0.5):
         """Energy belief propagation, return the energy after propagation."""
@@ -694,10 +699,10 @@ class scHeteroNet(nn.Module, BaseClassificationMethod):
         return loss
 
     # predict_proba and predict are used for the single run
-    def predict_proba(self, dataset_ind):
+    def predict_proba(self, dataset_ind, save_path=None):
         self.eval()
         with torch.no_grad():
-            logits = self(dataset_ind)
+            logits = self(dataset_ind, save_path=save_path)
             probabilities = F.softmax(logits, dim=1).cpu()
         return probabilities
 
@@ -729,8 +734,11 @@ class scHeteroNet(nn.Module, BaseClassificationMethod):
         return result
 
     def score(self, x, y, idx, *, score_func: Optional[Union[str, Mapping[Any, float]]] = None,
-              return_pred: bool = False) -> Union[float, Tuple[float, Any]]:
-        y_pred = self.predict_proba(x)
+              return_pred: bool = False, save_path=None, batch=None) -> Union[float, Tuple[float, Any]]:
+        y_pred = self.predict_proba(x, save_path=save_path)
+        if save_path is not None and batch is not None:
+            # np.save(save_path + '_predictions.npy', y_pred.cpu().numpy())
+            np.savez_compressed(save_path + '_predictions.npz', predictions=y.cpu().numpy(), batch=batch)
         func = partial(eval_acc, acc=resolve_score_func(score_func or self._DEFAULT_METRIC))
         score = func(y[idx], y_pred[idx])
         return (score, y_pred) if return_pred else score

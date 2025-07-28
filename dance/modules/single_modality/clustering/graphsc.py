@@ -267,6 +267,9 @@ class GraphSC(BaseClusteringMethod):
             raise ValueError(f"Unknown clustering {self.cluster_method}, available options are: 'kmeans', 'leiden'")
         return pred
 
+    def get_latent(self):
+        return self.z
+
 
 class GCNAE(nn.Module):
     """Graph convolutional autoencoder class.
