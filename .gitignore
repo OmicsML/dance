@@ -48,3 +48,5 @@ temp_ans.json
 check_time.py
 t.py
 examples/heart_ans.csv
+examples/atlas/generate_method.ipynb
+examples/atlas/get_result_web.py

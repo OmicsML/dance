@@ -103,7 +103,7 @@ class ScGNN2:
         if mask is not None:  # and metric == 'MSE':
             # true_target = true_target[~mask[test_idx]]
             # imputed_target = imputed_target[~mask[test_idx]]
-            imputed_target[mask[test_idx]] = true_target[mask[test_idx]]
+            imputed_target[mask[test_idx]] = true_target[mask[test_idx]].to(imputed_target.dtype)
         if metric == 'RMSE':
             return np.sqrt(F.mse_loss(true_target, imputed_target).item())
         elif metric == 'PCC':

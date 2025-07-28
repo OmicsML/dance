@@ -28,7 +28,9 @@ from dance.transforms import (
     SaveRaw,
     SetConfig,
 )
+from dance.transforms.filter import FilterGenesTopK
 from dance.transforms.graph import FeatureFeatureGraph
+from dance.transforms.misc import UpdateRaw
 from dance.typing import LogLevel
 
 
@@ -173,14 +175,16 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             FilterCellsScanpy(min_counts=1),
             SaveRaw(),
             AnnDataTransform(sc.pp.log1p),
+            FilterGenesTopK(num_genes=2000, mode="var"),
+            UpdateRaw(),
             FeatureFeatureGraph(threshold=threshold, normalize_edges=normalize_edges),
         ]
         if mask:
             transforms.extend([
-                CellwiseMaskData(distr=distr, mask_rate=mask_rate, seed=seed),
+                CellwiseMaskData(distr=distr, mask_rate=mask_rate, seed=seed, add_test_mask=True),
                 SetConfig({
-                    "feature_channel": [None, None, "FeatureFeatureGraph", "train_mask"],
-                    "feature_channel_type": ["X", "raw_X", "uns", "layers"],
+                    "feature_channel": [None, None, "FeatureFeatureGraph", "train_mask", "valid_mask", "test_mask"],
+                    "feature_channel_type": ["X", "raw_X", "uns", "layers", "layers", "layers"],
                     "label_channel": [None, None],
                     "label_channel_type": ["X", "raw_X"],
                 })
@@ -538,7 +542,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         if mask is not None:  # and metric == 'MSE':
             # true_target = true_target[~mask[test_idx]]
             # imputed_target = imputed_target[~mask[test_idx]]
-            imputed_target[mask[test_idx]] = true_target[mask[test_idx]]
+            imputed_target[mask[test_idx]] = true_target[mask[test_idx]].to(imputed_target.dtype)
         if metric == 'RMSE':
             return np.sqrt(F.mse_loss(true_target, imputed_target).item())
         elif metric == 'PCC':

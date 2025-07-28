@@ -2,12 +2,13 @@ import argparse
 import os
 import pprint
 import sys
+import time
 from pathlib import Path
 from typing import get_args
 
 import numpy as np
-import wandb
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.singlecellnet import SingleCellNet
@@ -92,6 +93,7 @@ if __name__ == "__main__":
         train_score = model.score(x_train, y_train)
         score = model.score(x_valid, y_valid)
         test_score = model.score(x_test, y_test)
+        time.sleep(20)
         wandb.log({"train_acc": train_score, "acc": score, "test_acc": test_score})
         wandb.finish()
 
