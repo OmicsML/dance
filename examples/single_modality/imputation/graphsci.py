@@ -32,10 +32,11 @@ if __name__ == '__main__':
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--mask", type=bool, default=True, help="Mask data for validation.")
     parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
-    parser.add_argument("--num_runs", type=int, default=5, help="Number of repetitions")
+    parser.add_argument("--num_runs", type=int, default=1, help="Number of repetitions")
     params = parser.parse_args()
     print(vars(params))
     rmses = []
+    mres = []
     for seed in range(params.seed, params.seed + params.num_runs):
         set_seed(seed)
 
@@ -47,7 +48,7 @@ if __name__ == '__main__':
 
         device = "cpu" if params.gpu == -1 else f"cuda:{params.gpu}"
         if params.mask:
-            X, X_raw, g, mask = data.get_x(return_type="default")
+            X, X_raw, g, mask, valid_mask, test_mask = data.get_x(return_type="default")
         else:
             mask = None
             X, X_raw, g = data.get_x(return_type="default")
@@ -63,14 +64,24 @@ if __name__ == '__main__':
                   params.weight_decay)
         model.load_model()
         imputed_data = model.predict(X_train, X_raw_train, g, mask)
-        score = model.score(X, imputed_data, mask, metric='RMSE')  #保留了90%，查看剩余10%的偏差
-        print("RMSE: %.4f" % score)
-        rmses.append(score)
+        train_RMSE = model.score(X, imputed_data.clone(), ~mask, "RMSE", log1p=False)
+        train_pcc = model.score(X, imputed_data.clone(), ~mask, "PCC", log1p=False)
+        train_mre = model.score(X, imputed_data.clone(), ~mask, metric="MRE", log1p=False)
+        val_RMSE = model.score(X, imputed_data.clone(), ~valid_mask, "RMSE", log1p=False)
+        val_pcc = model.score(X, imputed_data.clone(), ~valid_mask, "PCC", log1p=False)
+        val_mre = model.score(X, imputed_data.clone(), ~valid_mask, metric="MRE", log1p=False)
+        test_RMSE = model.score(X, imputed_data.clone(), ~test_mask, "RMSE", log1p=False)
+        test_pcc = model.score(X, imputed_data.clone(), ~test_mask, "PCC", log1p=False)
+        test_mre = model.score(X, imputed_data.clone(), ~test_mask, metric="MRE", log1p=False)
+        rmses.append(test_RMSE)
+        mres.append(test_mre)
 
     print('graphsci')
     print(params.dataset)
     print(f'rmses: {rmses}')
     print(f'rmses: {np.mean(rmses)} +/- {np.std(rmses)}')
+    print(f'mres: {mres}')
+    print(f'mres: {np.mean(mres)} +/- {np.std(mres)}')
 """To reproduce GraphSCI benchmarks, please refer to command lines belows:
 
 Mouse Brain:

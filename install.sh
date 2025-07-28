@@ -52,6 +52,8 @@ esac
 
 # Create environment
 conda create -n ${envname} python=3.11 -y
+CONDA_BASE=$(conda info --base)
+source ${CONDA_BASE}/etc/profile.d/conda.sh
 conda activate ${envname}
 
 # Install CUDA enabled dependencies

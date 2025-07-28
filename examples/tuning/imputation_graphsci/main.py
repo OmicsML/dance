@@ -8,9 +8,9 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import torch
-import wandb
 
 import dance.transforms.normalize as NormFuncs
+import wandb
 from dance import logger
 from dance.data import Data
 from dance.datasets.singlemodality import ImputationDataset
@@ -21,7 +21,7 @@ from dance.utils import set_seed
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dropout", type=float, default=0.1, help="dropout probability")
-    parser.add_argument("--gpu", type=int, default=-1, help="GPU id, -1 for cpu")
+    parser.add_argument("--gpu", type=int, default=1, help="GPU id, -1 for cpu")
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
     parser.add_argument("--train_size", type=float, default=0.9, help="proportion of training set")
     parser.add_argument("--le", type=float, default=1, help="parameter of expression loss")

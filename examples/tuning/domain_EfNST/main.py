@@ -5,9 +5,11 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import wandb
+import scanpy as sc
 from sklearn.metrics import adjusted_rand_score
 
+import wandb
+from dance.data.base import Data
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.EfNST import EfNsSTRunner
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
@@ -41,6 +43,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_dir", type=str, default='../temp_data', help='test directory')
     parser.add_argument('--additional_sweep_ids', action='append', type=str, help='get prior runs')
     parser.add_argument("--sample_file", type=str, default=None)
+    parser.add_argument("--sample_obs", type=int, default=None)
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
     args = parser.parse_args()
     file_root_path = Path(args.root_path, args.sample_number).resolve()
@@ -60,6 +63,8 @@ if __name__ == "__main__":
                 random_state=args.seed)
             dataloader = SpatialLIBDDataset(data_id=args.sample_number)
             data = dataloader.load_data(transform=None, cache=args.cache)
+            if args.sample_obs is not None:
+                data = Data(sc.pp.subsample(data.data, copy=True, n_obs=args.sample_obs, random_state=args.seed))
             # preprocessing_pipeline = EfNsSTRunner.preprocessing_pipeline(data_name=args.sample_number,verbose=args.verbose,cnnType=args.cnnType,
             #                                                              pca_n_comps=args.pca_n_comps,distType=args.distType,k=args.k,
             #                                                              dim_reduction=not args.no_dim_reduction,
@@ -96,4 +101,6 @@ if __name__ == "__main__":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """
 python main.py --sample_number 151507 --count 3 >> 151507/out.log 2>&1 &
+
+python main.py --sample_number 151507
 """

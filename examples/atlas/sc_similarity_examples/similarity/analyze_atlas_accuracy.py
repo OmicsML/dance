@@ -7,7 +7,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
-from tqdm import tqdm
 
 from dance.pipeline import get_additional_sweep
 from dance.settings import ATLASDIR, DANCEDIR, SIMILARITYDIR
@@ -167,17 +166,16 @@ def get_ans_from_cache(query_dataset, method):
     sweep_url = re.search(r"step2:([^|]+)", step_str).group(1)
     _, _, sweep_id = spilt_web(sweep_url)
     # sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
-    # runs = sweep.runs#!!!! 有问题
     sweep_ids = get_additional_sweep(entity=entity, project=project, sweep_id=sweep_id)
     runs = []
     for sweep_id in sweep_ids:
         runs.extend(wandb.Api().sweep(f"{entity}/{project}/{sweep_id}").runs)
-    for atlas_dataset in tqdm(atlas_datasets):
+    for atlas_dataset in atlas_datasets:
         best_yaml = conf_data[conf_data["dataset_id"] == atlas_dataset][f"{method}_step2_best_yaml"].iloc[0]
         match_run = None
 
         # Find matching run configuration
-        for run in tqdm(runs, leave=False):
+        for run in runs:
             if isinstance(best_yaml, float) and np.isnan(best_yaml):
                 continue
             if is_matching_dict(best_yaml, run.config):
@@ -194,35 +192,35 @@ def get_ans_from_cache(query_dataset, method):
     return ans
 
 
-ans_all = {}
-parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--methods", default=["cta_actinn", "cta_celltypist", "cta_scdeepsort", "cta_singlecellnet"],
-                    nargs="+")
-parser.add_argument("--tissue", type=str, default="pancreas")
-args = parser.parse_args()
-methods = args.methods
-tissue = args.tissue
-
-# atlas_datasets = [
-#     "01209dce-3575-4bed-b1df-129f57fbc031", "055ca631-6ffb-40de-815e-b931e10718c0",
-#     "2a498ace-872a-4935-984b-1afa70fd9886", "2adb1f8a-a6b1-4909-8ee8-484814e2d4bf",
-#     "3faad104-2ab8-4434-816d-474d8d2641db", "471647b3-04fe-4c76-8372-3264feb950e8",
-#     "4c4cd77c-8fee-4836-9145-16562a8782fe", "84230ea4-998d-4aa8-8456-81dd54ce23af",
-#     "8a554710-08bc-4005-87cd-da9675bdc2e7", "ae29ebd0-1973-40a4-a6af-d15a5f77a80f",
-#     "bc260987-8ee5-4b6e-8773-72805166b3f7", "bc2a7b3d-f04e-477e-96c9-9d5367d5425c",
-#     "d3566d6a-a455-4a15-980f-45eb29114cab", "d9b4bc69-ed90-4f5f-99b2-61b0681ba436",
-#     "eeacb0c1-2217-4cf6-b8ce-1f0fedf1b569"
-# ]
-# query_datasets = [
-#     "c7775e88-49bf-4ba2-a03b-93f00447c958", "456e8b9b-f872-488b-871d-94534090a865",
-#     "738942eb-ac72-44ff-a64b-8943b5ecd8d9", "a5d95a42-0137-496f-8a60-101e17f263c8",
-#     "71be997d-ff75-41b9-8a9f-1288c865f921"
-# ]
-conf_data = pd.read_excel(SIMILARITYDIR / "data/Cell Type Annotation Atlas.xlsx", sheet_name=tissue)
-# conf_data = pd.read_csv(f"results/{tissue}_result.csv", index_col=0)
-atlas_datasets = list(conf_data[conf_data["queryed"] == False]["dataset_id"])
-query_datasets = list(conf_data[conf_data["queryed"] == True]["dataset_id"])
 if __name__ == "__main__":
+    ans_all = {}
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--methods", default=["cta_actinn", "cta_celltypist", "cta_scdeepsort", "cta_singlecellnet"],
+                        nargs="+")
+    parser.add_argument("--tissue", type=str, default="pancreas")
+    args = parser.parse_args()
+    methods = args.methods
+    tissue = args.tissue
+
+    # atlas_datasets = [
+    #     "01209dce-3575-4bed-b1df-129f57fbc031", "055ca631-6ffb-40de-815e-b931e10718c0",
+    #     "2a498ace-872a-4935-984b-1afa70fd9886", "2adb1f8a-a6b1-4909-8ee8-484814e2d4bf",
+    #     "3faad104-2ab8-4434-816d-474d8d2641db", "471647b3-04fe-4c76-8372-3264feb950e8",
+    #     "4c4cd77c-8fee-4836-9145-16562a8782fe", "84230ea4-998d-4aa8-8456-81dd54ce23af",
+    #     "8a554710-08bc-4005-87cd-da9675bdc2e7", "ae29ebd0-1973-40a4-a6af-d15a5f77a80f",
+    #     "bc260987-8ee5-4b6e-8773-72805166b3f7", "bc2a7b3d-f04e-477e-96c9-9d5367d5425c",
+    #     "d3566d6a-a455-4a15-980f-45eb29114cab", "d9b4bc69-ed90-4f5f-99b2-61b0681ba436",
+    #     "eeacb0c1-2217-4cf6-b8ce-1f0fedf1b569"
+    # ]
+    # query_datasets = [
+    #     "c7775e88-49bf-4ba2-a03b-93f00447c958", "456e8b9b-f872-488b-871d-94534090a865",
+    #     "738942eb-ac72-44ff-a64b-8943b5ecd8d9", "a5d95a42-0137-496f-8a60-101e17f263c8",
+    #     "71be997d-ff75-41b9-8a9f-1288c865f921"
+    # ]
+    conf_data = pd.read_excel(SIMILARITYDIR / "data/Cell Type Annotation Atlas.xlsx", sheet_name=tissue)
+    # conf_data = pd.read_csv(f"results/{tissue}_result.csv", index_col=0)
+    atlas_datasets = list(conf_data[conf_data["queryed"] == False]["dataset_id"])
+    query_datasets = list(conf_data[conf_data["queryed"] == True]["dataset_id"])
     for query_dataset in query_datasets:
         ans = []
         for method in methods:

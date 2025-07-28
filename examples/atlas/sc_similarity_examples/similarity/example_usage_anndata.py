@@ -139,7 +139,7 @@ def run_test_case(source_file):
             "common_genes_num",
             "ground_truth",
             # "mmd",
-            "metadata_sim"
+            # "metadata_sim"
         ])
 
     # Convert results to DataFrame and save

@@ -11,9 +11,12 @@ import os
 import random
 from pathlib import Path
 
+from skimage import img_as_ubyte
 from sklearn import preprocessing
+from sklearn.neighbors import NearestNeighbors
 from sympy import E, false
 
+from dance import logger
 from dance.data.base import Data
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.base import BaseClusteringMethod
@@ -69,10 +72,11 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import adjusted_rand_score, calinski_harabasz_score, pairwise_distances
 from torch.autograd import Variable
 from torch.nn.parameter import Parameter
+from torch.utils.data import DataLoader, Dataset
 from torch_geometric.nn import BatchNorm, Sequential
 from torch_sparse import SparseTensor
+from torchvision import transforms
 from tqdm import tqdm
-
 
 #class Aug:
 # def __init__(self, data,spatial_k=50, spatial_type="KDTree"):
@@ -93,6 +97,96 @@ from tqdm import tqdm
 # 		for j in ind:
 # 			spatial_weight[i][j] = 1
 # 	return spatial_weight
+
+
+class SpatialImageDataset(Dataset):
+
+    def __init__(self, paths, transform=None):
+        self.paths = paths
+        self.spot_names = paths.index.tolist()
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, idx):
+        spot_name = self.spot_names[idx]
+        img_path = self.paths.iloc[idx]
+
+        # Load image
+        image = Image.open(img_path).convert("RGB")  # Ensure 3 channels
+
+        if self.transform:
+            image = self.transform(image)
+
+        return image, spot_name
+
+
+def extract_features_batch(adata, model, device, batch_size=64, num_workers=4):
+    """Extracts features from image slices in an efficient, batched manner.
+
+    Args:
+        adata (anndata.AnnData): AnnData object with 'slices_path' in obs.
+        model (torch.nn.Module): The pre-trained PyTorch model.
+        device (torch.device): The device to run the model on (e.g., torch.device('cuda')).
+        batch_size (int): Number of images to process in one batch.
+        num_workers (int): Number of CPU workers for loading data in parallel.
+
+    Returns:
+        pd.DataFrame: A DataFrame where rows are spots and columns are features.
+
+    """
+    # 1. 设置模型为评估模式，并关闭梯度计算
+    model.eval()
+
+    # 2. 定义图像预处理流程
+    # 和你原来的步骤一致：resize -> to tensor -> convert to float
+    # torchvision.transforms 能够高效地完成这些
+    preprocess = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),  # 这会自动将 [0, 255] 的 PIL Image 转为 [0.0, 1.0] 的 FloatTensor
+        # 如果你的模型需要特定的归一化，请在这里添加
+        # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+
+    # 3. 创建Dataset和DataLoader
+    # shuffle=False is CRITICAL to keep the order of spots
+    dataset = SpatialImageDataset(paths=adata.obs['slices_path'], transform=preprocess)
+    data_loader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=True  # Speeds up CPU to GPU transfer
+    )
+
+    all_features = []
+    all_spot_names = []
+
+    # 4. 高效的批处理循环
+    with torch.no_grad():  # 非常重要！关闭梯度计算，节省内存和计算
+        for image_batch, spot_name_batch in tqdm(data_loader, desc="Extracting features"):
+            # DataLoader已经将一批图像打包成一个(B, C, H, W)的张量
+            # B = batch_size, C=3, H=224, W=224
+
+            # 将整个批次的数据一次性移动到GPU
+            image_batch = image_batch.to(device)
+
+            # 对整个批次进行推理
+            result_batch = model(image_batch)
+
+            # 将结果移回CPU，并存储
+            # .cpu() returns a tensor on CPU, .numpy() converts it to numpy array
+            all_features.append(result_batch.cpu().numpy())
+            all_spot_names.extend(list(spot_name_batch))
+
+    # 5. 合并所有批次的结果并创建DataFrame (只执行一次!)
+    final_features = np.concatenate(all_features, axis=0)
+    feat_df = pd.DataFrame(final_features, index=all_spot_names)
+
+    return adata, feat_df
+
+
 def cal_spatial_weight(
     data,
     spatial_k=50,
@@ -144,9 +238,22 @@ def cal_weight_matrix(adata, platform="Visium", pd_dist_type="euclidean", md_dis
         rate = 3
         reg_row = LinearRegression().fit(array_row.values.reshape(-1, 1), img_row)
         reg_col = LinearRegression().fit(array_col.values.reshape(-1, 1), img_col)
-        physical_distance = pairwise_distances(adata.obsm['spatial_pixel'][["y_pixel", "x_pixel"]], metric=pd_dist_type)
         unit = math.sqrt(reg_row.coef_**2 + reg_col.coef_**2)
-        physical_distance = np.where(physical_distance >= rate * unit, 0, 1)
+
+        #   physical_distance = pairwise_distances(adata.obsm['spatial_pixel'][["y_pixel", "x_pixel"]], metric=pd_dist_type,n_jobs=-1)
+        #   physical_distance = np.where(physical_distance >= rate * unit, 0, 1)
+        coords = adata.obsm['spatial_pixel'][["y_pixel", "x_pixel"]].values
+        n_spots = coords.shape[0]
+        radius = rate * unit
+        nbrs = NearestNeighbors(radius=radius, metric=pd_dist_type, n_jobs=-1).fit(coords)
+        distances, indices = nbrs.radius_neighbors(coords, return_distance=True)
+        row_ind = []
+        col_ind = []
+        for i in range(n_spots):
+            row_ind.extend([i] * len(indices[i]))
+            col_ind.extend(indices[i])
+        data = np.ones(len(row_ind), dtype=np.int8)
+        physical_distance = csr_matrix((data, (row_ind, col_ind)), shape=(n_spots, n_spots))
     else:
         physical_distance = cal_spatial_weight(adata.obsm['spatial'], spatial_k=spatial_k, spatial_type=spatial_type)
 
@@ -589,18 +696,20 @@ class Image_Feature:
         model.eval()
         if "slices_path" not in self.adata.obs.keys():
             raise ValueError("Please run the function image_crop first")
-        for spot, slice_path in self.adata.obs['slices_path'].items():
-            spot_slice = Image.open(slice_path)
-            spot_slice = spot_slice.resize((224, 224))
-            spot_slice = np.asarray(spot_slice, dtype="int32")
-            spot_slice = spot_slice.astype(np.float32)
-            tensor = img_to_tensor(spot_slice)
-            tensor = tensor.resize_(1, 3, 224, 224)
-            tensor = tensor.to(self.device)
-            result = model(Variable(tensor))
-            result_npy = result.data.cpu().numpy().ravel()
-            feat_df[spot] = result_npy
-            feat_df = feat_df.copy()
+        # for spot, slice_path in self.adata.obs['slices_path'].items():
+        #     spot_slice = Image.open(slice_path)
+        #     spot_slice = spot_slice.resize((224, 224))
+        #     spot_slice = np.asarray(spot_slice, dtype="int32")
+        #     spot_slice = spot_slice.astype(np.float32)
+        #     tensor = img_to_tensor(spot_slice)
+        #     tensor = tensor.resize_(1, 3, 224, 224)
+        #     tensor = tensor.to(self.device)
+        #     result = model(Variable(tensor))
+        #     result_npy = result.data.cpu().numpy().ravel()
+        #     feat_df[spot] = result_npy
+        #     feat_df = feat_df.copy()
+        _, feat_df = extract_features_batch(self.adata, model, self.device)
+        feat_df = feat_df.transpose()
         self.adata.obsm["image_feat"] = feat_df.transpose().to_numpy()
         if self.verbose:
             print("The image feature is added to adata.obsm['image_feat'] !")
@@ -616,7 +725,7 @@ def image_crop(adata, save_path, crop_size=50, target_size=224, verbose=False, q
     image = adata.uns["image"]
     if image.dtype == np.float32 or image.dtype == np.float64:
         image = (image * 255).astype(np.uint8)
-    img_pillow = Image.fromarray(image)
+    img_pillow = Image.fromarray(img_as_ubyte(image))
     tile_names = []
     with tqdm(total=len(adata), desc="Tiling image", bar_format="{l_bar}{bar} [ time left: {remaining} ]") as pbar:
         for imagerow, imagecol in zip(adata.obsm["spatial_pixel"]['x_pixel'], adata.obsm["spatial_pixel"]['y_pixel']):
@@ -797,19 +906,23 @@ class TrainingConfig:
 @register_preprocessor("misc")
 class EfNSTImageTransform(BaseTransform):
 
-    def __init__(self, data_name, cnnType='efficientnet-b0', pca_n_comps=200, save_path="./", verbose=False, **kwargs):
+    def __init__(self, data_name, cnnType='efficientnet-b0', pca_n_comps=200, save_path="./", verbose=False,
+                 crop_size=50, target_size=224, **kwargs):
         self.data_name = data_name
         self.verbose = verbose
         self.save_path = save_path
         self.pca_n_comps = pca_n_comps
         self.cnnType = cnnType
+        self.crop_size = crop_size
+        self.target_size = target_size
         super().__init__(**kwargs)
 
     def __call__(self, data: Data) -> Data:
         adata = data.data
         save_path_image_crop = Path(os.path.join(self.save_path, 'Image_crop', f'{self.data_name}'))
         save_path_image_crop.mkdir(parents=True, exist_ok=True)
-        adata = image_crop(adata, save_path=save_path_image_crop, quality='fulres')
+        adata = image_crop(adata, save_path=save_path_image_crop, quality='fulres', crop_size=self.crop_size,
+                           target_size=self.target_size)
         adata = Image_Feature(adata, pca_components=self.pca_n_comps, cnnType=self.cnnType).Extract_Image_Feature()
         if self.verbose:
             save_data_path = Path(os.path.join(self.save_path, f'{self.data_name}'))

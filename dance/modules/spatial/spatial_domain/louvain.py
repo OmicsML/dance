@@ -339,12 +339,13 @@ class Louvain(BaseClusteringMethod):
         self.resolution = resolution
 
     @staticmethod
-    def preprocessing_pipeline(dim: int = 50, n_neighbors: int = 17, log_level: LogLevel = "INFO"):
+    def preprocessing_pipeline(dim: int = 50, n_neighbors: int = 17, log_level: LogLevel = "INFO",
+                               save_info: bool = False):
         return Compose(
             FilterGenesMatch(prefixes=["ERCC", "MT-"]),
             AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
             AnnDataTransform(sc.pp.log1p),
-            CellPCA(n_components=dim),
+            CellPCA(n_components=dim, save_info=save_info),
             NeighborGraph(n_neighbors=n_neighbors),
             SetConfig({
                 "feature_channel": "NeighborGraph",
