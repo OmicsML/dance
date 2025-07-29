@@ -55,3 +55,4 @@ examples/result_analysis/*
 !examples/result_analysis/get_num.py
 examples/single_modality/cell_type_annotation/**/*.xlsx
 examples/single_modality/cell_type_annotation/**/*.csv
+examples/atlas/generate_method.ipynb
