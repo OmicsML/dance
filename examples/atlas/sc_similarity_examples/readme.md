@@ -8,3 +8,4 @@
 \[data/similarity_weights_results\]+\[similarity/visualize_atlas_performance.py\]+\[cache/sweep_cache.json\]->\[data/imgs\]
 
 #注意additional sweep_id的问题
+#sweep_cache.json需要注意additional_sweep_id的问题， sweep_cache_data.pkl不需要。

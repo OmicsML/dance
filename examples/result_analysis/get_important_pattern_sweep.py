@@ -23,6 +23,8 @@ if os.path.exists('migration/cache/sweep_cache_data.pkl'):
         sweep_cache_data = pickle.load(file)
 else:
     sweep_cache_data = {}
+
+exclude_apr_pipeline = ["FilterGenesMatch"]
 # # List of tasks to analyze
 # # tasks = ["cell type annotation new", "clustering", "imputation_new", "spatial domain", "cell type deconvolution"]
 # tasks = ['joint embedding']
@@ -32,44 +34,38 @@ else:
 # ascendings = [False]
 # # Whether higher values are better for each metric
 # # ascendings = [False, False, True, False, True]
-metrics_dict = [
-    {
-        "task": "celltype annotation",
-        "metric": "test_acc",
-        "ascending": False
-    },
-    {
-        "task": "cluster",
-        "metric": "acc",
-        "ascending": False
-    },
-    {
-        "task": "imputation",
-        "metric": "test_MRE",
-        "ascending": True
-    },
-    {
-        "task": "spatial domain",
-        "metric": "ARI",
-        "ascending": False
-    },
-    {
-        "task": "celltype deconvolution",
-        "metric": "test_MSE",
-        "ascending": True
-    },
-    # {
-    #     "task": "joint embedding",
-    #     "metric": "ARI",
-    #     "ascending": False
-    # }
-]
+metrics_dict = [{
+    "task": "celltype annotation",
+    "metric": "test_acc",
+    "ascending": False
+}, {
+    "task": "cluster",
+    "metric": "acc",
+    "ascending": False
+}, {
+    "task": "imputation",
+    "metric": "test_MRE",
+    "ascending": True
+}, {
+    "task": "spatial domain",
+    "metric": "ARI",
+    "ascending": False
+}, {
+    "task": "celltype deconvolution",
+    "metric": "test_MSE",
+    "ascending": True
+}, {
+    "task": "joint embedding",
+    "metric": "ARI",
+    "ascending": False
+}]
 tasks = [d["task"] for d in metrics_dict]
 mertic_names = [d["metric"] for d in metrics_dict]
 ascendings = [d["ascending"] for d in metrics_dict]
 
 
-def summary_pattern(step2_origin_data, metric_name, ascending, alpha=0.05, vis=False):
+def summary_pattern(step2_origin_data: pd.DataFrame, metric_name, ascending, task, positive, only_apr, alpha=0.05,
+                    vis=False):
     """Analyze patterns in pipeline configurations and their impact on performance
     metrics.
 
@@ -98,6 +94,7 @@ def summary_pattern(step2_origin_data, metric_name, ascending, alpha=0.05, vis=F
         - Pattern analysis results including forest model and/or APR analysis
 
     """
+    step2_origin_data.rename(columns=lambda col: col.replace('run_kwargs_pipeline', 'pipeline', 1), inplace=True)
     columns = sorted([
         col for col in step2_origin_data.columns
         if (col.startswith("pipeline") or col.startswith("run_kwargs_pipeline"))
@@ -124,7 +121,17 @@ def summary_pattern(step2_origin_data, metric_name, ascending, alpha=0.05, vis=F
         buffer_percentage = 0.2  # 20%
         replacement = max_metric * (1 + buffer_percentage)
         step2_data[metric_name] = step2_data[metric_name].fillna(replacement)
-    apr_ans = get_frequent_itemsets(step2_data, metric_name, ascending)
+    drop_columns = []
+    for col in step2_data.columns:
+        for exclude_col in exclude_apr_pipeline:
+            if str(step2_data[col].iloc[0]).endswith(exclude_col):
+                drop_columns.append(col)
+            if task == "imputation":
+                if str(step2_data[col].iloc[0]).endswith("FilterGenesNumberPlaceHolder") or str(
+                        step2_data[col].iloc[0]).endswith("FilterGenesTopK"):
+                    drop_columns.append(col)
+    step2_data = step2_data.drop(columns=drop_columns)
+    apr_ans = get_frequent_itemsets(step2_data, metric_name, ascending, threshold_per=0.4)
     if positive and not only_apr:
         return {"forest_model": get_forest_model_pattern(step2_data, metric_name), "apr_ans": apr_ans}
     else:
@@ -173,6 +180,12 @@ if __name__ == "__main__":
                 dataset = data.columns[col_idx]
                 value = data.iloc[row_idx, col_idx]
                 step_name = data.iloc[row_idx]["step name"]
+
+                result_path = EXAMPLESDIR / f"dance_auto_preprocess/patterns/{'only_apr_' if only_apr else ''}{'neg_' if not positive else ''}{task}_{dataset}_{method}_pattern.json"
+
+                if os.path.exists(result_path):
+                    continue  # Skip if result file already exists
+
                 # if not start:
                 #     continue
                 # if method != "Scgnn2":
@@ -182,6 +195,8 @@ if __name__ == "__main__":
                     sweep_url = value
                 else:
                     continue
+                print(result_path)
+
                 _, _, sweep_id = spilt_web(sweep_url)
                 if sweep_id in sweep_cache_data:
                     summary_data = sweep_cache_data[sweep_id]
@@ -212,15 +227,17 @@ if __name__ == "__main__":
                 try:
                     ans = summary_data
                     ans_single = {
-                        "task": task,
-                        "dataset": dataset,
-                        "method": method,
-                        "pattern": summary_pattern(ans, mertic_names[i], ascendings[i])
+                        "task":
+                        task,
+                        "dataset":
+                        dataset,
+                        "method":
+                        method,
+                        "pattern":
+                        summary_pattern(ans, mertic_names[i], ascendings[i], task=task, positive=positive,
+                                        only_apr=only_apr)
                     }
-                    with open(
-                            EXAMPLESDIR /
-                            f"dance_auto_preprocess/patterns/{'only_apr_' if only_apr else ''}{'neg_' if not positive else ''}{task}_{dataset}_{method}_pattern.json",
-                            "w") as f:
+                    with open(result_path, "w") as f:
                         json.dump(ans_single, f, indent=2)
                     ans_all.append(ans_single)
                     print(dataset)

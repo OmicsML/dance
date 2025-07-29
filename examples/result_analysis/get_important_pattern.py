@@ -145,12 +145,13 @@ def get_frequent_itemsets(step2_data, metric_name, ascending, threshold_per=0.1,
     step2_data.loc[:, metric_name] = step2_data.loc[:, metric_name].astype(float)
     df_sorted = step2_data.sort_values(metric_name, ascending=ascending)
     top_10_percent = df_sorted.head(threshold)
-    columns = sorted([col for col in step2_data.columns if col.startswith("pipeline")])
+    columns = sorted(
+        [col for col in step2_data.columns if col.startswith("pipeline") or col.startswith("run_kwargs_pipeline")])
     transactions = top_10_percent[columns].values.tolist()
-    te = TransactionEncoder()
+    te = TransactionEncoder()  #joint embedding may have problems
     te_ary = te.fit(transactions).transform(transactions)
     df = pd.DataFrame(te_ary, columns=te.columns_)
-    frequent_itemsets = apriori(df, use_colnames=True, min_support=0.3)
+    frequent_itemsets = apriori(df, use_colnames=True, min_support=0.1)
     # print(frequent_itemsets)
     # rules = association_rules(frequent_itemsets, metric="confidence", min_threshold=0.5)
     frequent_itemsets['itemsets'] = frequent_itemsets['itemsets'].apply(lambda x: tuple(x))
