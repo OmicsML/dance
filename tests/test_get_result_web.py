@@ -44,14 +44,14 @@ def test_check_exist(tmp_path):
     results_dir.mkdir(parents=True)
 
     # Test empty directory
-    assert check_exist(str(tmp_path)) is False
+    assert check_exist(str(tmp_path), check_params=True) is False
 
     # Create test files
     (results_dir / "file1.txt").touch()
     (results_dir / "file2.txt").touch()
 
     # Test case with multiple files
-    assert check_exist(str(tmp_path)) is True
+    assert check_exist(str(tmp_path), check_params=True) is True
 
 
 # Create test fixed data
