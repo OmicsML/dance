@@ -117,7 +117,7 @@ as well as easily reproducible experiments by providing unified tools for
 The full installation process might be a bit tedious and could involve some debugging when using CUDA enabled packages.
 Thus, we provide an `install.sh` script that simplifies the installation process, assuming the user have [conda](https://conda.io/projects/conda/en/latest/index.html) set up on their machines.
 The installation script creates a conda environment `dance` and install the DANCE package along with all its dependencies with a apseicifc CUDA version.
-Currently, two options are accepted: `cpu` and  `cu118`.
+Currently, two options are accepted: `cpu` and `cu118`.
 For example, to install the DANCE package using CUDA 11.8 in a `dance-env` conda environment, simply run:
 
 ```bash
@@ -283,7 +283,7 @@ pip install -e .
 | ------------------------ | ----------------- | -------------------------- | --------------------------- |
 | ScMoGCN                  | Accuracy          | 0.0827 / 0.0810            | 0.0600 / 0.0630             |
 | SCMM                     | Accuracy          | 0.005 / N/A                | 5e-5 / N/A                  |
-| Cross-modal autoencoders | Accuracy          | 0.0002 / N/A               | 0.0002 /  N/A               |
+| Cross-modal autoencoders | Accuracy          | 0.0002 / N/A               | 0.0002 / N/A                |
 
 #### 3) Joint Embedding
 
@@ -297,11 +297,11 @@ pip install -e .
 
 | Model      | Evaluation Metric | GEX2ADT (current/reported) | GEX2ATAC (current/reported) |
 | ---------- | ----------------- | -------------------------- | --------------------------- |
-| ScMoGCN    | ARI               | 0.706 / N/A                | 0.702 /  N/A                |
-| ScMoGCNv2  | ARI               | 0.734 / N/A                | N/A /  N/A                  |
-| scMVAE     | ARI               | 0.499 /  N/A               | 0.577 /  N/A                |
-| scDEC(JAE) | ARI               | 0.705 /  N/A               | 0.735 /  N/A                |
-| DCCA       | ARI               | 0.35 /  N/A                | 0.381 /  N/A                |
+| ScMoGCN    | ARI               | 0.706 / N/A                | 0.702 / N/A                 |
+| ScMoGCNv2  | ARI               | 0.734 / N/A                | N/A / N/A                   |
+| scMVAE     | ARI               | 0.499 / N/A                | 0.577 / N/A                 |
+| scDEC(JAE) | ARI               | 0.705 / N/A                | 0.735 / N/A                 |
+| DCCA       | ARI               | 0.35 / N/A                 | 0.381 / N/A                 |
 
 #### 4) Multimodal Imputation
 
@@ -337,7 +337,7 @@ pip install -e .
 
 | Model   | Evaluation Metric | 151673 (current/reported) | 151676 (current/reported) | 151507 (current/reported) |
 | ------- | ----------------- | ------------------------- | ------------------------- | ------------------------- |
-| SpaGCN  | ARI               | 0.51  / 0.522             | 0.41 / N/A                | 0.45 / N/A                |
+| SpaGCN  | ARI               | 0.51 / 0.522              | 0.41 / N/A                | 0.45 / N/A                |
 | STAGATE | ARI               | 0.59 / N/A                | 0.60 / 0.60               | 0.608 / N/A               |
 | stLearn | ARI               | 0.30 / 0.36               | 0.29 / N/A                | 0.31 / N/A                |
 | Louvain | ARI               | 0.31 / 0.33               | 0.2528 / N/A              | 0.28 / N/A                |
