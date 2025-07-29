@@ -413,9 +413,9 @@ wandb = try_import("wandb")
 entity = "xzy11632"
 project = "dance-dev"
 # tissues = ["Blood", "Brain", "Heart", "Intestine", "Kidney", "Lung", "Pancreas"]
-tissues=["Kidney"]
+tissues = ["Kidney"]
 # methods = ["cta_actinn", "cta_celltypist", "cta_scdeepsort", "cta_singlecellnet"]
-methods=["cta_celltypist"]
+methods = ["cta_actinn"]
 if __name__ == "__main__":
     # Initialize wandb and set global configuration
     # Load dataset configuration and process results for tissue

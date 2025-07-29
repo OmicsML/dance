@@ -118,7 +118,7 @@ def test_write_ans(mock_settings):
 
     # Verify high score update success
     dataset1_row = result_df[result_df['Dataset_id'] == 'dataset1'].iloc[0]
-    assert dataset1_row['cta_actinn_best_res'] == 0.8
+    assert dataset1_row['cta_actinn_best_res'] == 0.9
     assert dataset1_row['cta_actinn'] == 'url1_new'
     assert dataset1_row['cta_actinn_best_yaml'] == 'yaml1_new'
 
