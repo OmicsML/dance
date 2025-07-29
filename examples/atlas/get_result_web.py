@@ -274,7 +274,7 @@ def check_exist(file_path, check_params=False):
         elif os.path.exists(f"{file_path}/results/pipeline/best_test_acc.csv"):
             return f"{file_path}/results/pipeline/best_test_acc.csv"
         else:
-            return None
+            return False
 
 
 def get_new_ans(tissue):
