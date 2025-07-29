@@ -56,3 +56,11 @@ examples/result_analysis/*
 examples/single_modality/cell_type_annotation/**/*.xlsx
 examples/single_modality/cell_type_annotation/**/*.csv
 examples/atlas/generate_method.ipynb
+examples/single_modality/imputation/data
+examples/tuning/figures
+temp_ans.csv
+temp_ans.json
+check_time.py
+results - cell type deconvolution.csv
+results - spatial domain.csv
+t.py
