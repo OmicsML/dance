@@ -39,7 +39,10 @@ examples/atlas/metadatas
 examples/spatial/spatial_domain/data/spatial
 examples/spatial/cell_type_deconvo/data/spatial
 examples/atlas/sc_similarity_examples/temp
-examples/atlas/sc_similarity_examples/visualization
+examples/atlas/sc_similarity_examples/visualization/*
+!examples/atlas/sc_similarity_examples/visualization/vis_sim_v2_vis.py
+!examples/atlas/sc_similarity_examples/visualization/vis_sim_v2_data.py
+!examples/atlas/sc_similarity_examples/visualization/visualize_atlas_performance_v2.py
 examples/atlas/sc_similarity_examples/data
 examples/atlas/sc_similarity_examples/temp
 examples/atlas/sc_similarity_examples/similarity/temp.ipynb
