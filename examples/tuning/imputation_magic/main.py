@@ -7,9 +7,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-import wandb
 from sklearn.utils import issparse
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import ImputationDataset
 from dance.modules.single_modality.imputation.magic import MAGIC

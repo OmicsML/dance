@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import wandb
 from sklearn.model_selection import train_test_split
 
+import wandb
 from dance import logger
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.stagate import Stagate

@@ -135,10 +135,10 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         ]
         if mask:
             transforms.extend([
-                CellwiseMaskData(distr=distr, mask_rate=mask_rate, seed=seed,add_test_mask=True),
+                CellwiseMaskData(distr=distr, mask_rate=mask_rate, seed=seed, add_test_mask=True),
                 SetConfig({
-                    "feature_channel": [None, None, "targets", "predictors", "train_mask","valid_mask","test_mask"],
-                    "feature_channel_type": ["X", "raw_X", "uns", "uns", "layers","layers","layers"],
+                    "feature_channel": [None, None, "targets", "predictors", "train_mask", "valid_mask", "test_mask"],
+                    "feature_channel_type": ["X", "raw_X", "uns", "uns", "layers", "layers", "layers"],
                     "label_channel": [None, None],
                     "label_channel_type": ["X", "raw_X"],
                 })

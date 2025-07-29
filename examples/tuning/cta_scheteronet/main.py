@@ -10,9 +10,9 @@ import numpy as np
 import scanpy as sc
 import torch
 import torch.nn as nn
-import wandb
 from sklearn.model_selection import train_test_split
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scheteronet import (

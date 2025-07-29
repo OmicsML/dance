@@ -4,8 +4,9 @@ import pprint
 import sys
 import time
 from pathlib import Path
-import torch
+
 import numpy as np
+import torch
 
 import wandb
 from dance import logger

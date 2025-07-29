@@ -33,7 +33,7 @@ if __name__ == '__main__':
     params = parser.parse_args()
     print(vars(params))
     rmses = []
-    mres=[]
+    mres = []
     for seed in range(params.seed, params.seed + params.num_runs):
         set_seed(seed)
 
