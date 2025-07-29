@@ -24,7 +24,7 @@ repos:
       - id: pyupgrade
         args: [--py3-plus]
   - repo: https://github.com/google/yapf
-    rev: v0.40.2
+    rev: v0.43.0
     hooks:
       - id: yapf
         name: Format code
