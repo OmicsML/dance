@@ -64,3 +64,6 @@ check_time.py
 results - cell type deconvolution.csv
 results - spatial domain.csv
 t.py
+examples/tuning/imputation_magic/data
+examples/tuning/joint_embedding_scmogcn/models/model_joint_embedding_1.pth
+models/model_joint_embedding_1.pth
