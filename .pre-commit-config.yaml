@@ -17,21 +17,23 @@ repos:
     hooks:
       - id: pyupgrade
         args: [--py3-plus]
-  # - repo: https://github.com/google/yapf
-  #   rev: v0.40.2
-  #   hooks:
-  #     - id: yapf
-  #       name: Format code
-  #       additional_dependencies: [toml]
+
+  - repo: https://github.com/google/yapf
+    rev: v0.40.2
+    hooks:
+      - id: yapf
+        name: Format code
+        additional_dependencies: [toml]
+
   - repo: https://github.com/pycqa/isort
     rev: 5.13.2
     hooks:
       - id: isort
         name: Sort imports
-        # args: [--line-width, "120", --profile, black]
+        args: [--line-width, "120", --profile, black]
 
   - repo: https://github.com/PyCQA/docformatter
-    rev: eb1df34
+    rev: v1.7.7
     hooks:
       - id: docformatter
         name: Format docstring
