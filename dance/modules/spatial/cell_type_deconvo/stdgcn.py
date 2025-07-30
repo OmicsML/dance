@@ -23,7 +23,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from igraph import split_join_distance
-
 # PyTorch related
 from sklearn import preprocessing
 from sklearn.decomposition import NMF
@@ -34,7 +33,6 @@ from sklearn.neighbors import KDTree, NearestNeighbors  # 合并了来自 sklear
 from torch.autograd import Variable
 from torch.nn.modules.module import Module  # 注意: 通常直接使用 nn.Module
 from torch.nn.parameter import Parameter  # 注意: 通常直接使用 nn.Parameter
-
 # tqdm
 from tqdm import tqdm
 

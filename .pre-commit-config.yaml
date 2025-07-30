@@ -1,4 +1,3 @@
----
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
@@ -6,18 +5,13 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
         exclude: ^docs/
-  # - repo: https://github.com/lyz-code/yamlfix  # The tool that actually fixes
-  #   rev: 1.16.0  # <---- UPDATE THIS to the latest stable version
-  #   hooks:
-  #     - id: yamlfix
-  #       name: yamlfix (Auto-Fix)  # Optional: Rename for clarity
-  #       additional_dependencies:
-  #         - maison==1.4.3  # <--- 例子：指定 maison 版本为 0.2.3
+
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.35.1
     hooks:
       - id: yamllint
         args: [-c=.yamllint.yml]
+
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.16.0
     hooks:
@@ -34,7 +28,8 @@ repos:
     hooks:
       - id: isort
         name: Sort imports
-        args: [--line-width, '120', --profile, black]
+        # args: [--line-width, "120", --profile, black]
+
   - repo: https://github.com/PyCQA/docformatter
     rev: eb1df34
     hooks:
@@ -42,9 +37,12 @@ repos:
         name: Format docstring
         additional_dependencies: [tomli]
         args: [--config, pyproject.toml]
+
   - repo: https://github.com/executablebooks/mdformat
     rev: 0.7.17
     hooks:
       - id: mdformat
         name: Format markdown
-        additional_dependencies: [mdformat-gfm, mdformat-tables]
+        additional_dependencies:
+          - mdformat-gfm
+          - mdformat-tables
