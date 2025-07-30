@@ -3,7 +3,7 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
-      # - id: trailing-whitespace
+      - id: trailing-whitespace
       - id: end-of-file-fixer
         exclude: ^docs/
   # - repo: https://github.com/lyz-code/yamlfix  # The tool that actually fixes
@@ -29,12 +29,12 @@ repos:
       - id: yapf
         name: Format code
         additional_dependencies: [toml]
-  # - repo: https://github.com/pycqa/isort
-  #   rev: 5.13.2
-  #   hooks:
-  #     - id: isort
-  #       name: Sort imports
-  #       args: [--line-width, '120', --profile, black]
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: Sort imports
+        args: [--line-width, '120', --profile, black]
   - repo: https://github.com/PyCQA/docformatter
     rev: eb1df34
     hooks:
@@ -42,9 +42,9 @@ repos:
         name: Format docstring
         additional_dependencies: [tomli]
         args: [--config, pyproject.toml]
-  # - repo: https://github.com/executablebooks/mdformat
-  #   rev: 0.7.17
-  #   hooks:
-  #     - id: mdformat
-  #       name: Format markdown
-  #       additional_dependencies: [mdformat-gfm, mdformat-tables]
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 0.7.17
+    hooks:
+      - id: mdformat
+        name: Format markdown
+        additional_dependencies: [mdformat-gfm, mdformat-tables]
