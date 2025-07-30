@@ -23,12 +23,12 @@ repos:
     hooks:
       - id: pyupgrade
         args: [--py3-plus]
-  - repo: https://github.com/google/yapf
-    rev: v0.40.2
-    hooks:
-      - id: yapf
-        name: Format code
-        additional_dependencies: [toml]
+  # - repo: https://github.com/google/yapf
+  #   rev: v0.40.2
+  #   hooks:
+  #     - id: yapf
+  #       name: Format code
+  #       additional_dependencies: [toml]
   - repo: https://github.com/pycqa/isort
     rev: 5.13.2
     hooks:
