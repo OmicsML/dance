@@ -81,3 +81,4 @@ examples/tuning/joint_embedding_scmvae/openproblems_2022_multi_atac2gex/config.p
 examples/tuning/imputation_graphsci/tsne_visualization.png
 examples/tuning/imputation_deepimpute/*.png
 examples/temp_hpancreas
+proxy.txt
