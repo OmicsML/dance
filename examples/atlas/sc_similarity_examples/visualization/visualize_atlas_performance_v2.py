@@ -103,58 +103,58 @@ def vis(data, target_value, title, ax):
         Axes object to plot on
 
     """
-    # 将输入数据转换为 NumPy 数组，方便后续处理
+    # Convert input data to NumPy array for easier processing
     data_np = np.array(data)
-    # 为 Seaborn 创建 DataFrame
-    # 确保 'test_acc' 列是 float 类型，即使 data_np 为空也能正常处理
+    # Create DataFrame for Seaborn
+    # Ensure 'test_acc' column is float type, even if data_np is empty
     data_df = pd.DataFrame({'test_acc': data_np.astype(float)})
 
-    # 1. 将小提琴图改成箱线图
+    # 1. Change violin plot to box plot
     sns.boxplot(y='test_acc', data=data_df, color='skyblue', ax=ax)
 
-    # 2. target_value 改成线，并将百分位数放到标签里
-    #    仅当 target_value 是一个有效数字时执行
-    tv_float = float(target_value)  # 将 target_value 转换为 float 类型进行判断和计算
+    # 2. Change target_value to line and put percentile in label
+    #    Only execute when target_value is a valid number
+    tv_float = float(target_value)  # Convert target_value to float type for judgment and calculation
 
     if not np.isnan(tv_float):
-        # 准备 target_value 线的标签文本
+        # Prepare label text for target_value line
         label_for_target_line = f'Atlas Value: {tv_float:.4f}'
         percentile_info_str = ""
 
-        # 仅当数据列表不为空时，计算百分位数
+        # Only calculate percentile when data list is not empty
         if len(data_np) > 0:
             percentile = (np.sum(data_np <= tv_float) / len(data_np)) * 100
-            percentile_info_str = f"\n({percentile:.1f}% percentile)"  # 使用换行符使图例更易读
+            percentile_info_str = f"\n({percentile:.1f}% percentile)"  # Use newline to make legend more readable
             label_for_target_line += percentile_info_str
 
-        # 绘制 target_value 的水平线
+        # Draw horizontal line for target_value
         ax.axhline(y=tv_float, color='red', linestyle='--', linewidth=2, label=label_for_target_line)
 
-        # 在图上添加 target_value 的文本标注 (与图例中的标签分开)
-        # 计算文本标注的 y 轴位置，使其略高于红线
-        text_y_position = tv_float  # 默认位置
+        # Add text annotation for target_value on the plot (separate from legend label)
+        # Calculate y-axis position for text annotation to be slightly above the red line
+        text_y_position = tv_float  # Default position
         if len(data_np) > 0:
             data_min, data_max = np.min(data_np), np.max(data_np)
-            if (data_max - data_min) > 1e-9:  # 检查数据是否有跨度
+            if (data_max - data_min) > 1e-9:  # Check if data has span
                 text_y_position = tv_float + (data_max - data_min) * 0.02
-            else:  # 数据无跨度 (所有值相同) 或跨度极小
+            else:  # Data has no span (all values same) or very small span
                 text_y_position = tv_float + (abs(tv_float * 0.02) if abs(tv_float) > 1e-9 else 0.002)
-        else:  # 数据为空
+        else:  # Data is empty
             text_y_position = tv_float + (abs(tv_float * 0.02) if abs(tv_float) > 1e-9 else 0.002)
 
         ax.text(0, text_y_position, f'{tv_float:.4f}', color='red', ha='center', va='bottom', size=12)
 
-    # 3. 设置标题和标签 (保持不变)
+    # 3. Set title and labels (unchanged)
     ax.set_title(str(title))
     ax.set_ylabel('test_acc')
     ax.title.set_size(16)
     ax.yaxis.label.set_size(14)
     ax.tick_params(axis='both', which='major', labelsize=10)
 
-    # 4. 显示图例 (保持不变)
-    #    为了避免在没有可显示图例项时出现警告，可以先检查是否有句柄
+    # 4. Display legend (unchanged)
+    #    To avoid warnings when there are no legend items to display, check if there are handles first
     handles, labels = ax.get_legend_handles_labels()
-    if handles:  # 仅当有图例项时显示图例
+    if handles:  # Only display legend when there are legend items
         ax.legend()
 
 

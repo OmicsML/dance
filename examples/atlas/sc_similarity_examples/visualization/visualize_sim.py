@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pandas.api.types as ptypes  # 导入Pandas类型API
+import pandas.api.types as ptypes  # Import Pandas type API
 import scipy.sparse as sp
 
 from dance.atlas.sc_similarity.anndata_similarity import get_anndata
@@ -70,9 +70,9 @@ def get_atlas_ans(query_dataset, method):
 def plot_pre_normalized_radar_v3(
         df,
         highlight_dataset_name,
-        # 控制高亮区域
+        # Control highlight area
         highlight_fill=False,
-        # 新参数：控制其他区域
+        # New parameter: control other areas
         other_fill=True,
         highlight_color='crimson',
         other_color='skyblue',
@@ -85,47 +85,47 @@ def plot_pre_normalized_radar_v3(
         title_fontsize=16,
         label_fontsize=10,
         tick_label_fontsize=9):
-    """绘制雷达图，直接使用预归一化的数据 (版本3)。
+    """Draw radar chart, directly using pre-normalized data (version 3).
 
-    新功能:
-    - highlight_fill (bool): 控制是否填充高亮区域。
-    - other_fill (bool): 控制是否填充其他非高亮区域。
+    New features:
+    - highlight_fill (bool): Control whether to fill the highlight area.
+    - other_fill (bool): Control whether to fill other non-highlight areas.
 
     """
 
-    # --- 1. 输入验证 ---
-    # (省略了与v2相同的验证代码...)
+    # --- 1. Input validation ---
+    # (Omitted validation code same as v2...)
     if not isinstance(df, pd.DataFrame): raise TypeError("Input 'df' must be a pandas DataFrame.")
     if df.empty: raise ValueError("Input DataFrame is empty.")
     if highlight_dataset_name not in df.index: raise ValueError(f"Dataset '{highlight_dataset_name}' not found.")
     if not ((df.min().min() >= 0) and (df.max().max() <= 1)): raise ValueError("All values must be between 0 and 1.")
 
-    # --- 2. 准备绘图 ---
+    # --- 2. Prepare plotting ---
     features = df.columns.tolist()
     num_vars = len(features)
     angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
     angles += angles[:1]
 
-    # --- 3. 绘图 ---
+    # --- 3. Plotting ---
     plt.style.use('seaborn-v0_8-whitegrid')
     fig, ax = plt.subplots(figsize=figsize, subplot_kw=dict(polar=True))
 
-    # 绘制其他dataset
+    # Plot other datasets
     for index, row in df.iterrows():
         if index == highlight_dataset_name:
             continue
         values = row.tolist()
         values += values[:1]
 
-        # 绘制其他dataset的轮廓线
+        # Plot contour lines of other datasets
         ax.plot(angles, values, color=other_color, linewidth=other_linewidth, zorder=2)
 
-        # ==================== 对其他区域的核心修改 ====================
-        # 根据 other_fill 参数决定是否填充
+        # ==================== Core modifications for other areas ====================
+        # Decide whether to fill based on other_fill parameter
         if other_fill:
-            ax.fill(angles, values, color=other_color, alpha=other_alpha, zorder=1)  # 将填充的zorder降低
+            ax.fill(angles, values, color=other_color, alpha=other_alpha, zorder=1)  # Lower the zorder of fill
 
-    # 绘制高亮的dataset (始终在顶层)
+    # Plot highlighted dataset (always on top layer)
     highlight_values = df.loc[highlight_dataset_name].tolist()
     highlight_values += highlight_values[:1]
     ax.plot(angles, highlight_values, color=highlight_color, linewidth=highlight_linewidth, zorder=4,
@@ -134,7 +134,7 @@ def plot_pre_normalized_radar_v3(
     if highlight_fill:
         ax.fill(angles, highlight_values, color=highlight_color, alpha=highlight_fill_alpha, zorder=3)
 
-    # --- 4. 设置坐标轴和标签 ---
+    # --- 4. Set axes and labels ---
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(features, fontsize=label_fontsize)
     ax.set_ylim(0, 1)
@@ -142,7 +142,7 @@ def plot_pre_normalized_radar_v3(
     ax.set_yticklabels(["0.25", "0.50", "0.75", "1.0 (Best)"], fontsize=tick_label_fontsize, color="grey")
     ax.set_rlabel_position(180 / num_vars if num_vars > 1 else 45)
 
-    # --- 5. 添加图例和标题 ---
+    # --- 5. Add legend and title ---
     ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.15))
     plt.title(title, size=title_fontsize, y=1.15, weight='bold')
     plt.tight_layout(pad=2.0)

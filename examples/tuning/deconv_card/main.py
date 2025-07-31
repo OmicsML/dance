@@ -50,8 +50,9 @@ if __name__ == "__main__":
         # inputs: x_count, x_spatial
         inputs, y = data.get_data(split_name="test", return_type="numpy")
 
-        basis = data.get_feature(return_type="default", channel="CellTopicProfile",
-                                 channel_type="varm")  #降维之后没法寻找特定基因的varm了，也就是基因在每个细胞类型上的表现
+        basis = data.get_feature(
+            return_type="default", channel="CellTopicProfile", channel_type="varm"
+        )  #After dimensionality reduction, can't find specific gene varm anymore, that is, gene expression in each cell type
 
         # Train and evaluate model
         model = Card(basis, random_state=args.seed)

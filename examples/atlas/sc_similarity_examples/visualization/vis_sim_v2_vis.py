@@ -29,53 +29,53 @@ def plot_pre_normalized_radar_v3(
     highlight_dataset_name,
     tissue,
     query_dataset,
-    # 控制区域
+    # Control area
     highlight_fill=False,
     other_fill=False,
-    # 颜色和透明度
+    # Colors and transparency
     highlight_color='crimson',
     other_color='skyblue',
     other_alpha=0.20,
     highlight_fill_alpha=0.45,
-    # 线宽
+    # Line width
     highlight_linewidth=0.5,
     other_linewidth=0.5,
-    # 尺寸和字体
-    figsize=(15, 10),  # 建议稍微增大图形尺寸以容纳大字体
+    # Size and font
+    figsize=(15, 10),  # Suggest slightly increasing figure size to accommodate large fonts
     title="Performance Radar",
     title_fontsize=18,
-    label_fontsize=17,  # 现在可以安全地调大字体
+    label_fontsize=17,  # Now can safely increase font size
     tick_label_fontsize=16,
-    # Y轴控制
+    # Y-axis control
     ylim_min=0.0,
     ylim_max=1.0,
     num_yticks=4,
-    # ==================== 新增核心参数 ====================
-    label_distance_factor=1.1  # 控制标签与图表边缘的距离
-    # (1.0 = 在边缘, 1.2 = 距离边缘20%的半径)
+    # ==================== New core parameters ====================
+    label_distance_factor=1.1  # Control distance between labels and chart edge
+    # (1.0 = at edge, 1.2 = 20% radius from edge)
     # ====================================================
 ):
-    """绘制雷达图 (版本6)。
+    """Draw radar chart (version 6).
 
-    新功能:
-    - 智能标签布局: 手动放置坐标轴标签，避免与图表重叠，允许使用更大的字体。
-    - label_distance_factor: 控制标签与图表边缘的距离。
+    New features:
+    - Smart label layout: Manually place axis labels to avoid overlap with chart, allowing larger fonts.
+    - label_distance_factor: Control distance between labels and chart edge.
 
     """
 
-    # --- 1. 输入验证 ---
+    # --- 1. Input validation ---
     if not isinstance(df, pd.DataFrame): raise TypeError("Input 'df' must be a pandas DataFrame.")
     if df.empty: raise ValueError("Input DataFrame is empty.")
     if highlight_dataset_name not in df.index: raise ValueError(f"Dataset '{highlight_dataset_name}' not found.")
 
-    # --- 2. 准备数据 ---
+    # --- 2. Prepare data ---
     features_raw = df.columns.tolist()
     features = [similarity_names.get(f, f) for f in features_raw]
     num_vars = len(features)
     angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
     angles += angles[:1]
 
-    # --- 自动计算 Y 轴下限 ---
+    # --- Auto-calculate Y-axis lower limit ---
     final_ylim_min = ylim_min
     if final_ylim_min is None:
         global_min = df.min().min()
@@ -83,11 +83,11 @@ def plot_pre_normalized_radar_v3(
         final_ylim_min = max(0, global_min - padding)
         print(f"Auto-calculated ylim_min: {final_ylim_min:.3f}")
 
-    # --- 3. 绘图 ---
+    # --- 3. Plotting ---
     plt.style.use('seaborn-v0_8-whitegrid')
     fig, ax = plt.subplots(figsize=figsize, subplot_kw=dict(polar=True))
 
-    # 绘制其他和高亮的dataset
+    # Plot other and highlighted datasets
     for index, row in df.iterrows():
         is_highlight = (index == highlight_dataset_name)
         values = row.tolist()
@@ -102,54 +102,54 @@ def plot_pre_normalized_radar_v3(
         elif not is_highlight and other_fill:
             ax.fill(angles, values, color=other_color, alpha=other_alpha, zorder=1)
 
-    # --- 4. 设置坐标轴和标签 (核心修改部分) ---
+    # --- 4. Set axes and labels (core modification part) ---
 
-    # 设置Y轴范围和刻度
+    # Set Y-axis range and ticks
     ax.set_ylim(final_ylim_min, ylim_max)
     yticks = np.linspace(final_ylim_min, ylim_max, num_yticks)
     yticklabels = [f"{tick:.2f}" for tick in yticks]
     if ylim_max == 1.0: yticklabels[-1] = f"{yticklabels[-1]} (Best)"
     ax.set_yticks(yticks)
     ax.set_yticklabels(yticklabels, fontsize=tick_label_fontsize, color="black")
-    ax.set_rlabel_position(90)  # 将Y轴标签放在右侧
+    ax.set_rlabel_position(90)  # Place Y-axis labels on the right
 
-    # 设置X轴（角度轴）的网格线，但隐藏默认标签
+    # Set X-axis (angle axis) grid lines, but hide default labels
     ax.set_xticks(angles[:-1])
-    ax.set_xticklabels([])  # <--- 关键：禁用默认标签！
+    ax.set_xticklabels([])  # <--- Key: disable default labels!
 
-    # ==================== 手动放置和对齐标签 ====================
+    # ==================== Manual placement and alignment of labels ====================
     for i, angle in enumerate(angles[:-1]):
         angle_deg = np.rad2deg(angle)
 
-        # 确定水平对齐方式
+        # Determine horizontal alignment
         if angle_deg == 0: ha = 'left'
         elif angle_deg == 90: ha = 'right'
         elif 0 < angle_deg < 90: ha = 'left'
         elif 270 < angle_deg < 360: ha = 'left'
         else: ha = 'right'
 
-        # 确定垂直对齐方式
+        # Determine vertical alignment
         if angle_deg in [0, 180]: va = 'center'
         elif 90 < angle_deg < 270: va = 'top'
         else: va = 'bottom'
 
         ax.text(
             angle,
-            ylim_max * label_distance_factor,  # 在图表外围放置
+            ylim_max * label_distance_factor,  # Place outside the chart
             features[i],
             size=label_fontsize,
             ha=ha,
             va=va,
-            fontweight='bold')  # 加粗使其更清晰
+            fontweight='bold')  # Bold to make it clearer
     # ==========================================================
 
-    # --- 5. 添加图例和标题 ---
-    # 调整位置以适应更大的字体和更远的标签
+    # --- 5. Add legend and title ---
+    # Adjust position to accommodate larger fonts and farther labels
     ax.legend(loc='upper right', bbox_to_anchor=(1.6, 1.2), fontsize=label_fontsize)
     # plt.title(title, size=title_fontsize, y=1.2, weight='bold')
 
-    # --- 6. 保存和显示 ---
-    # `tight_layout` 在手动布局后可能效果不佳，可以不使用或最后再调用
+    # --- 6. Save and display ---
+    # `tight_layout` may not work well after manual layout, can skip or call at the end
     fig.tight_layout()
     if query_dataset is not None:
         img_path = SIMILARITYDIR / f"data/imgs/sim_imgs/{tissue}/{query_dataset}_radar_plot.pdf"

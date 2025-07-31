@@ -27,7 +27,7 @@ from dance.transforms.misc import Compose, SaveRaw
 from dance.typing import LogLevel
 from dance.utils import set_seed
 
-#saveRAW 以及 updateRAW
+#saveRAW and updateRAW
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_dataset", nargs="+", type=int, default=[1759], help="Testing dataset IDs")

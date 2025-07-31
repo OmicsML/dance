@@ -23,7 +23,7 @@ from dance.pipeline import get_additional_sweep
 from dance.settings import DANCEDIR, SIMILARITYDIR, entity, project
 from dance.utils import try_import
 
-# --- FastAPI 相关的导入 ---
+# --- FastAPI related imports ---
 
 sys.path.append(str(DANCEDIR))
 from examples.atlas.sc_similarity_examples.similarity.analyze_atlas_accuracy import is_matching_dict
@@ -42,14 +42,14 @@ wandb = try_import("wandb")
 data_dir = DANCEDIR / f"examples/tuning/temp_data"
 
 
-# 辅助函数：将Matplotlib figure对象转为Base64字符串
+# Helper function: convert Matplotlib figure object to Base64 string
 def fig_to_base64(fig):
     buf = io.BytesIO()
     fig.savefig(buf, format='png')
     buf.seek(0)
     image_bytes = buf.getvalue()
     base64_string = base64.b64encode(image_bytes).decode('utf-8')
-    plt.close(fig)  # 重要：关闭图形，防止内存泄漏
+    plt.close(fig)  # Important: close figure to prevent memory leaks
     return base64_string
 
 
@@ -141,14 +141,14 @@ def get_sim(adata: ad.AnnData, tissue: str, sweep_dict: Optional[dict] = None, f
                                         feature_name=feature_name, conf_data=conf_data, save=False,
                                         method_runs_cache=method_accs_cache)
         b64_image2 = fig_to_base64(fig2)
-    # 4. 将所有内容打包到一个Python字典中
+    # 4. Package all content into a Python dictionary
     response_data = {"metadata": ans_conf, "plot1_png_base64": b64_image1, "plot2_png_base64": b64_image2}
 
-    # FastAPI会自动将字典转换为JSON响应
+    # FastAPI will automatically convert dictionary to JSON response
     return response_data
 
 
-# ----------------- 新增 FastAPI 部分 -----------------
+# ----------------- New FastAPI section -----------------
 app = FastAPI()
 
 
@@ -164,15 +164,18 @@ async def get_atlas_method(atlas_id, tissue):
 
 
 @app.post("/api/get_similarity")
-async def run_similarity_analysis(h5ad_file: UploadFile = File(..., description="上传 .h5ad 格式的查询数据文件"),
-                                  tissue: str = Form(..., description="组织类型, 例如 'brain'"),
-                                  feature_name: str = Form("metadata_sim", description="要使用的特征名称"),
-                                  use_sim_cache: bool = Form(False, description="是否使用缓存的相似度矩阵"),
-                                  query_dataset: Optional[str] = Form(None, description="查询数据集的ID"),
-                                  sweep_dict_json: Optional[str] = Form(None, description="包含sweep ID的JSON字符串")):
-    """接收上传的h5ad文件和参数，运行相似度分析，并返回包含结果和图表的JSON。"""
-    # 1. 处理上传的文件
-    # 创建一个安全的临时文件来保存上传内容
+async def run_similarity_analysis(h5ad_file: UploadFile = File(..., description="Upload .h5ad format query data file"),
+                                  tissue: str = Form(..., description="Tissue type, e.g. 'brain'"),
+                                  feature_name: str = Form("metadata_sim", description="Feature name to use"),
+                                  use_sim_cache: bool = Form(False,
+                                                             description="Whether to use cached similarity matrix"),
+                                  query_dataset: Optional[str] = Form(None, description="Query dataset ID"),
+                                  sweep_dict_json: Optional[str] = Form(
+                                      None, description="JSON string containing sweep IDs")):
+    """Receive uploaded h5ad file and parameters, run similarity analysis, and return
+    JSON containing results and charts."""
+    # 1. Process uploaded file
+    # Create a secure temporary file to save uploaded content
     temp_dir = tempfile.gettempdir()
     temp_file_path = os.path.join(temp_dir, f"{uuid.uuid4()}.h5ad")
 
@@ -180,36 +183,36 @@ async def run_similarity_analysis(h5ad_file: UploadFile = File(..., description=
         with open(temp_file_path, "wb") as buffer:
             buffer.write(await h5ad_file.read())
 
-        # 使用scanpy读取临时文件
+        # Use scanpy to read temporary file
         adata = sc.read_h5ad(temp_file_path)
 
-        # 2. 处理 sweep_dict
+        # 2. Process sweep_dict
         sweep_dict = None
         if sweep_dict_json:
             try:
                 sweep_dict = json.loads(sweep_dict_json)
             except json.JSONDecodeError:
-                raise HTTPException(status_code=400, detail="sweep_dict_json 不是一个有效的JSON字符串。")
+                raise HTTPException(status_code=400, detail="sweep_dict_json is not a valid JSON string.")
 
-        # 3. 调用你的核心分析函数
-        logger.info(f"开始分析 tissue={tissue}, feature_name={feature_name}...")
+        # 3. Call your core analysis function
+        logger.info(f"Starting analysis tissue={tissue}, feature_name={feature_name}...")
         results = get_sim(adata=adata, tissue=tissue, sweep_dict=sweep_dict, feature_name=feature_name,
                           use_sim_cache=use_sim_cache, query_dataset=query_dataset)
-        logger.info("分析完成。")
+        logger.info("Analysis completed.")
 
         return results
 
     except Exception as e:
-        # 捕获所有可能的错误，并返回一个有意义的错误信息
-        logger.error(f"分析过程中发生错误: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"服务器内部错误: {str(e)}")
+        # Catch all possible errors and return a meaningful error message
+        logger.error(f"Error occurred during analysis: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
     finally:
-        # 4. 清理临时文件，无论成功或失败
+        # 4. Clean up temporary files, whether successful or failed
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
-            logger.info(f"已清理临时文件: {temp_file_path}")
+            logger.info(f"Cleaned up temporary file: {temp_file_path}")
 
-# 启动服务的命令 (在终端中运行)
+# Command to start the service (run in terminal)
 # uvicorn main:app --host 0.0.0.0 --port 8100 --reload
 
 # if __name__ == "__main__":
@@ -224,7 +227,7 @@ async def run_similarity_analysis(h5ad_file: UploadFile = File(..., description=
                   query_dataset="576f193c-75d0-4a11-bd25-8676587e6dc2")
 
 
-#     print("要启动API服务，请在终端中运行: uvicorn main:app --reload")
+#     print("To start the API service, run in terminal: uvicorn main:app --reload")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8100)

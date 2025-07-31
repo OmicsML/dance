@@ -30,10 +30,10 @@ from sklearn.decomposition import NMF
 from sklearn.metrics import DistanceMetric
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.model_selection import train_test_split
-from sklearn.neighbors import KDTree, NearestNeighbors  # 合并了来自 sklearn.neighbors 的导入
+from sklearn.neighbors import KDTree, NearestNeighbors  # Combined imports from sklearn.neighbors
 from torch.autograd import Variable
-from torch.nn.modules.module import Module  # 注意: 通常直接使用 nn.Module
-from torch.nn.parameter import Parameter  # 注意: 通常直接使用 nn.Parameter
+from torch.nn.modules.module import Module  # Note: usually directly use nn.Module
+from torch.nn.parameter import Parameter  # Note: usually directly use nn.Parameter
 
 # tqdm
 from tqdm import tqdm
@@ -703,7 +703,7 @@ def generate_a_spot_optimized(
 
 import numpy as np
 
-# from scipy.sparse import csr_matrix # 如果 sc_exp.X 可能不是csr但仍是稀疏的
+# from scipy.sparse import csr_matrix # If sc_exp.X might not be csr but still sparse
 
 
 def process_single_spot(i, spot_data_item, sc_exp, word_to_idx_celltype, generation_method):
@@ -1381,18 +1381,18 @@ class stdgcnGraph(BaseTransform):
                  **kwargs):
         self.real_split_name = real_split_name
         self.pseudo_split_name = pseudo_split_name
-        # 从 cli_args 构建 inter_exp_adj_paras
+        # Build inter_exp_adj_paras from cli_args
         self.inter_exp_adj_paras = {
             'find_neighbor_method': inter_find_neighbor_method,
             'dist_method': inter_dist_method,
             'corr_dist_neighbors': inter_corr_dist_neighbors,
         }
-        # 从 cli_args 构建 spatial_adj_paras
+        # Build spatial_adj_paras from cli_args
         self.spatial_adj_paras = {
             'link_method': spatial_link_method,
             'space_dist_threshold': space_dist_threshold,
         }
-        # 从 cli_args 构建 real_intra_exp_adj_paras
+        # Build real_intra_exp_adj_paras from cli_args
         self.real_intra_exp_adj_paras = {
             'find_neighbor_method': real_intra_find_neighbor_method,
             'dist_method': real_intra_dist_method,
@@ -1400,7 +1400,7 @@ class stdgcnGraph(BaseTransform):
             'PCA_dimensionality_reduction': real_intra_pca_dimensionality_reduction,
             'dim': real_intra_dim,
         }
-        # 从 cli_args 构建 pseudo_intra_exp_adj_paras
+        # Build pseudo_intra_exp_adj_paras from cli_args
         self.pseudo_intra_exp_adj_paras = {
             'find_neighbor_method': pseudo_intra_find_neighbor_method,
             'dist_method': pseudo_intra_dist_method,
@@ -1635,17 +1635,18 @@ from typing import Any, List, Literal, Mapping, Optional, Tuple, Union
 class stdGCNWrapper(BaseRegressionMethod):
 
     def __init__(self, cli_args):
-        # 从 cli_args 构建 integration_for_adj_paras
+        # Build integration_for_adj_paras from cli_args
 
-        # 从 cli_args 构建 GCN_paras
+        # Build GCN_paras from cli_args
         self.GCN_paras = {
             'epoch_n': cli_args.epoch_n,
-            'dim': cli_args.gcn_dim,  # 假设 GCN_paras 内部期望的键是 'dim'
+            'dim': cli_args.gcn_dim,  # Assume GCN_paras internally expects key 'dim'
             'common_hid_layers_num': cli_args.common_hid_layers_num,
             'fcnn_hid_layers_num': cli_args.fcnn_hid_layers_num,
             'dropout': cli_args.dropout,
-            'learning_rate_SGD': cli_args.learning_rate_sgd,  # 假设 GCN_paras 内部期望的键是 'learning_rate_SGD'
-            'weight_decay_SGD': cli_args.weight_decay_sgd,  # 假设 GCN_paras 内部期望的键是 'weight_decay_SGD'
+            'learning_rate_SGD':
+            cli_args.learning_rate_sgd,  # Assume GCN_paras internally expects key 'learning_rate_SGD'
+            'weight_decay_SGD': cli_args.weight_decay_sgd,  # Assume GCN_paras internally expects key 'weight_decay_SGD'
             'momentum': cli_args.momentum,
             'dampening': cli_args.dampening,
             'nesterov': cli_args.nesterov,
@@ -1653,29 +1654,29 @@ class stdGCNWrapper(BaseRegressionMethod):
             'clip_grad_max_norm': cli_args.clip_grad_max_norm,
             'print_loss_epoch_step': cli_args.print_loss_epoch_step,
         }
-        self.GCN_device = cli_args.gcn_device  # 直接从 cli_args 获取
-        self.n_jobs = cli_args.n_jobs  # 直接从 cli_args 获取
+        self.GCN_device = cli_args.gcn_device  # Get directly from cli_args
+        self.n_jobs = cli_args.n_jobs  # Get directly from cli_args
 
     # @staticmethod
     # def preprocessing_pipeline(args,log_level: LogLevel = "INFO"):
     #     return Compose(
     #     CelltypeTransform(),
     #     pseudoSpotGen(
-    #         spot_num=args.spot_num,  # 从 pseudo_spot_simulation_paras 映射过来
-    #         min_cell_number_in_spot=args.min_cell_num_in_spot, # 从 pseudo_spot_simulation_paras 映射过来 (注意原始key是 min_cell_num_in_spot)
-    #         max_cell_number_in_spot=args.max_cell_num_in_spot, # 从 pseudo_spot_simulation_paras 映射过来 (注意原始key是 max_cell_num_in_spot)
-    #         max_cell_types_in_spot=args.max_cell_types_in_spot, # 从 pseudo_spot_simulation_paras 映射过来
-    #         generation_method=args.generation_method,  # 从 pseudo_spot_simulation_paras 映射过来
-    #         n_jobs=args.n_jobs  # 直接从 args 获取
+    #         spot_num=args.spot_num,  # Mapped from pseudo_spot_simulation_paras
+    #         min_cell_number_in_spot=args.min_cell_num_in_spot, # Mapped from pseudo_spot_simulation_paras (note original key is min_cell_num_in_spot)
+    #         max_cell_number_in_spot=args.max_cell_num_in_spot, # Mapped from pseudo_spot_simulation_paras (note original key is max_cell_num_in_spot)
+    #         max_cell_types_in_spot=args.max_cell_types_in_spot, # Mapped from pseudo_spot_simulation_paras
+    #         generation_method=args.generation_method,  # Mapped from pseudo_spot_simulation_paras
+    #         n_jobs=args.n_jobs  # Get directly from args
     #     ),
-    #     RemoveSplit(split_name="ref", log_level="INFO"), # 无变化
-    #     FilterGenesCommon(split_keys=["pseudo", "test"]), # 无变化
+    #     RemoveSplit(split_name="ref", log_level="INFO"), # No change
+    #     FilterGenesCommon(split_keys=["pseudo", "test"]), # No change
     #     FilterGenesPlaceHolder(),
-    #     SaveRaw(), # 无变化
+    #     SaveRaw(), # No change
     #     NormalizeTotalLog1P(),
     #     FilterGenesTopK(num_genes=4000),
-    #     updateAnndataObsTransform(split="test"), # 无变化
-    #     CellTypeNum(), # 无变化
+    #     updateAnndataObsTransform(split="test"), # No change
+    #     CellTypeNum(), # No change
     #     CellPCA(out="feature.cell"),
     #     DataInteragraionTransform(batch_removal_method=args.adj_batch_removal_method if args.adj_batch_removal_method and args.adj_batch_removal_method.lower() != 'none' else None,
     #         min_dim=args.adj_dim,
@@ -1716,36 +1717,36 @@ class stdGCNWrapper(BaseRegressionMethod):
                 pvals_adj_threshold=args.pvals_adj_threshold,
                 log_fold_change_threshold=args.log_fold_change_threshold,
                 min_within_group_fraction_threshold=args.
-                min_within_group_fraction_threshold,  # 从 find_marker_genes_paras 映射过来
+                min_within_group_fraction_threshold,  # Mapped from find_marker_genes_paras
                 max_between_group_fraction_threshold=args.
-                max_between_group_fraction_threshold,  # 从 find_marker_genes_paras 映射过来
-                top_gene_per_type=args.top_gene_per_type  # 从 find_marker_genes_paras 映射过来
+                max_between_group_fraction_threshold,  # Mapped from find_marker_genes_paras
+                top_gene_per_type=args.top_gene_per_type  # Mapped from find_marker_genes_paras
             ),
             pseudoSpotGen(
-                spot_num=args.spot_num,  # 从 pseudo_spot_simulation_paras 映射过来
+                spot_num=args.spot_num,  # Mapped from pseudo_spot_simulation_paras
                 min_cell_number_in_spot=args.
-                min_cell_num_in_spot,  # 从 pseudo_spot_simulation_paras 映射过来 (注意原始key是 min_cell_num_in_spot)
+                min_cell_num_in_spot,  # Mapped from pseudo_spot_simulation_paras (note original key is min_cell_num_in_spot)
                 max_cell_number_in_spot=args.
-                max_cell_num_in_spot,  # 从 pseudo_spot_simulation_paras 映射过来 (注意原始key是 max_cell_num_in_spot)
-                max_cell_types_in_spot=args.max_cell_types_in_spot,  # 从 pseudo_spot_simulation_paras 映射过来
-                generation_method=args.generation_method,  # 从 pseudo_spot_simulation_paras 映射过来
-                n_jobs=args.n_jobs  # 直接从 args 获取
+                max_cell_num_in_spot,  # Mapped from pseudo_spot_simulation_paras (note original key is max_cell_num_in_spot)
+                max_cell_types_in_spot=args.max_cell_types_in_spot,  # Mapped from pseudo_spot_simulation_paras
+                generation_method=args.generation_method,  # Mapped from pseudo_spot_simulation_paras
+                n_jobs=args.n_jobs  # Get directly from args
             ),
-            RemoveSplit(split_name="ref", log_level="INFO"),  # 无变化
-            FilterGenesCommon(split_keys=["pseudo", "test"]),  # 无变化
-            SaveRaw(),  # 无变化
+            RemoveSplit(split_name="ref", log_level="INFO"),  # No change
+            FilterGenesCommon(split_keys=["pseudo", "test"]),  # No change
+            SaveRaw(),  # No change
             STPreprocessTransform(
-                normalize=args.dn_normalize,  # 从 data_normalization_paras 映射过来
-                log=args.dn_log,  # 从 data_normalization_paras 映射过来
-                scale=args.dn_scale,  # 从 data_normalization_paras 映射过来
+                normalize=args.dn_normalize,  # Mapped from data_normalization_paras
+                log=args.dn_log,  # Mapped from data_normalization_paras
+                scale=args.dn_scale,  # Mapped from data_normalization_paras
                 split="pseudo"),
-            updateAnndataObsTransform(split="test"),  # 无变化
+            updateAnndataObsTransform(split="test"),  # No change
             STPreprocessTransform(
-                normalize=args.dn_normalize,  # 从 data_normalization_paras 映射过来
-                log=args.dn_log,  # 从 data_normalization_paras 映射过来
-                scale=args.dn_scale,  # 从 data_normalization_paras 映射过来
+                normalize=args.dn_normalize,  # Mapped from data_normalization_paras
+                log=args.dn_log,  # Mapped from data_normalization_paras
+                scale=args.dn_scale,  # Mapped from data_normalization_paras
                 split="test"),
-            CellTypeNum(),  # 无变化
+            CellTypeNum(),  # No change
             FeatureCellPlaceHolder(out="feature.cell"),
             DataInteragraionTransform(
                 batch_removal_method=args.adj_batch_removal_method

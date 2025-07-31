@@ -136,20 +136,20 @@ def extract_features_batch(adata, model, device, batch_size=64, num_workers=4):
         pd.DataFrame: A DataFrame where rows are spots and columns are features.
 
     """
-    # 1. 设置模型为评估模式，并关闭梯度计算
+    # 1. Set model to evaluation mode and disable gradient computation
     model.eval()
 
-    # 2. 定义图像预处理流程
-    # 和你原来的步骤一致：resize -> to tensor -> convert to float
-    # torchvision.transforms 能够高效地完成这些
+    # 2. Define image preprocessing pipeline
+    # Consistent with your original steps: resize -> to tensor -> convert to float
+    # torchvision.transforms can efficiently complete these operations
     preprocess = transforms.Compose([
         transforms.Resize((224, 224)),
-        transforms.ToTensor(),  # 这会自动将 [0, 255] 的 PIL Image 转为 [0.0, 1.0] 的 FloatTensor
-        # 如果你的模型需要特定的归一化，请在这里添加
+        transforms.ToTensor(),  # This automatically converts [0, 255] PIL Image to [0.0, 1.0] FloatTensor
+        # If your model requires specific normalization, add it here
         # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
 
-    # 3. 创建Dataset和DataLoader
+    # 3. Create Dataset and DataLoader
     # shuffle=False is CRITICAL to keep the order of spots
     dataset = SpatialImageDataset(paths=adata.obs['slices_path'], transform=preprocess)
     data_loader = DataLoader(
@@ -163,24 +163,24 @@ def extract_features_batch(adata, model, device, batch_size=64, num_workers=4):
     all_features = []
     all_spot_names = []
 
-    # 4. 高效的批处理循环
-    with torch.no_grad():  # 非常重要！关闭梯度计算，节省内存和计算
+    # 4. Efficient batch processing loop
+    with torch.no_grad():  # Very important! Disable gradient computation to save memory and computation
         for image_batch, spot_name_batch in tqdm(data_loader, desc="Extracting features"):
-            # DataLoader已经将一批图像打包成一个(B, C, H, W)的张量
+            # DataLoader has already packed a batch of images into a (B, C, H, W) tensor
             # B = batch_size, C=3, H=224, W=224
 
-            # 将整个批次的数据一次性移动到GPU
+            # Move the entire batch of data to GPU at once
             image_batch = image_batch.to(device)
 
-            # 对整个批次进行推理
+            # Perform inference on the entire batch
             result_batch = model(image_batch)
 
-            # 将结果移回CPU，并存储
+            # Move results back to CPU and store
             # .cpu() returns a tensor on CPU, .numpy() converts it to numpy array
             all_features.append(result_batch.cpu().numpy())
             all_spot_names.extend(list(spot_name_batch))
 
-    # 5. 合并所有批次的结果并创建DataFrame (只执行一次!)
+    # 5. Merge all batch results and create DataFrame (execute only once!)
     final_features = np.concatenate(all_features, axis=0)
     feat_df = pd.DataFrame(final_features, index=all_spot_names)
 
@@ -563,7 +563,7 @@ class EFNST_model(nn.Module):
     def encode(self, x, adj):
         feat_x = self.encoder(x)
         edge_index_tensor = torch.stack([adj.storage.row(), adj.storage.col()], dim=0)
-        edge_values = adj.storage.value()  # 形状是 [num_edges]
+        edge_values = adj.storage.value()  # Shape is [num_edges]
         if edge_values is not None:
             edge_attr_prepared = edge_values.unsqueeze(-1)
         conv_x = self.conv(feat_x, edge_index_tensor, edge_attr_prepared)
@@ -839,7 +839,7 @@ class TrainingConfig:
         if pretrain:
             self.pretrain()
             pre_z, _ = self.process()
-        if clusterType == 'KMeans' and cluster_n is not None:  # 使用K均值算法进行聚类，且聚类数目已知
+        if clusterType == 'KMeans' and cluster_n is not None:  # Use K-means algorithm for clustering, and cluster number is known
             cluster_method = KMeans(n_clusters=cluster_n, n_init=cluster_n * 2, random_state=88)
             y_pred_last = np.copy(cluster_method.fit_predict(pre_z))
             if self.domains is None:
@@ -1060,7 +1060,7 @@ class EfNsSTRunner(BaseClusteringMethod):
             EfNSTAugmentTransform(),
             EfNSTGraphTransform(distType=distType, k=k),
             EfNSTConcatgTransform(dim_reduction=dim_reduction, min_cells=min_cells, platform=platform,
-                                  pca_n_comps=pca_n_comps),  #xenium也可以用Visium的方式处理
+                                  pca_n_comps=pca_n_comps),  #xenium can also be processed using Visium method
             SetConfig({
                 "feature_channel": ["feature.cell", "EfNSTGraph"],
                 "feature_channel_type": ["obsm", "uns"],

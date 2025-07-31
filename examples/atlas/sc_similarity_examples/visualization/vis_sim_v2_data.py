@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pandas.api.types as ptypes  # 导入Pandas类型API
+import pandas.api.types as ptypes  # Import Pandas type API
 import scipy.sparse as sp
 
 from dance.atlas.sc_similarity.anndata_similarity import get_anndata
