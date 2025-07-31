@@ -16,13 +16,7 @@ pipeline:
   - type: normalize
     target: NormalizePlaceHolder
   - type: filter.gene
-    target: FilterGenesRegression
-    params_to_tune:
-      method:
-        values: [enclasc, seurat3, scmap]
-      num_genes:
-        min: 100
-        max: 10000
+    target: FilterGenesNumberPlaceHolder
   - type: feature.cell
     target: WeightedFeatureSVD
     params:
