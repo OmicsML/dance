@@ -1,17 +1,13 @@
 # =============================================================================
-# System files
+# 系统和开发工具相关
 # =============================================================================
 .DS_Store
 .vscode/
-
-# =============================================================================
-# Development tools
-# =============================================================================
 .tox/
 wandb/
 
 # =============================================================================
-# Build and cache
+# 构建和缓存
 # =============================================================================
 *.egg*
 __pycache__/
@@ -19,7 +15,7 @@ build/
 *.log
 
 # =============================================================================
-# Data files
+# 数据文件
 # =============================================================================
 *.pkl
 *.pt
@@ -28,11 +24,9 @@ build/
 *.h5ad
 *.gz
 *.tif
-temp_data/
-trash/
 
 # =============================================================================
-# Temporary files
+# 临时文件
 # =============================================================================
 temp_ans.csv
 temp_ans.json
@@ -45,47 +39,28 @@ proxy.txt
 readme.txt
 
 # =============================================================================
-# Result files
+# 结果文件
 # =============================================================================
 results - cell type deconvolution.csv
 results - spatial domain.csv
 
 # =============================================================================
-# Examples directory - data files
+# Examples 目录
 # =============================================================================
+
+# 通用数据文件
 examples/**/*.h5ad
 examples/**/*.h5
 examples/**/*.zip
 examples/**/*.gz
 examples/**/*.tif
 
-# Examples - configuration files
+# tuning 子目录
 examples/tuning/**/*.yaml
 examples/tuning/**/*.csv
 examples/tuning/**/*.sh
 examples/tuning/**/*.tar.gz
 examples/tuning/**/*.txt
-examples/atlas/config/run_config.csv
-
-# Examples - specific directories
-examples/atlas/demos/atlas_csvs/
-examples/atlas/demos/atlas_patterns/
-examples/atlas/metadatas/
-examples/spatial/spatial_domain/data/spatial/
-examples/spatial/cell_type_deconvo/data/spatial/
-examples/atlas/sc_similarity_examples/temp/
-examples/atlas/sc_similarity_examples/visualization/*
-examples/atlas/sc_similarity_examples/data/*
-examples/atlas/sc_similarity_examples/similarity/temp.ipynb
-examples/atlas/dropbox_token.txt
-examples/atlas/generate_method.ipynb
-examples/computer_resources/
-examples/tuning/check_sweep.py
-examples/tuning/result.md
-examples/result_analysis/*
-examples/single_modality/cell_type_annotation/**/*.xlsx
-examples/single_modality/cell_type_annotation/**/*.csv
-examples/single_modality/imputation/data/
 examples/tuning/figures/
 examples/tuning/imputation_magic/data/
 examples/tuning/domain_EfNST/Image_crop/
@@ -95,40 +70,90 @@ examples/tuning/joint_embedding_scmvae/get_run_kwargs.py
 examples/tuning/joint_embedding_scmvae/openproblems_2022_multi_atac2gex/config.png
 examples/tuning/imputation_graphsci/tsne_visualization.png
 examples/tuning/imputation_deepimpute/*.png
-examples/temp_hpancreas/
-
-# Examples - model files
-examples/multi_modality/joint_embedding/models/*.pth
+examples/tuning/check_sweep.py
+examples/tuning/result.md
 examples/tuning/joint_embedding_scmogcn/models/model_joint_embedding_1.pth
-models/model_joint_embedding_1.pth
 
-# =============================================================================
-# Exception rules - preserve specific files
-# =============================================================================
+# tuning 保留规则 - 每个算法文件夹保留一个示例结果文件夹
 
-# Preserve specific configuration files
-!examples/tuning/cta_actinn/1027-1357-1641-517-706-777-850-972_245-332-377-398-405-455-470-492/pipeline_params_tuning_config.yaml
-!examples/tuning/cta_actinn/1970_1970_1759/config_yamls/params/0_test_acc_params_tuning_config.yaml
-!examples/tuning/cta_actinn/1970_1970_1759/config_yamls/params/1_test_acc_params_tuning_config.yaml
-!examples/tuning/cta_actinn/1970_1970_1759/config_yamls/params/2_test_acc_params_tuning_config.yaml
+!examples/tuning/cluster_graphsc/human_pbmc2_cell/**
+!examples/tuning/cluster_scdcc/human_pbmc2_cell/**
+!examples/tuning/cluster_scdsc/human_pbmc2_cell/**
+!examples/tuning/cluster_scdeepcluster/human_pbmc2_cell/**
+!examples/tuning/cluster_sctag/human_pbmc2_cell/**
+!examples/tuning/domain_louvain/sub_mba/**
+!examples/tuning/domain_spagcn/sub_mba/**
+!examples/tuning/domain_stlearn/sub_mba/**
+!examples/tuning/deconv_card/hcc_liver/**
+!examples/tuning/deconv_spotlight/hcc_liver/**
+!examples/tuning/deconv_stdgcn/hcc_liver/**
+# !examples/tuning/deconv_card/kidney_3323/**
+# !examples/tuning/joint_embedding_scmvae/GSE140203_SKIN_atac2gex/**
+# !examples/tuning/predict_modality_babel/pbmc_cite/**
+# !examples/tuning/imputation_scgnn2/mouse_brain_data/**
+# !examples/tuning/imputation_graphsci/mouse_brain_data/**
+# !examples/tuning/joint_embedding_jae/human_breast_TGFb_data/**
+
+# tuning 保留规则
+!examples/tuning/cta_scheteronet/328_138/**
+!examples/tuning/cta_celltypist/328_138/**
+!examples/tuning/cta_scdeepsort/328_138/**
+!examples/tuning/cta_singlecellnet/328_138/**
+!examples/tuning/cta_svm/328_138/config_yamls/params/0_params_tuning_config.yaml
+!examples/tuning/cta_svm/328_138/config_yamls/params/1_params_tuning_config.yaml
+!examples/tuning/cta_svm/328_138/config_yamls/params/2_params_tuning_config.yaml
+!examples/tuning/cta_svm/328_138/results/**
+!examples/tuning/cta_svm/328_138/pipeline_params_tuning_config.yaml
+!examples/tuning/cta_svm/328_138/pipeline_tuning_config.yaml
+
+!examples/tuning/cta_actinn/328_138/**
+
+!examples/tuning/step3_default_params.yaml
+
+# atlas 子目录
+examples/atlas/demos/atlas_csvs/
+examples/atlas/demos/atlas_patterns/
+examples/atlas/metadatas/
+examples/atlas/sc_similarity_examples/temp/
+examples/atlas/sc_similarity_examples/visualization/*
+examples/atlas/sc_similarity_examples/data/*
+examples/atlas/sc_similarity_examples/similarity/temp.ipynb
+examples/atlas/dropbox_token.txt
+examples/atlas/generate_method.ipynb
+examples/atlas/config/run_config.csv
+
+# atlas 保留规则
 !examples/atlas/sc_similarity_examples/visualization/*.py
 !examples/atlas/sc_similarity_examples/data/Cell Type Annotation Atlas.xlsx
+
+# single_modality 子目录
+examples/single_modality/cell_type_annotation/**/*.xlsx
+examples/single_modality/cell_type_annotation/**/*.csv
+examples/single_modality/imputation/data/
+
+# 其他 Examples
+examples/spatial/spatial_domain/data/spatial/
+examples/spatial/cell_type_deconvo/data/spatial/
+examples/computer_resources/
+examples/temp_hpancreas/
+examples/result_analysis/*
+examples/multi_modality/joint_embedding/models/*.pth
+
+# 保留 result_analysis 下特定脚本
 !examples/result_analysis/get_important_pattern_sweep.py
 !examples/result_analysis/get_important_pattern.py
 !examples/result_analysis/get_num.py
 
-# Preserve specific directories
-!examples/tuning/cta_actinn/1970_1970_1759/**
-!examples/tuning/cta_celltypist/1970_1970_1759/**
-!examples/tuning/cta_scdeepsort/1970_1970_1759/**
-!examples/tuning/cta_singlecellnet/1970_1970_1759/**
-!examples/tuning/cta_svm/753_3285_2695/**
-!examples/tuning/cta_svm/params_run.sh
-!examples/tuning/cta_svm/params_tuning_config.yaml
-!examples/tuning/cta_svm/pipeline_params_tuning_config.yaml
-!examples/tuning/cta_svm/pipeline_run.sh
-!examples/tuning/cta_svm/pipeline_tuning_config.yaml
-!examples/tuning/step3_default_params.yaml
-!examples/tuning/cta_actinn/328_138/config_yamls/params/**
-!examples/tuning/cta_actinn/328_138/results/**
-!examples/tuning/cta_actinn/328_138/pipeline_params_tuning_config.yaml
+# =============================================================================
+# 模型文件
+# =============================================================================
+models/model_joint_embedding_1.pth
+examples/tuning/joint_embedding_scmogcn/models/model_joint_embedding_1.pth
+examples/multi_modality/joint_embedding/models/*.pth
+
+# =============================================================================
+# 其他
+# =============================================================================
+trash
+out.log
+temp_data

@@ -1,0 +1,61 @@
+---
+type: preprocessor
+tune_mode: pipeline_params
+pipeline_tuning_top_k: 3
+parameter_tuning_freq_n: 10
+pipeline:
+  - type: filter.gene
+    include:
+      - FilterGenesPercentile
+      - FilterGenesScanpyOrder
+      - FilterGenesPlaceHolder
+    default_params:
+      FilterGenesScanpyOrder:
+        order: [min_counts, min_cells, max_counts, max_cells]
+        min_counts: 1
+        max_counts: 134732
+        min_cells: 1
+        max_cells: 401
+  - type: normalize
+    include:
+      - ScaleFeature
+      - ScTransform
+      - Log1P
+      - NormalizeTotal
+      - NormalizePlaceHolder
+      - NormalizeTotalLog1P
+    default_params:
+      ScTransform:
+        processes_num: 8
+  - type: filter.gene
+    include:
+      - HighlyVariableGenesLogarithmizedByMeanAndDisp
+      - HighlyVariableGenesRawCount
+      - HighlyVariableGenesLogarithmizedByTopGenes
+      - FilterGenesTopK
+      - FilterGenesRegression
+      - FilterGenesNumberPlaceHolder
+    default_params:
+      FilterGenesTopK:
+        num_genes: 2208
+      FilterGenesRegression:
+        num_genes: 2208
+      HighlyVariableGenesRawCount:
+        n_top_genes: 2208
+      HighlyVariableGenesLogarithmizedByTopGenes:
+        n_top_genes: 2208
+  - type: feature.cell
+    target: SCNFeature
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        feature_channel: SCNFeature
+        label_channel: cell_type
+wandb:
+  entity: xzy11632
+  project: dance-dev
+  method: grid
+  metric:
+    name: acc
+    goal: maximize
