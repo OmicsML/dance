@@ -94,6 +94,7 @@ examples/tuning/joint_embedding_scmogcn/models/model_joint_embedding_1.pth
 !examples/tuning/joint_embedding_dcca/GSE140203_SKIN_atac2gex/**
 !examples/tuning/joint_embedding_jae/GSE140203_SKIN_atac2gex/**
 !examples/tuning/joint_embedding_scmogcn/GSE140203_SKIN_atac2gex/**
+!examples/tuning/joint_embedding_scmvae/GSE140203_SKIN_atac2gex/**
 !examples/tuning/imputation_deepimpute/human_melanoma_data/**
 
 # tuning 保留规则
