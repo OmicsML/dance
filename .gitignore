@@ -90,9 +90,11 @@ examples/tuning/joint_embedding_scmogcn/models/model_joint_embedding_1.pth
 !examples/tuning/deconv_spotlight/hcc_liver/**
 !examples/tuning/deconv_stdgcn/hcc_liver/**
 !examples/tuning/deconv_dstg/hcc_liver/**
+!examples/tuning/deconv_spatialdecon/hcc_liver/**
 !examples/tuning/joint_embedding_dcca/GSE140203_SKIN_atac2gex/**
 !examples/tuning/joint_embedding_jae/GSE140203_SKIN_atac2gex/**
-
+!examples/tuning/joint_embedding_scmogcn/GSE140203_SKIN_atac2gex/**
+!examples/tuning/imputation_deepimpute/human_melanoma_data/**
 
 # tuning 保留规则
 !examples/tuning/cta_scheteronet/328_138/**

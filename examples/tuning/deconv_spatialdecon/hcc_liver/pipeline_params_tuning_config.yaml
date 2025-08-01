@@ -1,0 +1,62 @@
+---
+type: preprocessor
+tune_mode: pipeline_params
+pipeline_tuning_top_k: 3
+parameter_tuning_freq_n: 20
+pipeline:
+  - type: filter.gene
+    include:
+      - FilterGenesPercentile
+      - FilterGenesScanpyOrder
+      - FilterGenesPlaceHolder
+    default_params:
+      FilterGenesScanpyOrder:
+        order: [min_counts, max_counts, min_cells, max_cells]
+        min_counts: 100
+        max_counts: 0.99
+        min_cells: 0.01
+        max_cells: 0.99
+  - type: normalize
+    include:
+      - ScaleFeature
+      - ScTransform
+      - Log1P
+      - NormalizeTotal
+      - NormalizePlaceHolder
+      - NormalizeTotalLog1P
+    default_params:
+      ScTransform:
+        processes_num: 8
+  - type: filter.gene
+    include:
+      - HighlyVariableGenesLogarithmizedByMeanAndDisp
+      - HighlyVariableGenesRawCount
+      - FilterGenesNumberPlaceHolder
+      - HighlyVariableGenesLogarithmizedByTopGenes
+      - FilterGenesTopK
+      - FilterGenesRegression
+    default_params:
+      FilterGenesTopK:
+        num_genes: 3000
+      FilterGenesRegression:
+        num_genes: 3000
+      HighlyVariableGenesRawCount:
+        n_top_genes: 3000
+      HighlyVariableGenesLogarithmizedByTopGenes:
+        n_top_genes: 3000
+  - type: pseudobulk
+    target: CellTopicProfile  # so skip feature.cell
+    params:
+      split_name: ref
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        label_channel: cell_type_portion
+wandb:
+  entity: xzy11632
+  project: dance-dev
+  method: grid  # try grid to provide a comprehensive search
+  metric:
+    name: MSE
+    goal: minimize
