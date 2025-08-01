@@ -13,7 +13,7 @@ repos:
   #       name: yamlfix (Auto-Fix)  # Optional: Rename for clarity
   #       args: [--config-file, environment.toml]
   #       additional_dependencies:
-  #         - maison==1.4.3  # <--- 例子：指定 maison 版本为 0.2.3
+  #         - maison==1.4.3
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.35.1
     hooks:

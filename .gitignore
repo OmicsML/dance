@@ -83,16 +83,15 @@ examples/tuning/joint_embedding_scmogcn/models/model_joint_embedding_1.pth
 !examples/tuning/cluster_sctag/human_pbmc2_cell/**
 !examples/tuning/domain_louvain/sub_mba/**
 !examples/tuning/domain_spagcn/sub_mba/**
+!examples/tuning/domain_stagate/sub_mba/**
 !examples/tuning/domain_stlearn/sub_mba/**
+!examples/tuning/domain_EfNST/sub_mba/**
 !examples/tuning/deconv_card/hcc_liver/**
 !examples/tuning/deconv_spotlight/hcc_liver/**
 !examples/tuning/deconv_stdgcn/hcc_liver/**
-# !examples/tuning/deconv_card/kidney_3323/**
-# !examples/tuning/joint_embedding_scmvae/GSE140203_SKIN_atac2gex/**
-# !examples/tuning/predict_modality_babel/pbmc_cite/**
-# !examples/tuning/imputation_scgnn2/mouse_brain_data/**
-# !examples/tuning/imputation_graphsci/mouse_brain_data/**
-# !examples/tuning/joint_embedding_jae/human_breast_TGFb_data/**
+!examples/tuning/deconv_dstg/hcc_liver/**
+!examples/tuning/joint_embedding_jae/GSE140203_SKIN_atac2gex/**
+
 
 # tuning 保留规则
 !examples/tuning/cta_scheteronet/328_138/**
