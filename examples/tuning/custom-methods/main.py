@@ -21,7 +21,8 @@ from dance.typing import LogLevel
 from dance.utils import set_seed
 
 
-@register_preprocessor("feature", "cell")  # NOTE: register any custom preprocessing function to be used for tuning
+@register_preprocessor("feature", "cell",
+                       overwrite=True)  # NOTE: register any custom preprocessing function to be used for tuning
 class GaussRandProjFeature(BaseTransform):
     """Custom preprocessing to extract cell feature via Gaussian random projection."""
 
@@ -48,10 +49,10 @@ if __name__ == "__main__":
     parser.add_argument("--dense_dim", type=int, default=400, help="dim of PCA")
     parser.add_argument("--gpu", type=int, default=0, help="GPU id, set to -1 for CPU")
     parser.add_argument("--log_level", type=str, default="INFO", choices=get_args(LogLevel))
-    parser.add_argument("--species", default="mouse")
-    parser.add_argument("--test_dataset", nargs="+", default=[2695], type=int, help="list of dataset id")
+    parser.add_argument("--species", default="human")
+    parser.add_argument("--test_dataset", nargs="+", default=[138], type=int, help="list of dataset id")
     parser.add_argument("--tissue", default="Brain")  # TODO: Add option for different tissue name for train/test
-    parser.add_argument("--train_dataset", nargs="+", default=[753], type=int, help="list of dataset id")
+    parser.add_argument("--train_dataset", nargs="+", default=[328], type=int, help="list of dataset id")
     parser.add_argument("--valid_dataset", nargs="+", default=None, type=int, help="list of dataset id")
     parser.add_argument("--tune_mode", default="pipeline_params", choices=["pipeline", "params", "pipeline_params"])
     parser.add_argument("--seed", type=int, default=10)
@@ -130,6 +131,5 @@ Human Spleen
 $ python main.py --species human --tissue Spleen --train_dataset 3043 3777 4029 4115 4362 4657  --test_dataset 1729 2125 2184 2724 2743 --valid_dataset 3043 3777 4029 4115 4362 4657 --count 240
 
 
-main.py --species human --tissue Spleen --train_dataset 3043 3777 4029 4115 4362 4657 --test_dataset 1729 2125 2184 2724 2743 --valid_dataset 3043 3777 4029 4115 4362 4657 --count 240 --sweep_id=p1iletlj
-
+python main.py --tune_mode pipeline_params --species human --tissue Brain --train_dataset 328 --test_dataset 138
 """

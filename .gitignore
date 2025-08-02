@@ -98,6 +98,8 @@ examples/tuning/joint_embedding_scmogcn/models/model_joint_embedding_1.pth
 !examples/tuning/imputation_deepimpute/human_melanoma_data/**
 !examples/tuning/imputation_graphsci/human_melanoma_data/**
 !examples/tuning/imputation_scgnn2/human_melanoma_data/**
+!examples/tuning/custom-methods/**
+examples/tuning/custom-methods/wandb
 
 # tuning 保留规则
 !examples/tuning/cta_scheteronet/328_138/**
