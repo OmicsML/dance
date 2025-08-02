@@ -1,5 +1,5 @@
+---
 extends: default
-
 rules:
   line-length: disable
   document-start: disable
@@ -7,4 +7,4 @@ rules:
     allowed-values: ['true', 'false', 'on']
     level: error
   braces:
-    max-spaces-inside: 1
+    max-spaces-inside: 2

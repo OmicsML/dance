@@ -28,7 +28,9 @@ from dance.transforms import (
     SaveRaw,
     SetConfig,
 )
+from dance.transforms.filter import FilterGenesTopK
 from dance.transforms.graph import FeatureFeatureGraph
+from dance.transforms.misc import UpdateRaw
 from dance.typing import LogLevel
 
 
@@ -173,14 +175,16 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             FilterCellsScanpy(min_counts=1),
             SaveRaw(),
             AnnDataTransform(sc.pp.log1p),
+            FilterGenesTopK(num_genes=2000, mode="var"),
+            UpdateRaw(),
             FeatureFeatureGraph(threshold=threshold, normalize_edges=normalize_edges),
         ]
         if mask:
             transforms.extend([
-                CellwiseMaskData(distr=distr, mask_rate=mask_rate, seed=seed),
+                CellwiseMaskData(distr=distr, mask_rate=mask_rate, seed=seed, add_test_mask=True),
                 SetConfig({
-                    "feature_channel": [None, None, "FeatureFeatureGraph", "train_mask"],
-                    "feature_channel_type": ["X", "raw_X", "uns", "layers"],
+                    "feature_channel": [None, None, "FeatureFeatureGraph", "train_mask", "valid_mask", "test_mask"],
+                    "feature_channel_type": ["X", "raw_X", "uns", "layers", "layers", "layers"],
                     "label_channel": [None, None],
                     "label_channel_type": ["X", "raw_X"],
                 })
@@ -460,10 +464,11 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             log_lik - kl
 
         """
+        origin_device = batch.device
         params = [batch, adj_orig, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean, disp, pi, mask]
-        # for index, param in enumerate(params):
-        #     if isinstance(param, torch.Tensor):
-        #         params[index] = params[index].cpu()
+        for index, param in enumerate(params):
+            if isinstance(param, torch.Tensor):
+                params[index] = params[index].cpu()
         batch, adj_orig, z_adj, z_adj_log_std, z_adj_mean, z_exp, mean, disp, pi, mask = params
         pos_weight = (adj_orig.shape[0]**2 - adj_orig.sum(axis=1)) / (adj_orig.sum(axis=1))
         norm_adj = adj_orig.shape[0] * adj_orig.shape[0] / float(
@@ -491,9 +496,9 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         kl = ka * kl_adj - ke * kl_exp
         loss = log_lik - kl
         results = [loss_adj, loss_exp, log_lik, kl, loss]
-        # for index, res in enumerate(results):
-        #     if isinstance(res, torch.Tensor):
-        #         results[index] = results[index].to(origin_device)
+        for index, res in enumerate(results):
+            if isinstance(res, torch.Tensor):
+                results[index] = results[index].to(origin_device)
         loss_adj, loss_exp, log_lik, kl, loss = results
         return loss_adj, loss_exp, log_lik, kl, loss
 
@@ -537,7 +542,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         if mask is not None:  # and metric == 'MSE':
             # true_target = true_target[~mask[test_idx]]
             # imputed_target = imputed_target[~mask[test_idx]]
-            imputed_target[mask[test_idx]] = true_target[mask[test_idx]]
+            imputed_target[mask[test_idx]] = true_target[mask[test_idx]].to(imputed_target.dtype)
         if metric == 'RMSE':
             return np.sqrt(F.mse_loss(true_target, imputed_target).item())
         elif metric == 'PCC':

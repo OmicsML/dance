@@ -1,0 +1,69 @@
+---
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: misc
+    target: EfNSTImageTransform
+    params:
+      data_name: sub_mba
+  - type: misc
+    target: EfNSTAugmentTransform
+  - type: graph.cell
+    target: EfNSTGraphTransform
+    params:
+      distType: KDTree
+      k: 12
+  - type: filter.gene
+    target: FilterGenesPlaceHolder
+  - type: normalize
+    target: Log1P
+    params_to_tune:
+      base:
+        min: 1.0
+        max: 10.0
+  - type: filter.gene
+    target: HighlyVariableGenesLogarithmizedByMeanAndDisp
+    params_to_tune:
+      min_disp:
+        min: 0.05
+        max: 0.5
+      max_disp:
+        min: 1.0
+        max: 100.0
+      min_mean:
+        min: 0.0
+        max: 0.0125
+      max_mean:
+        min: 3.0
+        max: 20.0
+      n_bins:
+        min: 10
+        max: 30
+      flavor:
+        values: [seurat, cell_ranger]
+  - type: feature.cell
+    target: CellSVD
+    params:
+      out: feature.cell
+      log_level: INFO
+    params_to_tune:
+      n_components:
+        min: 100
+        max: 1000
+      algorithm:
+        values: [arpack, randomized]
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        feature_channel: [feature.cell, EfNSTGraph]
+        feature_channel_type: [obsm, uns]
+        label_channel: label
+        label_channel_type: obs
+wandb:
+  entity: xzy11632
+  project: dance-dev
+  method: bayes
+  metric:
+    name: ARI
+    goal: maximize

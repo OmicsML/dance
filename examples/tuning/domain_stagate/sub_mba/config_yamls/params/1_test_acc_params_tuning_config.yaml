@@ -1,0 +1,161 @@
+---
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: filter.gene
+    target: FilterGenesScanpyOrder
+    params_to_tune:
+      order:
+        values:
+          - - min_counts
+            - min_cells
+            - max_counts
+            - max_cells
+          - - min_counts
+            - min_cells
+            - max_cells
+            - max_counts
+          - - min_counts
+            - max_counts
+            - min_cells
+            - max_cells
+          - - min_counts
+            - max_counts
+            - max_cells
+            - min_cells
+          - - min_counts
+            - max_cells
+            - min_cells
+            - max_counts
+          - - min_counts
+            - max_cells
+            - max_counts
+            - min_cells
+          - - min_cells
+            - min_counts
+            - max_counts
+            - max_cells
+          - - min_cells
+            - min_counts
+            - max_cells
+            - max_counts
+          - - min_cells
+            - max_counts
+            - min_counts
+            - max_cells
+          - - min_cells
+            - max_counts
+            - max_cells
+            - min_counts
+          - - min_cells
+            - max_cells
+            - min_counts
+            - max_counts
+          - - min_cells
+            - max_cells
+            - max_counts
+            - min_counts
+          - - max_counts
+            - min_counts
+            - min_cells
+            - max_cells
+          - - max_counts
+            - min_counts
+            - max_cells
+            - min_cells
+          - - max_counts
+            - min_cells
+            - min_counts
+            - max_cells
+          - - max_counts
+            - min_cells
+            - max_cells
+            - min_counts
+          - - max_counts
+            - max_cells
+            - min_counts
+            - min_cells
+          - - max_counts
+            - max_cells
+            - min_cells
+            - min_counts
+          - - max_cells
+            - min_counts
+            - min_cells
+            - max_counts
+          - - max_cells
+            - min_counts
+            - max_counts
+            - min_cells
+          - - max_cells
+            - min_cells
+            - min_counts
+            - max_counts
+          - - max_cells
+            - min_cells
+            - max_counts
+            - min_counts
+          - - max_cells
+            - max_counts
+            - min_counts
+            - min_cells
+          - - max_cells
+            - max_counts
+            - min_cells
+            - min_counts
+      min_counts:
+        min: 3
+        max: 500
+      min_cells:
+        min: 0.0
+        max: 0.1
+      max_counts:
+        min: 0.9
+        max: 1.0
+      max_cells:
+        min: 0.95
+        max: 1.0
+  - type: filter.gene
+    target: FilterGenesMatch
+    params:
+      prefixes: [ERCC, MT-]
+  - type: normalize
+    target: Log1P
+    params_to_tune:
+      base:
+        min: 1.0
+        max: 10.0
+  - type: filter.gene
+    target: HighlyVariableGenesLogarithmizedByTopGenes
+    params_to_tune:
+      n_top_genes:
+        min: 100
+        max: 10000
+      n_bins:
+        min: 10
+        max: 30
+      flavor:
+        values: [seurat, cell_ranger]
+  - type: graph.spatial
+    target: StagateGraph
+    params:
+      radius: 150
+  - type: feature.cell
+    target: FeatureCellPlaceHolder
+    params:
+      out: feature.cell
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        feature_channel: [feature.cell, StagateGraph]
+        feature_channel_type: [obsm, obsp]
+        label_channel: label
+        label_channel_type: obs
+wandb:
+  entity: xzy11632
+  project: dance-dev
+  method: bayes
+  metric:
+    name: ARI
+    goal: maximize

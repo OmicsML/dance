@@ -11,6 +11,7 @@ numpy==1.26.4
 omegaconf==2.3.0
 opencv-python==4.9.0.80
 openpyxl==3.1.2
+pot==0.9.4
 pandas==2.2.2
 # pandas==1.5.3  # scib 1.1.4 requires pandas<2
 pyro-ppl==1.9.0
@@ -26,3 +27,8 @@ threadpoolctl==3.5.0
 tifffile==2024.2.12
 torchnmf==0.3.5
 tqdm==4.66.2
+anndata==0.10.8
+wandb==0.16.3
+uvicorn== 0.34.3
+fastapi == 0.115.12
+python-multipart==0.0.20

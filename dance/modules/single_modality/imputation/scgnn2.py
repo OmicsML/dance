@@ -70,6 +70,56 @@ class ScGNN2:
     def predict(self, x: Optional[Any] = None) -> np.ndarray:
         return self.x_imputed
 
+    def score(self, true_expr, imputed_expr, mask=None, metric="MSE", log1p=True, test_idx=None):
+        """Scoring function of model.
+
+        Parameters
+        ----------
+        true_expr :
+            True underlying expression values
+        imputed_expr :
+            Imputed expression values
+        test_idx :
+            index of testing cells
+        metric :
+            Choice of scoring metric - 'RMSE' or 'ARI'
+
+        Returns
+        -------
+        score :
+            evaluation score
+
+        """
+        allowd_metrics = {"RMSE", "PCC", "MRE"}
+        if metric not in allowd_metrics:
+            raise ValueError("scoring metric %r." % allowd_metrics)
+
+        if test_idx is None:
+            test_idx = range(len(true_expr))
+        true_target = true_expr[test_idx].to(self.device)
+        imputed_target = imputed_expr[test_idx].to(self.device)
+        if log1p:
+            imputed_target = torch.log1p(imputed_target)
+        if mask is not None:  # and metric == 'MSE':
+            # true_target = true_target[~mask[test_idx]]
+            # imputed_target = imputed_target[~mask[test_idx]]
+            imputed_target[mask[test_idx]] = true_target[mask[test_idx]].to(imputed_target.dtype)
+        if metric == 'RMSE':
+            return np.sqrt(F.mse_loss(true_target, imputed_target).item())
+        elif metric == 'PCC':
+            # corr_cells = np.corrcoef(true_target.cpu(), imputed_target.cpu())
+            # return corr_cells
+            return np.corrcoef(true_target.cpu()[~mask[test_idx]], imputed_target.cpu()[~mask[test_idx]])[0, 1]
+        elif metric == "MRE":
+            actual = true_target.cpu()[~mask[test_idx]]
+            predicted = imputed_target.cpu()[~mask[test_idx]]
+            abs_error = torch.abs(predicted - actual)
+            abs_actual = torch.abs(actual)
+            abs_actual[abs_actual < 1e-10] = 1e-10
+            relative_error = abs_error / abs_actual
+            mre = torch.mean(relative_error).item()
+            return mre
+
 
 # ---------------------------
 # args.seed
