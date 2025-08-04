@@ -30,7 +30,7 @@ from dance.transforms import (
     SetConfig,
 )
 from dance.transforms.graph import DSTGraph
-from dance.typing import Any, LogLevel, Optional, Tuple
+from dance.typing import Any, LogLevel, Optional, Tuple, Union
 from dance.utils import get_device
 
 
@@ -340,7 +340,7 @@ def masked_softmax_cross_entropy(preds, labels, mask):
 
 
 def split_mask_for_validation(pseudo_train_mask: torch.Tensor, valid_ratio: float = 0.3,
-                              random_seed: int | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+                              random_seed: Union[int, None] = None) -> Tuple[torch.Tensor, torch.Tensor]:
     """Splits a boolean mask into training and validation masks with reproducibility.
 
     Takes a pseudo training mask (1D boolean tensor) and splits the True
@@ -360,7 +360,7 @@ def split_mask_for_validation(pseudo_train_mask: torch.Tensor, valid_ratio: floa
                      be random based on the current RNG state. Defaults to None.
 
     Returns:
-        A tuple containing:
+        A Tuple containing:
         - final_train_mask (torch.Tensor): Boolean tensor, True for training samples.
         - valid_mask (torch.Tensor): Boolean tensor, True for validation samples.
 

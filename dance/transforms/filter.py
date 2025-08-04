@@ -775,7 +775,7 @@ class FilterGenesRegression(BaseTransform):
     ----
     The implementation is adapted from the EnClaSC GitHub repo: https://github.com/xy-chen16/EnClaSC
 
-    Reference
+    References
     ---------
     https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-020-03679-z
 
@@ -887,7 +887,7 @@ class FilterGenesMarkerGini(BaseTransform):
         If set, e.g., to :obj:`'marker'`, then save the marker indicator to the :obj:`.obs` column named as
         :obj:`marker`.
 
-    Reference
+    References
     ---------
     https://genomebiology.biomedcentral.com/articles/10.1186/s13059-016-1010-4?ref=https://githubhelp.com
 

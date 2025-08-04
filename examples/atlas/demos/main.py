@@ -13,9 +13,7 @@ import pandas as pd
 import scanpy as sc
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from joblib import PrintTime
 from matplotlib import pyplot as plt
-from networkx import dfs_tree
 
 from dance import logger
 from dance.atlas.sc_similarity.anndata_similarity import AnnDataSimilarity, get_anndata
@@ -55,6 +53,44 @@ def fig_to_base64(fig):
 
 def get_sim(adata: ad.AnnData, tissue: str, sweep_dict: Optional[dict] = None, feature_name: str = "bures",
             use_sim_cache=False, query_dataset=None):
+    """Analyze similarity between user query dataset and atlas datasets, returning the
+    most similar dataset and its best preprocessing workflows.
+
+    The main purpose of this function is: given a user's query dataset, the function returns the most similar dataset in the atlas and its best preprocessing workflows across different methods.
+
+    Parameters:
+    -----------
+    adata : ad.AnnData
+        User's query AnnData object
+    tissue : str
+        Tissue type of the query dataset (e.g., 'brain', 'heart', etc.)
+    sweep_dict : Optional[dict], default=None
+        Dictionary containing sweep configurations that have been run on the query dataset, format:
+        {"cta_actinn": "sweep_id1", "cta_celltypist": "sweep_id2", ...}
+        Usually not provided in most cases, in which case plot2 will not be generated
+    feature_name : str, default="bures"
+        Feature name used to evaluate similarity between query dataset and atlas datasets
+    use_sim_cache : bool, default=False
+        Whether to use cached similarity matrix, can improve computation speed
+    query_dataset : Optional[str], default=None
+        Cache name, used when use_sim_cache=True
+
+    Returns:
+    --------
+    dict
+        Dictionary containing the following key-value pairs:
+        - metadata: Best preprocessing workflow configurations for the most similar dataset in atlas across different methods
+        - plot1_png_base64: Base64 encoded plot1 (radar chart showing similarity scores of the most similar dataset using other functions except feature_name)
+        - plot2_png_base64: Base64 encoded plot2 (showing position of found preprocessing workflows in previously run searches, None when sweep_dict=None)
+
+    Notes:
+    ------
+    - Plot1 displays the performance of the most similar dataset across multiple similarity metrics (in radar chart format)
+    - Plot2 is only generated when sweep_dict is provided, showing the position of best preprocessing workflows in historical search results
+    - Supported similarity features include: wasserstein, Hausdorff, spectral, etc.
+    - Supported methods include: cta_actinn, cta_celltypist, cta_scdeepsort, cta_singlecellnet
+
+    """
     conf_data = pd.read_excel(SIMILARITYDIR / "data/Cell Type Annotation Atlas.xlsx", sheet_name=tissue)
     atlas_datasets = list(conf_data[conf_data["queryed"] == False]["dataset_id"])
     ans = {}
@@ -154,6 +190,38 @@ app = FastAPI()
 
 @app.get("/api/get_method")
 async def get_atlas_method(atlas_id, tissue):
+    """Retrieve the best preprocessing workflows for a specific atlas dataset across
+    different methods.
+
+    This endpoint returns the optimal preprocessing configurations for a given atlas dataset
+    identified by its ID and tissue type, across all supported cell type annotation methods.
+
+    Parameters:
+    -----------
+    atlas_id : str
+        The ID of the atlas dataset to retrieve preprocessing workflows for
+    tissue : str
+        The tissue type of the atlas dataset (e.g., 'brain', 'heart', etc.)
+
+    Returns:
+    --------
+    dict
+        Dictionary containing the best preprocessing workflow configurations for the specified
+        atlas dataset across different methods:
+        - cta_celltypist: Best preprocessing workflow for CellTypist method
+        - cta_scdeepsort: Best preprocessing workflow for scDeepSort method
+        - cta_singlecellnet: Best preprocessing workflow for SingleCellNet method
+        - cta_actinn: Best preprocessing workflow for ACTINN method
+        - dataset_id: The atlas dataset ID
+
+    Notes:
+    ------
+    - The workflows are retrieved from the Cell Type Annotation Atlas Excel file
+    - Supported methods include: cta_celltypist, cta_scdeepsort, cta_singlecellnet, cta_actinn
+    - Each method returns its optimal preprocessing configuration in YAML format
+
+    """
+
     conf_data = pd.read_excel(SIMILARITYDIR / "data/Cell Type Annotation Atlas.xlsx", sheet_name=tissue)
     ans_conf = {
         method: conf_data.loc[conf_data["dataset_id"] == atlas_id, f"{method}_step2_best_yaml"].iloc[0]
@@ -172,8 +240,44 @@ async def run_similarity_analysis(h5ad_file: UploadFile = File(..., description=
                                   query_dataset: Optional[str] = Form(None, description="Query dataset ID"),
                                   sweep_dict_json: Optional[str] = Form(
                                       None, description="JSON string containing sweep IDs")):
-    """Receive uploaded h5ad file and parameters, run similarity analysis, and return
-    JSON containing results and charts."""
+    """FastAPI wrapper for the get_sim function to perform similarity analysis via HTTP
+    API.
+
+    This endpoint receives an uploaded h5ad file and analysis parameters, then calls the get_sim function
+    to analyze similarity between the query dataset and atlas datasets. It returns the most similar
+    dataset from the atlas along with its best preprocessing workflows and visualization plots.
+
+    Parameters:
+    -----------
+    h5ad_file : UploadFile
+        Uploaded .h5ad format query data file
+    tissue : str
+        Tissue type of the query dataset (e.g., 'brain', 'heart', etc.)
+    feature_name : str, default="metadata_sim"
+        Feature name used to evaluate similarity between query and atlas datasets
+    use_sim_cache : bool, default=False
+        Whether to use cached similarity matrix for faster computation
+    query_dataset : Optional[str], default=None
+        Query dataset ID for cache identification
+    sweep_dict_json : Optional[str], default=None
+        JSON string containing sweep configurations that have been run on the query dataset
+
+    Returns:
+    --------
+    dict
+        Same return format as get_sim function:
+        - metadata: Best preprocessing workflow configurations for the most similar atlas dataset
+        - plot1_png_base64: Base64 encoded radar chart showing similarity metrics
+        - plot2_png_base64: Base64 encoded plot showing preprocessing workflow positions (if sweep_dict provided)
+
+    Notes:
+    ------
+    - This is essentially a FastAPI wrapper around the get_sim function
+    - The function handles file upload, parameter processing, and temporary file cleanup
+    - All core analysis logic is delegated to the get_sim function
+    - Returns the same analysis results as get_sim but through HTTP API interface
+
+    """
     # 1. Process uploaded file
     # Create a secure temporary file to save uploaded content
     temp_dir = tempfile.gettempdir()

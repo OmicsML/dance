@@ -31,8 +31,8 @@ class MorphologyFeatureCNN(BaseTransform):
     target_size
         Target patch size.
 
-    Reference
-    ---------
+    References
+    ----------
     https://doi.org/10.1101/2020.05.31.125658
 
     """
@@ -107,8 +107,8 @@ class SMEFeature(BaseTransform):
     n_components
         Number of feature dimension.
 
-    Reference
-    ---------
+    References
+    ----------
     https://doi.org/10.1101/2020.05.31.125658
 
     """
@@ -162,8 +162,8 @@ class SpatialIDEFeature(BaseTransform):
         1. Variance-stabilizing transformation for negative-binomial-distributed data (Anscombe's transformation).
         2. Regress log total count values out from the Anscombe-transformed expression values.
 
-    Reference
-    ---------
+    References
+    ----------
     https://www.nature.com/articles/nmeth.4636#Sec2
 
     """
@@ -222,8 +222,8 @@ class TangramFeature(BaseTransform):
     First, compute the cell density inside each voxel. Then, the cell density distributions are compared using
     Kullback-Leibler (KL) divergence, whereas gene expression is assessed via cosine similarity.
 
-    Reference
-    ---------
+    References
+    ----------
     https://www.nature.com/articles/s41592-021-01264-7
 
     """

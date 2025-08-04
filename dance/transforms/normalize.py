@@ -118,7 +118,7 @@ class ScTransformR(BaseTransform):
     min_cells
         Minimum number of cells the gene has to express in, below which that gene will be discarded.
 
-    Reference
+    References
     ---------
     https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1874-1
 
@@ -232,7 +232,7 @@ class ScTransform(BaseTransform):
     processes_num
         Number of processes. Default to the total number of available processors.
 
-    Reference
+    References
     ---------
     https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1874-1
 
