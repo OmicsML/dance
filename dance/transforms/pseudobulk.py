@@ -212,7 +212,7 @@ def get_ct_profile(
 class CellGiottoTopicProfile(BaseTransform):
     """Giotto cell topic profile.
 
-    Reference
+    References
     ---------
     https://rubd.github.io/Giotto_site/reference/findGiniMarkers_one_vs_all.html
 

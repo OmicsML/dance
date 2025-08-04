@@ -2,6 +2,7 @@ import argparse
 from pprint import pprint
 
 import numpy as np
+from sklearn.model_selection import train_test_split
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.spotlight import SPOTlight
@@ -15,7 +16,7 @@ parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate.")
 parser.add_argument("--rank", type=int, default=2, help="Rank of the NMF module.")
 parser.add_argument("--bias", type=bool, default=False, help="Include/Exclude bias term.")
 parser.add_argument("--max_iter", type=int, default=4000, help="Maximum optimization iteration.")
-parser.add_argument("--device", default="auto", help="Computation device.")
+parser.add_argument("--device", default="cuda:5", help="Computation device.")
 parser.add_argument("--seed", type=int, default=17, help="Random seed.")
 parser.add_argument("--num_runs", type=int, default=1)
 args = parser.parse_args()
@@ -37,9 +38,12 @@ for seed in range(args.seed, args.seed + args.num_runs):
 
     # Train and evaluate model
     model = SPOTlight(ref_count, ref_annot, cell_types, rank=args.rank, bias=args.bias, device=args.device)
-    score = model.fit_score(x, y, lr=args.lr, max_iter=args.max_iter)
-    scores.append(score)
-    print(f"MSE: {score:7.4f}")
+    valid_idx, test_idx = train_test_split(np.arange(len(x)), test_size=0.3, random_state=seed)
+
+    valid_score, test_score = model.fit_score(x, y, lr=args.lr, max_iter=args.max_iter, valid_idx=valid_idx,
+                                              test_idx=test_idx)
+    scores.append(test_score)
+    print(f"MSE: {test_score:7.4f}")
 print(f"SPOTLight {args.dataset}:")
 print(f"{scores}\n{np.mean(scores):.5f} +/- {np.std(scores):.5f}")
 """To reproduce SpatialDecon benchmarks, please refer to command lines belows:

@@ -2,6 +2,7 @@ import argparse
 from pprint import pprint
 
 import numpy as np
+from sklearn.model_selection import train_test_split
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.spatialdecon import SpatialDecon
@@ -35,9 +36,13 @@ for seed in range(args.seed, args.seed + args.num_runs):
 
     # Train and evaluate model
     spaDecon = SpatialDecon(ct_profile, ct_select=cell_types, bias=args.bias, device=args.device)
-    score = spaDecon.fit_score(x, y, lr=args.lr, max_iter=args.max_iter, print_period=100)
-    scores.append(score)
-    print(f"MSE: {score:7.4f}")
+    valid_idx, test_idx = train_test_split(np.arange(len(x)), test_size=0.3, random_state=args.seed)
+    # Train and evaluate model
+    spaDecon = SpatialDecon(ct_profile, ct_select=cell_types, bias=args.bias, device=args.device)
+    valid_score, test_score = spaDecon.fit_score(x, y, lr=args.lr, max_iter=args.max_iter, print_period=100,
+                                                 valid_idx=valid_idx, test_idx=test_idx)
+    scores.append(test_score)
+    print(f"MSE: {test_score:7.4f}")
 print(f"SpatialDecon {args.dataset}:")
 print(f"{scores}\n{np.mean(scores):.5f} +/- {np.std(scores):.5f}")
 """To reproduce SpatialDecon benchmarks, please refer to command lines belows:

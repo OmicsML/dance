@@ -37,7 +37,7 @@ class SC3Feature(BaseTransform):
     d
         Number of cells selected.
 
-    Reference
+    References
     ---------
     https://www.nature.com/articles/nmeth.4236
 

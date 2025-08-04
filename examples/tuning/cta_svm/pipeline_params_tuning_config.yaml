@@ -1,3 +1,4 @@
+---
 type: preprocessor
 tune_mode: pipeline_params
 pipeline_tuning_top_k: 2
@@ -28,7 +29,7 @@ pipeline:
       - FilterGenesPlaceHolder
     default_params:
       FilterGenesScanpyOrder:
-        order: ["min_counts", "min_cells", "max_counts", "max_cells"]
+        order: [min_counts, min_cells, max_counts, max_cells]
         min_counts: 1
         max_counts: 5000
         min_cells: 1
@@ -63,7 +64,7 @@ pipeline:
 wandb:
   entity: danceteam
   project: dance-dev
-  method: grid #try grid to provide a comprehensive search
+  method: grid  # try grid to provide a comprehensive search
   metric:
     name: acc  # val/acc
     goal: maximize

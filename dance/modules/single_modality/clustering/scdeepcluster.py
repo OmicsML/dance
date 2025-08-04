@@ -421,7 +421,7 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         aris = []
         P = {}
         Q = {}
-
+        Z = {}
         delta_label = np.inf
         for epoch in range(epochs):
             if epoch % update_interval == 0:
@@ -434,8 +434,10 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
                 p_ = {f"epoch{epoch}": p}
                 q_ = {f"epoch{epoch}": q}
+                z_ = {f"epoch{epoch}": latent.data}
                 P = {**P, **p_}
                 Q = {**Q, **q_}
+                Z = {**Z, **z_}
 
                 # check stop criterion
                 if False:
@@ -482,6 +484,7 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
 
         index = update_interval * np.argmax(aris)
         self.q = Q[f"epoch{index}"]
+        self.z = Z[f"epoch{index}"]
 
     def predict_proba(self, x: Optional[Any] = None) -> np.ndarray:
         """Get the predicted propabilities for each cell.
@@ -516,6 +519,17 @@ class ScDeepCluster(nn.Module, TorchNNPretrain, BaseClusteringMethod):
         """
         pred = self.predict_proba().argmax(1)
         return pred
+
+    def get_latent(self) -> torch.Tensor:
+        """Get the latent representation of the input data.
+
+        Returns
+        -------
+        z
+            Latent representation of the input data.
+
+        """
+        return self.z
 
 
 class MeanAct(nn.Module):

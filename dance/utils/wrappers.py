@@ -1,11 +1,15 @@
 import datetime
 import functools
 import time
+from typing import Union
 
+import anndata
+import mudata
 import numpy as np
 import torch
 
 from dance import logger
+from dance.data.base import Data
 from dance.typing import Any, Callable
 
 
@@ -85,3 +89,48 @@ def torch_to_numpy(func):
         return func(*new_args)
 
     return wrapped_func
+
+
+import functools
+
+
+def add_mod_and_transform(cls):
+    """A decorator that modifies a class to add functionality for working with specific
+    modalities (`mod`) in a `mudata` object."""
+    original_init = cls.__init__
+    original_call = cls.__call__
+    cls.add_mod_and_transform = "add_mod_and_transform"
+
+    @functools.wraps(original_init)
+    def new_init(self, *args, **kwargs):
+        mod = kwargs.pop('mod', None)
+        original_init(self, *args, **kwargs)
+        self.mod = mod
+
+    @functools.wraps(original_call)
+    def new_call(self, data: Data, *args, **kwargs):
+        """
+        Parameters
+        ----------
+        data : Data
+            The input data object containing the `mudata` with multiple modalities.
+        Returns
+        -------
+        Any
+            The result of the original_call method.
+        """
+        if hasattr(self, 'mod') and self.mod is not None:
+            md_data = data.data
+            ad_data = Data(data=transform_mod_to_anndata(md_data, self.mod))
+            res = original_call(self, ad_data, *args, **kwargs)
+            data.data.mod[self.mod] = ad_data.data
+        else:
+            return original_call(self, data, *args, **kwargs)
+
+    cls.__init__ = new_init
+    cls.__call__ = new_call
+    return cls
+
+
+def transform_mod_to_anndata(mod_data: mudata.MuData, mod_key: str):
+    return mod_data.mod[mod_key]

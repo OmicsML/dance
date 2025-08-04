@@ -3,11 +3,13 @@ from abc import ABC
 from typing import get_args
 
 import anndata as ad
+import mudata as md
 import numpy as np
 import pandas as pd
 import scanpy as sc
+import scipy
 import scipy.sparse as sp
-from scipy.stats import rankdata
+from scipy.stats import median_abs_deviation, rankdata
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import MinMaxScaler, PolynomialFeatures
 
@@ -20,6 +22,7 @@ from dance.transforms.interface import AnnDataTransform
 from dance.typing import Dict, GeneSummaryMode, List, Literal, Logger, Optional, Tuple, Union
 from dance.utils import default
 from dance.utils.status import deprecated
+from dance.utils.wrappers import add_mod_and_transform
 
 
 def get_count(count_or_ratio: Optional[Union[float, int]], total: int) -> Optional[int]:
@@ -48,6 +51,7 @@ def get_count(count_or_ratio: Optional[Union[float, int]], total: int) -> Option
 
 
 @register_preprocessor("filter")
+@add_mod_and_transform
 class FilterScanpy(BaseTransform):
     """Scanpy filtering transformation with additional options."""
 
@@ -128,7 +132,12 @@ class FilterScanpy(BaseTransform):
             subset_func = getattr(data.data, self._subsetting_func_name)
             self.logger.info(f"Subsetting {self._FILTER_TARGET} ({~subset_ind.sum():,} removed) due to {self}")
             if self.inplace:
-                subset_func(subset_ind)
+                if self._FILTER_TARGET == "genes":
+                    subset_func(subset_ind)
+                else:
+                    data.filter_by_mask(subset_ind)
+                    # subset_func(subset_ind)
+
             else:
                 if self._FILTER_TARGET == "genes":
                     data.data.obsm[self.out] = x[:, subset_ind]
@@ -145,9 +154,9 @@ class FilterScanpy(BaseTransform):
             elif self._FILTER_TARGET == "cells":
                 n_counts = np.sum(x, axis=1)
             if isinstance(self.min_counts, float) and 0 <= self.min_counts <= 1:
-                min_counts = np.percentile(n_counts, self.min_counts)
+                min_counts = np.percentile(n_counts, self.min_counts * 100)
             else:
-                max_counts = np.percentile(n_counts, self.max_counts)
+                max_counts = np.percentile(n_counts, self.max_counts * 100)
             return min_counts, max_counts
         else:
             return self.min_counts, self.max_counts
@@ -266,6 +275,45 @@ class FilterGenesScanpy(FilterScanpy):
                          max_genes_or_cells=max_cells, split_name=split_name, channel=channel,
                          channel_type=channel_type, key_n_counts=key_n_counts, key_n_genes_or_cells=key_n_cells,
                          inplace=inplace, **kwargs)
+
+
+@register_preprocessor("filter", "cell")
+@add_mod_and_transform
+class FilterCellsCommonMod(BaseTransform):
+    """Initialize the FilterCellsCommonMod class.
+
+    Parameters
+    ----------
+    mod1 : str
+        Name of the first modality in the single-cell dataset.
+    mod2 : str
+        Name of the second modality in the single-cell dataset.
+    sol : Optional[str], default=None
+        Name of the optional solution dataset containing cell labels or annotations.
+    **kwargs : dict
+        Additional keyword arguments passed to the base transformation class.
+
+    """
+
+    def __init__(self, mod1: str, mod2: str, sol: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.mod1 = mod1
+        self.mod2 = mod2
+        self.sol = sol
+
+    def __call__(self, data: Data):
+        md_data = data.data
+        data_mod1 = md_data.mod[self.mod1]
+        data_mod2 = md_data.mod[self.mod2]
+        common_cells = list(set(data_mod1.obs.index) & set(data_mod2.obs.index))
+        data_mod1 = data_mod1[common_cells, :]
+        data_mod2 = data_mod2[common_cells, :]
+        data.data.mod[self.mod1] = data_mod1
+        data.data.mod[self.mod2] = data_mod2
+        if self.sol is not None:
+            test_sol = md_data.mod[self.sol]
+            test_sol = test_sol[common_cells, :]
+            data.data.mod[self.sol] = test_sol
 
 
 @register_preprocessor("filter", "gene")
@@ -442,7 +490,6 @@ class FilterGenes(BaseTransform, ABC):
             gene_summary = np.nan_to_num(np.array(x.var(0) / x.mean(0)), posinf=0, neginf=0).ravel()
         else:
             raise DevError(f"{self.mode!r} not expected, please inform dev to fix this error.")
-
         self.logger.info(f"Filtering genes based on {self.mode} expression percentiles in layer {self.channel!r}")
         mask = self._get_preserve_mask(gene_summary)
         selected_genes = sorted(data.data.var_names[mask])
@@ -462,7 +509,7 @@ class FilterGenes(BaseTransform, ABC):
             selected_genes = sorted(set(selected_genes) | whitelist_gene_set)
             num_added = len(selected_genes) - orig_num_selected
             self.logger.info(f"{num_added:,} genes originally unselected are being added due to whitelist")
-
+        data.data.uns['gene_summary'] = gene_summary
         # Update data
         self.logger.info(f"{data.shape[1] - len(selected_genes):,} genes removed")
         if self.inplace:
@@ -472,6 +519,7 @@ class FilterGenes(BaseTransform, ABC):
 
 
 @register_preprocessor("filter", "gene")
+@add_mod_and_transform
 class FilterGenesPercentile(FilterGenes):
     """Filter genes based on percentiles of the summarized gene expressions.
 
@@ -540,6 +588,7 @@ class FilterGenesPercentile(FilterGenes):
 
 
 @register_preprocessor("filter", "gene")
+@add_mod_and_transform
 class FilterGenesTopK(FilterGenes):
     """Select top/bottom genes based on the  summarized gene expressions.
 
@@ -708,6 +757,7 @@ class FilterGenesMarker(BaseTransform):
 
 
 @register_preprocessor("filter", "gene")
+@add_mod_and_transform
 class FilterGenesRegression(BaseTransform):
     """Select genes based on regression.
 
@@ -725,7 +775,7 @@ class FilterGenesRegression(BaseTransform):
     ----
     The implementation is adapted from the EnClaSC GitHub repo: https://github.com/xy-chen16/EnClaSC
 
-    Reference
+    References
     ---------
     https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-020-03679-z
 
@@ -733,18 +783,19 @@ class FilterGenesRegression(BaseTransform):
     _DISPLAY_ATTRS = ("num_genes", )
 
     def __init__(self, method: str = "enclasc", num_genes: int = 1000, *, channel: Optional[str] = None,
-                 mod: Optional[str] = None, skip_count_check: bool = False, inplace=True, **kwargs):
+                 channel_type: Optional[str] = None, mod: Optional[str] = None, skip_count_check: bool = False,
+                 inplace=True, **kwargs):
         super().__init__(**kwargs)
 
         self.num_genes = num_genes
         self.channel = channel
-        self.mod = mod
         self.method = method
         self.skip_count_check = skip_count_check
         self.inplace = inplace
+        self.channel_type = channel_type
 
     def __call__(self, data):
-        feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
+        feat = data.get_feature(return_type="numpy", channel=self.channel, channel_type=self.channel_type)
 
         if not self.skip_count_check and np.mod(feat, 1).sum():
             warnings.warn("Expecting count data as input, but the input feature matrix does not appear to be count."
@@ -836,7 +887,7 @@ class FilterGenesMarkerGini(BaseTransform):
         If set, e.g., to :obj:`'marker'`, then save the marker indicator to the :obj:`.obs` column named as
         :obj:`marker`.
 
-    Reference
+    References
     ---------
     https://genomebiology.biomedcentral.com/articles/10.1186/s13059-016-1010-4?ref=https://githubhelp.com
 
@@ -995,6 +1046,7 @@ def gini_func(x, weights=None):
 
 
 @register_preprocessor("filter", "gene")
+@add_mod_and_transform
 class FilterGenesScanpyOrder(BaseTransform):
     """Scanpy filtering gene transformation with additional options.
 
@@ -1040,6 +1092,7 @@ class FilterGenesScanpyOrder(BaseTransform):
         add_n_counts=True,
         add_n_cells=True,
         inplace=True,
+        params_dict=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -1048,6 +1101,8 @@ class FilterGenesScanpyOrder(BaseTransform):
             ["min_counts", "min_cells", "max_counts", "max_cells"],
         )
         self.logger.info(f"Filter genes order: {self.filter_genes_order}")
+        # if load_params:
+
         geneParameterDict = {
             "min_counts": min_counts,
             "min_cells": min_cells,
@@ -1084,6 +1139,7 @@ class FilterGenesScanpyOrder(BaseTransform):
 
 
 @register_preprocessor("filter", "gene")
+@add_mod_and_transform
 class HighlyVariableGenesRawCount(AnnDataTransform):
     """Filter for highly variable genes using raw count matrix.
 
@@ -1120,9 +1176,10 @@ class HighlyVariableGenesRawCount(AnnDataTransform):
 
     """
 
-    def __init__(self, layer: Optional[str] = None, n_top_genes: Optional[int] = 1000, span: Optional[float] = 0.3,
-                 subset: bool = True, inplace: bool = True, batch_key: Optional[str] = None, check_values: bool = True,
-                 **kwargs):
+    def __init__(self, channel: Optional[str] = None, channel_type: Optional[str] = None,
+                 n_top_genes: Optional[int] = 1000, span: Optional[float] = 0.3, subset: bool = True,
+                 inplace: bool = True, batch_key: Optional[str] = None, check_values: bool = True, **kwargs):
+        layer = channel if channel_type == "layers" else None
         super().__init__(sc.pp.highly_variable_genes, layer=layer, n_top_genes=n_top_genes, batch_key=batch_key,
                          check_values=check_values, span=span, subset=subset, inplace=inplace, flavor="seurat_v3",
                          **kwargs)
@@ -1158,6 +1215,7 @@ class HighlyVariableGenesRawCount(AnnDataTransform):
 
 
 @register_preprocessor("filter", "gene")
+@add_mod_and_transform
 class HighlyVariableGenesLogarithmizedByTopGenes(AnnDataTransform):
     """Filter for highly variable genes based on top genes.
 
@@ -1197,16 +1255,19 @@ class HighlyVariableGenesLogarithmizedByTopGenes(AnnDataTransform):
 
     """
 
-    def __init__(self, layer: Optional[str] = None, n_top_genes: Optional[int] = 1000, n_bins: int = 20,
-                 flavor: Literal["seurat", "cell_ranger"] = "seurat", subset: bool = True, inplace: bool = True,
-                 batch_key: Optional[str] = None, **kwargs):
+    def __init__(self, channel: Optional[str] = None, channel_type: Optional[str] = None,
+                 n_top_genes: Optional[int] = 1000, n_bins: int = 20, flavor: Literal["seurat",
+                                                                                      "cell_ranger"] = "seurat",
+                 subset: bool = True, inplace: bool = True, batch_key: Optional[str] = None, **kwargs):
+        layer = channel if channel_type == "layers" else None
         super().__init__(sc.pp.highly_variable_genes, layer=layer, n_top_genes=n_top_genes, n_bins=n_bins,
                          flavor=flavor, subset=subset, inplace=inplace, batch_key=batch_key, **kwargs)
         self.logger.info("Expects logarithmized data")
 
 
 @register_preprocessor("filter", "gene")
-@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+@add_mod_and_transform
+# @deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
 class FilterGenesPlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process."""
 
@@ -1237,10 +1298,11 @@ class FilterGenesPlaceHolder(BaseTransform):
 
 
 @register_preprocessor("filter", "gene")
-@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+@add_mod_and_transform
+# @deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
 class FilterGenesNumberPlaceHolder(BaseTransform):
 
-    def __init__(self, **kwargs):
+    def __init__(self, channel=None, channel_type=None, **kwargs):
         super().__init__(**kwargs)
 
     def __call__(self, data: Data) -> Data:
@@ -1248,6 +1310,7 @@ class FilterGenesNumberPlaceHolder(BaseTransform):
 
 
 @register_preprocessor("filter", "gene")
+@add_mod_and_transform
 class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
     """Filter for highly variable genes based on mean and dispersion.
 
@@ -1293,10 +1356,12 @@ class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
 
     """
 
-    def __init__(self, layer: Optional[str] = None, min_disp: Optional[float] = 0.5, max_disp: Optional[float] = np.inf,
+    def __init__(self, channel: Optional[str] = None, channel_type: Optional[str] = None,
+                 min_disp: Optional[float] = 0.5, max_disp: Optional[float] = np.inf,
                  min_mean: Optional[float] = 0.0125, max_mean: Optional[float] = 3, n_bins: int = 20,
                  flavor: Literal["seurat", "cell_ranger"] = "seurat", subset: bool = True, inplace: bool = True,
                  batch_key: Optional[str] = None, **kwargs):
+        layer = channel if channel_type == "layers" else None
         super().__init__(sc.pp.highly_variable_genes, layer=layer, min_disp=min_disp, max_disp=max_disp,
                          min_mean=min_mean, max_mean=max_mean, n_bins=n_bins, flavor=flavor, subset=subset,
                          inplace=inplace, batch_key=batch_key, **kwargs)
@@ -1304,7 +1369,8 @@ class HighlyVariableGenesLogarithmizedByMeanAndDisp(AnnDataTransform):
 
 
 @register_preprocessor("filter", "cell")
-@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+@add_mod_and_transform
+# @deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
 class FilterCellsPlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process."""
 
@@ -1335,6 +1401,7 @@ class FilterCellsPlaceHolder(BaseTransform):
 
 
 @register_preprocessor("filter", "cell")
+@add_mod_and_transform
 class FilterCellsScanpyOrder(BaseTransform):
     """Scanpy filtering cell transformation with additional options.
 
@@ -1403,3 +1470,112 @@ class FilterCellsScanpyOrder(BaseTransform):
         for parameter in self.filter_cells_order:
             cellScanpyOrder = self.cellScanpyOrderDict[parameter]
             cellScanpyOrder(data)
+
+
+@register_preprocessor("filter", "cell")
+@add_mod_and_transform
+class FilterCellsType(BaseTransform):  #TODO not in search
+    """Filter cell types based on the threshold."""
+
+    def __init__(self, cell_type_threshold=10, **kwargs):
+        super().__init__(**kwargs)
+        self.cell_type_threshold = cell_type_threshold
+
+    def __call__(self, data: Data) -> Data:
+        # adata_copied = data.data.copy()
+        # cellType_Number = data.data.obsm["cell_type"].value_counts()
+        # celltype_to_remove = cellType_Number[cellType_Number <= self.cell_type_threshold].index
+        # adata_copied = adata_copied[~adata_copied.obsm["cell_type"].isin(celltype_to_remove), :]
+        # data.data = adata_copied
+        # return data
+
+        adata = data.data
+        one_hot_cell_types_df = adata.obsm["cell_type"]
+        if not isinstance(one_hot_cell_types_df, pd.DataFrame):
+            raise TypeError(
+                f"Expected obsm['cell_type'] to be a pandas.DataFrame, but got {type(one_hot_cell_types_df)}")
+        cellType_Counts = one_hot_cell_types_df.sum(axis=0)
+        celltype_names_to_remove = cellType_Counts[cellType_Counts <= self.cell_type_threshold].index
+        print(f"Found {len(celltype_names_to_remove)} cell types with counts <= {self.cell_type_threshold}.")
+        if len(celltype_names_to_remove) > 0:
+            print(f"Cell types to remove: {celltype_names_to_remove.tolist()}")  # Show names
+        if not celltype_names_to_remove.empty:  # Check if the Index object is empty
+            sub_df_to_remove = one_hot_cell_types_df[celltype_names_to_remove]
+            is_cell_to_remove = sub_df_to_remove.sum(axis=1) > 0
+            keep_mask = ~is_cell_to_remove
+            print(f"Keeping {keep_mask.sum()} cells out of {adata.n_obs}.")
+        else:
+            print("No cell types below threshold. Keeping all cells.")
+            keep_mask = pd.Series(True, index=adata.obs_names)
+        # adata = adata[keep_mask, :]
+        data.filter_by_mask(keep_mask)
+        return data
+
+
+@register_preprocessor("filter", "cell")
+@add_mod_and_transform
+class FilterCellTransform(BaseTransform):
+
+    def __init__(self, species: Literal["human", "mouse"] = "human", image_save_path: str = None, **kwargs):
+        super().__init__(**kwargs)
+        sc.settings.figdir = image_save_path
+        self.species = species
+        sc.settings.file_format_figs = "png"
+        self.image_save_path = image_save_path
+
+    def is_outlier(self, adata, metric: str, nmads: int):
+        M = adata.obs[metric]
+        floor = np.median(M) - nmads * median_abs_deviation(M)
+        cell = np.median(M) + nmads * median_abs_deviation(M)
+        outlier = (M < floor) | (cell < M)
+        self.logger.info(f"metric:{metric} floor:{floor} cell:{cell}")
+        return outlier
+
+    def __call__(self, data: Data) -> Data:
+        adata = data.data
+        # mitochondrial genes, "MT-" for human, "Mt-" for mouse
+        adata.var["mt"] = adata.var_names.str.startswith("MT-" if self.species == "human" else "Mt-")
+        # ribosomal genes
+        adata.var["ribo"] = adata.var_names.str.startswith(("RPS", "RPL"))
+        # hemoglobin genes
+        adata.var["hb"] = adata.var_names.str.contains("^HB[^(P)]")
+        sc.pp.calculate_qc_metrics(adata, qc_vars=["mt", "ribo", "hb"], inplace=True, percent_top=[20], log1p=True)
+        if self.image_save_path is not None:
+            sc.pl.violin(adata, ["n_genes_by_counts", "total_counts", "pct_counts_mt"], jitter=0.4, multi_panel=True,
+                         show=False, save=True)
+            sc.pl.scatter(adata, "total_counts", "n_genes_by_counts", color="pct_counts_mt", show=False, save=True)
+        adata.obs["outlier"] = (self.is_outlier(adata, "log1p_total_counts", 5)
+                                | self.is_outlier(adata, "log1p_n_genes_by_counts", 5)
+                                | self.is_outlier(adata, "pct_counts_in_top_20_genes", 5))
+        adata.obs["mt_outlier"] = self.is_outlier(adata, "pct_counts_mt", 3) | (adata.obs["pct_counts_mt"] > 8)
+        self.logger.info(f"Total number of cells: {adata.n_obs}")
+        mask = (~adata.obs['outlier']) & (~adata.obs['mt_outlier'])
+        # adata = adata[(~adata.obs.outlier) & (~adata.obs.mt_outlier)].copy()
+        data.filter_by_mask(mask)
+        adata = data.data
+        self.logger.info(f"Number of cells after filtering of low quality cells: {adata.n_obs}")
+        return data
+
+
+@register_preprocessor("filter", "cell")
+@add_mod_and_transform
+class ScrubletTransform(BaseTransform):
+
+    def __init__(self, image_save_path: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+        if image_save_path is not None:
+            sc.settings.figdir = image_save_path
+        self.image_save_path = image_save_path
+        sc.settings.file_format_figs = "png"
+
+    def __call__(self, data: Data) -> Data:
+        adata = data.data
+        sc.pp.scrublet(adata)
+        if self.image_save_path is not None:
+            sc.pl.scrublet_score_distribution(adata, show=False, save=True)
+        self.logger.info(f"Original number of cells: {adata.n_obs}")
+        mask = (~adata.obs['predicted_doublet'])
+        data.filter_by_mask(mask)
+        adata = data.data
+        self.logger.info(f"Number of cells after filtering: {adata.n_obs}")
+        return data

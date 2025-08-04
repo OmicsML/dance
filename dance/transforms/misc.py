@@ -1,6 +1,11 @@
+import copy
 from pprint import pformat
+from typing import Optional
+
+import mudata as md
 
 from dance import logger
+from dance.data.base import Data
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Any, Dict, Tuple
@@ -65,6 +70,33 @@ class Compose(BaseTransform):
         for transform in self.transforms:
             transform(data)
 
+    def transform_with_history(self, data: Data) -> Dict[str, Data]:
+        """Apply all transformations sequentially and record intermediate results.
+
+        Parameters
+        ----------
+        data : Data
+            The data object to be transformed.
+
+        Returns
+        -------
+        Dict[str, Data]
+            A dictionary containing the original data and results after each transformation.
+            Keys are transformation names or indices, values are the transformed data.
+
+        """
+        self.logger.info(f"Applying composed transformations with history tracking:\n{self!r}")
+
+        # Create a dictionary to store results
+        history = {"original": copy.deepcopy(data)}
+
+        # Apply each transformation and store results
+        for i, transform in enumerate(self.transforms):
+            transform(data)
+            history[transform.name] = copy.deepcopy(data)
+
+        return history
+
 
 @register_preprocessor("misc")
 class SetConfig(BaseTransform):
@@ -74,12 +106,14 @@ class SetConfig(BaseTransform):
     ----------
     config_dict
         Dance data object configuration dictionary. See :meth:`~dance.data.base.BaseData.set_config_from_dict`.
+    dummy_params
+        When the search space is empty, use this parameter to verify through wandb
 
     """
 
     _DISPLAY_ATTRS = ("config_dict", )
 
-    def __init__(self, config_dict: Dict[str, Any], **kwargs):
+    def __init__(self, config_dict: Dict[str, Any], dummy_params=10, **kwargs):
         super().__init__(**kwargs)
         self.config_dict = config_dict
 
@@ -153,3 +187,21 @@ class RemoveSplit(BaseTransform):
     def __call__(self, data):
         self.logger.info("Popping split: {self.split_name!r}")
         data.pop(split_name=self.split_name)
+
+
+@register_preprocessor("misc")
+class AlignMod(BaseTransform):
+    """Aligning mods and metadata in multimodal data."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __call__(self, data: Data) -> Data:
+        mod1, mod2, meta1, meta2, test_sol = data.data.mod.values()
+        meta1 = meta1[:, mod1.var.index]
+        meta2 = meta2[:, mod2.var.index]
+        test_sol = test_sol[:, mod1.var.index]
+        data.data.mod["meta1"] = meta1
+        data.data.mod["meta2"] = meta2
+        data.data.mod["test_sol"] = test_sol
+        return data

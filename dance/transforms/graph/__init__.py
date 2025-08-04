@@ -1,6 +1,7 @@
 from dance.transforms.graph.cell_feature_graph import CellFeatureBipartiteGraph, CellFeatureGraph, PCACellFeatureGraph
 from dance.transforms.graph.dstg_graph import DSTGraph
 from dance.transforms.graph.feature_feature_graph import FeatureFeatureGraph
+from dance.transforms.graph.heteronet_graph import HeteronetGraph
 from dance.transforms.graph.neighbor_graph import NeighborGraph
 from dance.transforms.graph.resept_graph import RESEPTGraph
 from dance.transforms.graph.scmogcn_graph import ScMoGNNGraph
@@ -11,6 +12,7 @@ __all__ = [
     "CellFeatureGraph",
     "DSTGraph",
     "FeatureFeatureGraph",
+    "HeteronetGraph",
     "NeighborGraph",
     "PCACellFeatureGraph",
     "RESEPTGraph",

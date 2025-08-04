@@ -6,6 +6,7 @@ import torch
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo import DSTG
+from dance.modules.spatial.cell_type_deconvo.dstg import split_mask_for_validation
 from dance.utils import set_seed
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -48,15 +49,17 @@ for seed in range(args.seed, args.seed + args.num_runs):
     adj = torch.sparse.FloatTensor(torch.LongTensor([adj.row.tolist(), adj.col.tolist()]),
                                    torch.FloatTensor(adj.data.astype(np.int32)))
     train_mask = data.get_split_mask("pseudo", return_type="torch")
+    train_mask, valid_mask = split_mask_for_validation(train_mask, random_seed=args.seed)
     inputs = (adj, x, train_mask)
 
     # Train and evaluate model
     model = DSTG(nhid=args.nhid, bias=args.bias, dropout=args.dropout, device=args.device)
     pred = model.fit_predict(inputs, y, lr=args.lr, max_epochs=args.epochs, weight_decay=args.wd)
     test_mask = data.get_split_mask("test", return_type="torch")
-    score = model.default_score_func(y[test_mask], pred[test_mask])
-    scores.append(score)
-    print(f"MSE: {score:7.4f}")
+    valid_score = model.default_score_func(y[valid_mask], pred[valid_mask])
+    test_score = model.default_score_func(y[test_mask], pred[test_mask])
+    scores.append(test_score)
+    print(f"MSE: {test_score:7.4f}")
 print(f"DSTG {args.dataset}:")
 print(f"{scores}\n{np.mean(scores):.5f} +/- {np.std(scores):.5f}")
 """To reproduce DSTG benchmarks, please refer to command lines belows:

@@ -1,3 +1,4 @@
+---
 type: preprocessor
 tune_mode: params
 pipeline:
@@ -8,12 +9,7 @@ pipeline:
       out: feature.cell
     params_to_tune:
       feat_norm_mode:
-        values:
-          - null
-          - normalize
-          - standardize
-          - minmax
-          - l2
+        values: [null, normalize, standardize, minmax, l2]
   - type: misc
     target: SetConfig
     params:

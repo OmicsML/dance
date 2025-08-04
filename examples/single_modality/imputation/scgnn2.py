@@ -3,6 +3,7 @@ from pprint import pformat
 
 import numpy as np
 import scanpy as sc
+import torch
 
 from dance import logger
 from dance.datasets.singlemodality import ImputationDataset
@@ -15,6 +16,7 @@ from dance.transforms import (
     FilterGenesScanpy,
     FilterGenesTopK,
 )
+from dance.transforms.misc import SetConfig
 from dance.utils import set_seed
 
 if __name__ == "__main__":
@@ -175,6 +177,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     rmses = []
+    mres = []
     for seed in range(args.seed, args.seed + args.num_runs):
         set_seed(seed)
         logger.info(pformat(vars(args)))
@@ -183,27 +186,52 @@ if __name__ == "__main__":
             FilterGenesScanpy(min_cells=0.01),
             FilterCellsScanpy(min_genes=0.01),
             FilterGenesTopK(num_genes=2000, mode="var"),
-            CellwiseMaskData(),
+            CellwiseMaskData(add_test_mask=True),
             AnnDataTransform(sc.pp.log1p),
+            SetConfig({
+                "feature_channel": ["train_mask", "valid_mask", "test_mask"],
+                "feature_channel_type": ["layers", "layers", "layers"]
+            }),
             log_level="INFO",
         )
         dataloader = ImputationDataset(data_dir=args.data_dir, dataset=args.dataset, train_size=args.train_size)
         data = dataloader.load_data(transform=preprocessing_pipeline)
 
-        x_train = data.data.X.A * data.data.layers["train_mask"]
-        test_mask = data.data.layers["valid_mask"]
+        train_mask, valid_mask, test_mask = data.get_x(return_type="default")
+        if not isinstance(data.data.X, np.ndarray):
+            x_train = data.data.X.A * train_mask
+            X = data.data.X.A
+            # x_valid = data.data.X.A * valid_mask
+            # x_test = data.data.X.A * test_mask
+        else:
+            x_train = data.data.X * train_mask
+            X = data.data.X
+            # x_valid = data.data.X * valid_mask
+            # x_test = data.data.X * test_mask
 
         model = ScGNN2(args)
 
         model.fit(x_train)
-        test_mse = ((data.data.X.A[test_mask] - model.predict()[test_mask])**2).mean()
-        print(f"MSE: {test_mse:.4f}, RMSE: {np.sqrt(test_mse):.4f}")
-        rmses.append(np.sqrt(test_mse))
-
+        imputed_data = model.predict()
+        X = torch.from_numpy(X)
+        imputed_data = torch.from_numpy(imputed_data)
+        train_RMSE = model.score(X, imputed_data.clone(), ~train_mask, "RMSE", log1p=False)
+        train_pcc = model.score(X, imputed_data.clone(), ~train_mask, "PCC", log1p=False)
+        train_mre = model.score(X, imputed_data.clone(), ~train_mask, metric="MRE", log1p=False)
+        val_RMSE = model.score(X, imputed_data.clone(), ~valid_mask, "RMSE", log1p=False)
+        val_pcc = model.score(X, imputed_data.clone(), ~valid_mask, "PCC", log1p=False)
+        val_mre = model.score(X, imputed_data.clone(), ~valid_mask, metric="MRE", log1p=False)
+        test_RMSE = model.score(X, imputed_data.clone(), ~test_mask, "RMSE", log1p=False)
+        test_pcc = model.score(X, imputed_data.clone(), ~test_mask, "PCC", log1p=False)
+        test_mre = model.score(X, imputed_data.clone(), ~test_mask, metric="MRE", log1p=False)
+        rmses.append(test_RMSE)
+        mres.append(test_mre)
     print('scgnn')
     print(args.dataset)
     print(f'rmses: {rmses}')
     print(f'rmses: {np.mean(rmses)} +/- {np.std(rmses)}')
+    print(f'mres: {mres}')
+    print(f'mres: {np.mean(mres)} +/- {np.std(mres)}')
 """
 
 Mouse Brain

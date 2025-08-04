@@ -1,13 +1,30 @@
 from dance.transforms import graph
-from dance.transforms.cell_feature import BatchFeature, CellPCA, CellSVD, WeightedFeaturePCA
+from dance.transforms.base import AnnDataAdaptor, BaseTransform
+from dance.transforms.cell_feature import (
+    BatchFeature,
+    CellPCA,
+    CellSparsePCA,
+    CellSVD,
+    FeatureCellPlaceHolder,
+    GaussRandProjFeature,
+    WeightedFeaturePCA,
+    WeightedFeatureSVD,
+)
 from dance.transforms.filter import (
+    FilterCellsCommonMod,
+    FilterCellsPlaceHolder,
     FilterCellsScanpy,
     FilterCellsScanpyOrder,
+    FilterCellsType,
+    FilterCellTransform,
+    FilterGenes,
     FilterGenesCommon,
     FilterGenesMarker,
     FilterGenesMarkerGini,
     FilterGenesMatch,
+    FilterGenesNumberPlaceHolder,
     FilterGenesPercentile,
+    FilterGenesPlaceHolder,
     FilterGenesRegression,
     FilterGenesScanpy,
     FilterGenesScanpyOrder,
@@ -16,12 +33,30 @@ from dance.transforms.filter import (
     HighlyVariableGenesLogarithmizedByMeanAndDisp,
     HighlyVariableGenesLogarithmizedByTopGenes,
     HighlyVariableGenesRawCount,
+    ScrubletTransform,
 )
 from dance.transforms.gene_holdout import GeneHoldout
 from dance.transforms.interface import AnnDataTransform
 from dance.transforms.mask import CellwiseMaskData, MaskData
-from dance.transforms.misc import Compose, RemoveSplit, SaveRaw, SetConfig
-from dance.transforms.normalize import Log1P, NormalizeTotal, ScaleFeature, ScTransform
+from dance.transforms.misc import AlignMod, Compose, RemoveSplit, SaveRaw, SetConfig, UpdateRaw
+from dance.transforms.normalize import (
+    Log1P,
+    NormalizePlaceHolder,
+    NormalizeTotal,
+    NormalizeTotalLog1P,
+    ScaleFeature,
+    ScTransform,
+    ScTransformR,
+    UpdateSizeFactors,
+    tfidfTransform,
+)
+from dance.transforms.preprocess import (
+    MaskedArray,
+    SAINTRandomWalkSampler,
+    SAINTSampler,
+    lsiTransformer,
+    tfidfTransformer,
+)
 from dance.transforms.pseudobulk import CellGiottoTopicProfile, CellTopicProfile, CellTypeNums, PseudoMixture
 from dance.transforms.sc3_feature import SC3Feature
 from dance.transforms.scn_feature import SCNFeature
@@ -29,27 +64,40 @@ from dance.transforms.spatial_feature import MorphologyFeatureCNN, SMEFeature, S
 from dance.transforms.stats import GeneStats
 
 __all__ = [
+    "AlignMod",
+    "AnnDataAdaptor",
     "AnnDataTransform",
+    "BaseTransform",
     "BatchFeature",
     "CellGiottoTopicProfile",
     "CellPCA",
     "CellSVD",
+    "CellSparsePCA",
     "CellTopicProfile",
     "CellTypeNums",
     "CellwiseMaskData",
     "Compose",
+    "FeatureCellPlaceHolder",
+    "FilterCellsCommonMod",
+    "FilterCellsPlaceHolder",
     "FilterCellsScanpy",
     "FilterCellsScanpyOrder",
+    "FilterCellsType",
+    "FilterCellTransform",
+    "FilterGenes",
     "FilterGenesCommon",
     "FilterGenesMarker",
     "FilterGenesMarkerGini",
     "FilterGenesMatch",
+    "FilterGenesNumberPlaceHolder",
     "FilterGenesPercentile",
+    "FilterGenesPlaceHolder",
     "FilterGenesRegression",
     "FilterGenesScanpy",
     "FilterGenesScanpyOrder",
     "FilterGenesTopK",
     "FilterScanpy",
+    "GaussRandProjFeature",
     "GeneHoldout",
     "GeneStats",
     "HighlyVariableGenesLogarithmizedByMeanAndDisp",
@@ -57,19 +105,31 @@ __all__ = [
     "HighlyVariableGenesRawCount",
     "Log1P",
     "MaskData",
+    "MaskedArray",
     "MorphologyFeatureCNN",
+    "NormalizePlaceHolder",
     "NormalizeTotal",
+    "NormalizeTotalLog1P",
     "PseudoMixture",
     "RemoveSplit",
+    "SAINTRandomWalkSampler",
+    "SAINTSampler",
     "SC3Feature",
     "SCNFeature",
     "SMEFeature",
     "SaveRaw",
     "ScTransform",
+    "ScTransformR",
     "ScaleFeature",
     "SetConfig",
     "SpatialIDEFeature",
     "TangramFeature",
+    "UpdateRaw",
+    "UpdateSizeFactors",
     "WeightedFeaturePCA",
+    "WeightedFeatureSVD",
     "graph",
+    "lsiTransformer",
+    "tfidfTransform",
+    "tfidfTransformer",
 ]  # yapf: disable

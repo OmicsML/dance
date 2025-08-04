@@ -1,0 +1,57 @@
+---
+type: preprocessor
+tune_mode: pipeline_params
+pipeline_tuning_top_k: 5
+parameter_tuning_freq_n: 20
+pipeline:
+  - type: filter.cell
+    target: FilterCellTransform
+    params:
+      species: human
+      image_save_path: ../figures/human_melanoma_data/
+      log_level: INFO
+  - type: filter.gene
+    target: FilterGenesScanpyOrder
+    params:
+      order: [min_counts, min_cells]
+      min_counts: 5
+      min_cells: 3
+  - type: filter.cell
+    target: ScrubletTransform
+    params:
+      image_save_path: ../figures/human_melanoma_data/
+  - type: filter.gene
+    include: [FilterGenesTopK]
+    default_params:
+      FilterGenesTopK:
+        num_genes: 2000
+        mode: var
+    step3_frozen: true
+  - type: split.entry
+    target: CellwiseMaskData
+    params:
+      add_test_mask: true
+  - type: normalize
+    include:
+      - ScaleFeature
+      - ScTransform
+      - Log1P
+      - NormalizeTotal
+      - NormalizePlaceHolder
+      - NormalizeTotalLog1P
+    default_params:
+      ScTransform:
+        processes_num: 8
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        feature_channel: [train_mask, valid_mask, test_mask]
+        feature_channel_type: [layers, layers, layers]
+wandb:
+  entity: xzy11632
+  project: dance-dev
+  method: grid  # try grid to provide a comprehensive search
+  metric:
+    name: MRE
+    goal: minimize

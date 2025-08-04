@@ -18,8 +18,8 @@ if __name__ == "__main__":
         "--normalize", action="store_true", help="Whether to perform the normalization for SingleCellNet. "
         "Disabled by default since the CellTypeAnnotation data is already normalized")
     parser.add_argument("--num_rand", type=int, default=100)
-    parser.add_argument("--num_top_gene_pairs", type=int, default=250)
-    parser.add_argument("--num_top_genes", type=int, default=100)
+    parser.add_argument("--num_top_gene_pairs", type=int, default=25)
+    parser.add_argument("--num_top_genes", type=int, default=10)
     parser.add_argument("--num_trees", type=int, default=1000)
     parser.add_argument("--species", default="mouse", type=str)
     parser.add_argument("--stratify", type=bool, default=True)
@@ -75,5 +75,12 @@ $ python singlecellnet.py --species mouse --tissue Spleen --train_dataset 1970 -
 
 Mouse Kidney
 $ python singlecellnet.py --species mouse --tissue Kidney --train_dataset 4682 --test_dataset 203
+
+python singlecellnet.py --species human --tissue Brain  --train_dataset 328 --test_dataset 138
+python singlecellnet.py --species human --tissue CD8  --train_dataset 1027 1357 1641 517 706 777 850 972  --test_dataset 245 332 377 398 405 455 470 492
+
+python singlecellnet.py --species human --tissue CD4 --train_dataset 1013 1247 598 732 767 768 770 784 845 864 --test_dataset 315 340 376 381 390 404 437 490 551 559
+python singlecellnet.py --species human --tissue Spleen  --train_dataset 3043 3777 4029 4115 4362 4657  --test_dataset 1729 2125 2184 2724 2743
+python singlecellnet.py --species human --tissue Immune  --train_dataset 11407 1519 636 713 9054 9258 --test_dataset 1925 205 3323 6509 7572
 
 """
