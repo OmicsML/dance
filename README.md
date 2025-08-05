@@ -15,31 +15,43 @@ ______________________________________________________________________
 [![Slack](https://img.shields.io/badge/slack-OmicsML-brightgreen)](https://omicsml.slack.com)
 [![Twitter URL](https://img.shields.io/twitter/url?style=social&url=https%3A%2F%2Ftwitter.com%2FOmicsML)](https://twitter.com/OmicsML)
 
-DANCE is a Python toolkit to support deep learning models for analyzing single-cell gene expression at scale. Our goal is to build up a deep learning community and benchmark platform for computational models in single-cell analysis. It includes three modules at present:
+## Overview of DANCE 1.0 and 2.0
 
-1. **Single-modality analysis**
-1. **Single-cell multimodal omics**
-1. **Spatially resolved transcriptomics**
+**DANCE 1.0** is a Python toolkit designed to support deep learning models for large-scale analysis of single-cell gene expression data. Its goal is to foster a deep learning community and establish a benchmark platform for computational methods in single-cell analysis.
 
-### Useful links
+**DANCE 2.0** extends this effort by introducing an automated preprocessing recommendation platform. It addresses the pressing need to move beyond trial-and-error approaches by transforming single-cell preprocessing into a systematic, data-driven, and interpretable workflow.
 
-OmicsML Homepage: https://omicsml.ai \
-DANCE Open Source: https://github.com/OmicsML/dance \
-DANCE Documentation: https://pydance.readthedocs.io/en/latest/ \
-DANCE Tutorials: https://github.com/OmicsML/dance-tutorials \
-DANCE Package Paper: https://www.biorxiv.org/content/10.1101/2022.10.19.512741v2 \
-Survey Paper: https://arxiv.org/abs/2210.12385
+Both include three modules at present:
 
-### Join the Community
+1. **Single-modality analysis**: cell type annotation, clustering, gene imputation
+1. **Single-cell multimodal omics**: modality prediction, modality matching, joint embedding
+1. **Spatially resolved transcriptomics**: spatial domain identification, cell type deconvolution
+
+## DANCE 2.0 Release Schedule
+
+- [ ] Open-source release of the DANCE 2.0 codebase
+- [ ] Launch of the DANCE 2.0 web platform for users to upload datasets and receive optimal preprocessing recommendations
+- [ ] Release of the DANCE 2.0 API for programmatic access to preprocessing recommendations
+
+## Useful links
+
+**DANCE Open Source**: https://github.com/OmicsML/dance \
+**DANCE Documentation**: https://pydance.readthedocs.io/en/latest/ \
+**DANCE 1.0 Tutorial**: https://github.com/OmicsML/dance-tutorials \
+**DANCE 1.0 Paper (published on Genome Biology)**: [DANCE: a deep learning library and benchmark platform for single-cell analysis](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-024-03211-z) \
+**DANCE 2.0 Paper**: [DANCE 2.0: Transforming single-cell analysis from black box to transparent workflow](https://www.biorxiv.org/content/10.1101/2025.07.17.665427v1) \
+**Survey Paper (published on ACM TIST):** [Deep Learning in Single-cell Analysis](https://dl.acm.org/doi/10.1145/3641284)
+
+## Join the Community
 
 Slack: https://join.slack.com/t/omicsml/shared_invite/zt-1hxdz7op3-E5K~EwWF1xDvhGZFrB9AbA \
 Twitter: https://twitter.com/OmicsML \
 Wechat Group Assistant: 736180290 \
 Email: danceteamgnn@gmail.com
 
-### Contributing
+## Contributing
 
-Community-wide contribution is the key for a sustainable development and
+Community-wide contribution is the key to sustainable development and
 continual growth of the DANCE package. We deeply appreciate any contribution
 made to improve the DANCE code base. If you would like to get started, please
 refer to our brief [guidelines](CONTRIBUTING.md) about our automated quality
@@ -117,7 +129,7 @@ as well as easily reproducible experiments by providing unified tools for
 The full installation process might be a bit tedious and could involve some debugging when using CUDA enabled packages.
 Thus, we provide an `install.sh` script that simplifies the installation process, assuming the user have [conda](https://conda.io/projects/conda/en/latest/index.html) set up on their machines.
 The installation script creates a conda environment `dance` and install the DANCE package along with all its dependencies with a apseicifc CUDA version.
-Currently, two options are accepted: `cpu` and `cu118`.
+Currently, two options are accepted: `cpu` and  `cu118`.
 For example, to install the DANCE package using CUDA 11.8 in a `dance-env` conda environment, simply run:
 
 ```bash
@@ -203,11 +215,11 @@ pip install -e .
 | NN                  | DeepImpute   | DeepImpute: an accurate, fast, and scalable deep neural network method to impute single-cell RNA-seq data    | 2019 | ✅      |
 | NN + TF             | Saver-X      | Transfer learning in single-cell transcriptomics improves data denoising and pattern discovery               | 2019 | P1      |
 
-| Model      | Evaluation Metric | Mouse Brain (current/reported) | Mouse Embryo (current/reported) | PBMC (current/reported) |
-| ---------- | ----------------- | ------------------------------ | ------------------------------- | ----------------------- |
-| DeepImpute | RMSE              | 0.87 / N/A                     | 1.20 / N/A                      | 2.30 / N/A              |
-| GraphSCI   | RMSE              | 1.55 / N/A                     | 1.81 / N/A                      | 3.68 / N/A              |
-| scGNN2.0   | MSE               | 1.04 / N/A                     | 1.12 / N/A                      | 1.22 / N/A              |
+| Model      | Mouse Brain (DANCE 2.0/DANCE1.0/Original) | Mouse Embryo (DANCE 2.0/DANCE1.0/Original) | PBMC (DANCE 2.0/DANCE1.0/Original) | Test MRE | Note                                                  |
+| ---------- | ----------------------------------------- | ------------------------------------------ | ---------------------------------- | -------- | ----------------------------------------------------- |
+| DeepImpute | 0.229/0.244/NA                            | 0.252/0.255/NA                             | 0.220/0.230/NA                     | NA       | Stage 1, 2 and 3 (valid mask as metric for selection) |
+| GraphSCI   | 0.453/0.654/NA                            | 0.459/0.497/NA                             | 0.458/0.704/NA                     | NA       | Stage 1, 2 and 3 (valid mask as metric for selection) |
+| scGNN2     | 0.323/0.629/NA                            | 0.299/0.620/NA                             | 0.441/0.684/NA                     | NA       | Stage 1, 2 and 3 (valid mask as metric for selection) |
 
 **Note**: scGNN2.0 is evaluated on 2,000 genes with highest variance following the original paper.
 
@@ -222,13 +234,13 @@ pip install -e .
 | Hierarchical Clustering | SingleR       | Reference-based analysis of lung single-cell sequencing reveals a transitional profibrotic macrophage.        | 2019 | P1      |
 | SVM                     | SVM           | A comparison of automatic cell identification methods for single-cell RNA sequencing data.                    | 2018 | ✅      |
 
-| Model         | Evaluation Metric | Mouse Brain 2695 (current/reported) | Mouse Spleen 1759 (current/reported) | Mouse Kidney 203 (current/reported) |
-| ------------- | ----------------- | ----------------------------------- | ------------------------------------ | ----------------------------------- |
-| scDeepsort    | ACC               | 0.542/0.363                         | 0.969/0.965                          | 0.847/0.911                         |
-| Celltypist    | ACC               | 0.824/0.666                         | 0.908/0.848                          | 0.823/0.832                         |
-| singleCellNet | ACC               | 0.693/0.803                         | 0.975/0.975                          | 0.795/0.842                         |
-| ACTINN        | ACC               | 0.727/0.778                         | 0.657/0.236                          | 0.762/0.798                         |
-| SVM           | ACC               | 0.683/0.683                         | 0.056/0.049                          | 0.704/0.695                         |
+| Model        | CARD Synthetic (DANCE 2.0/DANCE 1.0/Original) | SPOTlight Synthetic (DANCE 2.0/DANCE 1.0/Original) | Test MSE | Note                                                               |
+| ------------ | --------------------------------------------- | -------------------------------------------------- | -------- | ------------------------------------------------------------------ |
+| CARD         | 0.00553/0.00627/NA                            | 0.00653/0.00772/NA                                 | NA       | Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) |
+| DSTG         | 0.0105/0.0239/NA                              | 0.0314/0.0315/NA                                   | NA       | Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) |
+| spatialdecon | 0.00754/0.00821/NA                            | 0.00528/0.00528/NA                                 | NA       | Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) |
+| spotlight    | 0.0113/0.0250/NA                              | 0.00614/0.0106/NA                                  | NA       | Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) |
+| STdGCN       | 0.0058/0.0202/NA                              | 0.0145/0.0261/NA                                   | NA       | Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) |
 
 #### 3）Clustering
 
@@ -242,13 +254,13 @@ pip install -e .
 | AutoEncoder | scDCC         | Model-based deep embedding for constrained clustering analysis of single cell RNA-seq data                   | 2021 | ✅      |
 | AutoEncoder | scziDesk      | Deep soft K-means clustering with self-training for single-cell RNA sequence data                            | 2020 | P1      |
 
-| Model         | Evaluation Metric | 10x PBMC (current/reported) | Mouse ES (current/reported) | Worm Neuron (current/reported) | Mouse Bladder (current/reported) |
-| ------------- | ----------------- | --------------------------- | --------------------------- | ------------------------------ | -------------------------------- |
-| graph-sc      | ARI               | 0.72 / 0.70                 | 0.82 / 0.78                 | 0.57 / 0.46                    | 0.68 / 0.63                      |
-| scDCC         | ARI               | 0.82 / 0.81                 | 0.98 / N/A                  | 0.51 / 0.58                    | 0.60 / 0.66                      |
-| scDeepCluster | ARI               | 0.81 / 0.78                 | 0.98 / 0.97                 | 0.51 / 0.52                    | 0.56 / 0.58                      |
-| scDSC         | ARI               | 0.72 / 0.78                 | 0.84 / N/A                  | 0.46 / 0.65                    | 0.65 / 0.72                      |
-| scTAG         | ARI               | 0.77 / N/A                  | 0.96 / N/A                  | 0.49 / N/A                     | 0.69 / N/A                       |
+| Model         | Worm Neuron (DANCE 2.0/DANCE 1.0/Original) | Mouse Bladder (DANCE 2.0/DANCE 1.0/Original) | 10X PBMC (DANCE 2.0/DANCE 1.0/Original) | Mouse ES (DANCE 2.0/DANCE 1.0/Original) | Evaluation Metric | Note                                                    |
+| ------------- | ------------------------------------------ | -------------------------------------------- | --------------------------------------- | --------------------------------------- | ----------------- | ------------------------------------------------------- |
+| Graphsc       | 0.71/0.53/0.46                             | 0.76/0.59/0.63                               | 0.79/0.68/0.70                          | 0.95/0.81/0.78                          | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
+| scdcc         | 0.69//0.41/0.58                            | 0.78/0.60/0.66                               | 0.84/0.82/0.81                          | 0.9987/0.98/NA                          | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
+| scdeepcluster | 0.70/0.51/0.52                             | 0.80/0.56/0.58                               | 0.83/0.81/0.78                          | 0.9951/0.98/0.97                        | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
+| scdsc         | 0.66/0.46/0.65                             | 0.68/0.65/0.72                               | 0.72/0.72/0.78                          | 0.98/0.98/0.84/NA                       | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
+| sctag         | 0.72/0.49/NA                               | 0.76/0.69/NA                                 | 0.81/0.77/NA                            | 0.93/0.96/NA                            | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
 
 ### Multimodality Module
 
@@ -283,7 +295,7 @@ pip install -e .
 | ------------------------ | ----------------- | -------------------------- | --------------------------- |
 | ScMoGCN                  | Accuracy          | 0.0827 / 0.0810            | 0.0600 / 0.0630             |
 | SCMM                     | Accuracy          | 0.005 / N/A                | 5e-5 / N/A                  |
-| Cross-modal autoencoders | Accuracy          | 0.0002 / N/A               | 0.0002 / N/A                |
+| Cross-modal autoencoders | Accuracy          | 0.0002 / N/A               | 0.0002 /  N/A               |
 
 #### 3) Joint Embedding
 
@@ -295,13 +307,12 @@ pip install -e .
 | GNN/Auto-ecnoder | GLUE    | Multi-omics single-cell data integration and regulatory inference with graph-linked embedding         | 2021 | P1      |
 | Auto-encoder     | DCCA    | Deep cross-omics cycle attention model for joint analysis of single-cell multi-omics data             | 2021 | ✅      |
 
-| Model      | Evaluation Metric | GEX2ADT (current/reported) | GEX2ATAC (current/reported) |
-| ---------- | ----------------- | -------------------------- | --------------------------- |
-| ScMoGCN    | ARI               | 0.706 / N/A                | 0.702 / N/A                 |
-| ScMoGCNv2  | ARI               | 0.734 / N/A                | N/A / N/A                   |
-| scMVAE     | ARI               | 0.499 / N/A                | 0.577 / N/A                 |
-| scDEC(JAE) | ARI               | 0.705 / N/A                | 0.735 / N/A                 |
-| DCCA       | ARI               | 0.35 / N/A                 | 0.381 / N/A                 |
+| Model   | BRAIN ATAC2GEX (DANCE 2.0/DANCE 1.0/Original) | SKIN ATAC2GEX (DANCE 2.0/DANCE 1.0/Original) | OP 2022 Multi ATAC2GEX (DANCE 2.0/DANCE 1.0/Original) | Evaluation Metric | Note                                                    |
+| ------- | --------------------------------------------- | -------------------------------------------- | ----------------------------------------------------- | ----------------- | ------------------------------------------------------- |
+| dcca    | 0.399/0.340/0.112/NA                          | 0.597/0.597/0.335/NA                         | 0.549/0.52/0.438/NA                                   | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
+| jae     | 0.853/0.853/0.475/NA                          | 0.889/0.889/0.34/NA                          | 0.827/0.827/0.428/NA                                  | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
+| scmogcn | 0.704/0.691/0.478/NA                          | 0.634/0.621/0.32/NA                          | 0.85/0.85/0.433/NA                                    | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
+| scmvae  | 0.342/0.342/0.218/NA                          | 0.399/0.399/0.341/NA                         | 0.437/0.437/0.362/NA                                  | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
 
 #### 4) Multimodal Imputation
 
@@ -335,12 +346,13 @@ pip install -e .
 | Pseudo-space-time (PST) Distance | stLearn    | stLearn: integrating spatial location, tissue morphology and gene expression to find cell types, cell-cell interactions and spatial trajectories within undissociated tissues | 2020 | ✅      |
 | Heuristic                        | Louvain    | Fast unfolding of community hierarchies in large networks                                                                                                                     | 2008 | ✅      |
 
-| Model   | Evaluation Metric | 151673 (current/reported) | 151676 (current/reported) | 151507 (current/reported) |
-| ------- | ----------------- | ------------------------- | ------------------------- | ------------------------- |
-| SpaGCN  | ARI               | 0.51 / 0.522              | 0.41 / N/A                | 0.45 / N/A                |
-| STAGATE | ARI               | 0.59 / N/A                | 0.60 / 0.60               | 0.608 / N/A               |
-| stLearn | ARI               | 0.30 / 0.36               | 0.29 / N/A                | 0.31 / N/A                |
-| Louvain | ARI               | 0.31 / 0.33               | 0.2528 / N/A              | 0.28 / N/A                |
+| Model   | 151507 (DANCE 2.0/DANCE 1.0/Original) | 151673 (DANCE 2.0/DANCE 1.0/Original) | 151676 (DANCE 2.0/DANCE 1.0/Original) | Sub MBA (DANCE 2.0/DANCE 1.0/Original) | Evaluation Metric | Note                                                    |
+| ------- | ------------------------------------- | ------------------------------------- | ------------------------------------- | -------------------------------------- | ----------------- | ------------------------------------------------------- |
+| louvain | 0.31/0.28/NA                          | 0.34/0.31/0.33                        | 0.27/0.25/NA                          | 0.43/0.42/NA                           | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
+| spagcn  | 0.45/0.45/0.36                        | 0.44/0.51/0.522                       | 0.47/0.27/0.35                        | 0.32/0.32/NA                           | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
+| stagate | 0.593/0.608/0.51                      | 0.61/0.59/0.55                        | 0.60/0.60/0.55                        | 0.29/0.27/NA                           | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
+| stLearn | 0.34/0.31/NA                          | 0.28/0.30/0.36                        | 0.30/0.29/NA                          | 0.45/0.36/NA                           | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
+| EfNST   | 0.50/0.46/0.52                        | 0.53/0.49/0.52                        | 0.52/0.33/0.51                        | 0.30/0.19/NA                           | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
 
 #### 2）Cell Type Deconvolution
 
@@ -351,9 +363,10 @@ pip install -e .
 | NNMFreg                    | SPOTlight    | SPOTlight: seeded NMF regression to deconvolute spatial transcriptomics spots with single-cell transcriptomes | 2021 | ✅      |
 | NN Linear + CAR assumption | CARD         | Spatially informed cell-type deconvolution for spatial transcriptomics                                        | 2022 | ✅      |
 
-| Model        | Evaluation Metric | GSE174746 (current/reported) | CARD Synthetic (current/reported) | SPOTlight Synthetic (current/reported) |
-| ------------ | ----------------- | ---------------------------- | --------------------------------- | -------------------------------------- |
-| DSTG         | MSE               | .1722 / N/A                  | .0239 / N/A                       | .0315 / N/A                            |
-| SpatialDecon | MSE               | .0014 / .009                 | .0077 / N/A                       | .0055 / N/A                            |
-| SPOTlight    | MSE               | .0098 / N/A                  | .0246 / 0.118                     | .0109 / .16                            |
-| CARD         | MSE               | .0012 / N/A                  | .0078 / 0.0062                    | .0076 / N/A                            |
+| Model        | CARD Synthetic (DANCE 2.0/DANCE 1.0/Original) | SPOTlight Synthetic (DANCE 2.0/DANCE 1.0/Original) | Test MSE | Note                                                               |
+| ------------ | --------------------------------------------- | -------------------------------------------------- | -------- | ------------------------------------------------------------------ |
+| CARD         | 0.00553/0.00627/NA                            | 0.00653/0.00772/NA                                 | NA       | Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) |
+| DSTG         | 0.0105/0.0239/NA                              | 0.0314//0.0315/NA                                  | NA       | Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) |
+| spatialdecon | 0.00754/0.00821/NA                            | 0.00528/0.00528/NA                                 | NA       | Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) |
+| spotlight    | 0.0113/0.0250/NA                              | 0.00614/0.0106/NA                                  | NA       | Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) |
+| STdGCN       | 0.0058/0.0202/NA                              | 0.0145/0.0261/NA                                   | NA       | Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) |
