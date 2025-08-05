@@ -23,6 +23,6 @@ scipy==1.13.0
 statsmodels==0.14.2
 tables==3.9.2
 threadpoolctl==3.5.0
-tifffile==2024.2.12
+tifffile==2024.8.30
 torchnmf==0.3.5
 tqdm==4.66.2
