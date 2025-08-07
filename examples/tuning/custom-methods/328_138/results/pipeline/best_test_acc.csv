@@ -1,3 +1,3 @@
 id,_runtime,_step,_timestamp,_wandb_runtime,acc,pipeline.0.filter.gene,pipeline.1.normalize,pipeline.2.filter.gene,pipeline.3.feature.cell,test_acc,train_acc
-z8pa2v0y,13.172678709030151,0,1754125592.6847887,11,0.6515151262283325,FilterGenesPercentile,Log1P,FilterGenesRegression,CellSVD,0.2246376872062683,0.8091602921485901
-pg1eyiyv,13.237998247146606,0,1754125565.5422962,11,0.6515151262283325,FilterGenesPercentile,Log1P,FilterGenesRegression,CellPCA,0.2246376872062683,0.8129770755767822
+g5vpa779,3,0,1754371351.3028655,3,0.6515151262283325,FilterGenesPercentile,Log1P,FilterGenesRegression,CellSVD,0.2246376872062683,0.8091602921485901
+41d81yru,4,0,1754371339.968081,4,0.6515151262283325,FilterGenesPercentile,Log1P,FilterGenesRegression,CellPCA,0.2246376872062683,0.8129770755767822

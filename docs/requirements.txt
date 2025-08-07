@@ -12,3 +12,6 @@ sphinx==6.2.1
 sphinx_rtd_theme==2.0.0
 sphinxcontrib-napoleon==0.7
 sphinx-autodoc-typehints==1.23.0
+nbsphinx==0.9.7
+ipykernel==6.29.5
+wandb==0.21.0
