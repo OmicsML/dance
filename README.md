@@ -242,11 +242,13 @@ pip install -e .
 | NN                  | DeepImpute   | DeepImpute: an accurate, fast, and scalable deep neural network method to impute single-cell RNA-seq data    | 2019 | ✅      |
 | NN + TF             | Saver-X      | Transfer learning in single-cell transcriptomics improves data denoising and pattern discovery               | 2019 | P1      |
 
-| Model      | Mouse Brain (DANCE 2.0/DANCE1.0/Original) | Mouse Embryo (DANCE 2.0/DANCE1.0/Original) | PBMC (DANCE 2.0/DANCE1.0/Original) | Evaluation Metric | Note                                                  |
-| ---------- | ----------------------------------------- | ------------------------------------------ | ---------------------------------- | ----------------- | ----------------------------------------------------- |
-| DeepImpute | 0.229/0.244/NA                            | 0.252/0.255/NA                             | 0.220/0.230/NA                     | Test MRE          | Stage 1, 2 and 3 (valid mask as metric for selection) |
-| GraphSCI   | 0.453/0.654/NA                            | 0.459/0.497/NA                             | 0.458/0.704/NA                     | Test MRE          | Stage 1, 2 and 3 (valid mask as metric for selection) |
-| scGNN2     | 0.323/0.629/NA                            | 0.299/0.620/NA                             | 0.441/0.684/NA                     | Test MRE          | Stage 1, 2 and 3 (valid mask as metric for selection) |
+| Model      | Mouse Brain (DANCE 2.0/DANCE1.0/Original) | Mouse Embryo (DANCE 2.0/DANCE1.0/Original) | PBMC (DANCE 2.0/DANCE1.0/Original) | Evaluation Metric |
+| ---------- | ----------------------------------------- | ------------------------------------------ | ---------------------------------- | ----------------- |
+| DeepImpute | 0.229/0.244/NA                            | 0.252/0.255/NA                             | 0.220/0.230/NA                     | Test MRE          |
+| GraphSCI   | 0.453/0.654/NA                            | 0.459/0.497/NA                             | 0.458/0.704/NA                     | Test MRE          |
+| scGNN2     | 0.323/0.629/NA                            | 0.299/0.620/NA                             | 0.441/0.684/NA                     | Test MRE          |
+
+**Note**: Stage 1, 2 and 3 (valid mask as metric for selection) for all methods.
 
 **Note**: scGNN2.0 is evaluated on 2,000 genes with highest variance following the original paper.
 
@@ -262,14 +264,16 @@ pip install -e .
 | SVM                     | SVM           | A comparison of automatic cell identification methods for single-cell RNA sequencing data.                       | 2018 | ✅      |
 | GNN                     | scHeteroNet   | scHeteroNet: A Heterophily-Aware Graph Neural Network for Accurate Cell Type Annotation and Novel Cell Detection | 2018 | ✅      |
 
-| 方法          | GSE67835 Brain (DANCE 2.0/DANCE 1.0/Original) | CD8+ TIL atlas (DANCE 2.0/DANCE 1.0/Original) | GSE123813 Immune (DANCE 2.0/DANCE 1.0/Original) | CD4+ TIL atlas (DANCE 2.0/DANCE 1.0/Original) | GSE182320 (Tissue- Spleen)  (DANCE 2.0/DANCE 1.0/Original) | Evaluation Metric | Note                                                     |
-| ------------- | --------------------------------------------- | --------------------------------------------- | ----------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------- | ----------------- | -------------------------------------------------------- |
-| SVM           | 0.82/0.07/NA                                  | 0.81/0.39/NA                                  | 0.86/0.83/NA                                    | 0.92/0.48/NA                                  | 0.47/0.30/NA                                               | ACC               | Stage 1, 2 and 3 (valid dataset as metric for selection) |
-| ACTINN        | 0.80/0.80/NA                                  | 0.84/0.78/NA                                  | 0.83/0.81/NA                                    | 0.92/0.89/NA                                  | 0.47/0.44/NA                                               | ACC               | Stage 1, 2 and 3 (valid dataset as metric for selection) |
-| singleCellNet | 0.78/0.77/NA                                  | 0.76/0.75/NA                                  | 0.85/0.84/NA                                    | 0.87/0.85/NA                                  | 0.45/0.44/NA                                               | ACC               | Stage 1, 2 and 3 (valid dataset as metric for selection) |
-| Celltypist    | 0.84/0.90/NA                                  | 0.81/0.72/NA                                  | 0.83/0.80/NA                                    | 0.92/0.87/NA                                  | 0.45/0.43/NA                                               | ACC               | Stage 1, 2 and 3 (valid dataset as metric for selection) |
-| ScdeepSort    | 0.84/0.07/NA                                  | 0.83/0.65/NA                                  | 0.83/0.82/NA                                    | 0.92/0.78/NA                                  | 0.45/0.43/NA                                               | ACC               | Stage 1, 2 and 3 (valid dataset as metric for selection) |
-| scHeteroNet   | 0.87/0.83/NA                                  | 0.80/0.78/NA                                  | 0.82/0.81/NA                                    | 0.91/0.89/NA                                  | 0.47/0.45/NA                                               | ACC               | Stage 1, 2 and 3 (valid dataset as metric for selection) |
+| Model         | GSE67835 Brain<br>(DANCE 2.0/DANCE 1.0/Original) | CD8+ TIL atlas<br>(DANCE 2.0/DANCE 1.0/Original) | GSE123813 Immune<br>(DANCE 2.0/DANCE 1.0/Original) | CD4+ TIL atlas<br>(DANCE 2.0/DANCE 1.0/Original) | GSE182320 (Tissue- Spleen)<br>(DANCE 2.0/DANCE 1.0/Original) | Evaluation Metric |
+| ------------- | ------------------------------------------------ | ------------------------------------------------ | -------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------ | ----------------- |
+| SVM           | 0.82/0.07/NA                                     | 0.81/0.39/NA                                     | 0.86/0.83/NA                                       | 0.92/0.48/NA                                     | 0.47/0.30/NA                                                 | ACC               |
+| ACTINN        | 0.80/0.80/NA                                     | 0.84/0.78/NA                                     | 0.83/0.81/NA                                       | 0.92/0.89/NA                                     | 0.47/0.44/NA                                                 | ACC               |
+| singleCellNet | 0.78/0.77/NA                                     | 0.76/0.75/NA                                     | 0.85/0.84/NA                                       | 0.87/0.85/NA                                     | 0.45/0.44/NA                                                 | ACC               |
+| Celltypist    | 0.84/0.90/NA                                     | 0.81/0.72/NA                                     | 0.83/0.80/NA                                       | 0.92/0.87/NA                                     | 0.45/0.43/NA                                                 | ACC               |
+| ScdeepSort    | 0.84/0.07/NA                                     | 0.83/0.65/NA                                     | 0.83/0.82/NA                                       | 0.92/0.78/NA                                     | 0.45/0.43/NA                                                 | ACC               |
+| scHeteroNet   | 0.87/0.83/NA                                     | 0.80/0.78/NA                                     | 0.82/0.81/NA                                       | 0.91/0.89/NA                                     | 0.47/0.45/NA                                                 | ACC               |
+
+**Note**: Stage 1, 2 and 3 (valid dataset as metric for selection) for all methods.
 
 #### 3）Clustering
 
@@ -283,13 +287,15 @@ pip install -e .
 | AutoEncoder | scDCC         | Model-based deep embedding for constrained clustering analysis of single cell RNA-seq data                   | 2021 | ✅      |
 | AutoEncoder | scziDesk      | Deep soft K-means clustering with self-training for single-cell RNA sequence data                            | 2020 | P1      |
 
-| Model         | Worm Neuron (DANCE 2.0/DANCE 1.0/Original) | Mouse Bladder (DANCE 2.0/DANCE 1.0/Original) | 10X PBMC (DANCE 2.0/DANCE 1.0/Original) | Mouse ES (DANCE 2.0/DANCE 1.0/Original) | Evaluation Metric | Note                                                    |
-| ------------- | ------------------------------------------ | -------------------------------------------- | --------------------------------------- | --------------------------------------- | ----------------- | ------------------------------------------------------- |
-| graph-sc      | 0.71/0.53/0.46                             | 0.76/0.59/0.63                               | 0.79/0.68/0.70                          | 0.95/0.81/0.78                          | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
-| scDCC         | 0.69//0.41/0.58                            | 0.78/0.60/0.66                               | 0.84/0.82/0.81                          | 0.9987/0.98/NA                          | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
-| scDeepCluster | 0.70/0.51/0.52                             | 0.80/0.56/0.58                               | 0.83/0.81/0.78                          | 0.9951/0.98/0.97                        | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
-| scDSC         | 0.66/0.46/0.65                             | 0.68/0.65/0.72                               | 0.72/0.72/0.78                          | 0.98/0.98/0.84/NA                       | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
-| scTAG         | 0.72/0.49/NA                               | 0.76/0.69/NA                                 | 0.81/0.77/NA                            | 0.93/0.96/NA                            | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
+| Model         | Worm Neuron (DANCE 2.0/DANCE 1.0/Original) | Mouse Bladder (DANCE 2.0/DANCE 1.0/Original) | 10X PBMC (DANCE 2.0/DANCE 1.0/Original) | Mouse ES (DANCE 2.0/DANCE 1.0/Original) | Evaluation Metric |
+| ------------- | ------------------------------------------ | -------------------------------------------- | --------------------------------------- | --------------------------------------- | ----------------- |
+| graph-sc      | 0.71/0.53/0.46                             | 0.76/0.59/0.63                               | 0.79/0.68/0.70                          | 0.95/0.81/0.78                          | ARI               |
+| scDCC         | 0.69//0.41/0.58                            | 0.78/0.60/0.66                               | 0.84/0.82/0.81                          | 0.9987/0.98/NA                          | ARI               |
+| scDeepCluster | 0.70/0.51/0.52                             | 0.80/0.56/0.58                               | 0.83/0.81/0.78                          | 0.9951/0.98/0.97                        | ARI               |
+| scDSC         | 0.66/0.46/0.65                             | 0.68/0.65/0.72                               | 0.72/0.72/0.78                          | 0.98/0.98/0.84/NA                       | ARI               |
+| scTAG         | 0.72/0.49/NA                               | 0.76/0.69/NA                                 | 0.81/0.77/NA                            | 0.93/0.96/NA                            | ARI               |
+
+**Note**: Stage 1, 2 and 3 (test dataset as metric for selection) for all methods.
 
 ### Multimodality Module
 
@@ -336,12 +342,14 @@ pip install -e .
 | GNN/Auto-ecnoder | GLUE    | Multi-omics single-cell data integration and regulatory inference with graph-linked embedding         | 2021 | P1      |
 | Auto-encoder     | DCCA    | Deep cross-omics cycle attention model for joint analysis of single-cell multi-omics data             | 2021 | ✅      |
 
-| Model   | BRAIN ATAC2GEX (DANCE 2.0/DANCE 1.0/Original) | SKIN ATAC2GEX (DANCE 2.0/DANCE 1.0/Original) | OP 2022 Multi ATAC2GEX (DANCE 2.0/DANCE 1.0/Original) | Evaluation Metric | Note                                                    |
-| ------- | --------------------------------------------- | -------------------------------------------- | ----------------------------------------------------- | ----------------- | ------------------------------------------------------- |
-| DCCA    | 0.399/0.340/0.112/NA                          | 0.597/0.597/0.335/NA                         | 0.549/0.52/0.438/NA                                   | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
-| scDEC   | 0.853/0.853/0.475/NA                          | 0.889/0.889/0.34/NA                          | 0.827/0.827/0.428/NA                                  | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
-| ScMoGCN | 0.704/0.691/0.478/NA                          | 0.634/0.621/0.32/NA                          | 0.85/0.85/0.433/NA                                    | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
-| scMVAE  | 0.342/0.342/0.218/NA                          | 0.399/0.399/0.341/NA                         | 0.437/0.437/0.362/NA                                  | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
+| Model   | BRAIN ATAC2GEX (DANCE 2.0/DANCE 1.0/Original) | SKIN ATAC2GEX (DANCE 2.0/DANCE 1.0/Original) | OP 2022 Multi ATAC2GEX (DANCE 2.0/DANCE 1.0/Original) | Evaluation Metric |
+| ------- | --------------------------------------------- | -------------------------------------------- | ----------------------------------------------------- | ----------------- |
+| DCCA    | 0.399/0.112/NA                                | 0.597/0.335/NA                               | 0.549/0.438/NA                                        | ARI               |
+| scDEC   | 0.853/0.475/NA                                | 0.889/0.34/NA                                | 0.827/0.428/NA                                        | ARI               |
+| ScMoGCN | 0.704/0.478/NA                                | 0.634/0.32/NA                                | 0.85/0.433/NA                                         | ARI               |
+| scMVAE  | 0.342/0.218/NA                                | 0.399/0.341/NA                               | 0.437/0.362/NA                                        | ARI               |
+
+**Note**: Stage 1, 2 and 3 (test dataset as metric for selection) for all methods.
 
 #### 4) Multimodal Imputation
 
@@ -377,13 +385,15 @@ pip install -e .
 | GNN                              | EfNST      | A composite scaling network of EfficientNet for improving spatial domain identification performance                                                                           | 2024 |         |
 | ✅                               |            |                                                                                                                                                                               |      |         |
 
-| Model   | 151507 (DANCE 2.0/DANCE 1.0/Original) | 151673 (DANCE 2.0/DANCE 1.0/Original) | 151676 (DANCE 2.0/DANCE 1.0/Original) | Sub MBA (DANCE 2.0/DANCE 1.0/Original) | Evaluation Metric | Note                                                    |
-| ------- | ------------------------------------- | ------------------------------------- | ------------------------------------- | -------------------------------------- | ----------------- | ------------------------------------------------------- |
-| Louvain | 0.31/0.28/NA                          | 0.34/0.31/0.33                        | 0.27/0.25/NA                          | 0.43/0.42/NA                           | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
-| SpaGCN  | 0.45/0.45/0.36                        | 0.44/0.51/0.522                       | 0.47/0.27/0.35                        | 0.32/0.32/NA                           | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
-| STAGATE | 0.593/0.608/0.51                      | 0.61/0.59/0.55                        | 0.60/0.60/0.55                        | 0.29/0.27/NA                           | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
-| stLearn | 0.34/0.31/NA                          | 0.28/0.30/0.36                        | 0.30/0.29/NA                          | 0.45/0.36/NA                           | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
-| EfNST   | 0.50/0.46/0.52                        | 0.53/0.49/0.52                        | 0.52/0.33/0.51                        | 0.30/0.19/NA                           | ARI               | Stage 1, 2 and 3 (test dataset as metric for selection) |
+| Model   | 151676 (DANCE 2.0/DANCE 1.0/Original) | Sub MBA (DANCE 2.0/DANCE 1.0/Original) | Evaluation Metric |
+| ------- | ------------------------------------- | -------------------------------------- | ----------------- |
+| Louvain | 0.27/0.25/NA                          | 0.43/0.42/NA                           | ARI               |
+| SpaGCN  | 0.47/0.27/0.35                        | 0.32/0.32/NA                           | ARI               |
+| STAGATE | 0.60/0.60/0.55                        | 0.29/0.27/NA                           | ARI               |
+| stLearn | 0.30/0.29/NA                          | 0.45/0.36/NA                           | ARI               |
+| EfNST   | 0.52/0.33/0.51                        | 0.30/0.19/NA                           | ARI               |
+
+**Note**: Stage 1, 2 and 3 (test dataset as metric for selection) for all methods.
 
 #### 2）Cell Type Deconvolution
 
@@ -395,10 +405,12 @@ pip install -e .
 | NN Linear + CAR assumption | CARD         | Spatially informed cell-type deconvolution for spatial transcriptomics                                        | 2022 | ✅      |
 | GNN                        | STdGCN       | STdGCN: spatial transcriptomic cell-type deconvolution using graph convolutional networks                     | 2024 | ✅      |
 
-| Model        | CARD Synthetic (DANCE 2.0/DANCE 1.0/Original) | SPOTlight Synthetic (DANCE 2.0/DANCE 1.0/Original) | Evaluation Metric | Note                                                               |
-| ------------ | --------------------------------------------- | -------------------------------------------------- | ----------------- | ------------------------------------------------------------------ |
-| CARD         | 0.00553/0.00627/NA                            | 0.00653/0.00772/NA                                 | Test MSE          | Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) |
-| DSTG         | 0.0105/0.0239/NA                              | 0.0314/0.0315/NA                                   | Test MSE          | Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) |
-| SpatialDecon | 0.00754/0.00821/NA                            | 0.00528/0.00528/NA                                 | Test MSE          | Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) |
-| SPOTlight    | 0.0113/0.0250/NA                              | 0.00614/0.0106/NA                                  | Test MSE          | Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) |
-| STdGCN       | 0.0058/0.0202/NA                              | 0.0145/0.0261/NA                                   | Test MSE          | Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) |
+| Model        | CARD Synthetic (DANCE 2.0/DANCE 1.0/Original) | SPOTlight Synthetic (DANCE 2.0/DANCE 1.0/Original) | Evaluation Metric |
+| ------------ | --------------------------------------------- | -------------------------------------------------- | ----------------- |
+| CARD         | 0.00553/0.00627/NA                            | 0.00653/0.00772/NA                                 | Test MSE          |
+| DSTG         | 0.0105/0.0239/NA                              | 0.0314/0.0315/NA                                   | Test MSE          |
+| SpatialDecon | 0.00754/0.00821/NA                            | 0.00528/0.00528/NA                                 | Test MSE          |
+| SPOTlight    | 0.0113/0.0250/NA                              | 0.00614/0.0106/NA                                  | Test MSE          |
+| STdGCN       | 0.0058/0.0202/NA                              | 0.0145/0.0261/NA                                   | Test MSE          |
+
+**Note**: Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) for all methods.
