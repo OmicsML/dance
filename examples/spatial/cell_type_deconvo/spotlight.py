@@ -54,3 +54,4 @@ SPOTLight synthetic:
 $ python spotlight.py --dataset SPOTLight_synthetic --lr .1 --max_iter 150 --rank 10 --bias 0
 
 """
+

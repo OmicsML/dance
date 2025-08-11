@@ -96,6 +96,7 @@ if __name__ == "__main__":
                        required_indexes=[2, 5, sys.maxsize], metric="acc")
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
+\
 """ Reproduction information
 10X PBMC:
 python scdeepcluster.py --dataset 10X_PBMC --pretrain_epochs 300 --epochs 100 --sigma 2

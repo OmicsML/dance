@@ -73,6 +73,7 @@ if __name__ == "__main__":
             }, ignore_index=True)
         args.seed = args.seed + 1
     print(res)
+\
 """To reproduce BABEL on other samples, please refer to command lines belows:
 
 GEX to ADT (subset):
@@ -91,3 +92,4 @@ ATAC to GEX:
 $ python babel.py --subtask openproblems_bmmc_multiome_phase2_mod2 --device cuda
 
 """
+

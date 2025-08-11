@@ -71,15 +71,10 @@ class Model():
         """Get the decision matrix, probability matrix, and predicted cell types for the
         input data.
 
-        Parameters
-        ----------
-        indata
-            The input array-like object used as a query.
+        Parameters ---------- indata     The input array-like object used as a query.
 
-        Returns
-        ----------
-        tuple
-            A tuple of decision score matrix, raw probability matrix, and predicted cell type labels.
+        Returns ---------- tuple     A tuple of decision score matrix, raw probability
+        matrix, and predicted cell type labels.
 
         """
         scores = self.classifier.decision_function(indata)
@@ -160,9 +155,8 @@ class AnnotationResult():
         self.cell_count = labels.shape[0]
 
     def summary_frequency(self, by: str = 'predicted_labels') -> pd.DataFrame:
-        """
-        Get the frequency of cells belonging to each cell type predicted by celltypist.
-        Parameters
+        """Get the frequency of cells belonging to each cell type predicted by
+        celltypist. Parameters.
 
         ----------
         by: str
@@ -175,6 +169,7 @@ class AnnotationResult():
         ----------
         :class:`~pandas.DataFrame`
             A :class:`~pandas.DataFrame` object with cell type frequencies.
+
         """
         unique, counts = np.unique(self.predicted_labels[by], return_counts=True)
         df = pd.DataFrame(list(zip(unique, counts)), columns=["celltype", "counts"])
@@ -448,8 +443,8 @@ class Classifier():
         return adata.obsm['X_pca'], adata.obsp['connectivities'], adata.obsp['distances'], adata.uns['neighbors']
 
     def over_cluster(self, resolution: Optional[float] = None) -> pd.Series:
-        """Over-clustering input data with a canonical Scanpy pipeline. A neighborhood
-        graph will be used (or constructed if not found) for the over-clustering.
+        """Over-clustering input data with a canonical Scanpy pipeline. graph will be
+        used (or constructed if not found) for the over-clustering. A neighborhood.
 
         Parameters
         ----------
@@ -535,10 +530,8 @@ class Classifier():
 class Celltypist(BaseClassificationMethod):
     """The CellTypist cell annotation method.
 
-    Parameters
-    ----------
-    majority_voting
-        Whether to refine the predicted labels by running the majority voting classifier after over-clustering.
+    Parameters ---------- majority_voting     Whether to refine the predicted labels by
+    running the majority voting classifier after over-clustering.
 
     """
 

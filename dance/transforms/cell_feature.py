@@ -130,10 +130,7 @@ class WeightedFeatureSVD(BaseTransform):
 class CellPCA(BaseTransform):
     """Reduce cell feature matrix with PCA.
 
-    Parameters
-    ----------
-    n_components
-        Number of PCA components to use.
+    Parameters ---------- n_components     Number of PCA components to use.
 
     """
 
@@ -170,10 +167,7 @@ class CellPCA(BaseTransform):
 class CellSVD(BaseTransform):
     """Reduce cell feature matrix with SVD.
 
-    Parameters
-    ----------
-    n_components
-        Number of SVD components to take.
+    Parameters ---------- n_components     Number of SVD components to take.
 
     """
 
@@ -219,10 +213,7 @@ class CellSVD(BaseTransform):
 class FeatureCellPlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process.
 
-    Parameters
-    ----------
-    n_components
-        it will not be used
+    Parameters ---------- n_components     it will not be used
 
     """
 

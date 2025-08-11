@@ -1,10 +1,10 @@
 """Official release of scMoGNN method.
 
-Reference
----------
-Wen, Hongzhi, et al. "Graph Neural Networks for Multimodal Single-Cell Data Integration." arXiv preprint arXiv:2203.01884 (2022).
+Reference --------- Wen, Hongzhi, et al. "Graph Neural Networks for Multimodal Single-
+Cell Data Integration." arXiv preprint arXiv:2203.01884 (2022).
 
 """
+
 import copy
 import math
 from copy import deepcopy

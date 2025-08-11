@@ -135,6 +135,7 @@ if __name__ == "__main__":
                 score[s] = [score[s]]
             res = pd.DataFrame(score)
     print(res)
+\
 """To reproduce scMVAE on other samples, please refer to command lines belows:
 
 GEX-ADT:

@@ -61,11 +61,11 @@ if __name__ == "__main__":
         score = model.score(None, y)
         print(f"{score=:.4f}")
         aris.append(score)
-
     print('scdeepcluster')
     print(args.dataset)
     print(f'aris: {aris}')
     print(f'aris: {np.mean(aris)} +/- {np.std(aris)}')
+\
 """ Reproduction information
 10X PBMC:
 python scdeepcluster.py --dataset 10X_PBMC --pretrain_epochs 300 --epochs 100 --sigma 2
@@ -79,3 +79,4 @@ python scdeepcluster.py --dataset worm_neuron_cell --pretrain_epochs 300 --epoch
 Mouse Bladder:
 python scdeepcluster.py --dataset mouse_bladder_cell --pretrain_epochs 300 --sigma 2 --epochs 100
 """
+

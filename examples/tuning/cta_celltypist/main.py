@@ -92,17 +92,18 @@ if __name__ == "__main__":
                        root_path=file_root_path)
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
+\
 """To reproduce CellTypist benchmarks, please refer to command lines below:
 
-Mouse Brain
-$ python celltypist.py --species mouse --tissue Brain --train_dataset 753 3285 --test_dataset 2695
+Mouse Brain $ python celltypist.py --species mouse --tissue Brain --train_dataset 753
+3285 --test_dataset 2695
 
-Mouse Spleen
-$ python celltypist.py --species mouse --tissue Spleen --train_dataset 1970 --test_dataset 1759
+Mouse Spleen $ python celltypist.py --species mouse --tissue Spleen --train_dataset 1970
+--test_dataset 1759
 
-Mouse Kidney
-$ python celltypist.py --species mouse --tissue Kidney --train_dataset 4682 --test_dataset 203
+Mouse Kidney $ python celltypist.py --species mouse --tissue Kidney --train_dataset 4682
+--test_dataset 203
 
+ 2cmgqalz
 
-2cmgqalz
 """

@@ -62,9 +62,8 @@ class BaseMethod(ABC):
                   return_pred: bool = False, **fit_kwargs) -> Union[float, Tuple[float, Any]]:
         """Shortcut for fitting data using the input feature and return eval.
 
-        Note
-        ----
-        Only work for models where the fitting does not require labeled data, i.e. unsupervised methods.
+        Note ---- Only work for models where the fitting does not require labeled data,
+        i.e. unsupervised methods.
 
         """
         self.fit(x, **fit_kwargs)

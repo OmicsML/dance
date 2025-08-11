@@ -81,18 +81,12 @@ class SCNFeature(BaseTransform):
 def query_transform(exp_df: pd.DataFrame, gene_pairs: List[Tuple[str, str]]):
     """Transform expression data into SCN feature given selected gene pairs.
 
-    Parameters
-    ----------
-    exp_df
-        Expression matrix (sample x gene).
-    gene_pairs
-        List of selected top differentiating gene pairs.
+    Parameters ---------- exp_df     Expression matrix (sample x gene). gene_pairs
+    List of selected top differentiating gene pairs.
 
-    Returns
-    -------
-    gene_pair_diff_bin
-        SCN feature. A binary matrix indicating whether the source genes have higher expression than the target genes
-        in the top selected gene pairs.
+    Returns ------- gene_pair_diff_bin     SCN feature. A binary matrix indicating
+    whether the source genes have higher expression than the target genes     in the top
+    selected gene pairs.
 
     """
     genes1, genes2 = map(list, zip(*gene_pairs))
@@ -105,23 +99,13 @@ def get_top_gene_pairs(exp_df: pd.DataFrame, cell_type_array: np.ndarray, degs_d
                        num_top_pairs: int = 250, max_gene_per_ct: int = 3) -> List[Tuple[str, str]]:
     """Obtain top differentiating gene pairs.
 
-    Parameters
-    ----------
-    exp_df
-        Expression matrix (sample x gene).
-    cell_type_array
-        1-d array of cell-type information for each sample.
-    degs_dict
-        Dictionary of differentially expressed genes for each cell type.
-    num_top_pairs
-        Number of top differentiating gene pairs to get.
-    max_gene_per_ct
-        Maximum number of genes allowed to be attributed to a cell type (in the form of gene pairs).
+    Parameters ---------- exp_df     Expression matrix (sample x gene). cell_type_array
+    1-d array of cell-type information for each sample. degs_dict     Dictionary of
+    differentially expressed genes for each cell type. num_top_pairs     Number of top
+    differentiating gene pairs to get. max_gene_per_ct     Maximum number of genes
+    allowed to be attributed to a cell type (in the form of gene pairs).
 
-    Returns
-    -------
-    top_gene_pairs
-        List of top differentiating gene pairs.
+    Returns ------- top_gene_pairs     List of top differentiating gene pairs.
 
     """
     top_gene_pairs = []
@@ -184,27 +168,14 @@ def get_diff_exp_genes(exp_df: pd.DataFrame, cell_type_array: np.ndarray, *, num
                        mu: float = 2) -> Tuple[Dict[str, List[str]], List[str]]:
     """Get differntially expressed genes via regression.
 
-    Parameters
-    ----------
-    exp_df
-        Expression matrix (sample x gene).
-    cell_type_array
-        1-d array of cell-type information for each sample.
-    num_top_genes
-        Number of top differentially expressed genes to use.
-    threshold
-        Gene expression threshold parameters.
-    alpha1
-        Alpha 1 threshold parameter.
-    alpha2
-        Alpha 2 threshold parameter.
-    mu
-        mu threshold parameter.
+    Parameters ---------- exp_df     Expression matrix (sample x gene). cell_type_array
+    1-d array of cell-type information for each sample. num_top_genes     Number of top
+    differentially expressed genes to use. threshold     Gene expression threshold
+    parameters. alpha1     Alpha 1 threshold parameter. alpha2     Alpha 2 threshold
+    parameter. mu     mu threshold parameter.
 
-    Returns
-    -------
-    degs_dict
-        Dictionary of selected top differentially expressed genes for each cell type.
+    Returns ------- degs_dict     Dictionary of selected top differentially expressed
+    genes for each cell type.
 
     """
     alpha_df = genestats_alpha(exp_df, threshold=threshold)

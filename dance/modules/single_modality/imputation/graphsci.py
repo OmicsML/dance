@@ -276,7 +276,7 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             elif min_valid_loss >= self.valid_loss:
                 min_valid_loss = self.valid_loss
                 self.save_model()
-            print(f"[Epoch%d], train_loss %.6f, adj_loss %.6f, express_loss %.6f, kl_loss %.6f, valid_loss %.6f" \
+            print(f"[Epoch%d], train_loss %.6f, adj_loss %.6f, express_loss %.6f, kl_loss %.6f, valid_loss %.6f"\
                 % (epoch, self.train_loss, self.loss_adj, self.loss_exp, abs(self.kl), self.valid_loss))
 
     def train(self, train_data, train_data_raw, graph, train_mask, valid_mask, le=1, la=1, ke=1, ka=1):
@@ -310,7 +310,6 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
             loss value of training loop
 
         """
-
         self.gnnmodel.train()
         self.aemodel.train()
         self.optimizer.zero_grad()
@@ -362,7 +361,6 @@ class GraphSCI(nn.Module, BaseRegressionMethod):
         -------
 
         """
-
         if mask is None:
             mask = np.ones_like(features_raw.cpu()).astype(bool)
 

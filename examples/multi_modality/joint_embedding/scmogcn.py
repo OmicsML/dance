@@ -82,6 +82,7 @@ if __name__ == "__main__":
                 score[s] = [score[s]]
             res = pd.DataFrame(score)
     print(res)
+\
 """To reproduce scMoGCN on other samples, please refer to command lines belows:
 
 GEX-ADT:
@@ -91,3 +92,4 @@ GEX-ATAC:
 $ python scmogcn.py --subtask openproblems_bmmc_multiome_phase2 --device cuda
 
 """
+

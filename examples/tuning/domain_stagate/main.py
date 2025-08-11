@@ -74,9 +74,10 @@ if __name__ == "__main__":
                        required_indexes=[4, sys.maxsize], metric="ARI")
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
-""" To reproduce Stagate on other samples, please refer to command lines belows:
-NOTE: since the stagate method is unstable, you have to run at least 5 times to get
-      best performance. (same with original Stagate paper)
+\
+"""To reproduce Stagate on other samples, please refer to command lines belows: NOTE:
+since the stagate method is unstable, you have to run at least 5 times to get best
+performance. (same with original Stagate paper)
 
 human dorsolateral prefrontal cortex sample 151673:
 $ python stagate.py --sample_number 151673
@@ -86,4 +87,5 @@ $ python stagate.py --sample_number 151676
 
 human dorsolateral prefrontal cortex sample 151507:
 $ python stagate.py --sample_number 151507
+
 """
