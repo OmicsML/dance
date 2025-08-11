@@ -8,6 +8,7 @@ Ciortan, Madalina, and Matthieu Defrance. "GNN-based embedding for clustering sc
 (2022) 1037-1044.
 
 """
+
 import dgl
 import numpy as np
 import pandas as pd
@@ -158,22 +159,10 @@ class GraphSC(BaseClusteringMethod):
     ):
         """Train graph-sc.
 
-        Parameters
-        ----------
-        g
-            Input cell-gene graph.
-        y
-            Not used, for compatibility with the BaseClusteringMethod class.
-        epochs
-            Number of epochs.
-        lr
-            Learning rate.
-        batch_size
-            Batch size.
-        show_epoch_ari
-            Show ARI score for each epoch
-        eval_epoch
-            Evaluate every epoch.
+        Parameters ---------- g     Input cell-gene graph. y     Not used, for
+        compatibility with the BaseClusteringMethod class. epochs     Number of epochs.
+        lr     Learning rate. batch_size     Batch size. show_epoch_ari     Show ARI
+        score for each epoch eval_epoch     Evaluate every epoch.
 
         """
         g.ndata["order"] = g.ndata["label"] = g.ndata["feat_id"]
@@ -247,15 +236,10 @@ class GraphSC(BaseClusteringMethod):
     def predict(self, x: Optional[Any] = None):
         """Get predictions from the graph autoencoder model.
 
-        Parameters
-        ----------
-        x
-            Not used, for compatibility with BaseClusteringMethod class.
+        Parameters ---------- x     Not used, for compatibility with
+        BaseClusteringMethod class.
 
-        Returns
-        -------
-        pred
-            Prediction of given clustering method.
+        Returns ------- pred     Prediction of given clustering method.
 
         """
         if self.cluster_method == "kmeans":
@@ -383,17 +367,9 @@ class GCNAE(nn.Module):
 class InnerProductDecoder(nn.Module):
     """Inner product decoder class.
 
-    Parameters
-    ----------
-    activation
-        Activation function.
-    dropout
-        Dropout rate.
+    Parameters ---------- activation     Activation function. dropout     Dropout rate.
 
-    Returns
-    -------
-    adj
-        Reconstructed adjacency matrix.
+    Returns ------- adj     Reconstructed adjacency matrix.
 
     """
 
@@ -414,10 +390,7 @@ class WeightedGraphConv(GraphConv):
     def edge_selection_simple(self, edges):
         """Edge selection.
 
-        Parameters
-        ----------
-        edges
-            Edges of graph.
+        Parameters ---------- edges     Edges of graph.
 
         """
         return {"m": edges.src["h"] * edges.data["weight"]}
@@ -488,10 +461,7 @@ class WeightedGraphConvAlpha(GraphConv):
     def edge_selection_simple(self, edges):
         """Edge selection.
 
-        Parameters
-        ----------
-        edges
-            Edges of graph.
+        Parameters ---------- edges     Edges of graph.
 
         """
         number_of_edges = edges.src["h"].shape[0]

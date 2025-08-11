@@ -8,6 +8,7 @@ Dong, Kangning, and Shihua Zhang. "Deciphering spatial domains from spatially re
 graph attention auto-encoder." Nature communications 13.1 (2022): 1-12.
 
 """
+
 import numpy as np
 import scanpy as sc
 import torch
@@ -30,6 +31,7 @@ from dance.utils import get_device
 
 class GATConv(MessagePassing):
     """Graph attention layer from Graph Attention Network."""
+
     _alpha = None
 
     def __init__(self, in_channels, out_channels, heads: int = 1, concat: bool = True, negative_slope: float = 0.2,
@@ -131,14 +133,9 @@ class GATConv(MessagePassing):
 class Stagate(nn.Module, BasePretrain, BaseClusteringMethod):
     """Stagate class.
 
-    Parameters
-    ----------
-    hidden_dims
-        Hidden dimensions.
-    device
-        Computation device.
-    pretrain_path
-        Save the cell representations from the trained STAGATE model to the specified path. Do not save if unspecified.
+    Parameters ---------- hidden_dims     Hidden dimensions. device     Computation
+    device. pretrain_path     Save the cell representations from the trained STAGATE
+    model to the specified path. Do not save if unspecified.
 
     """
 
@@ -175,17 +172,11 @@ class Stagate(nn.Module, BasePretrain, BaseClusteringMethod):
     def forward(self, features, edge_index):
         """Forward function for training.
 
-        Parameters
-        ----------
-        features
-            Node features.
-        edge_index
-            Adjacent matrix.
+        Parameters ---------- features     Node features. edge_index     Adjacent
+        matrix.
 
-        Returns
-        -------
-        Tuple[Tensor, Tensor]
-            The second and the forth hidden layerx.
+        Returns ------- Tuple[Tensor, Tensor]     The second and the forth hidden
+        layerx.
 
         """
         h1 = F.elu(self.conv1(features, edge_index))
@@ -247,21 +238,11 @@ class Stagate(nn.Module, BasePretrain, BaseClusteringMethod):
     ):
         """Fit function for training.
 
-        Parameters
-        ----------
-        inputs
-            A tuple containing (1) the input features and (2) the edge index array (coo representation) of the
-            adjacency matrix.
-        epochs
-            Number of epochs.
-        lr
-            Learning rate.
-        gradient_clipping
-            Gradient clipping.
-        weight_decay
-            Weight decay.
-        num_cluster
-            Number of cluster.
+        Parameters ---------- inputs     A tuple containing (1) the input features and
+        (2) the edge index array (coo representation) of the     adjacency matrix.
+        epochs     Number of epochs. lr     Learning rate. gradient_clipping
+        Gradient clipping. weight_decay     Weight decay. num_cluster     Number of
+        cluster.
 
         """
         x, edge_index_array = inputs

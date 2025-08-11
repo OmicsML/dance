@@ -1,11 +1,11 @@
 """Reimplementation of the ACTINN cell-type annotation method.
 
-Reference
----------
-Ma, Feiyang, and Matteo Pellegrini. "ACTINN: automated identification of cell types in single cell RNA sequencing."
-Bioinformatics 36.2 (2020): 533-538.
+Reference --------- Ma, Feiyang, and Matteo Pellegrini. "ACTINN: automated
+identification of cell types in single cell RNA sequencing." Bioinformatics 36.2 (2020):
+533-538.
 
 """
+
 import numpy as np
 import scanpy as sc
 import torch
@@ -22,14 +22,8 @@ from dance.typing import LogLevel, Optional, Tuple
 class ACTINN(BaseClassificationMethod):
     """The ACTINN cell-type classification model.
 
-    Parameters
-    ----------
-    hidden_dims
-        Hidden layer dimensions.
-    lambd
-        Regularization parameter
-    device
-        Training device
+    Parameters ---------- hidden_dims     Hidden layer dimensions. lambd
+    Regularization parameter device     Training device
 
     """
 
@@ -70,17 +64,10 @@ class ACTINN(BaseClassificationMethod):
     def compute_loss(self, z: Tensor, y: Tensor):
         """Compute loss function.
 
-        Parameters
-        ----------
-        z
-            Output of forward propagation (cells by cell-types).
-        y
-            Cell labels (cells).
+        Parameters ---------- z     Output of forward propagation (cells by cell-types).
+        y     Cell labels (cells).
 
-        Returns
-        -------
-        torch.Tensor
-            Loss.
+        Returns ------- torch.Tensor     Loss.
 
         """
         log_prob = F.log_softmax(z, dim=-1)
@@ -93,17 +80,11 @@ class ACTINN(BaseClassificationMethod):
     def random_batches(self, x: Tensor, y: Tensor, batch_size: int = 32, seed: Optional[int] = None):
         """Shuffle data and split into batches.
 
-        Parameters
-        ----------
-        x
-            Training data (cells by genes).
-        y
-            True labels (cells by cell-types).
+        Parameters ---------- x     Training data (cells by genes). y     True labels
+        (cells by cell-types).
 
-        Yields
-        ------
-        Tuple[torch.Tensor, torch.Tensor]
-            Batch of training data (x, y).
+        Yields ------ Tuple[torch.Tensor, torch.Tensor]     Batch of training data (x,
+        y).
 
         """
         ns = x.shape[0]
@@ -124,22 +105,11 @@ class ACTINN(BaseClassificationMethod):
     ):
         """Fit the classifier.
 
-        Parameters
-        ----------
-        x_train
-            training data (cells by genes).
-        y_train
-            training labels (cells by cell-types).
-        batch_size
-            Training batch size.
-        lr
-            Initial learning rate.
-        num_epochs
-            Number of epochs to run.
-        print_cost
-            Print training loss if set to True.
-        seed
-            Random seed, if set to None, then random.
+        Parameters ---------- x_train     training data (cells by genes). y_train
+        training labels (cells by cell-types). batch_size     Training batch size. lr
+        Initial learning rate. num_epochs     Number of epochs to run. print_cost
+        Print training loss if set to True. seed     Random seed, if set to None, then
+        random.
 
         """
         input_dim, output_dim = x_train.shape[1], y_train.shape[1]
@@ -178,15 +148,9 @@ class ACTINN(BaseClassificationMethod):
     def predict(self, x: Tensor):
         """Predict cell labels.
 
-        Parameters
-        ----------
-        x
-            Gene expression input features (cells by genes).
+        Parameters ---------- x     Gene expression input features (cells by genes).
 
-        Returns
-        -------
-        torch.Tensor
-            Predicted cell-label indices.
+        Returns ------- torch.Tensor     Predicted cell-label indices.
 
         """
         x = x.clone().detach().to(self.device)

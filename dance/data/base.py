@@ -302,12 +302,8 @@ class BaseData(ABC):
     def set_split_idx(self, split_name: str, split_idx: Sequence[int]):
         """Set cell indices for a particular split.
 
-        Parameters
-        ----------
-        split_name
-            Name of the split to set.
-        split_idx
-            Indices to be used in this split.
+        Parameters ---------- split_name     Name of the split to set. split_idx
+        Indices to be used in this split.
 
         """
         self._split_idx_dict[split_name] = split_idx
@@ -339,12 +335,8 @@ class BaseData(ABC):
     def get_split_mask(self, split_name: str, return_type: FeatType = "numpy") -> Union[np.ndarray, torch.Tensor]:
         """Obtain mask representation of a particular split.
 
-        Parameters
-        ----------
-        split_name
-            Name of the split to retrieve.
-        return_type
-            Return numpy array if set to 'numpy', or torch Tensor if set to 'torch'.
+        Parameters ---------- split_name     Name of the split to retrieve. return_type
+        Return numpy array if set to 'numpy', or torch Tensor if set to 'torch'.
 
         """
         split_idx = self.get_split_idx(split_name, error_on_miss=True)
@@ -360,10 +352,7 @@ class BaseData(ABC):
     def get_split_data(self, split_name: str) -> Union[anndata.AnnData, mudata.MuData]:
         """Obtain the underlying data of a particular split.
 
-        Parameters
-        ----------
-        split_name
-            Name of the split to retrieve.
+        Parameters ---------- split_name     Name of the split to retrieve.
 
         """
         split_idx = self.get_split_idx(split_name, error_on_miss=True)
@@ -627,13 +616,10 @@ class Data(BaseData):
     ) -> Tuple[Any, Any]:
         """Retrieve cell features and labels from a particular split.
 
-        Parameters
-        ----------
-        split_name
-            Name of the split to retrieve. If not set, return all.
-        return_type
-            How should the features be returned. **numpy**: return as a numpy array; **torch**: return as a torch
-            tensor; **anndata**: return as an anndata object.
+        Parameters ---------- split_name     Name of the split to retrieve. If not set,
+        return all. return_type     How should the features be returned. **numpy**:
+        return as a numpy array; **torch**: return as a torch     tensor; **anndata**:
+        return as an anndata object.
 
         """
         x = self.get_x(split_name, return_type, **x_kwargs)

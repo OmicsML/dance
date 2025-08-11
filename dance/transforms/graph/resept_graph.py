@@ -13,8 +13,7 @@ from dance.utils.status import experimental
 class RESEPTGraph(BaseTransform):
     """RESEPT spatial spot graph.
 
-    Reference
-    ---------
+    Reference ---------
     https://www.biorxiv.org/content/10.1101/2021.07.08.451210v1.full
 
     """

@@ -305,16 +305,10 @@ class CellTypeAnnotationDataset(BaseDataset):
     def get_map_dict(map_file_path: str, tissue: str) -> Dict[str, Set[str]]:
         """Load cell-type mappings.
 
-        Parameters
-        ----------
-        map_file_path
-            Path to the mapping file.
-        tissue
-            Tissue of interest.
+        Parameters ---------- map_file_path     Path to the mapping file. tissue
+        Tissue of interest.
 
-        Notes
-        -----
-        Merge mapping across all test sets for the required tissue.
+        Notes ----- Merge mapping across all test sets for the required tissue.
 
         """
         map_df = pd.read_excel(osp.join(map_file_path, "map.xlsx"))
@@ -329,12 +323,9 @@ class CellTypeAnnotationDataset(BaseDataset):
 class ClusteringDataset(BaseDataset):
     """Data downloading and loading for clustering.
 
-    Parameters
-    ----------
-    data_dir
-        Path to store datasets.
-    dataset
-        Choice of dataset. Available options are '10X_PBMC', 'mouse_bladder_cell', 'mouse_ES_cell', 'worm_neuron_cell'.
+    Parameters ---------- data_dir     Path to store datasets. dataset     Choice of
+    dataset. Available options are '10X_PBMC', 'mouse_bladder_cell', 'mouse_ES_cell',
+    'worm_neuron_cell'.
 
     """
 

@@ -81,7 +81,6 @@ def construct_enhanced_feature_graph(u, v, e, cell_node_features, enhance_graph=
         The generated graph.
 
     """
-
     TRAIN_SIZE = kwargs['TRAIN_SIZE']
     FEATURE_SIZE = kwargs['FEATURE_SIZE']
 
@@ -184,7 +183,6 @@ def construct_pathway_graph(gex_data, **kwargs):
         Edge weight of each edge.
 
     """
-
     pww = kwargs['pathway_weight']
     npw = kwargs['no_pathway']
     subtask = kwargs['subtask']
@@ -323,7 +321,6 @@ def construct_basic_feature_graph(feature_mod1, feature_mod1_test=None, bf_input
         The generated graph.
 
     """
-
     if feature_mod1_test is not None:
         input_test_mod1 = csc_matrix(feature_mod1_test)
         assert (input_test_mod1.shape[1] == input_train_mod1.shape[1])
@@ -384,7 +381,6 @@ def gen_batch_features(ad_inputs):
         node features of cell nodes.
 
     """
-
     cells = []
     columns = [
         'cell_mean', 'cell_std', 'nonzero_25%', 'nonzero_50%', 'nonzero_75%', 'nonzero_max', 'nonzero_count',
@@ -526,7 +522,6 @@ def construct_modality_prediction_graph(dataset, **kwargs):
         The generated graph.
 
     """
-
     train_mod1 = dataset.modalities[0]
     input_train_mod1 = dataset.sparse_features()[0]
     if kwargs['inductive'] == 'trans':
@@ -719,7 +714,6 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
         yule(u, v[, w])	Compute the Yule dissimilarity between two boolean 1-D arrays.
         hamming also operates over discrete numerical vectors.
         """
-
         distMat = distance.cdist(featureMatrix, featureMatrix, distanceType)
 
         edgeList = []
@@ -736,7 +730,6 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
 
     def calculateThresholdgraphDistanceMatrix(featureMatrix, distanceType='euclidean', threshold=0.5):
         r"""Thresholdgraph: Graph with certain threshold."""
-
         distMat = distance.cdist(featureMatrix, featureMatrix, distanceType)
 
         edgeList = []
@@ -750,7 +743,6 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
 
     def calculateKNNThresholdgraphDistanceMatrix(featureMatrix, distanceType='cosine', k=10, threshold=0.5):
         r"""Thresholdgraph: KNN Graph with certain threshold."""
-
         distMat = distance.cdist(featureMatrix, featureMatrix, distanceType)
 
         edgeList = []
@@ -768,7 +760,6 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
         r"""Thresholdgraph: KNN Graph with Machine Learning based methods
         IsolationForest https://scikit-learn.org/stable/modules/generated/sklearn.ensemb
         le.IsolationForest.html#sklearn.ensemble.IsolationForest."""
-
         distMat = distance.cdist(featureMatrix, featureMatrix, distanceType)
         edgeList = []
 
@@ -792,7 +783,6 @@ def scGNNgenerateAdj(featureMatrix, graphType='KNNgraph', para=None, parallelLim
     def calculateKNNgraphDistanceMatrixStatsSingleThread(featureMatrix, distanceType='euclidean', k=10, param=None):
         r"""Thresholdgraph: KNN Graph with stats one-std based methods, SingleThread
         version."""
-
         edgeList = []
         # Version 1: cost memory, precalculate all dist
 

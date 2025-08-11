@@ -8,6 +8,7 @@ Minoura, Kodai, et al. A mixture-of-experts deep generative model for integrated
 data. Cell reports methods 1.5 (2021): 100071.
 
 """
+
 import math
 import os
 from copy import deepcopy
@@ -391,7 +392,7 @@ class MMVAE(nn.Module):
             nn.Parameter(torch.zeros(1, params.latent_dim), requires_grad=False),  # mu
             nn.Parameter(torch.zeros(1, params.latent_dim), **grad)  # logvar
         ])
-        self.vaes[0].llik_scaling = prod(self.vaes[1].dataSize) / prod(self.vaes[0].dataSize) \
+        self.vaes[0].llik_scaling = prod(self.vaes[1].dataSize) / prod(self.vaes[0].dataSize)\
             if params.llik_scaling == 0 else params.llik_scaling
         self.scale_factor = 10000
 
@@ -441,7 +442,6 @@ class MMVAE(nn.Module):
             Reconstruction results of two modalities.
 
         """
-
         qz_xs, zss = [], []
         read_counts = []
         # initialise cross-modal matrix
@@ -510,7 +510,6 @@ class MMVAE(nn.Module):
             Ratio for automatic train-validation split.
 
         """
-
         start_early_stop = self.params.deterministic_warmup
 
         idx = np.random.permutation(x_train.shape[0])

@@ -7,6 +7,7 @@ Reference
 Yang, Karren Dai, et al. "Multi-domain translation between single-cell imaging and sequencing data using autoencoders." Nature communications 12.1 (2021): 1-10.
 
 """
+
 import math
 import os
 import sys
@@ -426,16 +427,16 @@ class CMAE(nn.Module):
         class_weight = hyperparameters['gan_w'] if "class_w" not in hyperparameters else hyperparameters["class_w"]
 
         # total loss
-        self.loss_gen_total = hyperparameters['gan_w'] * self.loss_latent_a + \
-                              hyperparameters['gan_w'] * self.loss_latent_b + \
-                              class_weight * self.loss_class_a + \
-                              class_weight * self.loss_class_b + \
-                              hyperparameters['recon_x_w'] * self.loss_gen_recon_x_a + \
-                              hyperparameters['recon_x_w'] * self.loss_gen_recon_x_b + \
+        self.loss_gen_total = hyperparameters['gan_w'] * self.loss_latent_a +\
+                              hyperparameters['gan_w'] * self.loss_latent_b +\
+                              class_weight * self.loss_class_a +\
+                              class_weight * self.loss_class_b +\
+                              hyperparameters['recon_x_w'] * self.loss_gen_recon_x_a +\
+                              hyperparameters['recon_x_w'] * self.loss_gen_recon_x_b +\
                               hyperparameters['super_w'] * self.loss_supervision
 
         if variational:
-            self.loss_gen_total += hyperparameters['recon_kl_w'] * self.loss_gen_recon_kl_a + \
+            self.loss_gen_total += hyperparameters['recon_kl_w'] * self.loss_gen_recon_kl_a +\
                                    hyperparameters['recon_kl_w'] * self.loss_gen_recon_kl_b
 
         self.loss_gen_total.backward()
@@ -488,7 +489,6 @@ class CMAE(nn.Module):
             Current iteration number of resumed model.
 
         """
-
         hyperparameters = self.hyperparameters
         # Load generators
         last_model_name = get_model_list(checkpoint_dir, "gen")
@@ -559,7 +559,6 @@ class CMAE(nn.Module):
         None.
 
         """
-
         hyperparameters = self.hyperparameters
         idx = torch.randperm(train_mod1.shape[0])
         train_idx = idx[:int(idx.shape[0] * (1 - val_ratio))]

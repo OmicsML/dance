@@ -96,6 +96,7 @@ if __name__ == "__main__":
                        required_indexes=[2, 5, sys.maxsize - 1, sys.maxsize], metric="acc")
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
+\
 """Reproduction information
 10X PBMC:
 python sctag.py --dataset 10X_PBMC --pretrain_epochs 100 --w_a 0.01 --w_x 3 --w_c 0.1 --dropout 0.5

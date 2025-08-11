@@ -59,20 +59,18 @@ if __name__ == '__main__':
         score = model.score(X, imputed_data, mask, metric='RMSE')
         print("RMSE: %.4f" % score)
         rmses.append(score)
-
     print('deepimpute')
     print(params.dataset)
     print(f'rmses: {rmses}')
     print(f'rmses: {np.mean(rmses)} +/- {np.std(rmses)}')
+\
 """To reproduce deepimpute benchmarks, please refer to command lines belows:
 
-Mouse Brain
-$ python deepimpute.py --dataset mouse_brain_data
+Mouse Brain $ python deepimpute.py --dataset mouse_brain_data
 
-Mouse Embryo
-$ python deepimpute.py --dataset mouse_embryo_data
+Mouse Embryo $ python deepimpute.py --dataset mouse_embryo_data
 
-PBMC
-$ python deepimpute.py --dataset pbmc_data
+PBMC $ python deepimpute.py --dataset pbmc_data
 
 """
+

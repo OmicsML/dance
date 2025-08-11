@@ -168,10 +168,9 @@ if __name__ == "__main__":
         args.pathway = False
     if args.sampling:
         args.pathway = False
-
     torch.set_num_threads(args.cpu)
-
     pipeline(**vars(args))
+\
 """To reproduce scMoGCN on other samples, please refer to command lines belows:
 
 GEX to ADT (subset):
