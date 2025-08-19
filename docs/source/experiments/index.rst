@@ -14,3 +14,4 @@ This document contains all the experiments config.
    spatial_domain/index
    celltype_deconvolution/index
    step3_default_config
+   step_functions_index
