@@ -1,3 +1,3 @@
 id,_runtime,_step,_timestamp,_wandb_runtime,acc,params.0.FilterGenesPercentile.max_val,params.0.FilterGenesPercentile.min_val,params.0.FilterGenesPercentile.mode,params.1.ColumnSumNormalize.eps,params.1.ColumnSumNormalize.mode,params.2.FilterGenesRegression.method,params.2.FilterGenesRegression.num_genes,params.3.CellSVD.algorithm,params.3.CellSVD.n_components,test_acc,train_acc
-ex4i83qv,13.576059818267822,0.0,1754737592.5319088,11,0.7121211886405945,99,8,rv,0.5,minmax,seurat3,6106,arpack,218,0.3550724685192108,0.885496199131012
-nou13et9,,,,9,,97,1,cv,0.1,l2,scmap,8594,arpack,590,,
+9bwt95uk,13.6163969039917,0.0,1755664066.86501,11,0.3636363744735718,95,6,var,0.5,normalize,scmap,1609,randomized,539,0.06521739065647125,0.6717557311058044
+jhryorbj,,,,9,,98,4,sum,0.1,minmax,scmap,7435,arpack,793,,
