@@ -172,7 +172,7 @@ source install.sh cu118 dance-env
 **Note**: the first argument for cuda version is mandatory, while the second argument for conda environment name is optional (default is `dance`).
 
 <details>
-<summary><H3>Custom install</H3></summary>
+<H3>Custom install</H3>
 <br>
 
 **Step1. Setup environment**
