@@ -62,6 +62,17 @@ controls, as well as setting up the `dev` environments.
 If you find our work useful in your research, please consider citing our DANCE package or survey paper:
 
 ```bibtex
+@article{ding2025dance,
+  title={DANCE 2.0: Transforming single-cell analysis from black box to transparent workflow},
+  author={Ding, Jiayuan and Xing, Zhongyu and Wang, Yixin and Liu, Renming and Liu, Sheng and Huang, Zhi and Tang, Wenzhuo and Xie, Yuying and Zou, James and Qiu, Xiaojie and others},
+  journal={bioRxiv},
+  pages={2025--07},
+  year={2025},
+  publisher={Cold Spring Harbor Laboratory}
+}
+```
+
+```bibtex
 @article{ding2024dance,
   title={DANCE: A deep learning library and benchmark platform for single-cell analysis},
   author={Ding, Jiayuan and Liu, Renming and Wen, Hongzhi and Tang, Wenzhuo and Li, Zhaoheng and Venegas, Julian and Su, Runze and Molho, Dylan and Jin, Wei and Wang, Yixin and others},
@@ -411,7 +422,7 @@ pip install -e .
 | SPOTlight    | 0.0113/0.0250/NA                              | 0.00614/0.0106/NA                                  | Test MSE          |
 | STdGCN       | 0.0058/0.0202/NA                              | 0.0145/0.0261/NA                                   | Test MSE          |
 
-**Note**: Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) for all methods.
+**Note**: DANCE 2.0 indicates Stage 1, 2, and 3 (valid pseudo or dataset as metric for selection) for all methods.
 
 ### A Note on Function Naming
 
