@@ -1,5 +1,5 @@
 # =============================================================================
-# 系统和开发工具相关
+# System and development tools related
 # =============================================================================
 .DS_Store
 .vscode/
@@ -7,7 +7,7 @@
 wandb/
 
 # =============================================================================
-# 构建和缓存
+# Build and cache
 # =============================================================================
 *.egg*
 __pycache__/
@@ -15,7 +15,7 @@ build/
 *.log
 
 # =============================================================================
-# 数据文件
+# Data files
 # =============================================================================
 *.pkl
 *.pt
@@ -26,7 +26,7 @@ build/
 *.tif
 
 # =============================================================================
-# 临时文件
+# Temporary files
 # =============================================================================
 temp_ans.csv
 temp_ans.json
@@ -39,23 +39,23 @@ proxy.txt
 readme.txt
 
 # =============================================================================
-# 结果文件
+# Result files
 # =============================================================================
 results - cell type deconvolution.csv
 results - spatial domain.csv
 
 # =============================================================================
-# Examples 目录
+# Examples directory
 # =============================================================================
 
-# 通用数据文件
+# Common data files
 examples/**/*.h5ad
 examples/**/*.h5
 examples/**/*.zip
 examples/**/*.gz
 examples/**/*.tif
 
-# tuning 子目录
+# tuning subdirectory
 examples/tuning/**/*.yaml
 examples/tuning/**/*.csv
 examples/tuning/**/*.sh
@@ -74,7 +74,7 @@ examples/tuning/check_sweep.py
 examples/tuning/result.md
 examples/tuning/joint_embedding_scmogcn/models/model_joint_embedding_1.pth
 
-# tuning 保留规则 - 每个算法文件夹保留一个示例结果文件夹
+# tuning retention rules - keep one example result folder for each algorithm folder
 
 !examples/tuning/cluster_graphsc/human_pbmc2_cell/**
 !examples/tuning/cluster_scdcc/human_pbmc2_cell/**
@@ -101,7 +101,7 @@ examples/tuning/joint_embedding_scmogcn/models/model_joint_embedding_1.pth
 !examples/tuning/custom-methods/**
 examples/tuning/custom-methods/wandb
 
-# tuning 保留规则
+# tuning retention rules
 !examples/tuning/cta_scheteronet/328_138/**
 !examples/tuning/cta_celltypist/328_138/**
 !examples/tuning/cta_scdeepsort/328_138/**
@@ -117,7 +117,7 @@ examples/tuning/custom-methods/wandb
 
 !examples/tuning/step3_default_params.yaml
 
-# atlas 子目录
+# atlas subdirectory
 examples/atlas/demos/atlas_csvs/
 examples/atlas/demos/atlas_patterns/
 examples/atlas/metadatas/
@@ -129,16 +129,16 @@ examples/atlas/dropbox_token.txt
 examples/atlas/generate_method.ipynb
 examples/atlas/config/run_config.csv
 
-# atlas 保留规则
+# atlas retention rules
 !examples/atlas/sc_similarity_examples/visualization/*.py
 !examples/atlas/sc_similarity_examples/data/Cell Type Annotation Atlas.xlsx
 
-# single_modality 子目录
+# single_modality subdirectory
 examples/single_modality/cell_type_annotation/**/*.xlsx
 examples/single_modality/cell_type_annotation/**/*.csv
 examples/single_modality/imputation/data/
 
-# 其他 Examples
+# Other Examples
 examples/spatial/spatial_domain/data/spatial/
 examples/spatial/cell_type_deconvo/data/spatial/
 examples/computer_resources/
@@ -146,20 +146,20 @@ examples/temp_hpancreas/
 examples/result_analysis/*
 examples/multi_modality/joint_embedding/models/*.pth
 
-# 保留 result_analysis 下特定脚本
+# Keep specific scripts under result_analysis
 !examples/result_analysis/get_important_pattern_sweep.py
 !examples/result_analysis/get_important_pattern.py
 !examples/result_analysis/get_num.py
 
 # =============================================================================
-# 模型文件
+# Model files
 # =============================================================================
 models/model_joint_embedding_1.pth
 examples/tuning/joint_embedding_scmogcn/models/model_joint_embedding_1.pth
 examples/multi_modality/joint_embedding/models/*.pth
 
 # =============================================================================
-# 其他
+# Others
 # =============================================================================
 trash
 out.log
