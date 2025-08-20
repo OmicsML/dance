@@ -12,10 +12,10 @@ import pandas as pd
 import scipy
 import torch
 import torch.utils.data as data_utils
+import wandb
 from sklearn import preprocessing
 
 import dance.utils.metrics as metrics
-import wandb
 from dance import logger
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.dcca import DCCA

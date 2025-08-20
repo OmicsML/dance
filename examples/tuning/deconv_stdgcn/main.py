@@ -6,9 +6,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
+import wandb
 from sklearn.model_selection import train_test_split
 
-import wandb
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.stdgcn import stdGCNWrapper
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
