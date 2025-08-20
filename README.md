@@ -24,7 +24,7 @@ ______________________________________________________________________
 Both include three modules at present:
 
 1. **Single-modality analysis**: cell type annotation, clustering, gene imputation
-1. **Single-cell multimodal omics**: modality prediction, modality matching, joint embedding
+1. **Single-cell multimodal omics**: modality prediction (only DANCE 1.0), modality matching(only DANCE 1.0), joint embedding
 1. **Spatially resolved transcriptomics**: spatial domain identification, cell type deconvolution
 
 ## DANCE 2.0 Release Schedule
@@ -310,12 +310,12 @@ pip install -e .
 | Auto-encoder     | Cross-modal autoencoders | Multi-domain translation between single-cell imaging and sequencing data using autoencoders        | 2021 | ✅      |
 | Auto-encoder     | BABEL                    | BABEL enables cross-modality translation between multiomic profiles at single-cell resolution      | 2021 | ✅      |
 
-| Model                    | Evaluation Metric | GEX2ADT (current/reported) | ADT2GEX (current/reported) | GEX2ATAC (current/reported) | ATAC2GEX (current/reported) |
-| ------------------------ | ----------------- | -------------------------- | -------------------------- | --------------------------- | --------------------------- |
-| ScMoGCN                  | RMSE              | 0.3885 / 0.3885            | 0.3242 / 0.3242            | 0.1778 / 0.1778             | 0.2315 / 0.2315             |
-| SCMM                     | RMSE              | 0.6264 / N/A               | 0.4458 / N/A               | 0.2163 / N/A                | 0.3730 / N/A                |
-| Cross-modal autoencoders | RMSE              | 0.5725 / N/A               | 0.3585 / N/A               | 0.1917 / N/A                | 0.2551 / N/A                |
-| BABEL                    | RMSE              | 0.4335 / N/A               | 0.3673 / N/A               | 0.1816 / N/A                | 0.2394 / N/A                |
+| Model                    | Evaluation Metric | GEX2ADT (DANCE 1.0/Original) | ADT2GEX (DANCE 1.0/Original) | GEX2ATAC (DANCE 1.0/Original) | ATAC2GEX (DANCE 1.0/Original) |
+| ------------------------ | ----------------- | ---------------------------- | ---------------------------- | ----------------------------- | ----------------------------- |
+| ScMoGCN                  | RMSE              | 0.3885 / 0.3885              | 0.3242 / 0.3242              | 0.1778 / 0.1778               | 0.2315 / 0.2315               |
+| SCMM                     | RMSE              | 0.6264 / N/A                 | 0.4458 / N/A                 | 0.2163 / N/A                  | 0.3730 / N/A                  |
+| Cross-modal autoencoders | RMSE              | 0.5725 / N/A                 | 0.3585 / N/A                 | 0.1917 / N/A                  | 0.2551 / N/A                  |
+| BABEL                    | RMSE              | 0.4335 / N/A                 | 0.3673 / N/A                 | 0.1816 / N/A                  | 0.2394 / N/A                  |
 
 #### 2) Modality Matching
 
