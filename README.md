@@ -171,8 +171,7 @@ source install.sh cu118 dance-env
 
 **Note**: the first argument for cuda version is mandatory, while the second argument for conda environment name is optional (default is `dance`).
 
-<details>
-<summary><H3>Custom install</H3></summary>
+<H3>Custom install</H3>
 <br>
 
 **Step1. Setup environment**
@@ -262,7 +261,7 @@ pip install -e .
 | Neural Network          | ACTINN        | ACTINN: automated identification of cell types in single cell RNA sequencing.                                    | 2020 | ✅      |
 | Hierarchical Clustering | SingleR       | Reference-based analysis of lung single-cell sequencing reveals a transitional profibrotic macrophage.           | 2019 | P1      |
 | SVM                     | SVM           | A comparison of automatic cell identification methods for single-cell RNA sequencing data.                       | 2018 | ✅      |
-| GNN                     | scHeteroNet   | scHeteroNet: A Heterophily-Aware Graph Neural Network for Accurate Cell Type Annotation and Novel Cell Detection | 2018 | ✅      |
+| GNN                     | scHeteroNet   | scHeteroNet: A Heterophily-Aware Graph Neural Network for Accurate Cell Type Annotation and Novel Cell Detection | 2025 | ✅      |
 
 | Model         | GSE67835 Brain<br>(DANCE 2.0/DANCE 1.0/Original) | CD8+ TIL atlas<br>(DANCE 2.0/DANCE 1.0/Original) | GSE123813 Immune<br>(DANCE 2.0/DANCE 1.0/Original) | CD4+ TIL atlas<br>(DANCE 2.0/DANCE 1.0/Original) | GSE182320 (Tissue- Spleen)<br>(DANCE 2.0/DANCE 1.0/Original) | Evaluation Metric |
 | ------------- | ------------------------------------------------ | ------------------------------------------------ | -------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------ | ----------------- |
@@ -382,8 +381,7 @@ pip install -e .
 | Bayesian                         | BayesSpace | Spatial transcriptomics at subspot resolution with BayesSpace                                                                                                                 | 2021 | P1      |
 | Pseudo-space-time (PST) Distance | stLearn    | stLearn: integrating spatial location, tissue morphology and gene expression to find cell types, cell-cell interactions and spatial trajectories within undissociated tissues | 2020 | ✅      |
 | Heuristic                        | Louvain    | Fast unfolding of community hierarchies in large networks                                                                                                                     | 2008 | ✅      |
-| GNN                              | EfNST      | A composite scaling network of EfficientNet for improving spatial domain identification performance                                                                           | 2024 |         |
-| ✅                               |            |                                                                                                                                                                               |      |         |
+| GNN                              | EfNST      | A composite scaling network of EfficientNet for improving spatial domain identification performance                                                                           | 2024 | ✅      |
 
 | Model   | 151676 (DANCE 2.0/DANCE 1.0/Original) | Sub MBA (DANCE 2.0/DANCE 1.0/Original) | Evaluation Metric |
 | ------- | ------------------------------------- | -------------------------------------- | ----------------- |
