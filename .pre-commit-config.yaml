@@ -1,50 +1,51 @@
+---
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v5.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
         exclude: ^docs/
-
+  # - repo: https://github.com/lyz-code/yamlfix  # The tool that actually fixes
+  #   rev: 1.16.0  # <---- UPDATE THIS to the latest stable version
+  #   hooks:
+  #     - id: yamlfix
+  #       name: yamlfix (Auto-Fix)  # Optional: Rename for clarity
+  #       args: [--config-file, environment.toml]
+  #       additional_dependencies:
+  #         - maison==1.4.3
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.35.1
     hooks:
       - id: yamllint
         args: [-c=.yamllint.yml]
-
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.16.0
     hooks:
       - id: pyupgrade
         args: [--py3-plus]
-
   - repo: https://github.com/google/yapf
     rev: v0.40.2
     hooks:
       - id: yapf
         name: Format code
         additional_dependencies: [toml]
-
   - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
+    rev: 6.0.1
     hooks:
       - id: isort
         name: Sort imports
-        args: [--line-width, "120", --profile, black]
-
+        args: [--line-width, '120', --profile, black]
   - repo: https://github.com/PyCQA/docformatter
-    rev: v1.7.5
+    rev: eb1df34
     hooks:
       - id: docformatter
         name: Format docstring
         additional_dependencies: [tomli]
         args: [--config, pyproject.toml]
-
   - repo: https://github.com/executablebooks/mdformat
     rev: 0.7.17
     hooks:
       - id: mdformat
         name: Format markdown
-        additional_dependencies:
-          - mdformat-gfm
-          - mdformat-tables
+        additional_dependencies: [mdformat-gfm, mdformat-tables]

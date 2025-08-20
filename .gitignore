@@ -1,16 +1,166 @@
-# System
+# =============================================================================
+# System and development tools related
+# =============================================================================
 .DS_Store
+.vscode/
+.tox/
+wandb/
 
-# Tools
-.tox
-wandb
+# =============================================================================
+# Build and cache
+# =============================================================================
+*.egg*
+__pycache__/
+build/
+*.log
 
-# Data
+# =============================================================================
+# Data files
+# =============================================================================
 *.pkl
 *.pt
-temp_data
+*.zip
+*.h5
+*.h5ad
+*.gz
+*.tif
 
-# Build
-*.egg*
-__pycache__
-build/
+# =============================================================================
+# Temporary files
+# =============================================================================
+temp_ans.csv
+temp_ans.json
+check_time.py
+t.py
+t.ipynb
+del.sh
+data.yaml
+proxy.txt
+readme.txt
+
+# =============================================================================
+# Result files
+# =============================================================================
+results - cell type deconvolution.csv
+results - spatial domain.csv
+
+# =============================================================================
+# Examples directory
+# =============================================================================
+
+# Common data files
+examples/**/*.h5ad
+examples/**/*.h5
+examples/**/*.zip
+examples/**/*.gz
+examples/**/*.tif
+
+# tuning subdirectory
+examples/tuning/**/*.yaml
+examples/tuning/**/*.csv
+examples/tuning/**/*.sh
+examples/tuning/**/*.tar.gz
+examples/tuning/**/*.txt
+examples/tuning/figures/
+examples/tuning/imputation_magic/data/
+examples/tuning/domain_EfNST/Image_crop/
+examples/tuning/cta_scdeepsort/f7c1c579-2dc0-47e2-ba19-8165c5a0e353(Pancreas)/
+examples/tuning/cta_scdeepsort/old/f7c1c579-2dc0-47e2-ba19-8165c5a0e353(Pancreas)/
+examples/tuning/joint_embedding_scmvae/get_run_kwargs.py
+examples/tuning/joint_embedding_scmvae/openproblems_2022_multi_atac2gex/config.png
+examples/tuning/imputation_graphsci/tsne_visualization.png
+examples/tuning/imputation_deepimpute/*.png
+examples/tuning/check_sweep.py
+examples/tuning/result.md
+examples/tuning/joint_embedding_scmogcn/models/model_joint_embedding_1.pth
+
+# tuning retention rules - keep one example result folder for each algorithm folder
+
+!examples/tuning/cluster_graphsc/human_pbmc2_cell/**
+!examples/tuning/cluster_scdcc/human_pbmc2_cell/**
+!examples/tuning/cluster_scdsc/human_pbmc2_cell/**
+!examples/tuning/cluster_scdeepcluster/human_pbmc2_cell/**
+!examples/tuning/cluster_sctag/human_pbmc2_cell/**
+!examples/tuning/domain_louvain/sub_mba/**
+!examples/tuning/domain_spagcn/sub_mba/**
+!examples/tuning/domain_stagate/sub_mba/**
+!examples/tuning/domain_stlearn/sub_mba/**
+!examples/tuning/domain_EfNST/sub_mba/**
+!examples/tuning/deconv_card/hcc_liver/**
+!examples/tuning/deconv_spotlight/hcc_liver/**
+!examples/tuning/deconv_stdgcn/hcc_liver/**
+!examples/tuning/deconv_dstg/hcc_liver/**
+!examples/tuning/deconv_spatialdecon/hcc_liver/**
+!examples/tuning/joint_embedding_dcca/GSE140203_SKIN_atac2gex/**
+!examples/tuning/joint_embedding_jae/GSE140203_SKIN_atac2gex/**
+!examples/tuning/joint_embedding_scmogcn/GSE140203_SKIN_atac2gex/**
+!examples/tuning/joint_embedding_scmvae/GSE140203_SKIN_atac2gex/**
+!examples/tuning/imputation_deepimpute/human_melanoma_data/**
+!examples/tuning/imputation_graphsci/human_melanoma_data/**
+!examples/tuning/imputation_scgnn2/human_melanoma_data/**
+!examples/tuning/custom-methods/**
+examples/tuning/custom-methods/wandb
+
+# tuning retention rules
+!examples/tuning/cta_scheteronet/328_138/**
+!examples/tuning/cta_celltypist/328_138/**
+!examples/tuning/cta_scdeepsort/328_138/**
+!examples/tuning/cta_singlecellnet/328_138/**
+!examples/tuning/cta_svm/328_138/config_yamls/params/0_params_tuning_config.yaml
+!examples/tuning/cta_svm/328_138/config_yamls/params/1_params_tuning_config.yaml
+!examples/tuning/cta_svm/328_138/config_yamls/params/2_params_tuning_config.yaml
+!examples/tuning/cta_svm/328_138/results/**
+!examples/tuning/cta_svm/328_138/pipeline_params_tuning_config.yaml
+!examples/tuning/cta_svm/328_138/pipeline_tuning_config.yaml
+
+!examples/tuning/cta_actinn/328_138/**
+
+!examples/tuning/step3_default_params.yaml
+
+# atlas subdirectory
+examples/atlas/demos/atlas_csvs/
+examples/atlas/demos/atlas_patterns/
+examples/atlas/metadatas/
+examples/atlas/sc_similarity_examples/temp/
+examples/atlas/sc_similarity_examples/visualization/*
+examples/atlas/sc_similarity_examples/data/*
+examples/atlas/sc_similarity_examples/similarity/temp.ipynb
+examples/atlas/dropbox_token.txt
+examples/atlas/generate_method.ipynb
+examples/atlas/config/run_config.csv
+
+# atlas retention rules
+!examples/atlas/sc_similarity_examples/visualization/*.py
+!examples/atlas/sc_similarity_examples/data/Cell Type Annotation Atlas.xlsx
+
+# single_modality subdirectory
+examples/single_modality/cell_type_annotation/**/*.xlsx
+examples/single_modality/cell_type_annotation/**/*.csv
+examples/single_modality/imputation/data/
+
+# Other Examples
+examples/spatial/spatial_domain/data/spatial/
+examples/spatial/cell_type_deconvo/data/spatial/
+examples/computer_resources/
+examples/temp_hpancreas/
+examples/result_analysis/*
+examples/multi_modality/joint_embedding/models/*.pth
+
+# Keep specific scripts under result_analysis
+!examples/result_analysis/get_important_pattern_sweep.py
+!examples/result_analysis/get_important_pattern.py
+!examples/result_analysis/get_num.py
+
+# =============================================================================
+# Model files
+# =============================================================================
+models/model_joint_embedding_1.pth
+examples/tuning/joint_embedding_scmogcn/models/model_joint_embedding_1.pth
+examples/multi_modality/joint_embedding/models/*.pth
+
+# =============================================================================
+# Others
+# =============================================================================
+trash
+out.log
+temp_data

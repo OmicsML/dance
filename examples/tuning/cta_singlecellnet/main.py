@@ -2,6 +2,7 @@ import argparse
 import os
 import pprint
 import sys
+import time
 from pathlib import Path
 from typing import get_args
 
@@ -11,7 +12,7 @@ import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.singlecellnet import SingleCellNet
-from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
+from dance.pipeline import Pipeline, PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
 from dance.typing import LogLevel
 from dance.utils import set_seed
 
@@ -23,15 +24,14 @@ if __name__ == "__main__":
         "--normalize", action="store_true", help="Whether to perform the normalization for SingleCellNet. "
         "Disabled by default since the CellTypeAnnotation data is already normalized")
     parser.add_argument("--num_rand", type=int, default=100)
-    parser.add_argument("--num_top_gene_pairs", type=int, default=250)
-    parser.add_argument("--num_top_genes", type=int, default=100)
+    parser.add_argument("--num_top_gene_pairs", type=int, default=250)  #25
+    parser.add_argument("--num_top_genes", type=int, default=100)  #10
     parser.add_argument("--num_trees", type=int, default=1000)
     parser.add_argument("--species", default="mouse", type=str)
     parser.add_argument("--stratify", type=bool, default=True)
-    parser.add_argument("--test_dataset", type=int, nargs="+", default=[1759],
-                        help="List testing training dataset ids.")
+    parser.add_argument("--test_dataset", nargs="+", default=[], help="List testing training dataset ids.")
     parser.add_argument("--tissue", default="Spleen", type=str)
-    parser.add_argument("--train_dataset", type=int, nargs="+", default=[1970], help="List of training dataset ids.")
+    parser.add_argument("--train_dataset", nargs="+", default=[1970], help="List of training dataset ids.")
     parser.add_argument("--valid_dataset", nargs="+", default=None, help="List of valid dataset ids.")
     parser.add_argument("--seed", type=int, default=10)
 
@@ -40,13 +40,16 @@ if __name__ == "__main__":
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
+    parser.add_argument("--filetype", default="csv")
+    parser.add_argument('--additional_sweep_ids', action='append', type=str, help='get prior runs')
     args = parser.parse_args()
     logger.setLevel(args.log_level)
     logger.info(f"{pprint.pformat(vars(args))}")
     file_root_path = Path(
         args.root_path, "_".join([
             "-".join([str(num) for num in dataset])
-            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset] if dataset is not None
+            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
+            if (dataset is not None and dataset != [])
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
@@ -55,16 +58,24 @@ if __name__ == "__main__":
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
         set_seed(args.seed)
+        if "run_kwargs" in pipeline_planer.config and tune_mode == "params":
+            wandb_config = dict(wandb.config)
+            config = {'pipeline': wandb_config["run_kwargs"], "type": "preprocessor"}
+            preprocessing_pipeline = Pipeline(config)
 
+        else:
+            # Prepare preprocessing pipeline and apply it to data
+            kwargs = {tune_mode: dict(wandb.config)}
+            preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         # Initialize model and get model specific preprocessing pipeline
         model = SingleCellNet(num_trees=args.num_trees)
 
         # Load data and perform necessary preprocessing
         data = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
                                          species=args.species, tissue=args.tissue, valid_dataset=args.valid_dataset,
-                                         data_dir="../temp_data").load_data(cache=args.cache)
-        kwargs = {tune_mode: dict(wandb.config)}
-        preprocessing_pipeline = pipeline_planer.generate(**kwargs)
+                                         data_dir="../temp_data", filetype=args.filetype).load_data(cache=args.cache)
+        # kwargs = {tune_mode: dict(wandb.config)}
+        # preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
 
@@ -82,12 +93,14 @@ if __name__ == "__main__":
         train_score = model.score(x_train, y_train)
         score = model.score(x_valid, y_valid)
         test_score = model.score(x_test, y_test)
+        time.sleep(20)
         wandb.log({"train_acc": train_score, "acc": score, "test_acc": test_score})
         wandb.finish()
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
-    save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
+    save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path,
+                      additional_sweep_ids=args.additional_sweep_ids)
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        required_funs=["SCNFeature", "SetConfig"], required_indexes=[sys.maxsize - 1, sys.maxsize],

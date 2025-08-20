@@ -135,10 +135,10 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         ]
         if mask:
             transforms.extend([
-                CellwiseMaskData(distr=distr, mask_rate=mask_rate, seed=seed),
+                CellwiseMaskData(distr=distr, mask_rate=mask_rate, seed=seed, add_test_mask=True),
                 SetConfig({
-                    "feature_channel": [None, None, "targets", "predictors", "train_mask"],
-                    "feature_channel_type": ["X", "raw_X", "uns", "uns", "layers"],
+                    "feature_channel": [None, None, "targets", "predictors", "train_mask", "valid_mask", "test_mask"],
+                    "feature_channel_type": ["X", "raw_X", "uns", "uns", "layers", "layers", "layers"],
                     "label_channel": [None, None],
                     "label_channel_type": ["X", "raw_X"],
                 })
@@ -418,7 +418,7 @@ class DeepImpute(nn.Module, BaseRegressionMethod):
         if mask is not None:  # and metric == 'MSE':
             # true_target = true_target[~mask[test_idx]]
             # imputed_target = imputed_target[~mask[test_idx]]
-            imputed_target[mask[test_idx]] = true_target[mask[test_idx]]
+            imputed_target[mask[test_idx]] = true_target[mask[test_idx]].to(imputed_target.dtype)
         if metric == 'RMSE':
             return np.sqrt(F.mse_loss(true_target, imputed_target).item())
         elif metric == 'PCC':

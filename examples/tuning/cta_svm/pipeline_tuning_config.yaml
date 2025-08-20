@@ -1,12 +1,9 @@
+---
 type: preprocessor
 tune_mode: pipeline
 pipeline:
   - type: normalize
-    include:
-      - ScaleFeature
-      - ScTransform
-      - Log1P
-      - NormalizeTotal
+    include: [ScaleFeature, ScTransform, Log1P, NormalizeTotal]
     default_params:
       ScTransform:
         min_cells: 2
@@ -23,7 +20,7 @@ pipeline:
       - FilterGenesScanpyOrder
     default_params:
       FilterGenesScanpyOrder:
-        order: ["min_counts", "min_cells", "max_counts", "max_cells"]
+        order: [min_counts, min_cells, max_counts, max_cells]
         min_counts: 1
         max_counts: 5000
         min_cells: 1
@@ -54,7 +51,7 @@ pipeline:
 wandb:
   entity: danceteam
   project: dance-dev
-  method: grid # Use grid for a comprehensive search
+  method: grid  # Use grid for a comprehensive search
   metric:
     name: acc  # val/acc
     goal: maximize

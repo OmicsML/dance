@@ -1,0 +1,93 @@
+// Workflow
+digraph {
+	A [label="Filter Genes (mod1)
+FilterGenesScanpyOrder
+FilterGenesPlaceHolder
+FilterGenesPercentile"]
+	B [label="Filter Genes (mod2)
+FilterGenesScanpyOrder
+FilterGenesPlaceHolder
+FilterGenesPercentile"]
+	C [label="Align Mods"]
+	D [label="Normalize (mod1)
+NormalizePlaceHolder
+tfidfTransform"]
+	E [label="Normalize (mod2)
+NormalizePlaceHolder
+tfidfTransform"]
+	F [label="Normalize with Options (mod1)
+NormalizePlaceHolder
+ColumnSumNormalize
+ScTransform
+Log1P
+NormalizeTotal
+NormalizeTotalLog1P"]
+	G [label="Normalize with Options (mod2)
+NormalizePlaceHolder
+ColumnSumNormalize
+ScTransform
+Log1P
+NormalizeTotal
+NormalizeTotalLog1P"]
+	H [label="Filter Genes by Variability (mod1)
+HighlyVariableGenesLogarithmizedByMeanAndDisp
+HighlyVariableGenesRawCount
+FilterGenesNumberPlaceHolder
+HighlyVariableGenesLogarithmizedByTopGenes
+FilterGenesTopK
+FilterGenesRegression"]
+	I [label="Filter Genes by Variability (mod2)
+HighlyVariableGenesLogarithmizedByMeanAndDisp
+HighlyVariableGenesRawCount
+FilterGenesNumberPlaceHolder
+HighlyVariableGenesLogarithmizedByTopGenes
+FilterGenesTopK
+FilterGenesRegression"]
+	J [label="Filter Cells (mod1)
+FilterCellsScanpyOrder
+FilterCellsPlaceHolder"]
+	K [label="Filter Cells (mod2)
+FilterCellsScanpyOrder
+FilterCellsPlaceHolder"]
+	L [label="Filter Common Cells (mod1, mod2)"]
+	M [label="Filter Cells (meta1)
+FilterCellsScanpyOrder
+FilterCellsPlaceHolder"]
+	N [label="Filter Cells (meta2)
+FilterCellsScanpyOrder
+FilterCellsPlaceHolder"]
+	O [label="Filter Common Cells (meta1, meta2)"]
+	P [label="Cell Feature Embedding (mod1)
+CellPCA
+CellSVD
+GaussRandProjFeature
+WeightedFeaturePCA
+WeightedFeatureSVD
+FeatureCellPlaceHolder"]
+	Q [label="Cell Feature Embedding (mod2)
+CellPCA
+CellSVD
+GaussRandProjFeature
+WeightedFeaturePCA
+WeightedFeatureSVD
+FeatureCellPlaceHolder"]
+	R [label="Set Config"]
+	A -> B
+	B -> C
+	C -> D
+	B -> E
+	D -> F
+	E -> G
+	F -> H
+	G -> I
+	H -> J
+	I -> K
+	J -> L
+	K -> L
+	L -> M
+	M -> N
+	N -> O
+	O -> P
+	P -> Q
+	Q -> R
+}

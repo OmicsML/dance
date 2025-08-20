@@ -8,7 +8,9 @@ from functools import partial, reduce
 from operator import mul
 from pprint import pformat
 
+import omegaconf
 import pandas as pd
+import requests
 from omegaconf import DictConfig, OmegaConf
 
 from dance import logger
@@ -793,6 +795,14 @@ class PipelinePlaner(Pipeline):
     def wandb_sweep_config(self) -> Dict[str, Any]:
         if self.wandb_config is None:
             raise ValueError("wandb config not specified in the raw config.")
+        if "run_kwargs" in self.config:
+            return {
+                **self.wandb_config, "parameters": {
+                    "run_kwargs": {
+                        "values": omegaconf.OmegaConf.to_object(self.config.run_kwargs)
+                    }
+                }
+            }
         return {**self.wandb_config, "parameters": self.search_space()}
 
     def wandb_sweep(self) -> Tuple[str, str, str]:
@@ -807,7 +817,7 @@ class PipelinePlaner(Pipeline):
                              f"'entity' and 'project': {wandb_entity=!r}, {wandb_project=!r}")
 
         sweep_config = self.wandb_sweep_config()
-        logger.info(f"Sweep config:\n{pformat(sweep_config)}")
+        # logger.info(f"Sweep config:\n{pformat(sweep_config)}")
         wandb_sweep_id = wandb.sweep(sweep=sweep_config, entity=wandb_entity, project=wandb_project)
         logger.info(Color("blue")(f"\n\n\t[*] Sweep ID: {wandb_sweep_id}\n"))
 
@@ -832,6 +842,7 @@ class PipelinePlaner(Pipeline):
         else:
             entity = self.config.wandb.get("entity")
             project = self.config.wandb.get("project")
+            os.system(f"wandb sweep --resume {entity}/{project}/{sweep_id}")
 
         logger.info(f"Spawning agent: {sweep_id=}, {entity=}, {project=}, {count=}")
         wandb.agent(sweep_id, function=function, entity=entity, project=project, count=count)
@@ -839,7 +850,8 @@ class PipelinePlaner(Pipeline):
         return entity, project, sweep_id
 
 
-def save_summary_data(entity, project, sweep_id, summary_file_path, root_path, additional_sweep_ids=None):
+def save_summary_data(entity, project, sweep_id, summary_file_path, root_path, additional_sweep_ids=None,
+                      save=True) -> pd.DataFrame:
     """Download sweep summary data from wandb and save to file.
 
     The returned dataframe includes running time, results and corresponding hyperparameters, etc.
@@ -859,7 +871,6 @@ def save_summary_data(entity, project, sweep_id, summary_file_path, root_path, a
 
     summary_data = []
 
-    summary_file_path = os.path.join(root_path, summary_file_path)
     additional_sweep_ids = (additional_sweep_ids if additional_sweep_ids is not None else [])
     additional_sweep_ids.append(sweep_id)
     for sweep_id in additional_sweep_ids:
@@ -872,7 +883,8 @@ def save_summary_data(entity, project, sweep_id, summary_file_path, root_path, a
     ans = pd.DataFrame(summary_data).set_index(["id"])
     ans.sort_index(axis=1, inplace=True)
 
-    if summary_file_path is not None:
+    if save:
+        summary_file_path = os.path.join(root_path, summary_file_path)
         os.makedirs(os.path.dirname(summary_file_path), exist_ok=True)
         ans.to_csv(summary_file_path)  # save file
 
@@ -998,7 +1010,7 @@ def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, requir
 
 
 def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_default_params.yaml",
-                   result_load_path="results/pipeline/best_test_acc.csv", metric="test_acc", ascending=False,
+                   result_load_path="results/pipeline/best.csv", metric="acc", ascending=False,
                    step2_pipeline_planer=None, required_funs=["SetConfig"], required_indexes=[sys.maxsize],
                    root_path=None):
     """Generate the configuration file of step 3 based on the results of step 2.
@@ -1032,7 +1044,9 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
     conf = OmegaConf.load(conf_load_path)
     pipeline_top_k = default(step2_pipeline_planer.config.pipeline_tuning_top_k, DEFAULT_PIPELINE_TUNING_TOP_K)
     result = pd.read_csv(result_load_path).sort_values(by=metric, ascending=ascending).head(pipeline_top_k)
-    columns = sorted([col for col in result.columns if col.startswith("pipeline")])
+    columns = sorted(
+        [col for col in result.columns if (col.startswith("pipeline") or col.startswith("run_kwargs_pipeline"))],
+        key=lambda x: float(x.split('.')[1]))
     pipeline_names = result.loc[:, columns].values
     count = 0
     for row in pipeline_names:
@@ -1041,11 +1055,21 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
         for x in row:
             for k in conf.pipeline:
                 if k["target"] == x:
-                    pipeline.append(k)
+                    pipeline.append(deepcopy(k))
         for i, f in zip(required_indexes, required_funs):
-            for k in step2_pipeline_planer.config.pipeline:
-                if "target" in k and k["target"] == f:
-                    pipeline.insert(i, k)
+            if i == sys.maxsize:
+                i = len(step2_pipeline_planer.config.pipeline) - 1
+            elif i == sys.maxsize - 1:
+                i = len(step2_pipeline_planer.config.pipeline) - 2
+            elif i == sys.maxsize - 2:
+                i = len(step2_pipeline_planer.config.pipeline) - 3
+            k = step2_pipeline_planer.config.pipeline[i]
+            assert k["target"] == f
+            pipeline.insert(i, deepcopy(k))
+            # for k in step2_pipeline_planer.config.pipeline:
+            #     if "target" in k and k["target"] == f:
+            #         pipeline.insert(i, deepcopy(k))
+            #         break
         for p1 in step2_pipeline_planer.config.pipeline:
             if "step3_frozen" in p1 and p1["step3_frozen"]:
                 for p2 in pipeline:
@@ -1056,12 +1080,21 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
                             for target, d_p in p1.default_params.items():
                                 if target == p2["target"]:
                                     p2["params"] = d_p
+        step2_pipeline = step2_pipeline_planer.config.pipeline
+        # step2_pipeline=sorted(step2_pipeline_planer.config.pipeline,key=lambda x: float(x.split('.')[1]))
+        for p1, p2 in zip(step2_pipeline, pipeline):  #need order
+            if "params" in p1:
+                p2.params = p1.params
+                # for key, value in p1.params.items():
+                #     if "params" not in p2:
+                #         p2.params = {}
+                #     p2.params[key] = value
         temp_conf = conf.copy()
         temp_conf.pipeline = pipeline
         temp_conf.wandb = step2_pipeline_planer.config.wandb
         temp_conf.wandb.method = "bayes"
         os.makedirs(os.path.dirname(conf_save_path), exist_ok=True)
-        OmegaConf.save(temp_conf, f"{conf_save_path}/{count}_test_acc_params_tuning_config.yaml")
+        OmegaConf.save(temp_conf, f"{conf_save_path}/{count}_params_tuning_config.yaml")
         count += 1
 
 
@@ -1086,9 +1119,9 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
     step3_k = default(step2_pipeline_planer.config.parameter_tuning_freq_n, DEFAULT_PARAMETER_TUNING_FREQ_N)
     # Skip some of the already run step3 because in pandas, when you sort columns with exactly the same values, the results are not random.
     # Instead, pandas preserves the order of the original data. So we can skip it without causing any impact.
-    step3_start_k = default(step2_pipeline_planer.config.step3_start_k, 0)
+    step3_start_k = step2_pipeline_planer.config.step3_start_k if "step3_start_k" in step2_pipeline_planer.config else 0
     #Some sweep_ids of step3 that have already been run
-    step3_sweep_ids = step2_pipeline_planer.config.step3_sweep_ids
+    step3_sweep_ids = step2_pipeline_planer.config.step3_sweep_ids if "step3_sweep_ids" in step2_pipeline_planer.config else None
     step3_sweep_ids = [None] * (pipeline_top_k - step3_start_k) if step3_sweep_ids is None else (
         step3_sweep_ids + [None] * (pipeline_top_k - step3_start_k - len(step3_sweep_ids)))
 
@@ -1097,20 +1130,36 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
             continue
         try:
             pipeline_planer = PipelinePlaner.from_config_file(
-                f"{root_path}/config_yamls/{tune_mode}/{i}_test_acc_{tune_mode}_tuning_config.yaml")
+                f"{root_path}/config_yamls/{tune_mode}/{i}_{tune_mode}_tuning_config.yaml")
             entity, project, step3_sweep_id = pipeline_planer.wandb_sweep_agent(
                 partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=step3_sweep_ids[i - step3_start_k],
                 count=step3_k)  # score can be recorded for each epoch
-            save_summary_data(entity, project, step3_sweep_id, f"results/{tune_mode}/{i}_best_test_acc.csv",
-                              root_path=root_path)
+            save_summary_data(entity, project, step3_sweep_id, f"results/{tune_mode}/{i}_best.csv", root_path=root_path)
         except wandb.UsageError:
             logger.warning("continue")
             continue
 
 
-# def get_params(preprocessing_pipeline:Pipeline,type,key,name):
-#     ans=[]
-#     pips=list(filter(lambda p: p.type==type, preprocessing_pipeline.config.pipeline))
-#     for p in pips:
-#         ans.append(p[key][name])
-#     return ans
+def get_additional_sweep(entity, project, sweep_id):
+    """Recursively retrieve all related sweep IDs from a given sweep.
+
+    Given a sweep ID, this function recursively finds all related sweep IDs by examining
+    the command arguments of the runs within each sweep. It handles cases where sweeps
+    may have prior runs or additional sweep references.
+
+    """
+    wandb = try_import("wandb")
+    sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
+    additional_sweep_ids = [sweep_id]
+    #last run command
+    run = next((t_run for t_run in sweep.runs if t_run.state == "finished"), None)
+    if run is None:  # check summary data count, note aznph5wt, quantities may be inconsistent
+        return additional_sweep_ids
+    run_id = run.id
+    web_abs = requests.get(f"https://api.wandb.ai/files/{run.entity}/{run.project}/{run_id}/wandb-metadata.json")
+    args = dict(web_abs.json())["args"]
+    for i in range(len(args)):
+        if args[i] == '--additional_sweep_ids':
+            if i + 1 < len(args):
+                additional_sweep_ids += get_additional_sweep(entity=entity, project=project, sweep_id=args[i + 1])
+    return additional_sweep_ids

@@ -1,0 +1,249 @@
+import argparse
+import json
+import os
+import pickle
+import sys
+from pathlib import Path
+from turtle import pos
+
+import pandas as pd
+import requests
+from get_important_pattern import get_com_all, get_forest_model_pattern, get_frequent_itemsets
+from numpy import choose
+
+from dance.pipeline import flatten_dict, get_additional_sweep, save_summary_data
+from dance.settings import EXAMPLESDIR
+from dance.utils import spilt_web, try_import
+
+# Define basic configuration parameters
+entity = "xzy11632"
+project = "dance-dev"
+if os.path.exists('migration/cache/sweep_cache_data.pkl'):
+    with open("migration/cache/sweep_cache_data.pkl", 'rb') as file:
+        sweep_cache_data = pickle.load(file)
+else:
+    sweep_cache_data = {}
+
+exclude_apr_pipeline = ["FilterGenesMatch"]
+# # List of tasks to analyze
+# # tasks = ["cell type annotation new", "clustering", "imputation_new", "spatial domain", "cell type deconvolution"]
+# tasks = ['joint embedding']
+# # Corresponding metrics for each task
+# # mertic_names = ["test_acc", "acc", "MRE", "ARI", "MSE"]
+# mertic_names = ["ARI"]
+# ascendings = [False]
+# # Whether higher values are better for each metric
+# # ascendings = [False, False, True, False, True]
+metrics_dict = [{
+    "task": "celltype annotation",
+    "metric": "test_acc",
+    "ascending": False
+}, {
+    "task": "cluster",
+    "metric": "acc",
+    "ascending": False
+}, {
+    "task": "imputation",
+    "metric": "test_MRE",
+    "ascending": True
+}, {
+    "task": "spatial domain",
+    "metric": "ARI",
+    "ascending": False
+}, {
+    "task": "celltype deconvolution",
+    "metric": "test_MSE",
+    "ascending": True
+}, {
+    "task": "joint embedding",
+    "metric": "ARI",
+    "ascending": False
+}]
+tasks = [d["task"] for d in metrics_dict]
+mertic_names = [d["metric"] for d in metrics_dict]
+ascendings = [d["ascending"] for d in metrics_dict]
+
+
+def summary_pattern(step2_origin_data: pd.DataFrame, metric_name, ascending, task, positive, only_apr, alpha=0.05,
+                    vis=False):
+    """Analyze patterns in pipeline configurations and their impact on performance
+    metrics.
+
+    This function examines the relationship between pipeline configurations and their corresponding
+    performance metrics. It handles missing values differently based on whether higher or lower
+    metric values are better, and can optionally visualize the results.
+
+    Parameters
+    ----------
+    step2_origin_data : pd.DataFrame
+        DataFrame containing pipeline configurations and their results.
+    metric_name : str
+        Name of the performance metric to analyze.
+    ascending : bool
+        Whether higher metric values indicate better performance.
+    alpha : float, optional
+        Significance level for statistical tests, by default 0.05.
+    vis : bool, optional
+        Whether to generate visualizations, by default False.
+
+    Returns
+    -------
+    dict
+        A dictionary containing either:
+        - Error message if all metric values are NaN
+        - Pattern analysis results including forest model and/or APR analysis
+
+    """
+    step2_origin_data.rename(columns=lambda col: col.replace('run_kwargs_pipeline', 'pipeline', 1), inplace=True)
+    columns = sorted([
+        col for col in step2_origin_data.columns
+        if (col.startswith("pipeline") or col.startswith("run_kwargs_pipeline"))
+    ])
+    step2_data = step2_origin_data.loc[:, columns + [metric_name]]
+    # com_ans = get_com_all(step2_data, metric_name, ascending, vis=vis, alpha=alpha)
+    step2_data[metric_name] = step2_data[metric_name].astype(float)
+    if not ascending:
+        min_metric = step2_data[metric_name].min()
+        if pd.isna(min_metric):
+            return {
+                "error":
+                f"All {metric_name} values are NaN and the minimum cannot be calculated. Please check your data."
+            }
+        step2_data[metric_name] = step2_data[metric_name].fillna(0)  #if ascending=False
+    else:
+        max_metric = step2_data[metric_name].max()
+        if pd.isna(max_metric):
+            return {
+                "error":
+                f"All {metric_name} values are NaN and the maximum cannot be calculated. Please check your data."
+            }
+        print(f"\nmax {metric_name}:{max_metric}")
+        buffer_percentage = 0.2  # 20%
+        replacement = max_metric * (1 + buffer_percentage)
+        step2_data[metric_name] = step2_data[metric_name].fillna(replacement)
+    drop_columns = []
+    for col in step2_data.columns:
+        for exclude_col in exclude_apr_pipeline:
+            if str(step2_data[col].iloc[0]).endswith(exclude_col):
+                drop_columns.append(col)
+            if task == "imputation":
+                if str(step2_data[col].iloc[0]).endswith("FilterGenesNumberPlaceHolder") or str(
+                        step2_data[col].iloc[0]).endswith("FilterGenesTopK"):
+                    drop_columns.append(col)
+    step2_data = step2_data.drop(columns=drop_columns)
+    apr_ans = get_frequent_itemsets(step2_data, metric_name, ascending, threshold_per=0.4)
+    if positive and not only_apr:
+        return {"forest_model": get_forest_model_pattern(step2_data, metric_name), "apr_ans": apr_ans}
+    else:
+        return {"apr_ans": apr_ans}
+
+
+if __name__ == "__main__":
+    multi_mod = False
+    if multi_mod:
+        raise NotImplementedError("multi mod")
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--positive", action='store_true')
+    parser.add_argument("--only_apr", action='store_true')
+    parser.add_argument("--choose_tasks", nargs="+", default=tasks)
+    args = parser.parse_args()
+    choose_tasks = args.choose_tasks
+    positive = args.positive
+    only_apr = args.only_apr
+    if not positive:
+        assert only_apr
+        ascendings = [not item for item in ascendings]
+    file_root = Path(__file__).resolve().parent
+    prefix = f'https://wandb.ai/{entity}/{project}'
+    runs_sum = 0
+    wandb = try_import("wandb")
+
+    start = False
+    ans_all = []
+    for i, task in enumerate(tasks):
+        # Skip tasks not in choose_tasks list
+        if task not in choose_tasks:
+            continue
+
+        # Read and preprocess results from Excel file
+        data = pd.read_excel(EXAMPLESDIR / "result_analysis/results.xlsx", sheet_name=task, dtype=str)
+        data['Methods'] = data['Methods'].fillna(method='ffill')
+        data['step name'] = data['step name'].fillna(method='ffill')
+        data = data.set_index(['Methods'])
+
+        # Iterate through each method and dataset combination
+        for row_idx in range(data.shape[0]):
+            for col_idx in range(data.shape[1]):
+                # Extract metadata
+                method = data.index[row_idx]
+                dataset = data.columns[col_idx]
+                value = data.iloc[row_idx, col_idx]
+                step_name = data.iloc[row_idx]["step name"]
+
+                result_path = EXAMPLESDIR / f"dance_auto_preprocess/patterns/{'only_apr_' if only_apr else ''}{'neg_' if not positive else ''}{task}_{dataset}_{method}_pattern.json"
+
+                if os.path.exists(result_path):
+                    continue  # Skip if result file already exists
+
+                # if not start:
+                #     continue
+                # if method != "Scgnn2":
+                #     continue
+                if isinstance(value, str) and value.startswith(prefix) and (
+                        str(step_name).lower() == "step2" or str(step_name).lower() == "step 2"):  #TODO add step3
+                    sweep_url = value
+                else:
+                    continue
+                print(result_path)
+
+                _, _, sweep_id = spilt_web(sweep_url)
+                if sweep_id in sweep_cache_data:
+                    summary_data = sweep_cache_data[sweep_id]
+                else:
+                    summary_data = None
+                    sweep_ids = get_additional_sweep(entity=entity, project=project, sweep_id=sweep_id)
+                    try:
+                        sweep_ids.remove(sweep_id)
+                        summary_data = save_summary_data(entity, project, sweep_id=sweep_id, summary_file_path="",
+                                                         root_path="", save=False, additional_sweep_ids=sweep_ids)
+                        sweep_cache_data[sweep_id] = summary_data
+                        with open('migration/cache/sweep_cache_data.pkl', 'wb') as f:
+                            pickle.dump(sweep_cache_data, f)
+                    except Exception as e:
+                        print(e)
+
+                # sweep_ids = get_additional_sweep(entity, project, sweep_id)
+                # summary_data = []
+                # for sweep_id in sweep_ids:
+                #     sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
+                #     for run in sweep.runs:
+                #         result = dict(run.summary._json_dict).copy()
+                #         result.update(run.config)
+                #         result.update({"id": run.id})
+                #         summary_data.append(flatten_dict(result))  # get result and config
+                # ans = pd.DataFrame(summary_data).set_index(["id"])
+                # ans.sort_index(axis=1, inplace=True)
+                try:
+                    ans = summary_data
+                    ans_single = {
+                        "task":
+                        task,
+                        "dataset":
+                        dataset,
+                        "method":
+                        method,
+                        "pattern":
+                        summary_pattern(ans, mertic_names[i], ascendings[i], task=task, positive=positive,
+                                        only_apr=only_apr)
+                    }
+                    with open(result_path, "w") as f:
+                        json.dump(ans_single, f, indent=2)
+                    ans_all.append(ans_single)
+                    print(dataset)
+                    print(method)
+                except Exception as e:
+                    print(f"Error processing {task}, {dataset}, {method}: {e}")
+
+    with open(f"pattern.json", "w") as f:
+        json.dump(ans_all, f, indent=2)

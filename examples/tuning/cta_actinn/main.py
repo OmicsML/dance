@@ -1,4 +1,5 @@
 import argparse
+import os
 import pprint
 import sys
 from pathlib import Path
@@ -30,7 +31,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_epochs", type=int, default=50, help="Number of epochs")
     parser.add_argument("--print_cost", action="store_true", help="Print cost when training")
     parser.add_argument("--species", default="mouse")
-    parser.add_argument("--test_dataset", nargs="+", default=[1759], help="List of testing dataset ids.")
+    parser.add_argument("--test_dataset", nargs="+", default=[], help="List of testing dataset ids.")
     parser.add_argument("--tissue", default="Spleen")
     parser.add_argument("--train_dataset", nargs="+", default=[1970], help="List of training dataset ids.")
     parser.add_argument("--valid_dataset", nargs="+", default=None, help="List of valid dataset ids.")
@@ -39,21 +40,25 @@ if __name__ == "__main__":
     parser.add_argument("--tune_mode", default="pipeline_params", choices=["pipeline", "params", "pipeline_params"])
     parser.add_argument("--count", type=int, default=2)
     parser.add_argument("--sweep_id", type=str, default=None)
-    parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
+    parser.add_argument("--summary_file_path", default="results/pipeline/best_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
+    parser.add_argument("--filetype", default="csv")
+    parser.add_argument('--additional_sweep_ids', action='append', type=str, help='get prior runs')
     args = parser.parse_args()
     logger.setLevel(args.log_level)
     logger.info(f"\n{pprint.pformat(vars(args))}")
     file_root_path = Path(
         args.root_path, "_".join([
             "-".join([str(num) for num in dataset])
-            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset] if dataset is not None
+            for dataset in [args.train_dataset, args.valid_dataset, args.test_dataset]
+            if (dataset is not None and dataset != [])
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
 
     logger.setLevel(args.log_level)
-    logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
+    logger.info(f"Running ACTINN with the following parameters:\n{pprint.pformat(vars(args))}")
+    os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
 
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
@@ -68,7 +73,7 @@ if __name__ == "__main__":
         # Load data and perform necessary preprocessing
         data = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
                                          valid_dataset=args.valid_dataset, data_dir="./temp_data", tissue=args.tissue,
-                                         species=args.species).load_data()
+                                         species=args.species, filetype=args.filetype).load_data()
 
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
@@ -90,11 +95,12 @@ if __name__ == "__main__":
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
-    save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
+    save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path,
+                      additional_sweep_ids=args.additional_sweep_ids)
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
-                       root_path=file_root_path)
+                       root_path=file_root_path, metric="acc")
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """To reproduce ACTINN benchmarks, please refer to command lines below:
@@ -111,4 +117,6 @@ $ python actinn.py --species mouse --tissue Kidney --train_dataset 4682 --test_d
 Human CD4
 $ python main.py --species human --tissue CD4 --train_dataset 1013 1247 598 732 767 768 770 784 845 864 --test_dataset 315 340 376 381 390 404 437 490 551 559 --valid_dataset 1013 1247 598 732 767 768 770 784 845 864 --count 240
 
+
+python main.py --species human --tissue Spleen --train_dataset 3043 3777 4029 4115 4362 4657  --test_dataset 1729 2125 2184 2724 2743 --device cuda:1 --pipeline_name hvg_top_genes_pca
 """

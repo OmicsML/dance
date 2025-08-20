@@ -3,6 +3,7 @@ import hashlib
 import importlib
 import os
 import random
+import re
 import warnings
 from typing import get_args
 
@@ -113,3 +114,23 @@ def try_import(module_name: str, install_name: Optional[str] = None):
         return importlib.import_module(module_name)
     except ModuleNotFoundError as e:
         raise ImportError(f"{module_name} not installed. Please install first: $ pip install {install_name}") from e
+
+
+def spilt_web(url: str):
+    """Parse Weights & Biases URL to extract entity, project and sweep components."""
+    pattern = r"https://wandb\.ai/([^/]+)/([^/]+)/sweeps/([^/]+)"
+
+    match = re.search(pattern, url)
+
+    if match:
+        entity = match.group(1)
+        project = match.group(2)
+        pattern = r'/sweeps/([^/?]+)'  # Regular expression pattern
+        match = re.search(pattern, url)
+        if match:
+            sweep_id = match.group(1)
+            return entity, project, sweep_id
+        return None
+    else:
+        print(url)
+        print("No match found")

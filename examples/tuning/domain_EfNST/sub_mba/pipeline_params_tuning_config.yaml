@@ -1,0 +1,95 @@
+---
+type: preprocessor
+tune_mode: pipeline_params
+pipeline_tuning_top_k: 3
+parameter_tuning_freq_n: 20
+pipeline:
+  - type: misc
+    target: EfNSTImageTransform
+    params:
+      data_name: sub_mba
+  - type: misc
+    target: EfNSTAugmentTransform
+  - type: graph.cell
+    target: EfNSTGraphTransform
+    params:
+      distType: KDTree
+      k: 12
+  - type: filter.gene
+    include:
+      - FilterGenesPercentile
+      - FilterGenesScanpyOrder
+      - FilterGenesPlaceHolder
+    default_params:
+      FilterGenesScanpyOrder:
+        order: [min_counts, max_counts, min_cells, max_cells]
+        min_counts: 100
+        max_counts: 0.99
+        min_cells: 0.01
+        max_cells: 0.99
+  - type: normalize
+    include:
+      - ColumnSumNormalize
+      - ScTransform
+      - Log1P
+      - NormalizeTotal
+      - NormalizePlaceHolder
+      - NormalizeTotalLog1P
+    default_params:
+      ScTransform:
+        processes_num: 8
+      # NormalizeTotalLog1P:
+      #   target_sum: 1e4
+  - type: filter.gene
+    include:
+      - HighlyVariableGenesLogarithmizedByMeanAndDisp
+      - HighlyVariableGenesRawCount
+      - FilterGenesNumberPlaceHolder
+      - HighlyVariableGenesLogarithmizedByTopGenes
+      - FilterGenesTopK
+      - FilterGenesRegression
+    default_params:
+      FilterGenesTopK:
+        num_genes: 3000
+      FilterGenesRegression:
+        num_genes: 3000
+      HighlyVariableGenesRawCount:
+        n_top_genes: 3000
+      HighlyVariableGenesLogarithmizedByTopGenes:
+        n_top_genes: 3000
+  - type: feature.cell
+    include:
+      - CellPCA
+      - CellSVD
+      - GaussRandProjFeature
+      - WeightedFeaturePCA
+      - WeightedFeatureSVD
+    params:
+      out: feature.cell
+      log_level: INFO
+    default_params:
+      CellPCA:
+        n_components: 400
+      CellSVD:
+        n_components: 400
+      GaussRandProjFeature:
+        n_components: 400
+      WeightedFeaturePCA:
+        n_components: 400
+      WeightedFeatureSVD:
+        n_components: 400
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        feature_channel: [feature.cell, EfNSTGraph]
+        feature_channel_type: [obsm, uns]
+        label_channel: label
+        label_channel_type: obs
+wandb:
+  entity: xzy11632
+  project: dance-dev
+  method: grid  # try grid to provide a comprehensive search
+  metric:
+    name: ARI
+    goal: maximize

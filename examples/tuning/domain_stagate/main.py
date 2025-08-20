@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import wandb
+from sklearn.model_selection import train_test_split
 
 from dance import logger
 from dance.datasets.spatial import SpatialLIBDDataset
@@ -30,6 +31,7 @@ if __name__ == "__main__":
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
     parser.add_argument("--data_dir", type=str, default='../temp_data', help='test directory')
     parser.add_argument("--sample_file", type=str, default=None)
+    parser.add_argument("--device", type=str, default="cpu", help="Computation device")
     parser.add_argument('--additional_sweep_ids', action='append', type=str, help='get prior runs')
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
     args = parser.parse_args()
@@ -52,15 +54,18 @@ if __name__ == "__main__":
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
+        total_idx = data.get_split_idx("train")
+        valid_idx, test_idx = train_test_split(total_idx, test_size=0.9, random_state=args.seed)
         (x, adj), y = data.get_data(return_type="default")
         if not isinstance(x, np.ndarray):
             x = x.A
         edge_list_array = np.vstack(np.nonzero(adj))
 
         # Train and evaluate model
-        model = Stagate([x.shape[1]] + args.hidden_dims)
-        score = model.fit_score((x, edge_list_array), y, epochs=args.epochs, random_state=args.seed)
-        wandb.log({"ARI": score})
+        model = Stagate([x.shape[1]] + args.hidden_dims, device=args.device)
+        valid_score, test_score = model.fit_score((x, edge_list_array), y, epochs=args.epochs, random_state=args.seed,
+                                                  valid_idx=valid_idx, test_idx=test_idx)
+        wandb.log({"ARI": valid_score, "test_ari": test_score})
         gc.collect()
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(

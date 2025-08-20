@@ -7,7 +7,10 @@ import anndata as ad
 import mudata as md
 import numpy as np
 import scanpy as sc
+import scipy
 import scipy.sparse as sp
+import sklearn
+from sklearn.utils import issparse
 
 from dance import logger
 from dance.data import Data
@@ -572,6 +575,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
 
     def _raw_to_dance(self, raw_data):
         mod1, mod2, meta1, meta2, test_sol = self._maybe_preprocess(raw_data)
+        self._to_csr([mod1, mod2, meta1, meta2, test_sol])
 
         assert all(mod2.obs_names == mod1.obs_names), "Modalities not aligned"
         mdata = md.MuData({"mod1": mod1, "mod2": mod2, "meta1": meta1, "meta2": meta2, "test_sol": test_sol})
@@ -580,6 +584,17 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
         data = Data(mdata, train_size=train_size)
 
         return data
+
+    def _to_csr(self, datas):
+        for data in datas:
+            if scipy.sparse.issparse(data.X):
+                if not isinstance(data.X, scipy.sparse.csr_matrix):
+                    data.X = data.X.tocsr()
+                # data.X = np.array(data.X.todense()).astype(float)
+            if "counts" in data.layers and scipy.sparse.issparse(data.layers["counts"]):
+                if not isinstance(data.layers["counts"], scipy.sparse.csr_matrix):
+                    data.layers["counts"] = data.layers["counts"].tocsr()
+                # data.layers["counts"] = np.array(data.layers["counts"].todense()).astype(float)
 
     def _maybe_preprocess(self, raw_data):
         if self.preprocess is None:
@@ -744,7 +759,7 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
             if mod1.shape[1] > self.selection_threshold:
                 sc.pp.highly_variable_genes(mod1, layer="counts", flavor="seurat_v3",
                                             n_top_genes=self.selection_threshold, span=self.span)
-                mod1 = mod1[:, mod1.var["highly_variable"]]
+                mod1 = mod1[:, mod1.var["highly_variable"]]  # Equivalent to subset=True and _inplace_subset_var
             if mod2.shape[1] > self.selection_threshold:
                 sc.pp.highly_variable_genes(mod2, layer="counts", flavor="seurat_v3",
                                             n_top_genes=self.selection_threshold, span=self.span)

@@ -63,6 +63,24 @@ some of the experiments from the original papers.
    api/datasets
    api/transforms
    api/transforms.graph
+   api/search
+   api/atlas
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Tutorials
+
+   tutorials/tutorial.ipynb
+
+.. note::
+   The functions in the :doc:`api/atlas` module are primarily backend APIs for the DANCE 2.0 Platform.
+   For interactive usage, please visit the `DANCE 2.0 Platform <http://omicsml.ai:81/dance/>`_.
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Experiments
+
+   experiments/index
 
 Indices and tables
 ==================

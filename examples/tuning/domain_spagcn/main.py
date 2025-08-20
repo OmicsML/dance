@@ -6,6 +6,9 @@ from pathlib import Path
 
 import numpy as np
 import wandb
+from sklearn.model_selection import train_test_split
+from torch import mode
+from traitlets import default
 
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.spagcn import SpaGCN, refine
@@ -72,10 +75,12 @@ if __name__ == "__main__":
         pred = model.fit_predict((x, adj), init_spa=True, init="louvain", tol=args.tol, lr=args.lr, epochs=args.epochs,
                                  res=res)
         score = model.default_score_func(y, pred)
-
         refined_pred = refine(sample_id=data.data.obs_names.tolist(), pred=pred.tolist(), dis=adj_2d, shape="hexagon")
         score_refined = model.default_score_func(y, refined_pred)
-        wandb.log({"ARI": score, "ARI (refined)": score_refined})
+        wandb.log({
+            "ARI": score,
+            "ARI (refined)": score_refined,
+        })
         gc.collect()
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(

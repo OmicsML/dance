@@ -1,0 +1,35 @@
+---
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: filter.gene
+    target: FilterGenesPercentile
+    params_to_tune:
+      min_val:
+        min: 1
+        max: 10
+      max_val:
+        min: 95
+        max: 99
+      mode:
+        values: [sum, var, cv, rv]
+  - type: normalize
+    target: NormalizePlaceHolder
+  - type: filter.gene
+    target: FilterGenesNumberPlaceHolder
+  - type: pseudobulk
+    target: CellTopicProfile
+    params:
+      split_name: ref
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        label_channel: cell_type_portion
+wandb:
+  entity: xzy11632
+  project: dance-dev
+  method: bayes
+  metric:
+    name: MSE
+    goal: minimize

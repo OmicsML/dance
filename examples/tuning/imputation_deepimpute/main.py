@@ -1,9 +1,11 @@
 import argparse
 import os
 import sys
+from cgi import test
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import torch
 import wandb
 
@@ -16,7 +18,7 @@ from dance.utils import set_seed
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dropout", type=float, default=0.1, help="dropout probability")
-    parser.add_argument("--gpu", type=int, default=0, help="GPU id, -1 for cpu")
+    parser.add_argument("--gpu", type=int, default=1, help="GPU id, -1 for cpu")
     parser.add_argument("--lr", type=float, default=1e-5, help="learning rate")
     parser.add_argument("--n_epochs", type=int, default=500, help="number of training epochs")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size.")
@@ -38,15 +40,16 @@ if __name__ == '__main__':
     parser.add_argument("--tune_mode", default="pipeline_params", choices=["pipeline", "params", "pipeline_params"])
     parser.add_argument("--count", type=int, default=2)
     parser.add_argument("--sweep_id", type=str, default=None)
-    parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
+    parser.add_argument("--summary_file_path", default="results/pipeline/best.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
-
+    parser.add_argument("--get_result", action="store_true", help="save imputation result")
     params = parser.parse_args()
     print(vars(params))
     file_root_path = Path(params.root_path, params.dataset).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{params.tune_mode}_tuning_config.yaml")
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
+    logger.info(params.tune_mode)
 
     def evaluate_pipeline(tune_mode=params.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
@@ -55,11 +58,19 @@ if __name__ == '__main__':
         data = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset,
                                  train_size=params.train_size).load_data()
         # Prepare preprocessing pipeline and apply it to data
-        kwargs = {tune_mode: dict(wandb.config)}
+        wandb_config = wandb.config
+        if "run_kwargs" in pipeline_planer.config:
+            if any(d == dict(wandb.config["run_kwargs"]) for d in pipeline_planer.config.run_kwargs):
+                wandb_config = wandb_config["run_kwargs"]
+            else:
+                wandb.log({"skip": 1})
+                wandb.finish()
+                return
+        kwargs = {tune_mode: dict(wandb_config)}
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
-        X, X_raw, targets, predictors, mask = data.get_x(return_type="default")
+        X, X_raw, targets, predictors, mask, valid_mask, test_mask = data.get_x(return_type="default")
         if not isinstance(X, np.ndarray):
             X = X.toarray()
         if not isinstance(X_raw, np.ndarray):
@@ -73,21 +84,47 @@ if __name__ == '__main__':
 
         model.fit(X_train, X_train, mask, params.batch_size, params.lr, params.n_epochs, params.patience)
         imputed_data = model.predict(X_train, mask)
-        score = model.score(X, imputed_data, mask, "RMSE")
-        pcc = model.score(X, imputed_data, mask, "PCC")
-        mre = model.score(X, imputed_data, mask, metric="MRE")
-        wandb.log({"RMSE": score, "PCC": pcc, "MRE": mre})
+        train_RMSE = model.score(X, imputed_data.clone(), ~mask, "RMSE")
+        train_pcc = model.score(X, imputed_data.clone(), ~mask, "PCC")
+        train_mre = model.score(X, imputed_data.clone(), ~mask, metric="MRE")
+        val_RMSE = model.score(X, imputed_data.clone(), ~valid_mask, "RMSE")
+        val_pcc = model.score(X, imputed_data.clone(), ~valid_mask, "PCC")
+        val_mre = model.score(X, imputed_data.clone(), ~valid_mask, metric="MRE")
+        test_RMSE = model.score(X, imputed_data.clone(), ~test_mask, "RMSE")
+        test_pcc = model.score(X, imputed_data.clone(), ~test_mask, "PCC")
+        test_mre = model.score(X, imputed_data.clone(), ~test_mask, metric="MRE")
+        # wandb.log({"RMSE": score, "PCC": pcc, "MRE": mre})
+        wandb.log({
+            "train_RMSE": train_RMSE,
+            "train_PCC": train_pcc,
+            "train_MRE": train_mre,
+            "val_RMSE": val_RMSE,
+            "val_PCC": val_pcc,
+            "MRE": val_mre,
+            "test_RMSE": test_RMSE,
+            "test_PCC": test_pcc,
+            "test_MRE": test_mre
+        })
+        if params.get_result:
+            result = model.predict(X, None)
+            array = result.detach().cpu().numpy()
+            df = pd.DataFrame(data=array, index=data.data.obs_names, columns=data.data.var_names)
+            df.to_csv(f"{params.dataset}/result.csv")
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=params.sweep_id, count=params.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=params.summary_file_path, root_path=file_root_path)
+    if params.get_result:
+        sys.exit(0)
     if params.tune_mode == "pipeline" or params.tune_mode == "pipeline_params":
-        get_step3_yaml(result_load_path=f"{params.summary_file_path}", step2_pipeline_planer=pipeline_planer,
-                       conf_load_path=f"{Path(params.root_path).resolve().parent}/step3_default_params.yaml",
-                       root_path=file_root_path,
-                       required_funs=["SaveRaw", "UpdateRaw", "GeneHoldout", "CellwiseMaskData", "SetConfig"],
-                       required_indexes=[2, 6, sys.maxsize - 2, sys.maxsize - 1,
-                                         sys.maxsize], metric="MRE", ascending=True)
+        get_step3_yaml(
+            result_load_path=f"{params.summary_file_path}", step2_pipeline_planer=pipeline_planer,
+            conf_load_path=f"{Path(params.root_path).resolve().parent}/step3_default_params.yaml",
+            root_path=file_root_path, required_funs=[
+                "FilterCellTransform", "FilterGenesScanpyOrder", "ScrubletTransform", "SaveRaw", "UpdateRaw",
+                "GeneHoldout", "CellwiseMaskData", "SetConfig"
+            ], required_indexes=[0, 1, 2, 3, 7, sys.maxsize - 2, sys.maxsize - 1,
+                                 sys.maxsize], metric="MRE", ascending=True)
         if params.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """To reproduce deepimpute benchmarks, please refer to command lines belows:

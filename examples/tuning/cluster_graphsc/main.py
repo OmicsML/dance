@@ -2,11 +2,14 @@ import argparse
 import os
 import pprint
 import sys
+import time
+from cgi import test
 from pathlib import Path
 
 import numpy as np
 import torch
 import wandb
+from sklearn.model_selection import train_test_split
 
 from dance import logger
 from dance.datasets.singlemodality import ClusteringDataset
@@ -45,7 +48,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "-data", "--dataset", default="worm_neuron_cell", choices=[
             "10X_PBMC", "mouse_bladder_cell", "mouse_ES_cell", "worm_neuron_cell", "mouse_kidney_10x",
-            "human_ILCS_cell", "mouse_kidney_drop", "mouse_lung_cell", "mouse_kidney_cell", "mouse_kidney_cl2"
+            "human_ILCS_cell", "mouse_kidney_drop", "mouse_lung_cell", "mouse_kidney_cell", "mouse_kidney_cl2",
+            "human_skin_cell", "human_pbmc2_cell"
         ])
     parser.add_argument("--seed", type=int, default=0, help="Initial seed random, offset for each repeatition")
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
@@ -54,6 +58,7 @@ if __name__ == "__main__":
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
+    parser.add_argument('--additional_sweep_ids', action='append', type=str, help='get prior runs')
     args = parser.parse_args()
     aris = []
     logger.info(f"\n{pprint.pformat(vars(args))}")
@@ -74,7 +79,6 @@ if __name__ == "__main__":
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
-
         graph, y = data.get_train_data()
         n_clusters = len(np.unique(y))
 
@@ -91,15 +95,17 @@ if __name__ == "__main__":
                         num_workers=args.num_workers, device=args.device)
         model.fit(graph, epochs=args.epochs, lr=args.learning_rate, show_epoch_ari=args.show_epoch_ari,
                   eval_epoch=args.eval_epoch)
-        score = model.score(None, y)
+        score = model.score(graph, y)
         wandb.log({"acc": score})
         wandb.finish()
         del model
         torch.cuda.empty_cache()
+        time.sleep(20)
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
-    save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
+    save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path,
+                      additional_sweep_ids=args.additional_sweep_ids)
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",

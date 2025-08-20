@@ -6,6 +6,7 @@ from pprint import pprint
 
 import numpy as np
 import wandb
+from sklearn.model_selection import train_test_split
 
 from dance.datasets.spatial import CellTypeDeconvoDataset
 from dance.modules.spatial.cell_type_deconvo.card import Card
@@ -44,16 +45,21 @@ if __name__ == "__main__":
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
+        total_idx = data.get_split_idx("test")
+        valid_idx, test_idx = train_test_split(total_idx, test_size=0.3, random_state=args.seed)
         # inputs: x_count, x_spatial
         inputs, y = data.get_data(split_name="test", return_type="numpy")
-        basis = data.get_feature(return_type="default", channel="CellTopicProfile",
-                                 channel_type="varm")  #降维之后没法寻找特定基因的varm了，也就是基因在每个细胞类型上的表现
+
+        basis = data.get_feature(
+            return_type="default", channel="CellTopicProfile", channel_type="varm"
+        )  #After dimensionality reduction, can't find specific gene varm anymore, that is, gene expression in each cell type
 
         # Train and evaluate model
         model = Card(basis, random_state=args.seed)
-        score = model.fit_score(inputs, y, max_iter=args.max_iter, epsilon=args.epsilon,
-                                location_free=args.location_free)
-        wandb.log({"MSE": score})
+        valid_score, test_score = model.fit_score(inputs, y, max_iter=args.max_iter, epsilon=args.epsilon,
+                                                  location_free=args.location_free, valid_idx=valid_idx,
+                                                  test_idx=test_idx)
+        wandb.log({"MSE": valid_score, "test_MSE": test_score})
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import anndata as ad
 import numpy as np
+import pandas as pd
 import torch
 import wandb
 
@@ -20,7 +21,7 @@ from dance.utils import set_seed
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dropout", type=float, default=0.1, help="dropout probability")
-    parser.add_argument("--gpu", type=int, default=-1, help="GPU id, -1 for cpu")
+    parser.add_argument("--gpu", type=int, default=1, help="GPU id, -1 for cpu")
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
     parser.add_argument("--train_size", type=float, default=0.9, help="proportion of training set")
     parser.add_argument("--le", type=float, default=1, help="parameter of expression loss")
@@ -47,6 +48,7 @@ if __name__ == '__main__':
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
+    parser.add_argument("--get_result", action="store_true", help="save imputation result")
     params = parser.parse_args()
     print(vars(params))
     file_root_path = Path(params.root_path, params.dataset).resolve()
@@ -63,13 +65,21 @@ if __name__ == '__main__':
         data = ImputationDataset(data_dir=params.data_dir, dataset=params.dataset,
                                  train_size=params.train_size).load_data()
         # Prepare preprocessing pipeline and apply it to data
-        kwargs = {tune_mode: dict(wandb.config)}
+        wandb_config = wandb.config
+        if "run_kwargs" in pipeline_planer.config:
+            if any(d == dict(wandb.config["run_kwargs"]) for d in pipeline_planer.config.run_kwargs):
+                wandb_config = wandb_config["run_kwargs"]
+            else:
+                wandb.log({"skip": 1})
+                wandb.finish()
+                return
+        kwargs = {tune_mode: dict(wandb_config)}
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
 
         preprocessing_pipeline(data)
 
-        X, X_raw, g, mask = data.get_x(return_type="default")
+        X, X_raw, g, mask, valid_mask, test_mask = data.get_x(return_type="default")
         if not isinstance(X, np.ndarray):
             X = X.toarray()
         if not isinstance(X_raw, np.ndarray):
@@ -90,23 +100,50 @@ if __name__ == '__main__':
         norm_func = [p for p in preprocessing_pipeline._pipeline if p.type == "normalize"][0].functional
         norm_func(data_imputed_data)
         processed_imputed_data = torch.tensor(data_imputed_data.data.X).to(device)
-        score = model.score(X, processed_imputed_data, mask, metric='RMSE', log1p=False)
-        pcc = model.score(X, processed_imputed_data, mask, metric='PCC', log1p=False)
-        mre = model.score(X, processed_imputed_data, mask, metric='MRE', log1p=False)
-        wandb.log({"RMSE": score, "PCC": pcc, "MRE": mre})
+        # score = model.score(X, processed_imputed_data, mask, metric='RMSE', log1p=False)
+        # pcc = model.score(X, processed_imputed_data, mask, metric='PCC', log1p=False)
+        # mre = model.score(X, processed_imputed_data, mask, metric='MRE', log1p=False)
+        train_RMSE = model.score(X, imputed_data.clone(), ~mask, "RMSE", log1p=False)
+        train_pcc = model.score(X, imputed_data.clone(), ~mask, "PCC", log1p=False)
+        train_mre = model.score(X, imputed_data.clone(), ~mask, metric="MRE", log1p=False)
+        val_RMSE = model.score(X, imputed_data.clone(), ~valid_mask, "RMSE", log1p=False)
+        val_pcc = model.score(X, imputed_data.clone(), ~valid_mask, "PCC", log1p=False)
+        val_mre = model.score(X, imputed_data.clone(), ~valid_mask, metric="MRE", log1p=False)
+        test_RMSE = model.score(X, imputed_data.clone(), ~test_mask, "RMSE", log1p=False)
+        test_pcc = model.score(X, imputed_data.clone(), ~test_mask, "PCC", log1p=False)
+        test_mre = model.score(X, imputed_data.clone(), ~test_mask, metric="MRE", log1p=False)
+        wandb.log({
+            "train_RMSE": train_RMSE,
+            "train_PCC": train_pcc,
+            "train_MRE": train_mre,
+            "val_RMSE": val_RMSE,
+            "val_PCC": val_pcc,
+            "MRE": val_mre,
+            "test_RMSE": test_RMSE,
+            "test_PCC": test_pcc,
+            "test_MRE": test_mre
+        })
         gc.collect()
         torch.cuda.empty_cache()
+        if params.get_result:
+            result = model.predict(X, X_raw, g, None)
+            array = result.detach().cpu().numpy()
+            # Create DataFrame
+            df = pd.DataFrame(data=array, index=data.data.obs_names, columns=data.data.var_names)
+            df.to_csv(f"{params.dataset}/result.csv")
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=params.sweep_id, count=params.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=params.summary_file_path, root_path=file_root_path)
     if params.tune_mode == "pipeline" or params.tune_mode == "pipeline_params":
-        get_step3_yaml(result_load_path=f"{params.summary_file_path}", step2_pipeline_planer=pipeline_planer,
-                       conf_load_path=f"{Path(params.root_path).resolve().parent}/step3_default_params.yaml",
-                       root_path=file_root_path,
-                       required_funs=["SaveRaw", "UpdateRaw", "FeatureFeatureGraph", "CellwiseMaskData", "SetConfig"],
-                       required_indexes=[2, 6, sys.maxsize - 2, sys.maxsize - 1,
-                                         sys.maxsize], metric="MRE", ascending=True)
+        get_step3_yaml(
+            result_load_path=f"{params.summary_file_path}", step2_pipeline_planer=pipeline_planer,
+            conf_load_path=f"{Path(params.root_path).resolve().parent}/step3_default_params.yaml",
+            root_path=file_root_path, required_funs=[
+                "FilterCellTransform", "FilterGenesScanpyOrder", "ScrubletTransform", "SaveRaw", "UpdateRaw",
+                "FeatureFeatureGraph", "CellwiseMaskData", "SetConfig"
+            ], required_indexes=[0, 1, 2, 3, 7, sys.maxsize - 2, sys.maxsize - 1,
+                                 sys.maxsize], metric="MRE", ascending=True)
         if params.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """To reproduce GraphSCI benchmarks, please refer to command lines belows:

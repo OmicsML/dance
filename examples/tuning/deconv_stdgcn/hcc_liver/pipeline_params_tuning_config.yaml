@@ -1,0 +1,144 @@
+---
+type: preprocessor
+tune_mode: pipeline_params
+pipeline_tuning_top_k: 3
+parameter_tuning_freq_n: 20
+pipeline:
+  - type: misc
+    target: CelltypeTransform
+  - type: pseudobulk
+    target: pseudoSpotGen
+    params:
+      spot_num: 30000
+      min_cell_number_in_spot: 8
+      max_cell_number_in_spot: 12
+      max_cell_types_in_spot: 4
+      generation_method: celltype
+      n_jobs: -1
+  - type: misc
+    target: RemoveSplit
+    params:
+      split_name: ref
+      log_level: INFO
+  - type: filter.gene
+    target: FilterGenesCommon
+    params:
+      split_keys: [pseudo, test]
+  - type: filter.gene
+    include:
+      - FilterGenesPercentile
+      - FilterGenesScanpyOrder
+      - FilterGenesPlaceHolder
+    default_params:
+      FilterGenesScanpyOrder:
+        order: [min_counts, max_counts, min_cells, max_cells]
+        min_counts: 100
+        max_counts: 0.99
+        min_cells: 0.01
+        max_cells: 0.99
+  - type: misc
+    target: SaveRaw
+  - type: normalize
+    include:
+      - ColumnSumNormalize
+      - ScTransform
+      - Log1P
+      - NormalizeTotal
+      - NormalizePlaceHolder
+      - NormalizeTotalLog1P
+    default_params:
+      ScTransform:
+        processes_num: 8
+  - type: filter.gene
+    include:
+      - HighlyVariableGenesLogarithmizedByMeanAndDisp
+      - HighlyVariableGenesRawCount
+      - FilterGenesNumberPlaceHolder
+      - HighlyVariableGenesLogarithmizedByTopGenes
+      - FilterGenesTopK
+      - FilterGenesRegression
+    default_params:
+      FilterGenesTopK:
+        num_genes: 3000
+      FilterGenesRegression:
+        num_genes: 3000
+      HighlyVariableGenesRawCount:
+        n_top_genes: 3000
+      HighlyVariableGenesLogarithmizedByTopGenes:
+        n_top_genes: 3000
+  - type: misc
+    target: updateAnndataObsTransform
+    params:
+      split: test
+  - type: misc
+    target: CellTypeNum
+  - type: feature.cell
+    include:
+      - CellPCA
+      - CellSVD
+      - WeightedFeaturePCA
+      - WeightedFeatureSVD
+      - GaussRandProjFeature
+      - FeatureCellPlaceHolder
+    params:
+      out: feature.cell
+      log_level: INFO
+    default_params:
+      CellPCA:
+        n_components: 400
+      CellSVD:
+        n_components: 400
+      GaussRandProjFeature:
+        n_components: 400
+      WeightedFeaturePCA:
+        n_components: 400
+      WeightedFeatureSVD:
+        n_components: 400
+  - type: data.interagration
+    target: DataInteragraionTransform
+    params:
+      batch_removal_method:
+      min_dim: 30
+      dimensionality_reduction_method:
+      scale: false
+      cpu_num: 1
+      AE_device: cpu
+  - type: graph.cell
+    target: stdgcnGraph
+    params:
+      inter_find_neighbor_method: MNN
+      inter_dist_method: cosine
+      inter_corr_dist_neighbors: 20
+      spatial_link_method: soft
+      space_dist_threshold: 2.0
+      real_intra_find_neighbor_method: MNN
+      real_intra_dist_method: cosine
+      real_intra_pca_dimensionality_reduction: false
+      real_intra_corr_dist_neighbors: 10
+      real_intra_dim: 50
+      pseudo_intra_find_neighbor_method: MNN
+      pseudo_intra_dist_method: cosine
+      pseudo_intra_corr_dist_neighbors: 20
+      pseudo_intra_pca_dimensionality_reduction: false
+      pseudo_intra_dim: 50
+  - type: data.interagration
+    target: DataInteragraionTransform
+    params:
+      batch_removal_method:
+      min_dim: 80
+      dimensionality_reduction_method:
+      scale: false
+      cpu_num: 1
+      AE_device: cpu
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        label_channel: cell_type_portion
+wandb:
+  entity: xzy11632
+  project: dance-dev
+  method: grid  # try grid to provide a comprehensive search
+  metric:
+    name: MSE
+    goal: minimize

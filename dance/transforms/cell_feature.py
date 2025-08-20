@@ -1,6 +1,9 @@
+from re import A
+from typing import Literal
+
 import numpy as np
 import pandas as pd
-from sklearn.decomposition import PCA, TruncatedSVD
+from sklearn.decomposition import PCA, SparsePCA, TruncatedSVD
 from sklearn.random_projection import GaussianRandomProjection
 
 from dance.registry import register_preprocessor
@@ -8,9 +11,11 @@ from dance.transforms.base import BaseTransform
 from dance.typing import Optional, Union
 from dance.utils.matrix import normalize
 from dance.utils.status import deprecated
+from dance.utils.wrappers import add_mod_and_transform
 
 
 @register_preprocessor("feature", "cell")
+@add_mod_and_transform
 class WeightedFeaturePCA(BaseTransform):
     """Compute the weighted gene PCA as cell features.
 
@@ -32,13 +37,14 @@ class WeightedFeaturePCA(BaseTransform):
     _DISPLAY_ATTRS = ("n_components", "split_name", "feat_norm_mode", "feat_norm_axis")
 
     def __init__(self, n_components: Union[float, int] = 400, split_name: Optional[str] = None,
-                 feat_norm_mode: Optional[str] = None, feat_norm_axis: int = 0, **kwargs):
+                 feat_norm_mode: Optional[str] = None, feat_norm_axis: int = 0, save_info=False, **kwargs):
         super().__init__(**kwargs)
 
         self.n_components = n_components
         self.split_name = split_name
         self.feat_norm_mode = feat_norm_mode
         self.feat_norm_axis = feat_norm_axis
+        self.save_info = save_info
 
     def __call__(self, data):
         feat = data.get_x(self.split_name)  # cell x genes
@@ -51,21 +57,26 @@ class WeightedFeaturePCA(BaseTransform):
                 f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='full'"
             )
             self.n_components = min(feat.shape)
-        gene_pca = PCA(n_components=self.n_components)
+        gene_pca = PCA(n_components=self.n_components)  # genes x components
 
         gene_feat = gene_pca.fit_transform(feat.T)  # decompose into gene features
         self.logger.info(f"Decomposing {self.split_name} features {feat.shape} (k={gene_pca.n_components_})")
         self.logger.info(f"Total explained variance: {gene_pca.explained_variance_ratio_.sum():.2%}")
 
         x = data.get_x()
-        cell_feat = normalize(x, mode="normalize", axis=1) @ gene_feat
+        cell_feat = normalize(x, mode="normalize", axis=1) @ gene_feat  # cells x components
         data.data.obsm[self.out] = cell_feat.astype(np.float32)
         data.data.varm[self.out] = gene_feat.astype(np.float32)
-
+        if self.save_info:
+            data.data.uns["pca_components"] = gene_pca.components_
+            data.data.uns["pca_mean"] = gene_pca.mean_
+            data.data.uns["pca_explained_variance"] = gene_pca.explained_variance_
+            data.data.uns["pca_explained_variance_ratio"] = gene_pca.explained_variance_ratio_
         return data
 
 
 @register_preprocessor("feature", "cell")
+@add_mod_and_transform
 class WeightedFeatureSVD(BaseTransform):
     """Compute the weighted gene SVD as cell features.
 
@@ -87,13 +98,14 @@ class WeightedFeatureSVD(BaseTransform):
     _DISPLAY_ATTRS = ("n_components", "split_name", "feat_norm_mode", "feat_norm_axis")
 
     def __init__(self, n_components: Union[float, int] = 400, split_name: Optional[str] = None,
-                 feat_norm_mode: Optional[str] = None, feat_norm_axis: int = 0, **kwargs):
+                 feat_norm_mode: Optional[str] = None, feat_norm_axis: int = 0, save_info: bool = False, **kwargs):
         super().__init__(**kwargs)
 
         self.n_components = n_components
         self.split_name = split_name
         self.feat_norm_mode = feat_norm_mode
         self.feat_norm_axis = feat_norm_axis
+        self.save_info = save_info
 
     def __call__(self, data):
         feat = data.get_x(self.split_name)  # cell x genes
@@ -122,11 +134,15 @@ class WeightedFeatureSVD(BaseTransform):
         cell_feat = normalize(x, mode="normalize", axis=1) @ gene_feat
         data.data.obsm[self.out] = cell_feat.astype(np.float32)
         data.data.varm[self.out] = gene_feat.astype(np.float32)
-
+        if self.save_info:
+            data.data.uns["svd_components"] = gene_svd.components_
+            data.data.uns["svd_explained_variance"] = gene_svd.explained_variance_
+            data.data.uns["svd_explained_variance_ratio"] = gene_svd.explained_variance_ratio_
         return data
 
 
 @register_preprocessor("feature", "cell")
+@add_mod_and_transform
 class CellPCA(BaseTransform):
     """Reduce cell feature matrix with PCA.
 
@@ -140,33 +156,85 @@ class CellPCA(BaseTransform):
     _DISPLAY_ATTRS = ("n_components", )
 
     def __init__(self, n_components: Union[float, int] = 400, *, channel: Optional[str] = None,
-                 mod: Optional[str] = None, **kwargs):
+                 mod: Optional[str] = None, save_info: bool = False,
+                 svd_solver: Literal['auto', 'full', 'arpack', 'randomized'] = "auto", **kwargs):
         super().__init__(**kwargs)
 
         self.n_components = n_components
         self.channel = channel
-        self.mod = mod
+        self.save_info = save_info
+        self.svd_solver = svd_solver
 
     def __call__(self, data):
-        feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
+        feat = data.get_feature(return_type="numpy", channel=self.channel)
         if self.n_components > min(feat.shape):
             self.logger.warning(
-                f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='full'"
+                f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='{self.svd_solver}'"
             )
             self.n_components = min(feat.shape)
-        pca = PCA(n_components=self.n_components)
-        cell_feat = pca.fit_transform(feat)
+        if "pca" not in data.data.uns:
+            pca = PCA(n_components=self.n_components, svd_solver=self.svd_solver)
+            cell_feat = pca.fit_transform(feat)
+        else:
+            pca = data.data.uns["pca"]
+            cell_feat = pca.transform(feat)
         self.logger.info(f"Generating cell PCA features {feat.shape} (k={pca.n_components_})")
         evr = pca.explained_variance_ratio_
         self.logger.info(f"Top 10 explained variances: {evr[:10]}")
         self.logger.info(f"Total explained variance: {evr.sum():.2%}")
 
         data.data.obsm[self.out] = cell_feat
+        if self.save_info:
+            data.data.uns["pca_components"] = pca.components_
+            data.data.uns["pca_mean"] = pca.mean_
+            data.data.uns["pca_explained_variance"] = pca.explained_variance_
+            data.data.uns["pca_explained_variance_ratio"] = pca.explained_variance_ratio_
+            # data.data.uns["pca"] = pca
 
         return data
 
 
 @register_preprocessor("feature", "cell")
+@add_mod_and_transform
+class CellSparsePCA(BaseTransform):
+    """Reduce cell feature matrix with SparsePCA.
+
+    Parameters
+    ----------
+    n_components
+        Number of SparsePCA components to use.
+
+    """
+
+    _DISPLAY_ATTRS = ("n_components", )
+
+    def __init__(self, n_components: Union[float, int] = 400, *, channel: Optional[str] = None,
+                 mod: Optional[str] = None, **kwargs):
+        super().__init__(**kwargs)
+
+        self.n_components = n_components
+        self.channel = channel
+
+    def __call__(self, data):
+        feat = data.get_feature(return_type="numpy", channel=self.channel)
+        # if self.n_components > min(feat.shape):
+        #     self.logger.warning(
+        #         f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='full'"
+        #     )
+        #     self.n_components = min(feat.shape)
+        pca = SparsePCA(n_components=self.n_components)
+        cell_feat = pca.fit_transform(feat)
+        self.logger.info(f"Generating cell SparsePCA features {feat.shape} (k={pca.n_components_})")
+        # evr = pca.explained_variance_ratio_
+        # self.logger.info(f"Top 10 explained variances: {evr[:10]}")
+        # self.logger.info(f"Total explained variance: {evr.sum():.2%}")
+        data.data.obsm[self.out] = cell_feat
+
+        return data
+
+
+@register_preprocessor("feature", "cell")
+@add_mod_and_transform
 class CellSVD(BaseTransform):
     """Reduce cell feature matrix with SVD.
 
@@ -180,18 +248,20 @@ class CellSVD(BaseTransform):
     _DISPLAY_ATTRS = ("n_components", )
 
     def __init__(self, n_components: Union[float, int] = 400, *, channel: Optional[str] = None,
-                 mod: Optional[str] = None, **kwargs):
+                 mod: Optional[str] = None, algorithm: Literal['arpack',
+                                                               'randomized'] = "randomized", save_info=True, **kwargs):
         super().__init__(**kwargs)
 
         self.n_components = n_components
         self.channel = channel
-        self.mod = mod
+        self.save_info = save_info
+        self.algorithm = algorithm
 
     def __call__(self, data):
-        feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
+        feat = data.get_feature(return_type="numpy", channel=self.channel)
         if isinstance(self.n_components, float):
             n_components = min(feat.shape) - 1
-            svd = TruncatedSVD(n_components=n_components)
+            svd = TruncatedSVD(n_components=n_components, algorithm=self.algorithm)
             svd.fit_transform(feat)
             explained_variance = svd.explained_variance_ratio_.cumsum()
             self.n_components = (explained_variance < self.n_components).sum() + 1
@@ -200,7 +270,7 @@ class CellSVD(BaseTransform):
                 f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='full'"
             )
             self.n_components = min(feat.shape)
-        svd = TruncatedSVD(n_components=self.n_components)
+        svd = TruncatedSVD(n_components=self.n_components, algorithm=self.algorithm)
 
         cell_feat = svd.fit_transform(feat)
         self.logger.info(f"Generating cell SVD features {feat.shape} (k={self.n_components})")
@@ -210,12 +280,17 @@ class CellSVD(BaseTransform):
         self.logger.info(f"Total explained variance: {evr.sum():.2%}")
 
         data.data.obsm[self.out] = cell_feat
+        if self.save_info:
+            data.data.uns["svd_components"] = svd.components_
+            data.data.uns["svd_explained_variance"] = svd.explained_variance_
+            data.data.uns["svd_explained_variance_ratio"] = svd.explained_variance_ratio_
 
         return data
 
 
 @register_preprocessor("feature", "cell")
-@deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
+@add_mod_and_transform
+# @deprecated(msg="will be replaced by builtin bypass mechanism in pipeline")
 class FeatureCellPlaceHolder(BaseTransform):
     """Used as a placeholder to skip the process.
 
@@ -229,13 +304,12 @@ class FeatureCellPlaceHolder(BaseTransform):
     def __init__(self, n_components: int = 400, *, channel: Optional[str] = None, mod: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
         self.channel = channel
-        self.mod = mod
         self.logger.info(
             "n_components in FeatureCellPlaceHolder is used to make the parameters consistent and will not have any actual effect."
         )
 
     def __call__(self, data):
-        feat = data.get_feature(return_type="numpy", channel=self.channel, mod=self.mod)
+        feat = data.get_feature(return_type="numpy", channel=self.channel)
         cell_feat = feat
         gene_feat = feat.T
         data.data.obsm[self.out] = cell_feat
@@ -305,6 +379,7 @@ class BatchFeature(BaseTransform):
 
 
 @register_preprocessor("feature", "cell")  # NOTE: register any custom preprocessing function to be used for tuning
+@add_mod_and_transform
 class GaussRandProjFeature(BaseTransform):
     """Custom preprocessing to extract cell feature via Gaussian random projection."""
 

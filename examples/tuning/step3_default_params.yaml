@@ -3,7 +3,7 @@ type: preprocessor
 tune_mode: params
 pipeline:
   - type: normalize
-    target: ScaleFeature
+    target: ColumnSumNormalize
     params_to_tune:
       mode:
         values: [normalize, standardize, minmax, l2]
@@ -54,6 +54,8 @@ pipeline:
         values: [null, 1e3, 1e4, 1e5, 1e6]
       max_fraction:
         values: [0.01, 0.05, 0.5, 0.7, 1.0]
+  - type: normalize
+    target: tfidfTransform
   - type: normalize
     target: NormalizePlaceHolder
   - type: filter.gene
@@ -118,7 +120,7 @@ pipeline:
           - [max_cells, min_cells, max_counts, min_counts]
           - [max_cells, max_counts, min_counts, min_cells]
           - [max_cells, max_counts, min_cells, min_counts]
-            #cta_problem
+            # cta_problem
             # min_counts:
             #   min: 1
             #   max: 10
@@ -217,19 +219,21 @@ pipeline:
           - [max_genes, max_counts, min_counts, min_genes]
           - [max_genes, max_counts, min_genes, min_counts]
       min_counts:
-        min: 3
-        max: 1000
+        min: 0.0  # Change occurs when joint embedding
+        max: 0.05
       min_genes:
         min: 0.0
         max: 0.05
       max_counts:
-        min: 10000
-        max: 100000
+        min: 0.95
+        max: 1.0
       max_genes:
         min: 0.95
         max: 1.0
   - type: filter.cell
     target: FilterCellsPlaceHolder
+  - type: filter.cell
+    target: FilterCellsCommonMod
   - type: feature.cell
     target: CellPCA
     params:
@@ -238,8 +242,20 @@ pipeline:
       n_components:
         min: 100
         max: 1000
+      svd_solver:
+        values: [auto, full, arpack, randomized]
   - type: feature.cell
     target: CellSVD
+    params:
+      out: feature.cell
+    params_to_tune:
+      n_components:
+        min: 100
+        max: 1000
+      algorithm:
+        values: [arpack, randomized]
+  - type: feature.cell
+    target: CellSparsePCA
     params:
       out: feature.cell
     params_to_tune:

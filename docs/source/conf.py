@@ -13,6 +13,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.abspath('../..'))
+sys.path.insert(0, os.path.abspath('../../examples/atlas/demos'))
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -31,6 +32,7 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.intersphinx',
     'sphinx.ext.viewcode',
+    'nbsphinx',
     'sphinx_autodoc_typehints',
 ]
 
