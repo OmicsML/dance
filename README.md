@@ -326,11 +326,11 @@ pip install -e .
 | Generative Model | SCMM                     | SCMM: MIXTURE-OF-EXPERTS MULTIMODAL DEEP GENERATIVE MODEL FOR SINGLE-CELL MULTIOMICS DATA ANALYSIS | 2021 | ✅      |
 | Auto-encoder     | Cross-modal autoencoders | Multi-domain translation between single-cell imaging and sequencing data using autoencoders        | 2021 | ✅      |
 
-| Model                    | Evaluation Metric | GEX2ADT (current/reported) | GEX2ATAC (current/reported) |
-| ------------------------ | ----------------- | -------------------------- | --------------------------- |
-| ScMoGCN                  | Accuracy          | 0.0827 / 0.0810            | 0.0600 / 0.0630             |
-| SCMM                     | Accuracy          | 0.005 / N/A                | 5e-5 / N/A                  |
-| Cross-modal autoencoders | Accuracy          | 0.0002 / N/A               | 0.0002 /  N/A               |
+| Model                    | Evaluation Metric | GEX2ADT (DANCE 1.0/Original) | GEX2ATAC (DANCE 1.0/Original) |
+| ------------------------ | ----------------- | ---------------------------- | ----------------------------- |
+| ScMoGCN                  | Accuracy          | 0.0827 / 0.0810              | 0.0600 / 0.0630               |
+| SCMM                     | Accuracy          | 0.005 / N/A                  | 5e-5 / N/A                    |
+| Cross-modal autoencoders | Accuracy          | 0.0002 / N/A                 | 0.0002 /  N/A                 |
 
 #### 3) Joint Embedding
 
