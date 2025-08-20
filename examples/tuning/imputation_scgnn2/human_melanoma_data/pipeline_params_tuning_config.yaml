@@ -33,7 +33,7 @@ pipeline:
       add_test_mask: true
   - type: normalize
     include:
-      - ScaleFeature
+      - ColumnSumNormalize
       - ScTransform
       - Log1P
       - NormalizeTotal

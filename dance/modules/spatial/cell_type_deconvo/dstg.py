@@ -22,11 +22,11 @@ from dance import logger
 from dance.modules.base import BaseRegressionMethod
 from dance.transforms import (
     AnnDataTransform,
+    ColumnSumNormalize,
     Compose,
     FilterGenesCommon,
     PseudoMixture,
     RemoveSplit,
-    ScaleFeature,
     SetConfig,
 )
 from dance.transforms.graph import DSTGraph
@@ -181,7 +181,7 @@ class DSTG(BaseRegressionMethod):
             AnnDataTransform(sc.pp.log1p),
             AnnDataTransform(sc.pp.highly_variable_genes, flavor=hvg_flavor, n_top_genes=n_top_genes, batch_key="batch",
                              subset=True),
-            ScaleFeature(split_names="ALL", mode="standardize"),
+            ColumnSumNormalize(split_names="ALL", mode="standardize"),
             DSTGraph(k_filter=k_filter, num_cc=num_cc, ref_split="pseudo", inf_split="test"),
             SetConfig({
                 "feature_channel": ["DSTGraph", None],

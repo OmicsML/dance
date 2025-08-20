@@ -17,14 +17,14 @@ NormalizePlaceHolder
 tfidfTransform"]
 	F [label="Normalize with Options (mod1)
 NormalizePlaceHolder
-ScaleFeature
+ColumnSumNormalize
 ScTransform
 Log1P
 NormalizeTotal
 NormalizeTotalLog1P"]
 	G [label="Normalize with Options (mod2)
 NormalizePlaceHolder
-ScaleFeature
+ColumnSumNormalize
 ScTransform
 Log1P
 NormalizeTotal

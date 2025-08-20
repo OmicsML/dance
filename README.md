@@ -414,3 +414,7 @@ pip install -e .
 | STdGCN       | 0.0058/0.0202/NA                              | 0.0145/0.0261/NA                                   | Test MSE          |
 
 **Note**: Stage 1, 2 and 3 (valid pseudo or dataset as metric for selection) for all methods.
+
+### A Note on Function Naming
+
+The function `ScaleFeature` has been renamed to `ColumnSumNormalize` in the code to resolve a naming ambiguity. However, historical WandB logs have not been modified and will still reference the old name (`ScaleFeature`). This is a naming change only and does not affect the program's execution.

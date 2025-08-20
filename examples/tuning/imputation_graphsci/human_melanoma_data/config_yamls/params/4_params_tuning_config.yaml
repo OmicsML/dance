@@ -21,7 +21,7 @@ pipeline:
   - type: misc
     target: SaveRaw
   - type: normalize
-    target: ScaleFeature
+    target: ColumnSumNormalize
     params_to_tune:
       mode:
         values: [normalize, standardize, minmax, l2]

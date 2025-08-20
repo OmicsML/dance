@@ -28,7 +28,7 @@ pipeline:
     params:
       add_test_mask: true
   - type: normalize
-    target: ScaleFeature
+    target: ColumnSumNormalize
     params_to_tune:
       mode:
         values: [normalize, standardize, minmax, l2]

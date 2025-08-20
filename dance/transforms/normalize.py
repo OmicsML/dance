@@ -25,7 +25,7 @@ from dance.utils.wrappers import add_mod_and_transform
 
 @register_preprocessor("normalize")
 @add_mod_and_transform
-class ScaleFeature(BaseTransform):
+class ColumnSumNormalize(BaseTransform):
     """Scale the feature matrix in the AnnData object.
 
     This is an extension of :meth:`scanpy.pp.scale`, allowing split- or batch-wide scaling.

@@ -40,11 +40,11 @@ from dance.transforms.interface import AnnDataTransform
 from dance.transforms.mask import CellwiseMaskData, MaskData
 from dance.transforms.misc import AlignMod, Compose, RemoveSplit, SaveRaw, SetConfig, UpdateRaw
 from dance.transforms.normalize import (
+    ColumnSumNormalize,
     Log1P,
     NormalizePlaceHolder,
     NormalizeTotal,
     NormalizeTotalLog1P,
-    ScaleFeature,
     ScTransform,
     ScTransformR,
     UpdateSizeFactors,
@@ -120,7 +120,7 @@ __all__ = [
     "SaveRaw",
     "ScTransform",
     "ScTransformR",
-    "ScaleFeature",
+    "ColumnSumNormalize",
     "SetConfig",
     "SpatialIDEFeature",
     "TangramFeature",

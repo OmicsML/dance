@@ -27,7 +27,7 @@ pipeline:
         max_genes: 0.99
   - type: normalize
     include:
-      - ScaleFeature
+      - ColumnSumNormalize
       - ScTransform
       - Log1P
       - NormalizeTotal

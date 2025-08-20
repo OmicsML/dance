@@ -46,7 +46,7 @@ pipeline:
   - type: normalize
     include:
       - NormalizePlaceHolder
-      - ScaleFeature
+      - ColumnSumNormalize
       - ScTransform
       - Log1P
       - NormalizeTotal
@@ -59,7 +59,7 @@ pipeline:
   - type: normalize
     include:
       - NormalizePlaceHolder
-      - ScaleFeature
+      - ColumnSumNormalize
       - ScTransform
       - Log1P
       - NormalizeTotal
@@ -368,7 +368,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -788,7 +788,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: Log1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -802,7 +802,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -1208,7 +1208,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: Log1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -1264,7 +1264,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -1642,7 +1642,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: Log1P
     pipeline.7.filter.gene: FilterGenesNumberPlaceHolder
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -1670,7 +1670,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizePlaceHolder
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -1796,7 +1796,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -1838,7 +1838,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
@@ -2006,7 +2006,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: Log1P
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -2132,7 +2132,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -2272,7 +2272,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -2342,7 +2342,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizePlaceHolder
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -2650,7 +2650,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -2706,7 +2706,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: Log1P
     pipeline.7.filter.gene: FilterGenesRegression
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
@@ -2916,7 +2916,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: FilterGenesTopK
@@ -3126,7 +3126,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -3169,7 +3169,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: Log1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -3238,7 +3238,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
@@ -3519,7 +3519,7 @@ run_kwargs:
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: tfidfTransform
     pipeline.5.normalize: NormalizePlaceHolder
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -3770,7 +3770,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -3854,7 +3854,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: FilterGenesRegression
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -4092,7 +4092,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: FilterGenesNumberPlaceHolder
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -4120,7 +4120,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -4163,7 +4163,7 @@ run_kwargs:
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizeTotal
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: FilterGenesTopK
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -4358,7 +4358,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
@@ -4372,7 +4372,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -4484,7 +4484,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: FilterGenesNumberPlaceHolder
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -4596,8 +4596,8 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -4624,7 +4624,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellSVD
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -4638,7 +4638,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: FilterGenesRegression
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -4695,7 +4695,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizeTotalLog1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -4764,7 +4764,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: Log1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -4806,7 +4806,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: FilterGenesNumberPlaceHolder
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -4876,7 +4876,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -4904,7 +4904,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellSVD
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -5002,7 +5002,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -5325,7 +5325,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizePlaceHolder
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -5353,7 +5353,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: Log1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -5366,7 +5366,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: FilterGenesNumberPlaceHolder
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -5394,7 +5394,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: FilterGenesRegression
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -5507,7 +5507,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizeTotal
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -5549,7 +5549,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizeTotal
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -5563,7 +5563,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
     pipeline.5.normalize: ScTransform
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -5744,7 +5744,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: FilterGenesNumberPlaceHolder
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
@@ -5815,7 +5815,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: ScTransform
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -5829,7 +5829,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizeTotal
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesRegression
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -6038,7 +6038,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -6052,7 +6052,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: Log1P
     pipeline.7.filter.gene: FilterGenesRegression
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -6178,7 +6178,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: FilterGenesRegression
@@ -6193,7 +6193,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
     pipeline.5.normalize: Log1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -6514,7 +6514,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -6556,8 +6556,8 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesRegression
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -6752,8 +6752,8 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -6794,8 +6794,8 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesNumberPlaceHolder
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.9.filter.cell: FilterCellsPlaceHolder
@@ -6892,7 +6892,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -6906,7 +6906,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellSVD
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -6934,7 +6934,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -6990,7 +6990,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellSVD
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -7117,7 +7117,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
     pipeline.5.normalize: NormalizePlaceHolder
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -7172,7 +7172,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -7200,7 +7200,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellSVD
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -7313,7 +7313,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizeTotalLog1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -7341,7 +7341,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
     pipeline.5.normalize: NormalizePlaceHolder
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -7397,7 +7397,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizePlaceHolder
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -7550,7 +7550,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -7579,7 +7579,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
     pipeline.5.normalize: NormalizeTotal
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -7662,7 +7662,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -7971,7 +7971,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
     pipeline.5.normalize: NormalizeTotalLog1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -7998,7 +7998,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizePlaceHolder
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -8012,7 +8012,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeatureSVD
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -8027,7 +8027,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizeTotal
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -8278,7 +8278,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -8405,7 +8405,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizePlaceHolder
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -8446,8 +8446,8 @@ run_kwargs:
     pipeline.16.feature.cell: CellSVD
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -8502,7 +8502,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: FilterGenesRegression
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -8544,7 +8544,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -8587,7 +8587,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: Log1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -8600,7 +8600,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeatureSVD
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
@@ -8629,7 +8629,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizeTotalLog1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesRegression
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -8670,8 +8670,8 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -8712,7 +8712,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizePlaceHolder
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -8727,7 +8727,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: Log1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -8740,8 +8740,8 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -8839,7 +8839,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizePlaceHolder
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -8909,7 +8909,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: Log1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -8978,7 +8978,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -9104,7 +9104,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellSVD
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -9203,7 +9203,7 @@ run_kwargs:
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: tfidfTransform
     pipeline.5.normalize: Log1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -9216,7 +9216,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -9258,7 +9258,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
@@ -9286,7 +9286,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: FilterGenesRegression
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -9328,7 +9328,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -9427,7 +9427,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
     pipeline.5.normalize: NormalizePlaceHolder
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -9650,7 +9650,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellSVD
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -9777,7 +9777,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: ScTransform
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -9804,7 +9804,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizePlaceHolder
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -9832,7 +9832,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizePlaceHolder
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -9861,7 +9861,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizePlaceHolder
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: FilterGenesTopK
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -9888,7 +9888,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -9987,7 +9987,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizeTotal
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -10028,8 +10028,8 @@ run_kwargs:
     pipeline.16.feature.cell: CellSVD
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -10084,7 +10084,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -10196,8 +10196,8 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -10322,8 +10322,8 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeatureSVD
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -10336,7 +10336,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizePlaceHolder
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -10350,7 +10350,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellSVD
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: FilterGenesRegression
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -10658,8 +10658,8 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -10756,7 +10756,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeatureSVD
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -10771,7 +10771,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizePlaceHolder
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -10813,7 +10813,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizeTotalLog1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -10840,8 +10840,8 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -10952,8 +10952,8 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -10966,8 +10966,8 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesRegression
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -11078,7 +11078,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -11107,7 +11107,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizeTotal
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -11120,7 +11120,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: FilterGenesRegression
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -11162,7 +11162,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -11330,7 +11330,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: FilterGenesNumberPlaceHolder
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -11344,7 +11344,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -11358,7 +11358,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -11414,7 +11414,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
@@ -11667,7 +11667,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
     pipeline.5.normalize: NormalizeTotal
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -11680,8 +11680,8 @@ run_kwargs:
     pipeline.16.feature.cell: CellSVD
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -11806,7 +11806,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellSVD
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: FilterGenesRegression
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -11905,7 +11905,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizePlaceHolder
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: FilterGenesTopK
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -11933,7 +11933,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: Log1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -12002,7 +12002,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -12017,7 +12017,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: Log1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -12058,7 +12058,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeatureSVD
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: Log1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -12101,7 +12101,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizeTotalLog1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsPlaceHolder
@@ -12156,7 +12156,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellSVD
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizePlaceHolder
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -12170,7 +12170,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: Log1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -12226,7 +12226,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellSVD
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -12282,7 +12282,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -12297,7 +12297,7 @@ run_kwargs:
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: Log1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -12436,7 +12436,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellSVD
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -12492,7 +12492,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: Log1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
@@ -12521,7 +12521,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: NormalizePlaceHolder
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -12605,7 +12605,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: Log1P
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -12632,7 +12632,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -12758,7 +12758,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: Log1P
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: FilterGenesNumberPlaceHolder
@@ -13094,7 +13094,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: FilterGenesRegression
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -13276,7 +13276,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotalLog1P
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
@@ -13332,7 +13332,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
@@ -13346,7 +13346,7 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: Log1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByTopGenes
     pipeline.8.filter.gene: FilterGenesNumberPlaceHolder
@@ -13374,7 +13374,7 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
@@ -13403,7 +13403,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: ScTransform
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -13612,7 +13612,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: ScTransform
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -13738,7 +13738,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizePlaceHolder
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: FilterGenesTopK
@@ -13752,7 +13752,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeatureSVD
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: Log1P
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -13836,8 +13836,8 @@ run_kwargs:
     pipeline.16.feature.cell: CellPCA
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: FilterGenesTopK
     pipeline.8.filter.gene: FilterGenesNumberPlaceHolder
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -13851,7 +13851,7 @@ run_kwargs:
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
     pipeline.5.normalize: ScTransform
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -14033,7 +14033,7 @@ run_kwargs:
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
     pipeline.5.normalize: NormalizePlaceHolder
-    pipeline.6.normalize: ScaleFeature
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -14102,8 +14102,8 @@ run_kwargs:
     pipeline.16.feature.cell: FeatureCellPlaceHolder
     pipeline.3.normalize: NormalizePlaceHolder
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
-    pipeline.6.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
+    pipeline.6.normalize: ColumnSumNormalize
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
     pipeline.9.filter.cell: FilterCellsScanpyOrder
@@ -14186,7 +14186,7 @@ run_kwargs:
     pipeline.16.feature.cell: GaussRandProjFeature
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: tfidfTransform
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: HighlyVariableGenesLogarithmizedByMeanAndDisp
     pipeline.8.filter.gene: HighlyVariableGenesRawCount
@@ -14214,7 +14214,7 @@ run_kwargs:
     pipeline.16.feature.cell: WeightedFeaturePCA
     pipeline.3.normalize: tfidfTransform
     pipeline.4.normalize: NormalizePlaceHolder
-    pipeline.5.normalize: ScaleFeature
+    pipeline.5.normalize: ColumnSumNormalize
     pipeline.6.normalize: NormalizeTotal
     pipeline.7.filter.gene: HighlyVariableGenesRawCount
     pipeline.8.filter.gene: HighlyVariableGenesRawCount

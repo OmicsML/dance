@@ -2,7 +2,7 @@
 0,572f3f3e-d3e4-4d13-8e2b-88215e508481,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/gaurbw0r|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/5luhlhr8,https://wandb.ai/xzy11632/dance-dev/sweeps/6cvflsss,https://wandb.ai/xzy11632/dance-dev/sweeps/tdxjnsvf","- type: filter.gene
   target: FilterGenesPlaceHolder
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params:
     mode: l2
     eps: 0.5
@@ -102,7 +102,7 @@
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -137,7 +137,7 @@
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -172,7 +172,7 @@
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -197,7 +197,7 @@
 6,1c739a3e-c3f5-49d5-98e0-73975e751201,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/pe7wrxhx|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/bjghjlj5,https://wandb.ai/xzy11632/dance-dev/sweeps/wahyq279,https://wandb.ai/xzy11632/dance-dev/sweeps/33b4rte8","- type: filter.gene
   target: FilterGenesPlaceHolder
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params:
     mode: normalize
     eps: 0.7
@@ -236,7 +236,7 @@
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -298,7 +298,7 @@
   target: FilterGenesPercentile
   params: {}
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesTopK
@@ -394,7 +394,7 @@
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -429,7 +429,7 @@
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -464,7 +464,7 @@
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -499,7 +499,7 @@
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -534,7 +534,7 @@
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -569,7 +569,7 @@
     max_counts: 0.984514560421666
     max_cells: 0.9614458802125864
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params:
     mode: l2
     eps: 0.5
@@ -602,7 +602,7 @@
     max_val: 98
     mode: cv
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params:
     mode: l2
     eps: 0.5
@@ -676,7 +676,7 @@
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -711,7 +711,7 @@
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount

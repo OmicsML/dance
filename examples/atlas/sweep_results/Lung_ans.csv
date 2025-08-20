@@ -107,7 +107,7 @@ Dataset_id,cta_actinn,cta_actinn_best_yaml,cta_actinn_best_res,cta_actinn_run_st
   target: FilterGenesPlaceHolder
   params: {}
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesRegression
@@ -132,7 +132,7 @@ Dataset_id,cta_actinn,cta_actinn_best_yaml,cta_actinn_best_res,cta_actinn_run_st
   target: FilterGenesPlaceHolder
   params: {}
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesRegression
@@ -582,7 +582,7 @@ Dataset_id,cta_actinn,cta_actinn_best_yaml,cta_actinn_best_res,cta_actinn_run_st
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -1005,7 +1005,7 @@ Dataset_id,cta_actinn,cta_actinn_best_yaml,cta_actinn_best_res,cta_actinn_run_st
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -1039,7 +1039,7 @@ Dataset_id,cta_actinn,cta_actinn_best_yaml,cta_actinn_best_res,cta_actinn_run_st
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -1073,7 +1073,7 @@ Dataset_id,cta_actinn,cta_actinn_best_yaml,cta_actinn_best_res,cta_actinn_run_st
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesRegression
@@ -1100,7 +1100,7 @@ Dataset_id,cta_actinn,cta_actinn_best_yaml,cta_actinn_best_res,cta_actinn_run_st
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesRegression
@@ -1269,7 +1269,7 @@ Dataset_id,cta_actinn,cta_actinn_best_yaml,cta_actinn_best_res,cta_actinn_run_st
   target: FilterGenesPercentile
   params: {}
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesRegression
@@ -1641,7 +1641,7 @@ Dataset_id,cta_actinn,cta_actinn_best_yaml,cta_actinn_best_res,cta_actinn_run_st
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesTopK
@@ -1675,7 +1675,7 @@ Dataset_id,cta_actinn,cta_actinn_best_yaml,cta_actinn_best_res,cta_actinn_run_st
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesTopK
@@ -2012,7 +2012,7 @@ a68b64d8-aee3-4947-81b7-36b8fe5a44d2(Lung),"step2:https://wandb.ai/xzy11632/danc
   target: FilterGenesPlaceHolder
   params: {}
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -2033,7 +2033,7 @@ a68b64d8-aee3-4947-81b7-36b8fe5a44d2(Lung),"step2:https://wandb.ai/xzy11632/danc
   target: FilterGenesPlaceHolder
   params: {}
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -2063,7 +2063,7 @@ a68b64d8-aee3-4947-81b7-36b8fe5a44d2(Lung),"step2:https://wandb.ai/xzy11632/danc
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -2094,7 +2094,7 @@ a68b64d8-aee3-4947-81b7-36b8fe5a44d2(Lung),"step2:https://wandb.ai/xzy11632/danc
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -2115,7 +2115,7 @@ a68b64d8-aee3-4947-81b7-36b8fe5a44d2(Lung),"step2:https://wandb.ai/xzy11632/danc
 ",0.3480176329612732,"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/evbw6kzm|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/7xvyf7mr,https://wandb.ai/xzy11632/dance-dev/sweeps/2kek99h8,https://wandb.ai/xzy11632/dance-dev/sweeps/w6f7khiy","- type: filter.gene
   target: FilterGenesPlaceHolder
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params:
     mode: minmax
     eps: 0.5
@@ -2329,7 +2329,7 @@ a68b64d8-aee3-4947-81b7-36b8fe5a44d2(Lung),"step2:https://wandb.ai/xzy11632/danc
   target: FilterGenesPlaceHolder
   params: {}
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -2354,7 +2354,7 @@ a68b64d8-aee3-4947-81b7-36b8fe5a44d2(Lung),"step2:https://wandb.ai/xzy11632/danc
   target: FilterGenesPlaceHolder
   params: {}
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -2471,7 +2471,7 @@ a68b64d8-aee3-4947-81b7-36b8fe5a44d2(Lung),"step2:https://wandb.ai/xzy11632/danc
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -2584,7 +2584,7 @@ a68b64d8-aee3-4947-81b7-36b8fe5a44d2(Lung),"step2:https://wandb.ai/xzy11632/danc
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesTopK
@@ -2912,7 +2912,7 @@ a68b64d8-aee3-4947-81b7-36b8fe5a44d2(Lung),"step2:https://wandb.ai/xzy11632/danc
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesRegression
@@ -2943,7 +2943,7 @@ a68b64d8-aee3-4947-81b7-36b8fe5a44d2(Lung),"step2:https://wandb.ai/xzy11632/danc
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesRegression
@@ -3082,7 +3082,7 @@ a68b64d8-aee3-4947-81b7-36b8fe5a44d2(Lung),"step2:https://wandb.ai/xzy11632/danc
 fa27492b-82ff-4ab7-ac61-0e2b184eee67(Lung),"step2:https://wandb.ai/xzy11632/dance-dev/sweeps/4ft0jqyx|step3:https://wandb.ai/xzy11632/dance-dev/sweeps/hvc1tbps,https://wandb.ai/xzy11632/dance-dev/sweeps/aawb9nyx,https://wandb.ai/xzy11632/dance-dev/sweeps/gpci23wg","- type: filter.gene
   target: FilterGenesPlaceHolder
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params:
     mode: minmax
     eps: 0.3
@@ -3117,7 +3117,7 @@ fa27492b-82ff-4ab7-ac61-0e2b184eee67(Lung),"step2:https://wandb.ai/xzy11632/danc
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -3190,7 +3190,7 @@ fa27492b-82ff-4ab7-ac61-0e2b184eee67(Lung),"step2:https://wandb.ai/xzy11632/danc
     max_counts: 0.9341402623798708
     max_cells: 0.9734426567600912
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params:
     mode: l2
     eps: 0.5
@@ -3219,7 +3219,7 @@ fa27492b-82ff-4ab7-ac61-0e2b184eee67(Lung),"step2:https://wandb.ai/xzy11632/danc
   target: FilterGenesPlaceHolder
   params: {}
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesTopK
@@ -3383,7 +3383,7 @@ f72958f5-7f42-4ebb-98da-445b0c6de516,"step2:https://wandb.ai/xzy11632/dance-dev/
   target: FilterGenesPlaceHolder
   params: {}
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesTopK
@@ -3408,7 +3408,7 @@ f72958f5-7f42-4ebb-98da-445b0c6de516,"step2:https://wandb.ai/xzy11632/dance-dev/
   target: FilterGenesPlaceHolder
   params: {}
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesTopK
@@ -3583,7 +3583,7 @@ c5d88abe-f23a-45fa-a534-788985e93dad(Lung),"step2:https://wandb.ai/xzy11632/danc
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -3617,7 +3617,7 @@ c5d88abe-f23a-45fa-a534-788985e93dad(Lung),"step2:https://wandb.ai/xzy11632/danc
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -3690,7 +3690,7 @@ e04daea4-4412-45b5-989e-76a9be070a89,"step2:https://wandb.ai/xzy11632/dance-dev/
     max_counts: 0.9723318411635294
     max_cells: 0.9542112874371124
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params:
     mode: minmax
     eps: 0.3
@@ -3725,7 +3725,7 @@ e04daea4-4412-45b5-989e-76a9be070a89,"step2:https://wandb.ai/xzy11632/dance-dev/
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -3800,7 +3800,7 @@ e04daea4-4412-45b5-989e-76a9be070a89,"step2:https://wandb.ai/xzy11632/dance-dev/
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -3834,7 +3834,7 @@ e04daea4-4412-45b5-989e-76a9be070a89,"step2:https://wandb.ai/xzy11632/dance-dev/
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -3993,7 +3993,7 @@ e9175006-8978-4417-939f-819855eab80e,"step2:https://wandb.ai/xzy11632/dance-dev/
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -4027,7 +4027,7 @@ e9175006-8978-4417-939f-819855eab80e,"step2:https://wandb.ai/xzy11632/dance-dev/
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -4143,7 +4143,7 @@ d8da613f-e681-4c69-b463-e94f5e66847f,"step2:https://wandb.ai/xzy11632/dance-dev/
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -4216,7 +4216,7 @@ d8da613f-e681-4c69-b463-e94f5e66847f,"step2:https://wandb.ai/xzy11632/dance-dev/
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesRegression
@@ -4250,7 +4250,7 @@ d8da613f-e681-4c69-b463-e94f5e66847f,"step2:https://wandb.ai/xzy11632/dance-dev/
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesRegression

@@ -3,7 +3,7 @@ type: preprocessor
 tune_mode: params
 pipeline:
   - type: normalize
-    target: ScaleFeature
+    target: ColumnSumNormalize
     params_to_tune:
       mode:
         values: [normalize, standardize, minmax, l2]

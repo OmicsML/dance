@@ -16,7 +16,7 @@ pipeline:
         max_cells: 401
   - type: normalize
     include:
-      - ScaleFeature
+      - ColumnSumNormalize
       - ScTransform
       - Log1P
       - NormalizeTotal

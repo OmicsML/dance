@@ -136,7 +136,7 @@ Dataset_id,cta_actinn,cta_actinn_best_yaml,cta_actinn_best_res,cta_actinn_run_st
   target: FilterGenesPlaceHolder
   params: {}
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: FilterGenesTopK
@@ -347,7 +347,7 @@ f7c1c579-2dc0-47e2-ba19-8165c5a0e353(Intestine),"step2:https://wandb.ai/xzy11632
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount
@@ -646,7 +646,7 @@ e40c6272-af77-4a10-9385-62a398884f27,"step2:https://wandb.ai/xzy11632/dance-dev/
     min_cells: 0.01
     max_cells: 0.99
 - type: normalize
-  target: ScaleFeature
+  target: ColumnSumNormalize
   params: {}
 - type: filter.gene
   target: HighlyVariableGenesRawCount

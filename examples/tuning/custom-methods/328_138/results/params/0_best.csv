@@ -1,3 +1,3 @@
-id,_runtime,_step,_timestamp,_wandb_runtime,acc,params.0.FilterGenesPercentile.max_val,params.0.FilterGenesPercentile.min_val,params.0.FilterGenesPercentile.mode,params.1.Log1P.base,params.2.FilterGenesRegression.method,params.2.FilterGenesRegression.num_genes,params.3.CellSVD.algorithm,params.3.CellSVD.n_components,test_acc,train_acc
-eb4xq6sf,4,0.0,1754371376.674959,4,0.6969696879386902,98,7,cv,4.420786736087686,enclasc,5205,arpack,252,0.6449275612831116,0.9618320465087892
-pfyfb0zj,3,,,3,,96,6,sum,4.969456908680813,scmap,9604,arpack,712,,
+id,_runtime,_step,_timestamp,_wandb_runtime,acc,params.0.FilterGenesPercentile.max_val,params.0.FilterGenesPercentile.min_val,params.0.FilterGenesPercentile.mode,params.1.ColumnSumNormalize.eps,params.1.ColumnSumNormalize.mode,params.2.FilterGenesRegression.method,params.2.FilterGenesRegression.num_genes,params.3.CellPCA.n_components,params.3.CellPCA.svd_solver,test_acc,train_acc
+w0rno5wd,14.312397241592407,0,1754737525.2395022,12,0.6818181872367859,98,1,cv,0.5,minmax,enclasc,4284,446,arpack,0.3115941882133484,0.9618320465087892
+3xw5xrnw,11.834450244903564,0,1754737490.5787213,10,0.3636363744735718,95,7,cv,0.5,normalize,enclasc,1266,449,auto,0.06521739065647125,0.7251908183097839

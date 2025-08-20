@@ -14,11 +14,12 @@ pipeline:
       mode:
         values: [sum, var, cv, rv]
   - type: normalize
-    target: Log1P
+    target: ColumnSumNormalize
     params_to_tune:
-      base:
-        min: 1.0
-        max: 10.0
+      mode:
+        values: [normalize, standardize, minmax, l2]
+      eps:
+        values: [-1, 0.1, 0.3, 0.5, 0.7]
   - type: filter.gene
     target: FilterGenesRegression
     params_to_tune:
@@ -28,7 +29,7 @@ pipeline:
         min: 100
         max: 10000
   - type: feature.cell
-    target: CellSVD
+    target: CellPCA
     params:
       out: feature.cell
       log_level: INFO
@@ -36,8 +37,8 @@ pipeline:
       n_components:
         min: 100
         max: 1000
-      algorithm:
-        values: [arpack, randomized]
+      svd_solver:
+        values: [auto, full, arpack, randomized]
   - type: misc
     target: SetConfig
     params:

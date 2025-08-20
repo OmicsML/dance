@@ -36,7 +36,7 @@ from dance.transforms.filter import (
 from dance.transforms.graph import HeteronetGraph
 from dance.transforms.interface import AnnDataTransform
 from dance.transforms.misc import Compose, SaveRaw, SetConfig
-from dance.transforms.normalize import Log1P, NormalizeTotal, ScaleFeature, UpdateSizeFactors
+from dance.transforms.normalize import ColumnSumNormalize, Log1P, NormalizeTotal, UpdateSizeFactors
 from dance.typing import Any, LogLevel, Mapping, Optional, Tuple, Union
 from dance.utils.metrics import resolve_score_func
 

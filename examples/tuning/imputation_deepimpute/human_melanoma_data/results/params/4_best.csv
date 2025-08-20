@@ -1,4 +1,4 @@
-id,MRE,_runtime,_step,_timestamp,_wandb_runtime,params.4.ScaleFeature.eps,params.4.ScaleFeature.mode,test_MRE,test_PCC,test_RMSE,train_MRE,train_PCC,train_RMSE,val_PCC,val_RMSE
+id,MRE,_runtime,_step,_timestamp,_wandb_runtime,params.4.ColumnSumNormalize.eps,params.4.ColumnSumNormalize.mode,test_MRE,test_PCC,test_RMSE,train_MRE,train_PCC,train_RMSE,val_PCC,val_RMSE
 pdw06kh9,0.3047187328338623,896.2987730503082,0,1746630281.971245,894,-1.0,minmax,0.3048987090587616,NaN,0.0019949095576282847,6945467392,-0.0002971667509042481,0.6952282500926901,NaN,0.002141501531230412
 9hw0w3lf,NaN,857.8302028179169,0,1746629367.5029228,856,0.3,normalize,NaN,NaN,0.0,6947646976,NaN,0.6970101110061591,NaN,0.0
 qu49d0g5,NaN,852.1293547153473,0,1746628486.8170617,848,0.1,l2,NaN,NaN,0.0,6947646464,NaN,0.6970101110061591,NaN,0.0

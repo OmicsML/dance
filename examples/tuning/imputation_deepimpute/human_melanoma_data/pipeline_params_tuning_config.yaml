@@ -24,7 +24,7 @@ pipeline:
     target: SaveRaw
   - type: normalize
     include:
-      - ScaleFeature
+      - ColumnSumNormalize
       - ScTransform
       - Log1P
       - NormalizeTotal

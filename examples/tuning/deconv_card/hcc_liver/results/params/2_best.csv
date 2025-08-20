@@ -1,4 +1,4 @@
-id,MSE,_runtime,_step,_timestamp,_wandb_runtime,params.5.ScaleFeature.eps,params.5.ScaleFeature.mode,params.6.FilterGenesTopK.mode,params.6.FilterGenesTopK.num_genes,params.6.FilterGenesTopK.top,test_MSE
+id,MSE,_runtime,_step,_timestamp,_wandb_runtime,params.5.ColumnSumNormalize.eps,params.5.ColumnSumNormalize.mode,params.6.FilterGenesTopK.mode,params.6.FilterGenesTopK.num_genes,params.6.FilterGenesTopK.top,test_MSE
 4snj34j3,0.027468200801465153,117.15697264671326,0,1746604279.7017186,115,0.7,normalize,rv,2406,False,0.02757115849975939
 629mfi9y,0.0274682024056183,139.76675605773926,0,1746604143.464558,137,0.5,normalize,rv,688,True,0.027571160876700567
 z86vo9g3,1.3716042440411602,139.87492322921753,0,1746603984.5935683,138,0.7,standardize,rv,617,True,0.06324673749932919
