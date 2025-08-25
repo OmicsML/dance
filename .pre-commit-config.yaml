@@ -1,7 +1,7 @@
 ---
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -15,17 +15,17 @@ repos:
   #       additional_dependencies:
   #         - maison==1.4.3
   - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.35.1
+    rev: v1.37.1
     hooks:
       - id: yamllint
         args: [-c=.yamllint.yml]
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.16.0
+    rev: v3.20.0
     hooks:
       - id: pyupgrade
         args: [--py3-plus]
   - repo: https://github.com/google/yapf
-    rev: v0.40.2
+    rev: v0.43.0
     hooks:
       - id: yapf
         name: Format code
@@ -37,14 +37,14 @@ repos:
         name: Sort imports
         args: [--line-width, '120', --profile, black]
   - repo: https://github.com/PyCQA/docformatter
-    rev: eb1df34
+    rev: v1.7.7
     hooks:
       - id: docformatter
         name: Format docstring
         additional_dependencies: [tomli]
         args: [--config, pyproject.toml]
   - repo: https://github.com/executablebooks/mdformat
-    rev: 0.7.17
+    rev: 0.7.22
     hooks:
       - id: mdformat
         name: Format markdown
