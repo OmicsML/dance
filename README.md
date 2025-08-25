@@ -167,7 +167,7 @@ DANCE 2.0 tackles this challenge by transforming preprocessing from a black-box 
 The full installation process might be a bit tedious and could involve some debugging when using CUDA enabled packages.
 Thus, we provide an `install.sh` script that simplifies the installation process, assuming the user have [conda](https://conda.io/projects/conda/en/latest/index.html) set up on their machines.
 The installation script creates a conda environment `dance` and install the DANCE package along with all its dependencies with a apseicifc CUDA version.
-Currently, two options are accepted: `cpu` and  `cu118`.
+Currently, two options are accepted: `cpu` and `cu118`.
 For example, to install the DANCE package using CUDA 11.8 in a `dance-env` conda environment, simply run:
 
 ```bash
@@ -340,7 +340,7 @@ pip install -e .
 | ------------------------ | ----------------- | ---------------------------- | ----------------------------- |
 | ScMoGCN                  | Accuracy          | 0.0827 / 0.0810              | 0.0600 / 0.0630               |
 | SCMM                     | Accuracy          | 0.005 / N/A                  | 5e-5 / N/A                    |
-| Cross-modal autoencoders | Accuracy          | 0.0002 / N/A                 | 0.0002 /  N/A                 |
+| Cross-modal autoencoders | Accuracy          | 0.0002 / N/A                 | 0.0002 / N/A                  |
 
 #### 3) Joint Embedding
 
