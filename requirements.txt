@@ -9,7 +9,7 @@ networkx==3.2.1; python_version < "3.10"
 numba==0.59.0
 numpy==1.26.4
 omegaconf==2.3.0
-opencv-python==4.9.0.80
+opencv-python==4.12.0.88
 openpyxl==3.1.2
 pot==0.9.4
 pandas==2.2.2
