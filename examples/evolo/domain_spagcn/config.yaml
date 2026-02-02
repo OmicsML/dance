@@ -1,75 +1,70 @@
 # Configuration for function minimization example
-max_iterations: 5 #50
+max_iterations: 20 #50
 checkpoint_interval: 5
 
-# LLM configuration
+# # LLM configuration
+# llm:
+#   primary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # primary_model: "llama3.1-8b"
+#   primary_model_weight: 0.6
+#   secondary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # secondary_model: "llama-4-scout-17b-16e-instruct"
+#   secondary_model_weight: 0.4
+#   api_base: "https://api.deepseek.com"
+#   # api_base: "https://api.cerebras.ai/v1"
+#   temperature: 0.8
+#   top_p: 0.95
+#   max_tokens: 8192
+#   timeout: 1200
+
 llm:
-  primary_model: "deepseek-reasoner" #"deepseek-reasoner"
-  # primary_model: "llama3.1-8b"
-  primary_model_weight: 0.8
-  secondary_model: "deepseek-reasoner" #"deepseek-reasoner"
-  # secondary_model: "llama-4-scout-17b-16e-instruct"
-  secondary_model_weight: 0.2
-  api_base: "https://api.deepseek.com"
-  # api_base: "https://api.cerebras.ai/v1"
-  temperature: 0.7
-  max_tokens: 8192
-  timeout: 1200
+  models:
+    - name: "qwen3-coder-plus"
+      api_key: "sk-92265d8b2c044989b10ad59e3a27b56f"
+      api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      weight: 0.8
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+    - name: "qwen3-coder-flash"
+      api_key: "sk-92265d8b2c044989b10ad59e3a27b56f"
+      api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      weight: 0.2
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+    # - name: "deepseek-reasoner"
+    #   api_key: "sk-acad184f8a7848918d7c9046affd1b65"
+    #   api_base: "https://api.deepseek.com"
+    #   weight: 0.4
+    #   temperature: 0.8
+    #   max_tokens: 16000
+    #   timeout: 1200
+    #   top_p: 0.95
 
 # Prompt configuration
 prompt:
   system_message: "
-                    ### Improved Agent Prompt (for SpaGCN)
+        I need to optimize the code block between `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END` in the provided Python script. The goal is to significantly improve **computational efficiency** (speed and memory usage) and **model accuracy** (better spatial clustering).
 
-                    You are an expert programmer specializing in Graph Neural Networks (GNNs) and computational pathology/spatial transcriptomics.
+        Please provide a refactored version of the code focusing on the following areas:
 
-                    Your task is to critically evaluate and refactor the graph construction process for the **SpaGCN** pipeline, specifically targeting the `SpaGCNGraph` and `SpaGCNGraph2D` preprocessors. The main goals are to dramatically improve computational efficiency, reduce memory usage, and create a more biologically meaningful and powerful graph representation for the SpaGCN model.
+        **1. Computational Efficiency (Speed & Scalability):**
+        *   **Vectorize Image Feature Extraction:** In the `SpaGCNGraph` class, the histology feature extraction currently uses a Python `for` loop to slice the image and calculate means. Please replace this with vectorized NumPy operations or optimized patch-processing techniques (e.g., using `skimage.util.view_as_windows` or integral images) to eliminate the loop.
+        *   **Optimize Distance Calculations:** Replace the manual Numba-based pairwise distance loops with highly optimized routines from `scipy.spatial.distance` or `sklearn.metrics.pairwise`. If using Numba, ensure the implementation is thread-safe to avoid the mentioned 'segfault' on Mac M-chips.
+        *   **Memory Management:** For large datasets, $N \times N$ dense distance matrices are prohibitive. Suggest or implement a **Sparse Graph (k-NN)** approach where appropriate to reduce memory footprint from $O(N^2)$ to $O(N \times k)$.
 
-                    The script uses NumPy, and the final output should be a graph representation (an adjacency matrix) stored in `data.data.obsp`. Your modifications should focus on the internal logic of these preprocessors to achieve the stated goals.
+        **2. Model Accuracy (Feature Representation):**
+        *   **Enhanced Histology Features:** Currently, only the RGB mean is used for the $z$-axis. Suggest adding more descriptive features like **local variance, texture (HOG/LBP)**, or a mechanism to incorporate features from a **pre-trained CNN (e.g., ResNet)**.
+        *   **Robust Scaling:** Refine the calculation of the $z$-axis and the application of the `alpha` parameter. Ensure the scaling between spatial coordinates ($x, y$) and histology intensity ($z$) is robust to outliers and different image resolutions.
+        *   **Numerical Stability:** Improve the `pearson_distance` and `spearman_distance` functions to handle edge cases, such as zero-variance features, to prevent `NaN` results.
 
-                    ---
+        **3. Code Quality & Integration:**
+        *   Maintain the class structures (`SpaGCNGraph`, `SpaGCNGraph2D`) and the `register_preprocessor` decorators to ensure compatibility with the `dance` library.
+        *   Ensure the code remains compatible with `numba` where it provides a genuine speedup over vectorized NumPy."
 
-                    ### Context: The SpaGCN Model Architecture
-
-                    To make informed improvements, you must understand how the downstream `SpaGCN` model uses the graph:
-
-                    1.  **Input Graph:** The `SpaGCN` model's GCN layer takes a **weighted adjacency matrix** as input. This matrix is expected to represent the strength of similarity or connection between spots.
-                    2.  **Gaussian Kernel Transformation:** Before being passed to the GNN, the raw distance matrix `adj` (produced by the preprocessor) is transformed using a Gaussian kernel (heat kernel): `adj_exp = np.exp(-1 * (adj**2) / (2 * (self.l**2)))`.
-                    3.  **The `l` Parameter:** The `l` parameter is a crucial hyperparameter that acts as the bandwidth of the Gaussian kernel. It controls the 'softness' of the neighborhood definition. A smaller `l` leads to a sparser effective graph (only very close neighbors have significant weights), while a larger `l` makes connections more uniform. The `search_l` function is dedicated to finding an optimal `l` that results in an average number of neighbors `p`.
-                    4.  **Dense by Design:** The original SpaGCN algorithm is designed to work with this dense, Gaussian-weighted distance matrix. While this differs from many modern GNNs that prefer sparse graphs, any proposed change must be compatible with or offer a clear improvement over this core mechanism.
-
-                    ---
-
-                    ### Potential Improvement Strategies
-
-                    Focus your improvements on the `SpaGCNGraph` and `SpaGCNGraph2D` classes. Combine these strategies or develop your own novel approaches.
-
-                    **1. Drastically Improve Computational Efficiency (in `SpaGCNGraph`):**
-                    *   The current implementation uses an explicit Python `for` loop to iterate over every spot and extract image patches. This is extremely inefficient and will not scale.
-                        *   **Action:** Replace the loop with highly optimized, vectorized image filtering operations. The task of calculating a mean value in a local neighborhood is a classic image filtering problem. Use **`scipy.ndimage.uniform_filter`** to perform this operation on the entire image at once. This will provide a speedup of several orders of magnitude. You would apply the filter to each color channel and then sample the resulting values at the `xy_pixel` locations. This is a direct, high-impact replacement.
-
-                    **2. Rethinking the Graph Representation for Scalability:**
-                    *   Both classes compute a **dense pairwise distance matrix**. This is the bottleneck for both memory (O(N^2)) and downstream computation. While the original algorithm uses this, we can improve it.
-                        *   **Action: Sparse k-NN Graph Construction.** Instead of a dense matrix, construct a sparse k-NN graph.
-                            1.  Compute the `xyz` feature space as before.
-                            2.  Use an efficient library like `scikit-learn`'s **`NearestNeighbors`** or `scipy.spatial.cKDTree` to find the `k` nearest neighbors for each spot.
-                            3.  The output should be a sparse adjacency matrix (`scipy.sparse.csr_matrix`) where non-zero entries correspond to the distances between neighbors.
-                        *   **Benefit for `SpaGCN`:** This change fundamentally alters the input to the `search_l` and `calc_adj_exp` functions. By applying the Gaussian kernel only to the non-zero elements of this sparse matrix, you maintain the core weighting logic of SpaGCN while drastically reducing memory and making the GNN step much faster. This is a powerful, model-aware optimization.
-
-                    **3. Advanced Histology Feature Engineering (in `SpaGCNGraph`):**
-                    *   The current histology feature is a simple mean of RGB values. This can be significantly enriched.
-                        *   **Texture Features:** Use established computer vision techniques to extract texture features from patches. The **Grey-Level Co-occurrence Matrix (GLCM)**, implemented in `skimage.feature.graycomatrix`, is a powerful way to quantify texture properties like contrast, correlation, and energy, which may better capture tissue morphology.
-                        *   **Pre-trained CNN Features:** For a state-of-the-art approach, use a pre-trained **Convolutional Neural Network (CNN)** like ResNet (from `torchvision.models`). Extract patches from the histology image and pass them through the CNN. The output from an intermediate layer serves as a rich, high-level feature vector for each spot, capturing complex patterns beyond simple color. These features would replace the simple RGB mean `g`.
-
-                    **4. Refined Normalization and Weighting:**
-                    *   The calculation of the histology feature `z` involves a custom, variance-based scaling. This could be brittle.
-                        *   **Action:** Replace this custom logic with more standard and robust scaling techniques from `scikit-learn`. After extracting the image features (whether they are RGB means, texture stats, or CNN embeddings), apply a **`StandardScaler`** to them before combining them with the spatial coordinates.
-                        *   **The `alpha` Parameter:** The `alpha` parameter manually weights the histology dimension. When combining the scaled spatial coordinates `xy` and the scaled image features `img_feats`, a clearer approach is `xyz = hstack([xy, alpha * img_feats])`. This makes the contribution of the histology explicit and tunable.
-
-                    **Constraints:**
-                    Do not change the class signatures (`__init__` parameters) or the final output destination (`data.data.obsp[self.out]`). The goal is to refactor the *internal implementation* of the `__call__` method to be fundamentally better. The output should still be a graph representation that can be used by the `SpaGCN` model, preferably a sparse `scipy.sparse` matrix if you implement graph sparsification.
-                    "
-  
   include_artifacts: true
   max_artifact_bytes: 32768
   artifact_security_filter: true
@@ -81,6 +76,7 @@ database:
   num_islands: 3
   elite_selection_ratio: 0.2
   exploitation_ratio: 0.7
+
 
 # Evaluator configuration
 evaluator:

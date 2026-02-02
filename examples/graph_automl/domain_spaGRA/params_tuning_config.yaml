@@ -1,0 +1,32 @@
+---
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: filter.gene
+    target: PrefilterGenes
+    params:
+      min_cells: 3
+  - type: filter.gene
+    target: HighlyVariableGenesRawCount
+    params:
+      n_top_genes: 1000
+  - type: normalize
+    target: NormalizeTotalLog1P
+  - type: graph.spatial
+    target: CalSpatialNet
+    params_to_tune:
+      rad_cutoff: 
+        values: [100,150,200]
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        label_channel: label
+        label_channel_type: obs
+wandb:
+  entity: xzy11632
+  project: dance-dev
+  method: grid  # try grid to provide a comprehensive search
+  metric:
+    name: combined_score
+    goal: maximize

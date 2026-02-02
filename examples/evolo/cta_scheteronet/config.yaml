@@ -1,76 +1,76 @@
 # Configuration for function minimization example
-max_iterations: 5 #50
-checkpoint_interval: 5
+max_iterations: 20 #50
+checkpoint_interval: 2
 
-# LLM configuration
+# # LLM configuration
+# llm:
+#   primary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # primary_model: "llama3.1-8b"
+#   primary_model_weight: 0.6
+#   secondary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # secondary_model: "llama-4-scout-17b-16e-instruct"
+#   secondary_model_weight: 0.4
+#   api_base: "https://api.deepseek.com"
+#   # api_base: "https://api.cerebras.ai/v1"
+#   temperature: 0.8
+#   top_p: 0.95
+#   max_tokens: 8192
+#   timeout: 1200
+
 llm:
-  primary_model: "deepseek-reasoner" #"deepseek-reasoner"
-  # primary_model: "llama3.1-8b"
-  primary_model_weight: 0.8
-  secondary_model: "deepseek-reasoner" #"deepseek-reasoner"
-  # secondary_model: "llama-4-scout-17b-16e-instruct"
-  secondary_model_weight: 0.2
-  api_base: "https://api.deepseek.com"
-  # api_base: "https://api.cerebras.ai/v1"
-  temperature: 0.7
-  max_tokens: 8192
-  timeout: 1200
+  models:
+    - name: "qwen3-coder-plus"
+      api_key: "sk-92265d8b2c044989b10ad59e3a27b56f"
+      api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      weight: 0.7
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+    - name: "qwen3-coder-flash"
+      api_key: "sk-92265d8b2c044989b10ad59e3a27b56f"
+      api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      weight: 0.3
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
 
 # Prompt configuration
 prompt:
   system_message: "
+                **Objective:**
+                Optimize the `HeteronetGraph` class within the provided code block to enhance both the **computational efficiency** (speed/memory) and the **classification accuracy** of the downstream scHeteroNet/scGAT model. The goal is to construct a higher-quality graph representation of single-cell gene expression data.
 
-  ### Improved Agent Prompt (for scHeteroNet)
+                **Context:**
+                The code converts gene expression matrices into a graph structure for Graph Neural Networks. The current implementation uses `sklearn.neighbors.NearestNeighbors`, which can be slow and may produce noisy edges that hinder information propagation in single-cell data.
 
-  You are an expert programmer specializing in Graph Neural Networks (GNNs) and computational biology, particularly in single-cell data analysis. Your task is to significantly improve a preprocessing script that constructs a cell-cell similarity graph for the `scHeteroNet` model. The primary goal is to enhance the graph's structure and feature representation to boost the performance of downstream tasks like cell-type classification and out-of-distribution detection.
+                **Optimization Guidelines & Strategies:**
 
-  The script uses DGL, PyTorch, and scikit-learn. The core of the preprocessing involves building a k-Nearest Neighbors (k-NN) graph from a cell feature matrix. Your modifications should focus on the `HeteronetGraph` preprocessor class to create a more robust, informative, and computationally efficient graph specifically tailored for the `scHeteroNet` architecture.
+                1.  **Efficiency Improvements (Speed):**
+                    *   Replace the `sklearn` implementation with **DGL native operations** (e.g., `dgl.knn_graph`) or PyTorch-based distance calculations where possible. These are generally faster and better optimized for tensors than moving data back and forth to NumPy/sklearn.
+                    *   Minimize CPU-GPU transfer overhead if applicable, though the transform typically runs on CPU.
 
-  ---
+                2.  **Graph Topology Improvements (Accuracy):**
+                    *   **Mutual KNN (MNN):** Implement a 'Mutual Nearest Neighbors' strategy. Only keep an edge between node $u$ and node $v$ if $u$ is in $v$'s top-$k$ neighbors AND $v$ is in $u$'s top-$k$. This effectively removes noisy edges between distinct cell clusters, significantly improving classification accuracy.
+                    *   **Self-Loops:** Explicitly add self-loops (`g = dgl.add_self_loop(g)`) to the graph. This ensures that a cell's own feature information remains dominant during the message-passing aggregation steps.
+                    *   **Edge Pruning:** Consider implementing a distance threshold/radius mechanism combined with KNN. If a 'neighbor' is too far away (statistical outlier), do not create an edge, even if it is within the top $k$.
 
-  ### Context: The scHeteroNet Model Architecture
+                3.  **Robustness:**
+                    *   Ensure the code handles edge cases gracefully (e.g., disconnected components, zero-edge scenarios).
+                    *   Maintain type safety (ensure `dgl.ndata` features are float32 and labels are long).
 
-  To make informed improvements, you must understand the downstream GNN model:
+                **Constraints:**
+                *   You **must** maintain the class structure inheriting from `BaseTransform`.
+                *   The `__call__` method must accept the `data` object and store the resulting graph in `adata.uns[self.out]`.
+                *   The input features will be provided via `data.get_feature`.
 
-  1.  **Dual Adjacency Propagation:** The core `HetConv` layer in `scHeteroNet` does not perform standard message passing. Instead, it aggregates information from two separate, pre-computed adjacency matrices:
-      *   `adj_t`: The standard 1-hop normalized adjacency matrix.
-      *   `adj_t2`: A **strict 2-hop** normalized adjacency matrix (neighbors of neighbors, excluding direct 1-hop neighbors).
-      The model learns from both local (1-hop) and extended (2-hop) neighborhood structures simultaneously by concatenating their outputs.
+                **Freedom of Execution:**
+                *   You are free to refactor the `build_graph` helper method entirely or remove it in favor of logic inside `__call__`.
+                *   You may add new hyperparameters to `__init__` (e.g., `mutual: bool`, `add_self_loop: bool`) as long as you provide sensible defaults.
 
-  2.  **Internal Graph Processing (`init_adj` method):** The model performs its own specific normalization and processing of the input `edge_index`.
-      *   It uses `gcn_norm` internally.
-      *   Most importantly, it **explicitly removes all self-loops** from both the 1-hop and 2-hop adjacency matrices (`adj_t.remove_diag(0)`) and does **not** add them back during normalization (`add_self_loops=False`).
-
-  ---
-
-  ### Potential Improvement Strategies
-
-  Focus your improvements on the `HeteronetGraph` class. Combine these strategies or develop your own, keeping the `scHeteroNet` architecture in mind.
-
-  **1. Feature Space Engineering (Choosing what to build the graph from):**
-  *   The current approach builds the graph directly on input features. The quality of these features is critical.
-      *   **Dimensionality Reduction:** Before building the k-NN graph, apply dimensionality reduction like **PCA** to the input features. This reduces noise and captures the most significant axes of variation, leading to a more stable neighbor graph, which is vital for both the 1-hop and 2-hop structures.
-      *   **Use Pre-computed Embeddings:** If available, build the graph on specialized single-cell embeddings (e.g., from scVI, scANVI) instead of raw or PCA-transformed data.
-
-  **2. Advanced Graph Construction and Weighting:**
-  *   The current graph is unweighted. This can be significantly improved.
-      *   **Mutual k-NN:** Implement a mutual k-NN graph. An edge exists between cells A and B only if A is in B's k-neighbors *and* B is in A's k-neighbors. This creates a sparser, higher-confidence graph by removing noisy or asymmetric connections. **This is especially beneficial for `scHeteroNet`** because a cleaner 1-hop graph leads to a much more meaningful and less noisy 2-hop graph (`adj_t2`).
-      *   **Edge Weighting:** The `NearestNeighbors` function can return distances. Use these to weight the edges, for instance with a Gaussian (heat) kernel: `weight = exp(-distance^2 / sigma^2)`. While the model's `gcn_norm` operates on an unweighted topology, these weights can be used to *prune* the graph by removing low-weight edges before passing it to the model.
-
-  **3. Efficient and Native DGL Implementation:**
-  *   The current implementation uses scikit-learn and manually converts the edge list. This is inefficient.
-      *   **Action:** Replace the custom `build_graph` method with the native **`dgl.knn_graph`** function. This DGL function is significantly faster, can run on the GPU, and integrates seamlessly into the DGL workflow.
-
-  **4. Graph Post-processing (Model-Specific):**
-  *   **Crucial Constraint: Do NOT Add Self-Loops:** The most common GNN practice is to add self-loops. For this model, that is incorrect.
-      *   **Action:** **Do not add self-loops** (e.g., do not call `dgl.add_self_loop`). The `scHeteroNet` model's `init_adj` method internally removes all self-loops to create its specific 1-hop and 2-hop adjacency matrices. Adding them in preprocessing is counterproductive.
-  *   **Symmetrization:** The graph should be undirected. A standard k-NN graph is directed.
-      *   **Action:** After creating the graph, make it undirected using **`dgl.to_bidirected(g, copy_ndata=True)`**. This is a more robust approach than simply adding reverse edges manually.
-
-  **Constraints:**
-  Do not change the `scHeteroNet` class, the main training loop, the command-line arguments, or the final evaluation output format. Your modifications must be confined to the data preprocessing and graph construction within the `HeteronetGraph` class.
-  "
-  
+                **Output Format:**
+                Return only the optimized Python code block between `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END`."
   include_artifacts: true
   max_artifact_bytes: 32768
   artifact_security_filter: true
@@ -85,10 +85,10 @@ database:
 
 # Evaluator configuration
 evaluator:
-  timeout: 600000
+  timeout: 6000000
   cascade_thresholds: [0.3]
-  parallel_evaluations: 3
+  parallel_evaluations: 1
 
 # Evolution settings
 diff_based_evolution: true
-max_code_length: 20000
+max_code_length: 50000

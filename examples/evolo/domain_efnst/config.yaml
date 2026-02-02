@@ -1,86 +1,78 @@
 # Configuration for function minimization example
-max_iterations: 5 #50
-checkpoint_interval: 5
+max_iterations: 20 #50
+checkpoint_interval: 2
 
-# LLM configuration
+# # LLM configuration
+# llm:
+#   primary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # primary_model: "llama3.1-8b"
+#   primary_model_weight: 0.6
+#   secondary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # secondary_model: "llama-4-scout-17b-16e-instruct"
+#   secondary_model_weight: 0.4
+#   api_base: "https://api.deepseek.com"
+#   # api_base: "https://api.cerebras.ai/v1"
+#   temperature: 0.8
+#   top_p: 0.95
+#   max_tokens: 8192
+#   timeout: 1200
+
 llm:
-  primary_model: "deepseek-reasoner" #"deepseek-reasoner"
-  # primary_model: "llama3.1-8b"
-  primary_model_weight: 0.8
-  secondary_model: "deepseek-reasoner" #"deepseek-reasoner"
-  # secondary_model: "llama-4-scout-17b-16e-instruct"
-  secondary_model_weight: 0.2
-  api_base: "https://api.deepseek.com"
-  # api_base: "https://api.cerebras.ai/v1"
-  temperature: 0.7
-  max_tokens: 8192
-  timeout: 1200
+  models:
+    - name: "qwen3-coder-plus"
+      api_key: "sk-92265d8b2c044989b10ad59e3a27b56f"
+      api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      weight: 0.99
+      temperature: 0.5
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.85
+    - name: "qwen3-coder-flash"
+      api_key: "sk-92265d8b2c044989b10ad59e3a27b56f"
+      api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      weight: 0.01
+      temperature: 0.5
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.85
 
 # Prompt configuration
 prompt:
   system_message: "
-              ### Agent Prompt for Improving EfNST Preprocessing
+              **Role:** You are a Principal Research Scientist specializing in Computational Spatial Biology and Geometric Deep Learning. Your goal is to optimize the `# EVOLVE-BLOCK` to maximize **Adjusted Rand Index (ARI)** while ensuring the algorithm scales linearly with the number of spots.
 
-              You are an expert programmer specializing in multi-modal Graph Neural Networks (GNNs) for spatial transcriptomics and computational pathology.
+              **Task Objectives:**
+              Evolve the provided Python functions to create a high-fidelity spatial affinity graph that captures both local niche consistency and global tissue architecture.
 
-              Your task is to critically evaluate and refactor the entire data preprocessing pipeline for the **EfNST** algorithm. The pipeline is complex, involving image feature extraction, multi-modal data fusion, gene expression augmentation, and final graph construction. Your primary goals are to improve the biological relevance of the generated graph and node features, enhance computational efficiency, and simplify the overall workflow by leveraging modern best practices.
+              **1. Strategic Algorithm Enhancements:**
 
-              The pipeline consists of three main stages, encapsulated in the `EfNSTImageTransform`, `EfNSTAugmentTransform`, and `EfNSTGraphTransform` classes. Your improvements should address these stages both individually and holistically.
+              * **Adaptive Spatial Smoothing:** In `cal_spatial_weight`, replace binary neighbors with an **Adaptive Gaussian Kernel**. Use the local density (distance to the -th neighbor) to determine a spot-specific  (bandwidth). This accounts for varying cell densities across different tissue layers.
+              * **Latent Space Refinement:** In `cal_gene_weight`, use **TruncatedSVD** for sparse inputs. To filter noise, implement a **soft-thresholding** on the correlation matrix: replace raw values with  or an exponential transformation to sharpen strong biological signals.
+              * **Multi-Modal Multiplicative Fusion:** In `cal_weight_matrix`, implement a **Log-Domain Fusion** or a **Weighted Power Mean**. Simple multiplication of three matrices (Physical, Genetic, Morphological) often leads to 'vanishing weights' if one modality is noisy. Use: .
+              * **Topological Pruning:** Implement a 'Mutual Nearest Neighbor' (MNN) or a rank-based pruning logic to ensure that edges only exist between spots that are mutually similar in both spatial and feature space.
 
-              ---
+              **2. Efficiency & Sparsity Constraints:**
 
-              ### Context: The EfNST Model and Preprocessing Logic
+              * **Stay Sparse:** Every operation MUST return or manipulate `scipy.sparse` matrices. Converting to `.toarray()` or `.dense()` inside the weight calculation is strictly forbidden to prevent memory overflow on large-scale datasets.
+              * **Linear Algebra Ops:** Use `sklearn.metrics.pairwise.paired_distances` or optimized sparse dot products for calculations.
 
-              To make informed improvements, you must understand the algorithm's unique data flow:
+              **3. Hyperparameter Search Space:**
 
-              1.  **Multi-Stage Feature Engineering:** The process is sequential and multi-modal.
-                  *   **Stage 1 (`EfNSTImageTransform`):** Extracts deep features from histology image patches using a pre-trained CNN (EfficientNet).
-                  *   **Stage 2 (`EfNSTAugmentTransform`):** This is the core fusion step. It computes a `weights_matrix` by combining three separate similarity measures: **physical distance** (spatial), **gene correlation** (transcriptional), and **morphological similarity** (from CNN features). This matrix is then used to create *augmented* gene expression features for each spot by averaging the features of its neighbors, weighted by the multi-modal similarity.
-                  *   **Stage 3 (`EfNSTGraphTransform`):** Constructs the final graph that will be fed into the GNN.
+              * `spatial_k`: Range [15, 60] (Higher  captures broader context; lower  captures fine boundaries).
+              * `n_components`: Range [30, 80] (Balance between signal retention and noise reduction).
+              * `fusion_weights`: Introduce  parameters for weighting physical, genetic, and image data.
 
-              2.  **Decoupled Graph Topology and Node Features (CRITICAL INSIGHT):** The current implementation has a crucial design choice:
-                  *   The **final graph's structure** (its edges) is determined *only by spatial coordinates* (`adata.obsm['spatial']`) in `EfNSTGraphTransform`.
-                  *   The rich, **multi-modal information** is used to create the GNN's *input node features* (the augmented gene expression).
-                  *   Essentially, the GNN is tasked with propagating highly informative, multi-modal node features across a simple spatial grid graph.
+              **4. Constraints & Freedom:**
 
-              3.  **The GNN Model (`EFNST_model`):** The model is a Graph Autoencoder with a Variational (VAE) component. Its loss function aims to reconstruct both the node features and the graph's adjacency matrix, while also learning a clustered latent space.
+              * **Constraint:** Maintain function signatures: `cal_spatial_weight`, `cal_gene_weight`, and `cal_weight_matrix`.
+              * **Constraint:** The `adata` object must be updated with `weights_matrix_all` and `weights_matrix_nomd` in `.obsm`.
+              * **Freedom:** You are encouraged to import `sklearn.decomposition.TruncatedSVD`, `scipy.special.softmax`, or `sklearn.preprocessing.minmax_scale`.
+              * **Freedom:** You may implement an automated 'elbow method' or heuristic to determine the optimal  or  dynamically based on the input coordinate distribution.
+              **Freedom:**You are free to rewrite the internal logic of these functions entirely.In addition to these guidelines, feel free to improvise."
 
-              ---
 
-              ### Potential Improvement Strategies
-
-              Focus your improvements on the three main preprocessor classes.
-
-              **1. Unify Graph and Feature Modalities (Holistic Change):**
-              *   **Problem:** The current decoupling of graph topology (spatial-only) from node features (multi-modal) is a major limitation. The GNN can only pass messages between immediate spatial neighbors, even if two distant spots are nearly identical in gene expression and morphology.
-              *   **Action:** **Create a true multi-modal neighborhood graph.** Instead of building the final graph in `EfNSTGraphTransform` using only spatial coordinates, build it from a **concatenated feature space**.
-                  1.  Create a unified feature vector for each spot: `[scaled_spatial_coords, PCA(augmented_expression), PCA(image_features)]`.
-                  2.  Use `sklearn.preprocessing.StandardScaler` on each modality's features before concatenation to ensure they contribute fairly to the distance metric.
-                  3.  Build a single k-NN graph on this rich, multi-modal feature space. This will create a more biologically relevant graph where edges connect spots that are similar across all available data types, allowing the GNN to learn more powerful representations.
-
-              **2. Optimize the Multi-Modal Weight Matrix (`EfNSTAugmentTransform`):**
-              *   **Problem:** The `cal_weight_matrix` function combines similarity matrices via element-wise multiplication (`*`). This acts like a logical 'AND', meaning a connection is strong only if it's strong in *all three* modalities (spatial, gene, image). This can be overly restrictive.
-              *   **Action:** Implement a more flexible fusion strategy. Replace the element-wise product with a **weighted sum**: `w1*A_physical + w2*A_gene + w3*A_morpho`. This acts like a logical 'OR', allowing a strong similarity in one modality to create a connection, even if others are weaker. This is generally more robust for integrating diverse biological data.
-              *   **Efficiency Bottleneck:** The function currently computes multiple dense N x N `pairwise_distances` matrices. The subsequent `find_adjacent_spot` then performs `argsort` on the full dense matrix, which is very inefficient for large N.
-              *   **Action:** Refactor the augmentation step to be sparse. Instead of creating dense matrices, use `sklearn.neighbors.kneighbors_graph` for each modality to get a sparse k-NN graph. The augmentation for a spot can then be based on the *union* of its neighbors from the physical, gene, and morphological graphs, avoiding the need for dense matrix computations entirely.
-
-              **3. Refine Image Feature Extraction (`EfNSTImageTransform`):**
-              *   **Problem:** The `Image_Feature.Extract_Image_Feature` method applies a long list of *random* data augmentations (`RandomAutocontrast`, `RandomAffine`, etc.) during what should be a deterministic feature extraction step. This means running the pipeline twice will yield different image features, harming reproducibility. Data augmentation is for *training* a model, not for inference/feature extraction.
-              *   **Action:** **Remove all random transforms** from the feature extraction pipeline. The only necessary steps are `transforms.Resize`, `transforms.ToTensor`, and `transforms.Normalize` (to match the pre-trained CNN's requirements). This ensures the feature extraction is fast and deterministic.
-              *   **Advanced Feature Enhancement:** Instead of an ImageNet-pretrained EfficientNet, suggest using a more specialized model. State-of-the-art results often come from using features from **self-supervised learning models pre-trained on histology images** (e.g., HIPT, C-Path, RetCCL).
-
-              **4. Code Simplification and Best Practices:**
-              *   **Problem:** The `graph` class is complex, with manual conversions from edge lists to dictionaries to NetworkX graphs to SciPy sparse matrices.
-              *   **Action:** Simplify this dramatically. Functions like **`sklearn.neighbors.kneighbors_graph`** can directly and efficiently create a `scipy.sparse` adjacency matrix from a feature matrix. This can replace the majority of the `graph.main` method's logic with a single function call.
-              *   **Problem:** The `cal_weight_matrix` contains inefficient loops and redundant calculations for creating sparse matrices from neighbor lists.
-              *   **Action:** Refactor the `NearestNeighbors` usage to directly construct a `csr_matrix`, which is a standard and efficient pattern (as seen in the function's own code).
-
-              **Constraints:**
-              Do not change the `EfNsSTRunner` class, the main training loop, or the final evaluation output format. Your modifications must be confined to the data preprocessing and graph construction classes to produce more meaningful inputs for the GNN.
-              "
-  
   include_artifacts: true
-  max_artifact_bytes: 32768
+  max_artifact_bytes: 3276800
   artifact_security_filter: true
 
 # Database configuration
@@ -94,9 +86,9 @@ database:
 # Evaluator configuration
 evaluator:
   timeout: 600000
-  cascade_thresholds: [0.3]
-  parallel_evaluations: 3
+  cascade_thresholds: [0.01]
+  parallel_evaluations: 1
 
 # Evolution settings
 diff_based_evolution: true
-max_code_length: 20000
+max_code_length: 20000000000
