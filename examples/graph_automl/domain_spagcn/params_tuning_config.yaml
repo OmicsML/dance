@@ -1,0 +1,40 @@
+---
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: filter.gene
+    target: FilterGenesMatch
+    params:
+      prefixes: ["ERCC", "MT-"]
+  - type: normalize
+    target: NormalizeTotalLog1P
+    params:
+      target_sum: 10000
+  - type: graph.spatial
+    target: SpaGCNGraph
+    params_to_tune:
+      alpha: 
+        values: [1,2,2.5]
+      beta:
+        values: [40,49,60]
+  - type: graph.spatial
+    target: SpaGCNGraph2D
+  - type: feature.cell
+    target: CellPCA
+    params:
+      n_components: 50
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        label_channel: label
+        label_channel_type: obs
+        feature_channel: [CellPCA, SpaGCNGraph, SpaGCNGraph2D]
+        feature_channel_type: [obsm, obsp, obsp]
+wandb:
+  entity: xzy11632
+  project: dance-dev
+  method: grid  # try grid to provide a comprehensive search
+  metric:
+    name: combined_score
+    goal: maximize

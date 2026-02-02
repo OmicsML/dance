@@ -1,20 +1,26 @@
 # Configuration for function minimization example
-max_iterations: 50 #50
+max_iterations: 20 #50
 checkpoint_interval: 5
 
-# LLM configuration
 llm:
-  primary_model: "deepseek-reasoner" #"deepseek-reasoner"
-  # primary_model: "llama3.1-8b"
-  primary_model_weight: 0.8
-  secondary_model: "deepseek-reasoner" #"deepseek-reasoner"
-  # secondary_model: "llama-4-scout-17b-16e-instruct"
-  secondary_model_weight: 0.2
-  api_base: "https://api.deepseek.com"
-  # api_base: "https://api.cerebras.ai/v1"
-  temperature: 0.7
-  max_tokens: 8192
-  timeout: 1200
+  models:
+    - name: "qwen3-coder-plus"
+      api_key: "sk-92265d8b2c044989b10ad59e3a27b56f"
+      api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      weight: 0.99
+      temperature: 0.5
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.85
+    - name: "qwen3-coder-flash"
+      api_key: "sk-92265d8b2c044989b10ad59e3a27b56f"
+      api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      weight: 0.01
+      temperature: 0.5
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.85
+
 
 # Prompt configuration
 prompt:
@@ -70,7 +76,7 @@ prompt:
 
                   **Constraints:**
                   Do not change the `ScDeepSort` class, the main training loop, the command-line arguments, or the final evaluation output format (i.e., the script must still print 'mean_score: ...'). Your modifications must be confined to the data preprocessing and graph construction classes.
-                  "
+                  **In addition to these guidelines, feel free to improvise."
   include_artifacts: true
   max_artifact_bytes: 32768
   artifact_security_filter: true
@@ -86,7 +92,7 @@ database:
 # Evaluator configuration
 evaluator:
   timeout: 600000
-  cascade_thresholds: [0.3]
+  cascade_thresholds: [0.01]
   parallel_evaluations: 1
 
 # Evolution settings

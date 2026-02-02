@@ -201,7 +201,7 @@ if __name__ == "__main__":
     parser.add_argument("--tissue", default="Spleen", type=str)
     parser.add_argument("--train_dataset", nargs="+", type=int, default=[1970], help="List of training dataset ids.")
     parser.add_argument("--weight_decay", type=float, default=5e-4, help="Weight for L2 loss")
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seed", type=int, default=202)
     parser.add_argument("--num_runs", type=int, default=1)
     parser.add_argument("--val_size", type=float, default=0.0, help="val size")
     args = parser.parse_args()

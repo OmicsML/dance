@@ -114,8 +114,9 @@ class StLouvain(BaseClusteringMethod):
 
     """
 
-    def __init__(self, resolution: float = 1):
+    def __init__(self, resolution: float = 1,random_state=None):
         self.model = Louvain(resolution)
+        self.random_state=random_state
 
     @staticmethod
     def preprocessing_pipeline(morph_feat_dim: int = 50, sme_feat_dim: int = 50, pca_feat_dim: int = 10,
@@ -140,7 +141,7 @@ class StLouvain(BaseClusteringMethod):
             log_level=log_level,
         )
 
-    def fit(self, adj, partition=None, weight="weight", randomize=None, random_state=None):
+    def fit(self, adj, partition=None, weight="weight", randomize=None):
         """Fit function for model training.
 
         Parameters
@@ -163,7 +164,7 @@ class StLouvain(BaseClusteringMethod):
             :func:`numpy.random`.
 
         """
-        self.model.fit(adj, partition, weight, randomize, random_state)
+        self.model.fit(adj, partition, weight, randomize, self.random_state)
 
     def predict(self, x=None):
         """Prediction function."""

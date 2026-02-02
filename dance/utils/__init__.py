@@ -18,7 +18,7 @@ from dance.typing import Any, FileExistHandle, Optional, PathLike
 
 def get_device(device: str) -> str:
     if device == "auto":
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = "cuda:1" if torch.cuda.is_available() else "cpu"
     return device
 
 
@@ -134,3 +134,11 @@ def spilt_web(url: str):
     else:
         print(url)
         print("No match found")
+
+
+import scanpy as sc
+def sub_data(adata, n_cells=10000, random_state=42):
+    if adata.n_obs > n_cells:
+        sc.pp.subsample(adata, n_obs=n_cells, random_state=random_state, copy=False)
+        print(f"已随机抽取 {n_cells} 个细胞")
+        

@@ -1,6 +1,7 @@
 import argparse
 from typing import Optional
 
+from dance.transforms.filter import FilterGenesMatch
 import numpy as np
 import scanpy as sc
 
@@ -13,7 +14,7 @@ from dance.transforms.graph.neighbor_graph import NeighborGraph
 from dance.transforms.interface import AnnDataTransform
 from dance.transforms.misc import Compose, SetConfig
 from dance.typing import LogLevel
-from dance.utils import set_seed
+from dance.utils import set_seed,sub_data
 from dance.utils.metrics import calculate_unified_scores, resolve_score_func
 
 # EVOLVE-BLOCK-START
@@ -73,7 +74,7 @@ class NeighborGraph(BaseTransform):
 def get_preprocessing_pipeline(dim: int = 50, n_neighbors: int = 17, log_level: LogLevel = "INFO",
                             save_info: bool = False):
     return Compose(
-        FilterGenesMatch(prefixes=["ERCC", "MT-"]),  # pyright: ignore[reportUndefinedVariable]
+        FilterGenesMatch(prefixes=["ERCC", "MT-"]),  
         AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
         AnnDataTransform(sc.pp.log1p),
         CellPCA(n_components=dim, save_info=save_info),
@@ -109,7 +110,9 @@ if __name__ == "__main__":
 
         # Load data and perform necessary preprocessing
         dataloader = SpatialLIBDDataset(data_id=args.sample_number)
-        data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
+        data = dataloader.load_data(transform=None, cache=args.cache)
+        sub_data(data.data)
+        preprocessing_pipeline(data)
         (x,adj), y = data.get_data(return_type="default")
 
         # Train and evaluate model

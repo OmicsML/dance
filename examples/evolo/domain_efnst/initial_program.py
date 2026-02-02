@@ -49,7 +49,7 @@ from dance.transforms.filter import (
     HighlyVariableGenesLogarithmizedByTopGenes,
 )
 from dance.transforms.misc import Compose, SetConfig
-from dance.utils import set_seed
+from dance.utils import set_seed,sub_data
 from dance.utils.metrics import calculate_unified_scores, resolve_score_func
 from torch_sparse import SparseTensor
 """Created on Tue Jan 23 18:54:08 2024.
@@ -83,7 +83,6 @@ except ImportError:
 
 
 
-# EVOLVE-BLOCK-START
 class SpatialImageDataset(Dataset):
 
     def __init__(self, paths, transform=None):
@@ -111,7 +110,7 @@ def extract_features_batch(adata, model, device, batch_size=64, num_workers=4):
     Args:
         adata (anndata.AnnData): AnnData object with 'slices_path' in obs.
         model (torch.nn.Module): The pre-trained PyTorch model.
-        device (torch.device): The device to run the model on (e.g., torch.device('cuda')).
+        device (torch.device or str): The device to run the model on (e.g., torch.device('cuda'), 'cuda', 'cpu').
         batch_size (int): Number of images to process in one batch.
         num_workers (int): Number of CPU workers for loading data in parallel.
 
@@ -178,8 +177,14 @@ class Image_Feature:
         cnnType='efficientnet-b0',
         verbose=False,
         seeds=88,
+        device=None,
     ):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if device is None:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        elif isinstance(device, str):
+            self.device = torch.device(device)
+        else:
+            self.device = device
         self.adata = adata
         self.pca_components = pca_components
         self.verbose = verbose
@@ -368,33 +373,35 @@ class graph:
         return graph_dict
 
 
-
 @register_preprocessor("misc",overwrite=True)
 class EfNSTImageTransform(BaseTransform):
 
-    def __init__(self, data_name, cnnType='efficientnet-b0', pca_n_comps=200, save_path="./", verbose=False,
-                 crop_size=50, target_size=224, **kwargs):
-        self.data_name = data_name
+    def __init__(self, cnnType='efficientnet-b0', pca_n_comps=200, save_path="./", verbose=False,
+                 crop_size=50, target_size=224, device=None, **kwargs):
         self.verbose = verbose
         self.save_path = save_path
         self.pca_n_comps = pca_n_comps
         self.cnnType = cnnType
         self.crop_size = crop_size
         self.target_size = target_size
+        self.device = device
         super().__init__(**kwargs)
 
     def __call__(self, data: Data) -> Data:
         adata = data.data
+        self.data_name=adata.uns['data_name']
         save_path_image_crop = Path(os.path.join(self.save_path, 'Image_crop', f'{self.data_name}'))
         save_path_image_crop.mkdir(parents=True, exist_ok=True)
         adata = image_crop(adata, save_path=save_path_image_crop, quality='fulres', crop_size=self.crop_size,
                            target_size=self.target_size)
-        adata = Image_Feature(adata, pca_components=self.pca_n_comps, cnnType=self.cnnType).Extract_Image_Feature()
+        adata = Image_Feature(adata, pca_components=self.pca_n_comps, cnnType=self.cnnType, device=self.device).Extract_Image_Feature()
         if self.verbose:
             save_data_path = Path(os.path.join(self.save_path, f'{self.data_name}'))
             save_data_path.mkdir(parents=True, exist_ok=True)
             adata.write(os.path.join(save_data_path, f'{self.data_name}.h5ad'), compression="gzip")
         return data
+
+# EVOLVE-BLOCK-START
 def cal_spatial_weight(
     data,
     spatial_k=50,
@@ -417,8 +424,6 @@ def cal_spatial_weight(
         for j in ind:
             spatial_weight[i][j] = 1
     return spatial_weight
-
-
 def cal_gene_weight(data, n_components=50, gene_dist_type="cosine"):
 
     pca = PCA(n_components=n_components)
@@ -481,6 +486,8 @@ def cal_weight_matrix(adata, platform="Visium", pd_dist_type="euclidean", md_dis
     else:
         adata.obsm["weights_matrix_nomd"] = (gene_correlation * physical_distance)
     return adata
+# EVOLVE-BLOCK-END
+
 
 def find_adjacent_spot(adata, use_data="raw", neighbour_k=4, weights='weights_matrix_all', verbose=False):
     if use_data == "raw":
@@ -517,8 +524,6 @@ def find_adjacent_spot(adata, use_data="raw", neighbour_k=4, weights='weights_ma
     if verbose:
         adata.obsm['adjacent_weight'] = np.array(weights_list)
     return adata
-
-
 def augment_gene_data(adata, Adj_WT=0.2):
     adjacent_gene_matrix = adata.obsm["adjacent_data"].astype(float)
     if isinstance(adata.X, np.ndarray):
@@ -588,11 +593,11 @@ class EfNSTGraphTransform(BaseTransform):
         adata = data.data
         graph_dict = graph(adata.obsm['spatial'], distType=self.distType, k=self.k, rad_cutoff=self.rad_cutoff).main()
         adata.uns['EfNSTGraph'] = graph_dict
-# EVOLVE-BLOCK-END
-def get_preprocessing_pipeline(data_name, verbose=False, cnnType='efficientnet-b0', pca_n_comps=200, distType="KDTree",
-                               k=12, dim_reduction=True, min_cells=3, platform="Visium"):
+
+def get_preprocessing_pipeline(verbose=False, cnnType='efficientnet-b0', pca_n_comps=200, distType="KDTree",
+                               k=12, dim_reduction=True, min_cells=3, platform="Visium", device=None):
         return Compose(
-            EfNSTImageTransform(data_name=data_name, verbose=verbose, cnnType=cnnType),
+            EfNSTImageTransform(verbose=verbose, cnnType=cnnType, device=device),
             EfNSTAugmentTransform(),
             EfNSTGraphTransform(distType=distType, k=k),
             EfNSTConcatgTransform(dim_reduction=dim_reduction, min_cells=min_cells, platform=platform,
@@ -624,6 +629,7 @@ if __name__ == "__main__":
     parser.add_argument("--no_dim_reduction", action="store_true", help="Print detailed information.")
     parser.add_argument("--min_cells", type=int, default=3, help="Minimum number of cells.")
     parser.add_argument("--platform", type=str, default="Visium", help="Platform type.")
+    parser.add_argument("--device", type=str, default=None, help="Device to use (e.g., 'cuda', 'cpu', 'cuda:0').")
     args = parser.parse_args()
 
     scores = []
@@ -640,10 +646,12 @@ if __name__ == "__main__":
                 random_state=seed)
             dataloader = SpatialLIBDDataset(data_id=args.sample_number)
             data = dataloader.load_data(transform=None, cache=args.cache)
+            sub_data(data.data)
+            data.data.uns['data_name']=args.sample_number
             preprocessing_pipeline = get_preprocessing_pipeline(
-                data_name=args.sample_number, verbose=args.verbose, cnnType=args.cnnType, pca_n_comps=args.pca_n_comps,
+                verbose=args.verbose, cnnType=args.cnnType, pca_n_comps=args.pca_n_comps,
                 distType=args.distType, k=args.k, dim_reduction=not args.no_dim_reduction, min_cells=args.min_cells,
-                platform=args.platform)
+                platform=args.platform, device=args.device)
             preprocessing_pipeline(data)
             (x, adj), y = data.get_data()
             adata = data.data
@@ -660,7 +668,9 @@ if __name__ == "__main__":
                 "davies_bouldin": davies_bouldin_score(x, y_pred)
             }))
         finally:
-            EfNST.delete_imgs(adata)
+            
+            if "adata" in locals():
+                EfNST.delete_imgs(adata)
         score = adjusted_rand_score(y, y_pred)
         scores.append(score)
         print(f"ARI: {score:.4f}")

@@ -1,0 +1,527 @@
+"""Reimplementation of the scDeepSort cell-type annotation method.
+
+Reference
+---------
+Shao, Xin, et al. "scDeepSort: a pre-trained cell-type annotation method for single-cell transcriptomics using deep
+learning with a weighted graph neural network." Nucleic acids research 49.21 (2021): e122-e122.
+
+"""
+import time
+from contextlib import nullcontext
+from copy import deepcopy
+from pathlib import Path
+
+import dgl
+import torch
+import torch.nn as nn
+from dgl.dataloading import DataLoader, NeighborSampler
+
+from dance.models.nn import AdaptiveSAGE
+from dance.modules.base import BaseClassificationMethod
+from dance.transforms import Compose, SetConfig
+from dance.transforms.graph import PCACellFeatureGraph
+from dance.typing import LogLevel, Optional
+
+
+class GNN(nn.Module):
+    """The scDeepSort GNN model.
+
+    Message passing between cell and genes to learn cell representations for cell-type annotations. The graph contains
+    both cell and gene nodes. The gene features are initialized as PCA embeddings from the (normalized) scRNA-seq
+    samples matrix, and the cell features are computed as the weighted aggregation of the gene features according to
+    each cell's gene expressions.
+
+    Parameters
+    ----------
+    dim_in
+        Input dimension (PCA embeddings dimension).
+    dim_out
+        Output dimension (number of unique cell labels).
+    n_layers
+        Number of convolution layers.
+    gene_num
+        Number of genes.
+    dropout
+        Dropout ratio.
+    activation
+        Activation layer.
+    norm
+        Normalization layer.
+
+    """
+
+    def __init__(
+        self,
+        dim_in: int,
+        dim_out: int,
+        dim_hid: int,
+        n_layers: int,
+        gene_num: int,
+        activation: Optional[nn.Module] = None,
+        norm: Optional[nn.Module] = None,
+        dropout: Optional[float] = 0.,
+    ):
+        super().__init__()
+
+        self.n_layers = n_layers
+        self.gene_num = gene_num
+
+        # [gene_num] is alpha of gene-gene self loop, [gene_num+1] is alpha of cell-cell self loop, the rest are betas
+        self.alpha = nn.Parameter(torch.tensor([1] * (self.gene_num + 2), dtype=torch.float32).unsqueeze(-1))
+
+        dropout_layer = nn.Dropout(p=dropout) if dropout > 0 else nn.Identity()
+        act_layer = activation or nn.Identity()
+        norm_layer = norm or nn.Identity()
+
+        self.layers = nn.ModuleList()
+        for i in range(n_layers):
+            input_dimension = dim_in if i == 0 else dim_hid
+            self.layers.append(AdaptiveSAGE(input_dimension, dim_hid, self.alpha, dropout_layer, act_layer, norm_layer))
+
+        self.linear = nn.Linear(dim_hid, dim_out)
+        nn.init.xavier_uniform_(self.linear.weight, gain=nn.init.calculate_gain("relu"))
+
+    def forward(self, blocks, x):
+        assert len(blocks) == len(self.layers), f"Inonsistent layer info: {len(blocks)=} vs {len(self.layers)=}"
+        for block, layer in zip(blocks, self.layers):
+            x = layer(block, x)
+        return self.linear(x)
+
+
+class ScDeepSort(BaseClassificationMethod):
+    """The ScDeepSort cell-type annotation model.
+
+    Parameters
+    ----------
+    dim_in
+        Input dimension, i.e., the number of PCA used for cell and gene features.
+    dim_hid
+        Hidden dimension.
+    num_layers
+        Number of convolution layers.
+    species
+        Species name (only used for determining the read/write path).
+    tissue
+        Tissue name (only used for determining the read/write path).
+    dropout
+        Drop-out rate.
+    batch_size
+        Batch size.
+    device
+        Computation device, e.g., 'cpu', 'cuda'.
+
+    """
+
+    def __init__(self, dim_in: int, dim_hid: int, num_layers: int, species: str, tissue: str, *, dropout: int = 0,
+                 batch_size: int = 500, device: str = "cpu"):
+        self.dense_dim = dim_in
+        self.hidden_dim = dim_hid
+        self.n_layers = num_layers
+        self.dropout = dropout
+        self.species = species
+        self.tissue = tissue
+        self.batch_size = batch_size
+        self.device = device
+
+        self.postfix = time.strftime("%d_%m_%Y") + "_" + time.strftime("%H:%M:%S")
+        self.prj_path = Path().resolve()
+        self.save_path = (self.prj_path / "saved_models" / "single_modality" / "cell_type_annotation" / "pretrained" /
+                          self.species / "models")
+
+        if not self.save_path.exists():
+            self.save_path.mkdir(parents=True)
+
+    @staticmethod
+    def preprocessing_pipeline(n_components: int = 400, log_level: LogLevel = "INFO"):
+        return Compose(
+            PCACellFeatureGraph(n_components=n_components, split_name="train"),
+            SetConfig({"label_channel": "cell_type"}),
+            log_level=log_level,
+        )
+
+    def fit(self, graph: dgl.DGLGraph, labels: torch.Tensor, epochs: int = 300, lr: float = 1e-3,
+            weight_decay: float = 0, val_ratio: float = 0.2):
+        """Train scDeepsort model.
+
+        Parameters
+        ----------
+        graph
+            Training graph.
+        labels
+            Node (cell, gene) labels, -1 for genes.
+        epochs
+            Number of epochs to train the model.
+        lr
+            Learning rate.
+        weight_decay
+            Weight decay regularization strength.
+        val_ratio
+            Ratio of the training data to hold out for validation.
+
+        """
+        gene_mask = graph.ndata["cell_id"] != -1
+        cell_mask = graph.ndata["cell_id"] == -1
+        num_genes = gene_mask.sum()
+        num_cells = cell_mask.sum()
+        self.num_labels = labels.max().item() + 1
+
+        perm = torch.randperm(num_cells) + num_genes
+        num_val = int(num_cells * val_ratio)
+        val_idx = perm[:num_val].to(self.device)
+        train_idx = perm[num_val:].to(self.device)
+
+        full_labels = -torch.ones(num_genes + num_cells, dtype=torch.long)
+        full_labels[-num_cells:] = labels
+        graph = graph.to(self.device)
+        graph.ndata["label"] = full_labels.to(self.device)
+
+        self.model = GNN(self.dense_dim, self.num_labels, self.hidden_dim, self.n_layers, num_genes,
+                         activation=nn.ReLU(), dropout=self.dropout).to(self.device)
+        print(self.model)
+
+        self.sampler = NeighborSampler(fanouts=[-1] * self.n_layers, edge_dir="in")
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
+        self.loss_fn = nn.CrossEntropyLoss(reduction="sum")
+
+        print(f"Train Number: {len(train_idx)}, Val Number: {len(val_idx)}")
+        max_val_acc, best_train_acc, best_epoch = 0, 0, 0
+        best_state_dict = None
+        for epoch in range(epochs):
+            loss = self.cal_loss(graph, train_idx)
+            train_acc = self.evaluate(graph, train_idx)[-1]
+            val_correct, val_unsure, val_acc = self.evaluate(graph, val_idx)
+            if val_acc >= max_val_acc:
+                max_val_acc = val_acc
+                best_train_acc = train_acc
+                best_epoch = epoch
+                best_state_dict = deepcopy(self.model.state_dict())
+                self.save_model()
+            print(f">>>>Epoch {epoch:04d}: Train Acc {train_acc:.4f}, Loss {loss / len(train_idx):.4f}, "
+                  f"Val correct {val_correct}, Val unsure {val_unsure}, Val Acc {val_acc:.4f}")
+
+        if best_state_dict is not None:
+            self.model.load_state_dict(best_state_dict)
+
+        print(f"---{self.species} {self.tissue} Best val result:---")
+        print(f"Epoch {best_epoch:04d}, Train Acc {best_train_acc:.4f}, Val Correct Num {val_correct}, "
+              f"Val Total Num {len(val_idx)}, Val Unsure Num {val_unsure}, "
+              f"Val Acc {val_correct / len(val_idx):.4f}")
+
+    def cal_loss(self, graph: dgl.DGLGraph, idx: torch.Tensor):
+        """Calculate loss.
+
+        Parameters
+        ----------
+        graph
+            Input cell-gene graph object.
+        idx
+            1-D tensor containing the indexes of the cell nodes to calculate the loss.
+
+        Returns
+        -------
+        float
+            Averaged loss over all batches.
+
+        """
+        self.model.train()
+        total_loss = total_size = 0
+
+        num_workers = 4 if self.device == "cpu" else 0
+        dataloader = DataLoader(graph=graph, indices=idx, graph_sampler=self.sampler, batch_size=self.batch_size,
+                                num_workers=num_workers, shuffle=True)
+        with dataloader.enable_cpu_affinity() if self.device == "cpu" else nullcontext():
+            for _, _, blocks in dataloader:
+                blocks = [b.to(self.device) for b in blocks]
+                input_features = blocks[0].srcdata["features"]
+                output_labels = blocks[-1].dstdata["label"]
+                output_predictions = self.model(blocks, input_features)
+
+                loss = self.loss_fn(output_predictions, output_labels)
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+
+                total_size += (size := blocks[-1].num_dst_nodes())
+                total_loss += loss.item() * size
+
+        return total_loss / total_size
+
+    @torch.no_grad()
+    def evaluate(self, graph: dgl.DGLGraph, idx: torch.Tensor, unsure_rate: float = 2.0):
+        """Evaluate the model on certain cell nodes.
+
+        Parameters
+        ----------
+        idx
+            1-D tensor containing the indexes of the cell nodes to be evaluated.
+
+        Returns
+        -------
+        Tuple[int, int, float]
+            The total number of correct prediction, the total number of unsure prediction, and the accuracy score.
+
+        """
+        self.model.eval()
+        total_correct = total_unsure = 0
+
+        dataloader = DataLoader(graph=graph, indices=idx, graph_sampler=self.sampler, batch_size=self.batch_size,
+                                shuffle=True)
+        for _, _, blocks in dataloader:
+            blocks = [b.to(self.device) for b in blocks]
+            input_features = blocks[0].srcdata["features"]
+            output_labels = blocks[-1].dstdata["label"]
+            output_predictions = self.model(blocks, input_features)
+
+            for pred, label in zip(output_predictions.cpu(), output_labels.cpu()):
+                max_prob = pred.max().item()
+                if max_prob < unsure_rate / self.num_labels:
+                    total_unsure += 1
+                elif pred.argmax().item() == label:
+                    total_correct += 1
+
+        return total_correct, total_unsure, total_correct / len(idx)
+
+    def save_model(self):
+        """Save the model at the save_path."""
+        state = {"model": self.model.state_dict(), "optimizer": self.optimizer.state_dict()}
+        torch.save(state, self.save_path / f"{self.species}-{self.tissue}.pt")
+
+    def load_model(self):
+        """Load the model from the model path."""
+        filename = f"{self.species}-{self.tissue}.pt"
+        model_path = self.prj_path / "pretrained" / self.species / "models" / filename
+        state = torch.load(model_path, map_location=self.device)
+        self.model.load_state_dict(state["model"])
+
+    @torch.no_grad()
+    def predict_proba(self, graph: dgl.DGLGraph):
+        """Perform inference on a test dataset.
+
+        Parameters
+        ----------
+        graph
+            Input cell-gene graph to be predicted.
+
+        Returns
+        -------
+        np.ndarray
+            2-D array of predicted probabilities of the cell-types, where rows are cells and columns are cell-types.
+
+        """
+        self.model.eval()
+
+        cell_mask = graph.ndata["cell_id"] == -1
+        idx = torch.where(cell_mask)[0].to(self.device)
+        graph = graph.to(self.device)
+
+        logits = torch.zeros(graph.number_of_nodes(), self.num_labels)
+        dataloader = DataLoader(graph=graph, indices=idx, graph_sampler=self.sampler, batch_size=self.batch_size)
+        for _, output_nodes, blocks in dataloader:
+            blocks = [b.to(self.device) for b in blocks]
+            input_features = blocks[0].srcdata["features"]
+            logits[output_nodes] = self.model(blocks, input_features).detach().cpu()
+
+        pred_prob = nn.functional.softmax(logits[cell_mask], dim=-1).numpy()
+        return pred_prob
+
+    def predict(self, graph: dgl.DGLGraph, unsure_rate: float = 2.0, return_unsure: bool = False):
+        """Perform prediction on all test datasets.
+
+        Parameters
+        ----------
+        graph
+            Input cell-gene graph to be predicted.
+        unsure_rate
+            Threshold for uncertainty detection: predictions with maximum probability < unsure_rate / num_classes are marked uncertain.
+        return_unsure
+            If True, returns a boolean array indicating which predictions are uncertain.
+
+        Returns
+        -------
+        np.ndarray or tuple
+            Predicted cell types (and optional uncertainty indicator).
+
+        """
+        pred_prob = self.predict_proba(graph)
+        pred = pred_prob.argmax(1)
+        unsure = pred_prob.max(1) < unsure_rate / self.num_labels
+        return (pred, unsure) if return_unsure else pred
+
+
+The following is pseudocode generated based on the above algorithm:
+#Pseudocode-START
+### Algorithm 1: Graph Neural Network Forward Pass
+
+This procedure describes the data flow through the GNN model, specifically handling the message passing between gene and cell nodes using the AdaptiveSAGE layers.
+
+**algorithm** GNN_Forward
+    **input**: 
+        $\mathcal{B}$: A sequence of sampled graph blocks $\{B_1, B_2, \dots, B_L\}$ for message passing
+        $X$: Input feature matrix (PCA embeddings) for the source nodes in $B_1$
+        $\alpha$: Learnable weight vector for node self-loops (size $N_{genes} + 2$)
+        $\Theta$: Set of learnable parameters for the SAGE layers and the final Linear layer
+    **output**: 
+        $Z$: Logits matrix (unnormalized prediction scores)
+
+    **begin**
+        $H^{(0)} \leftarrow X$
+        
+        // Iteratively apply AdaptiveSAGE layers
+        // Note: The AdaptiveSAGE layer encapsulates aggregation, dropout, activation, and normalization
+        **for** $k \leftarrow 1$ **to** $L$ **do**
+            // Message passing using the graph structure in block B_k
+            $H_{agg} \leftarrow \text{AdaptiveSAGE\_Aggregate}(B_k, H^{(k-1)}, \alpha)$
+            
+            // Apply post-aggregation transformations
+            $H_{drop} \leftarrow \text{Dropout}(H_{agg})$
+            $H_{act} \leftarrow \text{ReLU}(H_{drop})$
+            $H^{(k)} \leftarrow \text{Normalize}(H_{act})$
+        **end for**
+
+        // Final linear projection to the number of cell types
+        $Z \leftarrow H^{(L)} \times W_{linear} + b_{linear}$
+        
+        **return** $Z$
+    **end**
+
+---
+
+### Algorithm 2: scDeepSort Training Procedure
+
+This procedure outlines the training lifecycle, including data splitting, mini-batch neighbor sampling, and the "save-best" mechanism based on validation accuracy.
+
+**algorithm** Train_scDeepSort
+    **input**:
+        $\mathcal{G} = (\mathcal{V}, \mathcal{E})$: Cell-Gene graph with node features
+        $Y$: Label vector for nodes ($Y_v = -1$ if $v \in \mathcal{V}_{gene}$, else cell type ID)
+        $E_{max}$: Maximum number of training epochs
+        $N_{batch}$: Batch size
+        $r_{val}$: Validation split ratio
+    **output**:
+        $\Theta^*, \alpha^*$: Optimized model parameters
+
+    **begin**
+        // 1. Initialization and Data Splitting
+        $\Theta, \alpha \leftarrow \text{InitializeWeights()}$
+        
+        // Separate cell nodes (labeled) from gene nodes (unlabeled/-1)
+        $\mathcal{I}_{cells} \leftarrow \{v \mid v \in \mathcal{V} \land Y_v \neq -1\}$
+        
+        // Randomly shuffle and split cell indices
+        $\mathcal{I}_{perm} \leftarrow \text{Permute}(\mathcal{I}_{cells})$
+        $N_{val} \leftarrow |\mathcal{I}_{cells}| \times r_{val}$
+        $\mathcal{I}_{val} \leftarrow \mathcal{I}_{perm}[0 \dots N_{val}]$
+        $\mathcal{I}_{train} \leftarrow \mathcal{I}_{perm}[N_{val} \dots \text{end}]$
+        
+        $Acc_{best} \leftarrow 0$
+        $\Theta^*, \alpha^* \leftarrow \Theta, \alpha$
+        $\mathcal{S} \leftarrow \text{NeighborSampler}(\text{fanouts}=[-1] \times L)$
+
+        // 2. Main Training Loop
+        **for** $epoch \leftarrow 1$ **to** $E_{max}$ **do**
+            
+            // Phase 2.1: Training (Mini-batch)
+            $L_{total} \leftarrow 0$
+            $\mathcal{D}_{train} \leftarrow \text{DataLoader}(\mathcal{G}, \mathcal{I}_{train}, \mathcal{S}, \text{batch\_size}=N_{batch}, \text{shuffle}=\textbf{true})$
+            
+            **for each** $(\text{src\_nodes}, \text{dst\_nodes}, \mathcal{B})$ **in** $\mathcal{D}_{train}$ **do**
+                $X_{batch} \leftarrow \mathcal{G}.\text{features}[\text{src\_nodes}]$
+                $Y_{batch} \leftarrow Y[\text{dst\_nodes}]$
+                
+                // Forward pass
+                $Z_{batch} \leftarrow \text{GNN\_Forward}(\mathcal{B}, X_{batch}, \alpha, \Theta)$
+                
+                // Calculate Loss (CrossEntropy)
+                $\mathcal{L} \leftarrow \text{CrossEntropyLoss}(Z_{batch}, Y_{batch})$
+                
+                // Optimization step
+                Compute gradients $\nabla_{\Theta}, \nabla_{\alpha}$ w.r.t. $\mathcal{L}$
+                $\Theta \leftarrow \Theta - \eta \cdot \nabla_{\Theta}$
+                $\alpha \leftarrow \alpha - \eta \cdot \nabla_{\alpha}$
+            **end for**
+
+            // Phase 2.2: Validation
+            $Correct \leftarrow 0$
+            $\mathcal{D}_{val} \leftarrow \text{DataLoader}(\mathcal{G}, \mathcal{I}_{val}, \mathcal{S}, \text{batch\_size}=N_{batch})$
+            
+            **for each** $(\dots, \text{dst\_nodes}, \mathcal{B})$ **in** $\mathcal{D}_{val}$ **do**
+                $Z_{val} \leftarrow \text{GNN\_Forward}(\mathcal{B}, \dots)$
+                $Pred_{val} \leftarrow \arg\max(Z_{val}, \text{axis}=1)$
+                $Correct \leftarrow Correct + \text{CountMatch}(Pred_{val}, Y[\text{dst\_nodes}])$
+            **end for**
+            
+            $Acc_{val} \leftarrow Correct / |\mathcal{I}_{val}|$
+            
+            // Phase 2.3: Checkpointing
+            **if** $Acc_{val} \geq Acc_{best}$ **then**
+                $Acc_{best} \leftarrow Acc_{val}$
+                $\Theta^*, \alpha^* \leftarrow \text{DeepCopy}(\Theta, \alpha)$
+                $\text{SaveModel}(\Theta^*, \alpha^*)$
+            **end if**
+            
+            $\text{Print}(\text{"Epoch: "}, epoch, \text{" Val Acc: "}, Acc_{val})$
+        **end for**
+        
+        **return** $\Theta^*, \alpha^*$
+    **end**
+
+---
+
+### Algorithm 3: Inference and Uncertainty Estimation
+
+This procedure describes how the model predicts cell types for test data and determines if a prediction is "unsure" based on a probability threshold.
+
+**algorithm** Predict_Proba_and_Unsure
+    **input**:
+        $\mathcal{G}_{test}$: Input graph for testing
+        $\Theta^*, \alpha^*$: Trained model parameters
+        $\tau$: Unsure rate threshold scalar (default 2.0)
+        $K$: Total number of unique cell types (labels)
+    **output**:
+        $P$: Array of predicted labels
+        $U$: Boolean array indicating uncertainty (True if unsure)
+
+    **begin**
+        // Identify all cell nodes (masking gene nodes)
+        $\mathcal{I}_{test} \leftarrow \{v \mid v \in \mathcal{V} \land \mathcal{G}_{test}.\text{is\_cell}[v] = \textbf{true}\}$
+        
+        $P \leftarrow \text{Array}(\text{size}=|\mathcal{I}_{test}|)$
+        $U \leftarrow \text{Array}(\text{size}=|\mathcal{I}_{test}|)$
+        
+        // Calculate the probability threshold
+        $\delta_{threshold} \leftarrow \tau / K$
+
+        // Inference Loop (Batched)
+        $\mathcal{S} \leftarrow \text{NeighborSampler}(\text{fanouts}=[-1] \times L)$
+        $\mathcal{D}_{test} \leftarrow \text{DataLoader}(\mathcal{G}_{test}, \mathcal{I}_{test}, \mathcal{S}, \text{batch\_size}=N_{batch})$
+        
+        **for each** $(\text{src}, \text{dst}, \mathcal{B})$ **in** $\mathcal{D}_{test}$ **do**
+            $X_{batch} \leftarrow \mathcal{G}_{test}.\text{features}[\text{src}]$
+            
+            // 1. Get raw logits
+            $Z_{batch} \leftarrow \text{GNN\_Forward}(\mathcal{B}, X_{batch}, \alpha^*, \Theta^*)$
+            
+            // 2. Compute Probabilities via Softmax
+            $Prob_{batch} \leftarrow \text{Softmax}(Z_{batch}, \text{axis}=1)$
+            
+            // 3. Determine labels and uncertainty
+            **for** $i \leftarrow 0$ **to** $\text{Length}(\text{dst}) - 1$ **do**
+                $p_{max} \leftarrow \max(Prob_{batch}[i])$
+                $label \leftarrow \arg\max(Prob_{batch}[i])$
+                
+                // Map local batch index back to global graph index
+                $node\_idx \leftarrow \text{dst}[i]$
+                $P[node\_idx] \leftarrow label$
+                
+                **if** $p_{max} < \delta_{threshold}$ **then**
+                    $U[node\_idx] \leftarrow \textbf{true}$
+                **else**
+                    $U[node\_idx] \leftarrow \textbf{false}$
+                **end if**
+            **end for**
+        **end for**
+
+        **return** $P, U$
+    **end**
+
+#Pseudocode-END

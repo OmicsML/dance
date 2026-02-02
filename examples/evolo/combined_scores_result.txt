@@ -1,0 +1,51 @@
+组合得分结果 (均值*0.8 + 0.2*avg_speed_score):
+- domain_spagra:
+  * 均值: 0.184617
+  * avg_speed_score: 0.747364
+  * 组合得分: 0.297166
+  * score数量: 6
+- domain_spagcn:
+  * 均值: 0.294945
+  * avg_speed_score: 0.425322
+  * 组合得分: 0.321020
+  * score数量: 6
+- cta_graphcs:
+  * 均值: 0.710522
+  * avg_speed_score: 0.416286
+  * 组合得分: 0.651675
+  * score数量: 4
+- domain_stagate:
+  * 均值: 0.414627
+  * avg_speed_score: 0.705460
+  * 组合得分: 0.472793
+  * score数量: 6
+- cta_scgat:
+  * 均值: 0.734212
+  * avg_speed_score: 0.517478
+  * 组合得分: 0.690866
+  * score数量: 4
+- cta_scheteronet:
+  * 均值: 0.730468
+  * avg_speed_score: 0.520363
+  * 组合得分: 0.688447
+  * score数量: 4
+- cta_scdeepsort:
+  * 均值: 0.714370
+  * avg_speed_score: 0.211672
+  * 组合得分: 0.613830
+  * score数量: 4
+- domain_louvain:
+  * 均值: 0.345657
+  * avg_speed_score: 0.815975
+  * 组合得分: 0.439720
+  * score数量: 6
+- cta_scrgcl:
+  * 均值: 0.563300
+  * avg_speed_score: 0.292086
+  * 组合得分: 0.509057
+  * score数量: 5
+- domain_stlearn:
+  * 均值: 0.206993
+  * avg_speed_score: 0.470631
+  * 组合得分: 0.259721
+  * score数量: 6

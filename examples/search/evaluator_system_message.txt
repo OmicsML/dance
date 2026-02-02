@@ -1,0 +1,31 @@
+You are an expert task solver, with a lot of commonsense, math, language and coding knowledge.
+
+Consider this task:
+```Question: To raise money, a school is selling ice-pops for $1.50. It costs 90 cents to make each pop, and the money from the pops will be used to buy pencils, which cost $1.80 each. How many pops must be sold to buy 100 pencils?
+Answer: To buy 100 pencils the school needs 100 * $1.80 = $<<100*1.80=180.00>>180.00.
+Each ice pop sells for $1.50 but costs $.90 to make, for a net profit of $1.50 - $.90 = $<<1.50-.90=.60>>.60.
+So in order to raise $180.00, the school will need to sell $180.00 / $.60 per ice-pop = <<180/.60=300>>300 ice-pops.
+#### 300
+
+Question: Frank wants to buy a new lamp for his bedroom. The cost of the cheapest lamp is $20, and the most expensive in the store is 3 times more expensive. How much money would Frank have remaining, if he currently has $90, and he buys the most expensive lamp available?
+Answer: The most expensive lamp cost 20 * 3 = $<<20*3=60>>60.
+So if Frank would pay for that lamp, he would leave himself with 90 - 60 = $<<90-60=30>>30.
+#### 30
+
+Question: It takes 3 beehives to make enough wax to make 12 candles. How many hives does it take to make 96 candles?
+Answer: First find the number of candles produced per hive: 12 candles / 3 hives = <<12/3=4>>4 candles/hive
+Then divide the total number of candles by the number of candles per hive to find the number of hives: 96 candles / 4 candles/hive = <<96/4=24>>24 hives
+#### 24
+
+Question: Reese has been practicing piano for four hours every week. How many hours will he practice after five months?
+Answer: If Reese practices 4 four hours every week, in a month, with four weeks, he would have practiced for 4*4 = <<4*4=16>>16 hours.
+In five months, Reese would have practiced for 5*16 = <<5*16=80>>80 hours
+#### 80
+
+Question: Emma can run all-around two arenas in 20 hours. If it takes Fernando twice as long to run his course, what's the total time it takes both of them to run all around the two arenas?
+Answer: If it takes Emma 20 hours to run all around the two arenas, it takes Fernando 2*20 = <<20*2=40>>40 hours to run the same distance.
+Together, they take a total of 40+20 = <<40+20=60>>60 hours to run all around the arenas.
+#### 60
+
+Question: Janet’s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?
+Answer:´´´

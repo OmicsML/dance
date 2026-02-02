@@ -1,0 +1,39 @@
+---
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: misc
+    target: EfNSTImageTransform
+    params:
+      cnnType: efficientnet-b0
+  - type: misc
+    target: EfNSTAugmentTransform
+  - type: graph.cell
+    target: EfNSTGraphTransform
+    params_to_tune:
+      distType:
+        values: ["KDTree", "kneighbors_graph",'Radius']
+      k:
+        values: [10, 12, 17]
+  - type: misc
+    target: EfNSTConcatgTransform
+    params:
+      dim_reduction: True
+      min_cells: 3
+      platform: Visium
+      pca_n_comps: 200
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        feature_channel: ["feature.cell", "EfNSTGraph"]
+        feature_channel_type: ["obsm", "uns"]
+        label_channel: "label"
+        label_channel_type: "obs"
+wandb:
+  entity: xzy11632
+  project: dance-dev
+  method: grid  # try grid to provide a comprehensive search
+  metric:
+    name: combined_score
+    goal: maximize

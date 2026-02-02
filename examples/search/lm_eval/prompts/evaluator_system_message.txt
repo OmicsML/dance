@@ -1,0 +1,36 @@
+You are an expert task solver, with a lot of commonsense, math, language and coding knowledge.
+
+Consider this task:
+```Question: Grant decided to sell his baseball gear since he was now playing football.  He sold his baseball cards for $25.  He got $10 for his baseball bat and agreed to sell his $30 baseball glove at 20% off.  He also sold both pair of his baseball cleats for $10 each.  How much money did Grant make?
+Answer: The baseball glove was originally $30 and he agreed to take 20% off so 30*.20 = $<<30*.20=6.00>>6.00 off
+If you take the price of the glove and subtract the discount then $30-$6 = $<<30-6=24.00>>24.00
+He sold 2 pair of shoes for $10 each so 2*$10 = $<<2*10=20.00>>20.00
+He got $25 for the cards, $10 for the bat, $24.00 for the glove and $20 for the shoes so he made $25+$10+$24+$20 = $<<25+10+24+20=79.00>>79.00
+#### 79
+
+Question: On Tuesday, a fruit vendor sold 2.5 dozen lemons and 5 dozens avocados. What is the total number of fruits that the fruit vendor sold?
+Answer: Since 1 dozen is equal to 12, then the vendor sold 2.5 x 12 = <<2.5*12=30>>30 lemons.
+While he sold 5 x 12 = <<5*12=60>>60 avocados.
+So, the fruit vendor sold a total of 30 + 60 = <<30+60=90>>90 fruits.
+#### 90
+
+Question: At the Taylor family reunion, there were 45 kids and 123 adults. When they sat down to eat, there were 14 tables. How many people sat at each table?
+Answer: There were 45 kids + 123 adults = <<45+123=168>>168 people at the reunion.
+All the people sat at 14 tables, so 168 people / 14 tables = <<168/14=12>>12 people per table.
+#### 12
+
+Question: Krista started raising chickens. She has 10 hens who lay eggs. She sells the eggs for $3 a dozen. In four weeks, she sold $120 worth of eggs. If she sold all the eggs her hens laid, how many eggs does each hen lay a week?
+Answer: At $3 a dozen, Krista sold $120 / $3 = <<120/3=40>>40 dozen eggs.
+If 10 hens laid 40 dozen eggs in 4 weeks, that means 40 dozen eggs / 10 hens = <<40/10=4>>4 dozen eggs were laid by each hen in four weeks.
+To find out how many eggs each hen laid in a week, 4 dozen eggs / 4 weeks = <<4/4=1>>1 dozen eggs each week.
+Since a dozen has 12 eggs, each hen lays 12*1 = <<12*1=12>>12 eggs each week.
+#### 12
+
+Question: Olaf is sailing across the ocean with 25 men, including himself. He needs 1/2 a gallon of water per day per man. The boat can go 200 miles per day and he needs to travel 4,000 miles. How many gallons of water does he need?
+Answer: He needs 12.5 gallons per day because 25 x .5 = <<25*.5=12.5>>12.5
+It will take 20 days of travel because 4,000 / 200 = <<4000/200=20>>20
+He will need 250 gallons of water because 20 x 12.5 = <<20*12.5=250>>250
+#### 250
+
+Question: Janet’s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?
+Answer:´´´

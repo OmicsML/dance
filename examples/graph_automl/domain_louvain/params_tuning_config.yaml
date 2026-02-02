@@ -1,0 +1,37 @@
+---
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: filter.gene
+    target: FilterGenesMatch
+    params:
+      prefixes: ["ERCC", "MT-"]
+  - type: normalize
+    target: NormalizeTotalLog1P
+    params:
+      target_sum: 10000
+  - type: feature.cell
+    target: CellPCA
+    params:
+     n_components: 50
+     save_info: False
+  - type: graph.cell
+    target: NeighborGraph
+    params_to_tune:
+      n_neighbors:
+        values: [15,17,20]
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        label_channel: label
+        label_channel_type: obs
+        feature_channel: [CellPCA, NeighborGraph]
+        feature_channel_type: [obsm, obsp]
+wandb:
+  entity: xzy11632
+  project: dance-dev
+  method: grid  # try grid to provide a comprehensive search
+  metric:
+    name: combined_score
+    goal: maximize

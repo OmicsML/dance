@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import scipy
+from scipy import stats
 import scipy.sparse as sp
 from scipy.stats import median_abs_deviation, rankdata
 from sklearn.linear_model import LinearRegression
@@ -19,7 +20,7 @@ from dance.exceptions import DevError
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.transforms.interface import AnnDataTransform
-from dance.typing import Dict, GeneSummaryMode, List, Literal, Logger, Optional, Tuple, Union
+from dance.typing import Dict, GeneSummaryMode, List, Literal, LogLevel, Logger, Optional, Tuple, Union
 from dance.utils import default
 from dance.utils.status import deprecated
 from dance.utils.wrappers import add_mod_and_transform
@@ -224,6 +225,48 @@ class FilterCellsScanpy(FilterScanpy):
             **kwargs,
         )
 
+@register_preprocessor("filter", "gene")
+@add_mod_and_transform
+class PrefilterGenes(BaseTransform):
+    """Filter genes based on various criteria.
+
+    Parameters
+    ----------
+    min_counts : int, optional
+        Minimum number of counts required for a gene to pass filtering.
+    max_counts : int, optional
+        Maximum number of counts allowed for a gene to pass filtering.
+    min_cells : int, optional
+        Minimum number of cells required for a gene to pass filtering. Default is 10.
+    max_cells : int, optional
+        Maximum number of cells allowed for a gene to pass filtering.
+    """
+
+    _DISPLAY_ATTRS = ("min_counts", "max_counts", "min_cells", "max_cells")
+
+    def __init__(self, min_counts=None, max_counts=None, min_cells=10, max_cells=None,
+                 out=None, log_level="WARNING"):
+        super().__init__(out=out, log_level=log_level)
+        self.min_counts = min_counts
+        self.max_counts = max_counts
+        self.min_cells = min_cells
+        self.max_cells = max_cells
+
+        if min_cells is None and min_counts is None and max_cells is None and max_counts is None:
+            raise ValueError('Provide one of min_counts, min_cells, max_counts or max_cells.')
+
+    def __call__(self, data):
+        """Filter genes based on specified criteria."""
+        adata = data.data
+
+        id_tmp = np.asarray([True] * adata.shape[1], dtype=bool)
+        id_tmp = np.logical_and(id_tmp, sc.pp.filter_genes(adata.X, min_cells=self.min_cells)[0]) if self.min_cells is not None else id_tmp
+        id_tmp = np.logical_and(id_tmp, sc.pp.filter_genes(adata.X, max_cells=self.max_cells)[0]) if self.max_cells is not None else id_tmp
+        id_tmp = np.logical_and(id_tmp, sc.pp.filter_genes(adata.X, min_counts=self.min_counts)[0]) if self.min_counts is not None else id_tmp
+        id_tmp = np.logical_and(id_tmp, sc.pp.filter_genes(adata.X, max_counts=self.max_counts)[0]) if self.max_counts is not None else id_tmp
+        adata._inplace_subset_var(id_tmp)
+
+        return data
 
 @register_preprocessor("filter", "gene")
 class FilterGenesScanpy(FilterScanpy):
@@ -1578,4 +1621,85 @@ class ScrubletTransform(BaseTransform):
         data.filter_by_mask(mask)
         adata = data.data
         self.logger.info(f"Number of cells after filtering: {adata.n_obs}")
+        return data
+
+
+@register_preprocessor("filter", "gene")
+@add_mod_and_transform
+class SupervisedFeatureSelection(BaseTransform):
+    """
+    Supervised feature selection transform using One-way ANOVA.
+    
+    This strictly replicates the logic of the original R function `select_feature`:
+    1. Performs ANOVA (f_oneway) for each gene across cell types.
+    2. Sorts genes by P-value (ascending).
+    3. Selects the top n_features.
+    
+    Features:
+    - Supports data wrapper (accessing data.data).
+    - Performs IN-PLACE subsetting.
+    """
+
+    _DISPLAY_ATTRS: Tuple[str] = ("label_col", "n_features")
+
+    def __init__(
+        self, 
+        label_col: str = 'cell_type', 
+        n_features: int = 2000, 
+        split_name: Optional[str] = None,
+        out: Optional[str] = None, 
+        log_level: LogLevel = "WARNING"
+    ):
+        super().__init__(out=out, log_level=log_level)
+        self.label_col = label_col
+        self.n_features = n_features
+        self.split_name = split_name
+    def __call__(self, data: Data) -> Data:
+        # 1. 解包：处理 data.data 的情况
+        adata = getattr(data, "data", data)
+        if self.split_name is not None:
+            split_idx = data.get_split_idx(self.split_name)
+            split_adata = adata[split_idx]
+        self.logger.info(f"Starting ANOVA feature selection based on '{self.label_col}'...")
+
+        # 检查标签是在 obs 中还是在 obsm 中
+        if self.label_col in adata.obs:
+            # 原始逻辑：标签在 obs 中
+            groups = split_adata.obs[self.label_col]
+        elif self.label_col in adata.obsm:
+            # 新逻辑：标签在 obsm 中，是概率矩阵
+            prob_matrix = split_adata.obsm[self.label_col]
+            # 将每个样本分配给概率最高的类别
+            groups = prob_matrix.idxmax(axis=1)
+        else:
+            raise ValueError(f"Column '{self.label_col}' not found in data.obs or data.obsm.")
+
+        unique_labels = groups.unique()
+        group_data_list = []
+        is_sparse = scipy.sparse.issparse(split_adata.X)
+        for label in unique_labels:
+            mask = (groups == label).values
+            subset_X = split_adata.X[mask]
+            if is_sparse:
+                subset_X = subset_X.toarray()
+            group_data_list.append(subset_X)
+        self.logger.info("Running Scipy f_oneway (ANOVA)...")
+        try:
+            F_stats, p_values = stats.f_oneway(*group_data_list)
+        except Exception as e:
+            self.logger.error(f"ANOVA calculation failed: {e}")
+            raise e
+        p_values = np.nan_to_num(p_values, nan=1.0)
+        sorted_indices = np.argsort(p_values)
+        top_indices = sorted_indices[:self.n_features]
+        selected_features = split_adata.var_names[top_indices].tolist()
+        self.logger.info(f"Selected top {len(selected_features)} genes via ANOVA.")
+        gene_mask = split_adata.var_names.isin(selected_features)
+        adata._inplace_subset_var(gene_mask)
+
+        # 释放临时内存
+        del group_data_list
+        del p_values
+        del sorted_indices
+
         return data

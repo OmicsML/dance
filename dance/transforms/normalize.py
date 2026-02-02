@@ -613,10 +613,10 @@ class NormalizeTotal(AnnDataTransform):
     """
 
     def __init__(self, target_sum: Optional[float] = None, max_fraction: float = 0.05, key_added: Optional[str] = None,
-                 layer: Optional[str] = None, layers: Union[Literal['all'], Iterable[str]] = None,
-                 layer_norm: Optional[str] = None, inplace: bool = True, copy: bool = False, **kwargs):
-        super().__init__(sc.pp.normalize_total, target_sum=target_sum, key_added=key_added, layer=layer, layers=layers,
-                         layer_norm=layer_norm, inplace=inplace, copy=copy, exclude_highly_expressed=True,
+                 layer: Optional[str] = None, 
+                 inplace: bool = True, copy: bool = False, **kwargs):
+        super().__init__(sc.pp.normalize_total, target_sum=target_sum, key_added=key_added, layer=layer, 
+                         inplace=inplace, copy=copy, exclude_highly_expressed=True,
                          max_fraction=max_fraction, **kwargs)
 
         if max_fraction == 1.0:

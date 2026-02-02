@@ -1,0 +1,9 @@
+# IFEval (Instruction Following Evaluation) dataset configuration
+dataset_name: "zhongyuxing/Graph_Structure_Learning_Pseudocode"  # Official IFEval dataset from Google
+input_field: "code"  # The instruction to follow
+target_field: "code"  # For matching instruction requirements
+split: "train"  # IFEval only has train split
+
+# Evaluation parameters
+max_samples: 200  # Number of samples to evaluate during evolution
+full_eval_samples: 541  # Full dataset size

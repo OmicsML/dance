@@ -1,0 +1,40 @@
+You are an expert task solver, with a lot of commonsense, math, language and coding knowledge.
+
+Consider this task:
+```Question: James has a small tree outside his window with 30 branches with 90 twigs per branch. 30% of the twigs sprout 4 leaves and the rest sprout 5 leaves. How many leaves are on the tree total?
+Answer: First find the total number of twigs on the tree: 30 branches * 90 twigs/branch = <<30*90=2700>>2700 twigs
+Then multiply that number by 30% to find how many twigs have 4 leaves: 2700 twigs * 30% = <<2700*30*.01=810>>810 twigs
+Then subtract that number from the total number of twigs to find how many have 5 leaves: 2700 twigs - 810 twigs = <<2700-810=1890>>1890 twigs
+Then multiply that number by 5 to find the number of leaves on the 5-leaved twigs: 1890 twigs * 5 leaves/twig = <<1890*5=9450>>9450 leaves
+Then multiply the number of 4-leaved twigs by 4 to find the total number of leaves they have: 810 twigs * 4 leaves/twig = <<810*4=3240>>3240 leaves
+Then add the two groups of leaves to find the total number of leaves: 9450 leaves + 3240 leaves = <<9450+3240=12690>>12690 leaves
+#### 12690
+
+Question: The city is holding its annual rubber duck race for charity.  The regular size rubber ducks are $3.00 each and the large size rubber duck is $5.00 each.  All of the rubber ducks will be dropped into the river at the same time and the first duck that floats across the finish line wins.  They sold 221 regular size ducks and 185 large size ducks.  How much money did the city raise for charity?
+Answer: They sold 221 regular size rubber ducks at $3.00 each so they made 221*3 = $<<221*3=663.00>>663.00
+They sold 185 large rubber ducks at $5.00 each so they made 185*5 = $<<185*5=925.00>>925.00
+The regular size ducks brought in $663.00 and the large brought in $925.00 for a total of 663+925 = $<<663+925=1588.00>>1,588.00 for charity
+#### 1588
+
+Question: In a factory, there are 300 employees. 200 of them earn $12 per hour. Of the rest, 40 of them earn $14 per hour. All others earn $17 per hour. What is the cost to employ all these people for one 8-hour long shift?
+Answer: The cost of the 200 employees is 200 employees * $12/employee/hour = $<<200*12=2400>>2400 per hour.
+The cost of the 40 employees is 40 employees * $14/employee/hour = $<<40*14=560>>560 per hour.
+The rest means 300 employees - 200 employees - 40 employees = <<300-200-40=60>>60 employees.
+These 60 employees' employment costs are at 60 employees * $17/employee/hour = $<<60*17=1020>>1020 per hour.
+So in total all employees earn $2400/hour + $560/hour + $1020/hour = $3980/hour.
+During an 8-hour shift, this cost would be at 8 hours * $3980/hour = $<<8*3980=31840>>31840.
+#### 31840
+
+Question: A passenger train transports passengers between two stations located in two separate cities. On a particular day, the train carried 100 passengers from one station to the other one way, and on the return trip carried 60 passengers. If the train made three more round trips that day, taking the same number of people as the first trip in each trip, calculate the total number of passengers transported between both stations?
+Answer: The total number of people transported in the first trip is 100 one way + 60 on the return trip = <<100+60=160>>160 people.
+If the train made three more round trips that day carrying the same number of passengers in each trip as the first, it carried a total of 3*160 = <<3*160=480>>480 in all three round trips.
+In total, the train carried 160+480 = <<160+480=640>>640 people over all its trips that day
+#### 640
+
+Question: Angus, Patrick, and Ollie went fishing for trout on Rainbow Lake.  Angus caught 4 more fish than Patrick did, but Ollie caught 7 fewer fish than Angus.  If Ollie caught 5 fish, how many fish did Patrick catch?
+Answer: If Ollie caught 7 less than Angus, then Angus caught 5+7=12 fish.
+And since Angus caught four more than Patrick, then Patrick caught 12-4=<<12-4=8>>8 fish.
+#### 8
+
+Question: Janet’s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?
+Answer:´´´

@@ -34,6 +34,7 @@ from dance.transforms.filter import (
     HighlyVariableGenesLogarithmizedByTopGenes,
     HighlyVariableGenesRawCount,
     ScrubletTransform,
+    PrefilterGenes
 )
 from dance.transforms.gene_holdout import GeneHoldout
 from dance.transforms.interface import AnnDataTransform
@@ -111,6 +112,7 @@ __all__ = [
     "NormalizeTotal",
     "NormalizeTotalLog1P",
     "PseudoMixture",
+    "PrefilterGenes",
     "RemoveSplit",
     "SAINTRandomWalkSampler",
     "SAINTSampler",

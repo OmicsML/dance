@@ -1,0 +1,43 @@
+You are an expert task solver, with a lot of commonsense, math, language and coding knowledge.
+
+Consider this task:
+```Question: Mrs. Brynlee reduced the prices of items in her store by 20% after the local government gave small businesses in her county a subsidy. If the price of a shirt in the store was $60 and that of the leather jacket was $90, calculate the amount of money Teagan will pay for buying 5 shirts and 10 leather jackets at the reduced prices.
+Answer: If the price of a shirt in the store was $60, its price was reduced by 20/100*$60=$<<60*20/100=12>>12
+The price of a shirt was reduced to $60-$12=$<<60-12=48>>48
+Teagan will pay $48*5= $<<48*5=240>>240 for buying 5 shirts
+If the initial price of the leather jacket was $90, the price reduced by 20/100*$90=$<<90*0.2=18>>18
+The final leather jacket after Mrs. Brynlee reduced the price by 20% is $90-$18=$<<90-18=72>>72
+Teagan will pay $72*10= $<<72*10=720>>720 for buying 10 leather jackets
+The amount of money Teagan paid to Mrs. Brynlee for the shirts and the leather jackets is $720+$240=$<<720+240=960>>960
+#### 960
+
+Question: Saheed made four times as much money as Kayla. Kayla made $30 less than Vika. Vika made $84. How many dollars did Saheed make?
+Answer: Kayla made $30 less than Vika = $84 - 30 = 54.
+Saheed made 4*Kayla = 4*54 = 216
+#### 216
+
+Question: A car driving cross-country traveled 180 miles in 4 hours. At this rate of speed, how many miles further will the car travel in the next 3 hours?
+Answer: The car drives 180 miles in 4 hours, so its average speed is 180 miles / 4 hours = <<180/4=45>>45 miles per hour.
+In the next 3 hours, the car will drive 45 miles/hour * 3 hours = <<45*3=135>>135 miles.
+#### 135
+
+Question: A spiral notebook costs $15, and a personal planner costs $10. How much would it cost in total to buy 4 spiral notebooks and 8 personal planners at a 20% discount?
+Answer: If a spiral notebook cost $15, a 20% discount would reduce the price by 20/100 *15 = $<<15*0.2=3>>3
+At a 20% discount, the buying price of a spiral notebook book is $15-$3= $<<15-3=12>>12
+At the same discount, a personal planner cost would reduce by 20/100 * $10 = $<<20/100*10=2>>2
+The new buying price of a personal planner will be $10-$2 =$<<10-2=8>>8
+To buy four spiral notebooks at a 20% discount, you'll pay 4*$12 = $<<4*12=48>>48
+At the same time discount, you'll buy eight personal planners at a cost pf 8*$8 = <<8*8=64>>64
+In total, to buy eight personal planners and four spiral notebooks, you'd have to pay $64+$48 = $112
+#### 112
+
+Question: A truck driver has to spend $2 per gallon of gas. She can drive 10 miles per gallon. She drives at a rate of 30 miles per hour. If she is paid $.50 per mile, how much money does she make if she drives for 10 hours?
+Answer: The truck driver drives for 10 hours at 30 miles per hour, so she drives 10*30=<<10*30=300>>300 miles.
+Therefore, she needs 300/10=<<300/10=30>>30 gallons of gas.
+This will cost her 30*$2=$<<30*2=60>>60.
+She will make 300*$.50= $<<300*.50=150>>150.
+Thus, after paying for gas, she will make $150-$60=$<<150-60=90>>90.
+#### 90
+
+Question: A robe takes 2 bolts of blue fiber and half that much white fiber.  How many bolts in total does it take?
+Answer:´´´

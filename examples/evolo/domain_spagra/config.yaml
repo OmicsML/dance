@@ -1,0 +1,129 @@
+# Configuration for function minimization example
+max_iterations: 20 #50
+checkpoint_interval: 5
+
+# # LLM configuration
+# llm:
+#   primary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # primary_model: "llama3.1-8b"
+#   primary_model_weight: 0.6
+#   secondary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # secondary_model: "llama-4-scout-17b-16e-instruct"
+#   secondary_model_weight: 0.4
+#   api_base: "https://api.deepseek.com"
+#   # api_base: "https://api.cerebras.ai/v1"
+#   temperature: 0.8
+#   top_p: 0.95
+#   max_tokens: 8192
+#   timeout: 1200
+
+llm:
+  models:
+    - name: "qwen3-coder-plus"
+      api_key: "sk-92265d8b2c044989b10ad59e3a27b56f"
+      api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      weight: 0.8
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+    - name: "qwen3-coder-flash"
+      api_key: "sk-92265d8b2c044989b10ad59e3a27b56f"
+      api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      weight: 0.2
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+    # - name: "deepseek-reasoner"
+    #   api_key: "sk-acad184f8a7848918d7c9046affd1b65"
+    #   api_base: "https://api.deepseek.com"
+    #   weight: 0.4
+    #   temperature: 0.8
+    #   max_tokens: 16000
+    #   timeout: 1200
+    #   top_p: 0.95
+
+# Prompt configuration
+prompt:
+  system_message: "
+                      ### Prompt for Evolutionary Code Optimization
+
+                      **Context:**
+                      You are an expert AI specializing in Graph Neural Networks (GNNs) and Computational Biology (Spatial Transcriptomics). You are tasked with optimizing a specific Python class, `CalSpatialNet`, within the `SpaGRA` algorithm. This class constructs the adjacency graph between cells based on their spatial coordinates. The quality of this graph directly dictates the performance (ARI score) of the downstream GAT (Graph Attention Network).
+
+                      **Objective:**
+                      Modify the code within the `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END` tags. Your goal is to **maximize the Clustering Accuracy (ARI)** while maintaining or improving **computational efficiency (speed/memory)**.
+
+                      **Evolution Strategies (Suggestions for Improvement):**
+
+                      1. **Algorithmic Enhancement (Topology):**
+                      * *Current Issue:* Simple KNN or Radius methods can be rigid and miss local tissue topology.
+                      * *Proposal:* Implement **Delaunay Triangulation** or **Gabriel Graph** construction. These methods often better represent the natural 'honeycomb' structure of tissue samples compared to fixed-k KNN.
+                      * *Alternative:* Implement **Adaptive KNN**, where the number of neighbors varies based on local density, or **MNN (Mutual Nearest Neighbors)** to remove weak links.
+
+
+                      2. **Edge Weighting (Soft Connections):**
+                      * *Current Issue:* The graph is binary (connected or not).
+                      * *Proposal:* Calculate **Gaussian Kernel weights** based on Euclidean distance (`exp(-dist^2 / 2*sigma^2)`). Assign these weights to the edges. This allows the GAT to pay more attention to physically closer neighbors.
+
+
+                      3. **Code Optimization (Vectorization):**
+                      * *Current Issue:* The current implementation iterates through samples (`for it in range(indices.shape[0])`) and creates a list of DataFrames. This is extremely slow for large datasets.
+                      * *Proposal:* **Fully vectorize** the edge list creation using NumPy broadcasting or flattening (e.g., `indices.flatten()`, `np.repeat`). Avoid appending to lists inside loops.
+
+
+
+                      **Hyperparameter Tuning Space:**
+                      You are free to adjust default values or introduce new hyperparameters within the `__init__` method:
+
+                      * `k_cutoff`: Range [6, 20] (Standard Visium spots usually have 6 hexagonal neighbors).
+                      * `rad_cutoff`: Range [100, 300] (Depending on pixel resolution).
+                      * `model`: Add support for 'Delaunay' or 'Gaussian'.
+
+                      **Constraints & Requirements:**
+
+                      1. **Interface Preservation:** The class must still inherit from `BaseTransform`. The `__call__` method must accept a `data` object (Dance Data wrapper) and modify `data.data.uns[self.spatial_uns]` with the resulting DataFrame.
+                      2. **Output Format:** The output `Spatial_Net` DataFrame in `adata.uns` must contain columns: `['Cell1', 'Cell2', 'Distance']`. (Adding a 'Weight' column is permitted and encouraged if handled downstream, but ensure compatibility).
+                      3. **Library Usage:** You may use `scipy.spatial` (e.g., `Delaunay`, `cKDTree`) and `sklearn`.
+                      4. **Error Handling:** Ensure no self-loops are created or that they are explicitly handled if the GAT requires them.
+
+                      **Degrees of Freedom:**
+
+                      * You may rewrite the entire logic of `__call__` and `__init__`.
+                      * You may import standard libraries (numpy, scipy, pandas).
+                      * You may remove the 'Radius' vs 'KNN' dichotomy if a superior unified graph construction method is implemented.
+
+                      **Input Code for Evolution:**
+                      (The code block between `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END` provided in the source).
+
+                      ---
+
+                      ### Example 'Thought Process' for the LLM (Optional Guidance)
+
+                      *If I want to improve accuracy, I should switch to Delaunay Triangulation because it creates a planar graph that strictly connects adjacent tissue spots without arbitrary distance cutoffs. This usually results in a cleaner signal for the GAT.*
+                      *If I want to improve speed, I must remove the `for it in range(...)` loop. I can use `indices.flatten()` to get the targets and `np.repeat(np.arange(n), k)` to get the sources, constructing the DataFrame in one shot.*
+
+                      **Action:** Generate the optimized `CalSpatialNet` class now."
+
+  include_artifacts: true
+  max_artifact_bytes: 32768
+  artifact_security_filter: true
+
+# Database configuration
+database:
+  population_size: 50
+  archive_size: 20
+  num_islands: 3
+  elite_selection_ratio: 0.2
+  exploitation_ratio: 0.7
+
+# Evaluator configuration
+evaluator:
+  timeout: 600000
+  cascade_thresholds: [0.3]
+  parallel_evaluations: 1
+
+# Evolution settings
+diff_based_evolution: true
+max_code_length: 20000

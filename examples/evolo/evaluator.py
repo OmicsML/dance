@@ -18,12 +18,12 @@ from dance.modules.spatial.spatial_domain import spagcn
 # original 300, while still being substantial enough to measure performance.
 
 from dance.settings import EXAMPLESDIR
-# stage1_args = scdeepsort_stage1_args
-# BENCHMARKS = scdeepsort_benchmarks
+stage1_args=os.getenv("stage1_args")
+BENCHMARKS_args=os.getenv("BENCHMARKS_args")
 with open(f"{EXAMPLESDIR}/evolo/benchmarks_config.json", "r") as f:
     BENCHMARKS = json.load(f)
-stage1_args = BENCHMARKS["scdeepsort_stage1_args"]
-BENCHMARKS = BENCHMARKS["scdeepsort_benchmarks"]
+stage1_args = BENCHMARKS[stage1_args]
+BENCHMARKS = BENCHMARKS[BENCHMARKS_args]
 
 # Timeout for each benchmark run in seconds.
 # Training these models can take time, especially for data download on the first run.
@@ -87,23 +87,23 @@ def _run_benchmark(program_path, benchmark_name, benchmark_args, timeout):
             "stdout": "", "stderr": traceback.format_exc(),
         }
 
+import numpy as np
+
 def evaluate(program_path):
     """
     Evaluates the script by running it against multiple benchmark datasets.
-
-    The score is based on the average accuracy across the benchmarks. The script's
-    ability to run without errors (reliability) is also factored in.
-
-    Dependencies: The evaluation environment must have the following packages installed:
-    - dance-cognition
-    - torch
-    - dgl
-    - scikit-learn
+    Failures result in a score of 0 for that benchmark, effectively penalizing reliability issues.
     """
     
     results = {}
     successful_runs = []
     failed_runs = []
+    
+    # 用于计算全局平均值的列表（包含成功和失败）
+    all_inner_scores = []
+    all_speed_scores = []
+    all_accuracy_scores = [] # 外部评分，备用
+    all_times = [] # 仅作记录，不参与核心分数计算（失败者时间可能不准）
 
     for name, args in BENCHMARKS.items():
         print(f"--- Running benchmark: {name} ---")
@@ -112,66 +112,105 @@ def evaluate(program_path):
         
         if result["status"] == "success":
             successful_runs.append(result)
-            print(f"Success! Score: {result['score']:.4f}, Inner Score: {result['inner_score']:.4f}, Time: {result['time']:.2f}s")
+            
+            # 1. 获取准确率
+            i_score = result.get("inner_score", 0.0)
+            e_score = result.get("score", 0.0)
+            
+            # 2. 计算单项速度分 (Normalized around 300s)
+            t = result.get("time", 300.0)
+            s_score = 1.0 / (1.0 + t / 300.0)
+            
+            # 3. 记录数据
+            all_inner_scores.append(i_score)
+            all_accuracy_scores.append(e_score)
+            all_speed_scores.append(s_score)
+            all_times.append(t)
+            
+            print(f"Success! Inner Score: {i_score:.4f}, Speed Score: {s_score:.4f}, Time: {t:.2f}s")
+            
         else:
             failed_runs.append(result)
+            
+            # 1. 失败者，所有分数为 0
+            all_inner_scores.append(0.0)
+            all_accuracy_scores.append(0.0)
+            all_speed_scores.append(0.0)
+            # 时间对于失败者来说通常没有意义（可能是超时或秒崩），不计入 all_times 以免拉低成功的平均时间统计
+            
             print(f"Failed! Error: {result['error']}")
             logger.info(f"Stdout: {result['stdout']}")
             logger.info(f"Stderr: {result['stderr']}")
 
-    if not successful_runs:
-        error_details = {
-            "error_type": "AllBenchmarksFailed",
-            "error_message": "All benchmark datasets failed to run successfully.",
-            "suggestion": "Check the detailed results for each benchmark. Common issues include timeouts, missing dependencies, or runtime errors in the code.",
-            "failed_benchmarks": {name: res["error"] for name, res in results.items() if res["status"] == "error"},
-            "sample_stderr": failed_runs[0]['stderr'][-1000:] if failed_runs and failed_runs[0]['stderr'] else "N/A"
-        }
-        return EvaluationResult(
-            metrics={
-                "combined_score": 0.0, "avg_accuracy": 0.0, "reliability_score": 0.0,
-                "error": "All benchmarks failed."
-            },
-            artifacts=error_details
-        )
+    # Calculate Global Metrics (分母为总任务数 len(BENCHMARKS))
+    total_benchmarks = len(BENCHMARKS)
+    if total_benchmarks == 0:
+        return EvaluationResult(metrics={"combined_score": 0.0, "error": "No benchmarks defined."}, artifacts={})
 
-    # Calculate metrics based on successful runs
-    avg_accuracy = np.mean([res["score"] for res in successful_runs])
-    avg_inner_accuracy = np.mean([res["inner_score"] for res in successful_runs])
-    avg_time = np.mean([res["time"] for res in successful_runs])
-    reliability_score = len(successful_runs) / len(BENCHMARKS)
+    # 使用 np.mean 计算全局平均（包含0值）
+    avg_inner_accuracy = np.mean(all_inner_scores) # 这就是原本的 accuracy * reliability
+    avg_accuracy = np.mean(all_accuracy_scores)
+    avg_speed_score = np.mean(all_speed_scores)
     
-    # Speed score (higher is better). Normalized around 5 minutes (300s).
-    speed_score = 1.0 / (1.0 + avg_time / 300.0)
+    # 显式计算 reliability 仅供展示
+    reliability_score = len(successful_runs) / total_benchmarks
 
-    # Combined score prioritizes accuracy, with a bonus for reliability.
-    combined_score = (0.8 * avg_inner_accuracy) + (0.2 * reliability_score)
+    # 计算成功任务的平均耗时（仅供参考，不影响分数）
+    avg_success_time = np.mean(all_times) if all_times else 0.0
 
+    # Combined Score 计算
+    # 逻辑：Reliability 已经内含在 avg_inner_accuracy 和 avg_speed_score 中了。
+    # 权重分配：80% 看准确率，20% 看速度。
+    combined_score = (0.8 * avg_inner_accuracy) + (0.2 * avg_speed_score)
+
+    # 准备返回数据
     artifacts = {
         "benchmark_summary": {
-            name: {"status": res["status"], "inner_score": round(res["inner_score"], 4) if "inner_score" in res else None, "time": round(res["time"], 2),"error":res["error"] if "error" in res else None}
+            name: {
+                "status": res["status"], 
+                "inner_score": round(res.get("inner_score", 0), 4), 
+                "time": round(res.get("time", 0), 2),
+                "error": res.get("error")
+            }
             for name, res in results.items()
         },
-        "average_execution_time": f"{avg_time:.2f} seconds",
-        "performance_overview": f"Achieved an train average accuracy of {avg_inner_accuracy:.4f} across {len(successful_runs)} successful benchmarks."
+        "performance_overview": (
+            f"Global Score: {combined_score:.4f}. "
+            f"Reliability: {len(successful_runs)}/{total_benchmarks}. "
+            f"Avg Accuracy (Global): {avg_inner_accuracy:.4f}."
+        )
     }
-    metrics={
-                "combined_score": float(combined_score),
-                "avg_accuracy": float(avg_accuracy),
-                "avg_inner_accuracy": float(avg_inner_accuracy),
-                "reliability_score": float(reliability_score),
-                "speed_score": float(speed_score),
-            }
+
+    # 如果全部失败，添加详细报错建议
+    if not successful_runs:
+        artifacts["error_details"] = {
+            "error_type": "AllBenchmarksFailed",
+            "suggestion": "Check dependencies or syntax. All runs crashed or timed out.",
+            "sample_stderr": failed_runs[0]['stderr'][-1000:] if failed_runs and failed_runs[0]['stderr'] else "N/A"
+        }
+
+    metrics = {
+        "combined_score": float(combined_score),
+        "avg_accuracy": float(avg_accuracy),
+        "avg_inner_accuracy": float(avg_inner_accuracy), # 全局平均，含0
+        "reliability_score": float(reliability_score),
+        "avg_speed_score": float(avg_speed_score),       # 全局平均，含0
+        "avg_success_time": float(avg_success_time)
+    }
+
+    # 展开每个 benchmark 的分数到 metrics 中
     for name, res in results.items():
-        metrics[f"{name}_score"] = float(res["score"]) if "score" in res else 0
-        metrics[f"{name}_inner_score"] = float(res["inner_score"]) if "inner_score" in res else 0
-        metrics[f"{name}_time"] = float(res["time"])
-        metrics[f"{name}_status"] = res["status"]
+        metrics[f"{name}_score"] = float(res.get("score", 0))
+        metrics[f"{name}_inner_score"] = float(res.get("inner_score", 0))
+        metrics[f"{name}_time"] = float(res.get("time", 0))
+        metrics[f"{name}_status"] = 1.0 if res["status"] == "success" else 0.0
+
     return EvaluationResult(
-       metrics=metrics,
+        metrics=metrics,
         artifacts=artifacts
     )
-
+    
+    
 def evaluate_stage1(program_path):
     """
     A quick first-stage evaluation. It runs a single, simple benchmark with very
@@ -182,7 +221,7 @@ def evaluate_stage1(program_path):
     
     # Use the simplest benchmark with only 2 epochs for a quick check.
     
-    timeout = 240  # 4 minutes timeout for the initial run (data download can be slow)
+    timeout = 240000 # 400 minutes timeout for the initial run (data download can be slow)
 
     result = _run_benchmark(program_path, "Stage1_Check", stage1_args, timeout)
     if result["status"] == "success":

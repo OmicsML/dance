@@ -5,7 +5,10 @@ from dance.transforms.graph.heteronet_graph import HeteronetGraph
 from dance.transforms.graph.neighbor_graph import NeighborGraph
 from dance.transforms.graph.resept_graph import RESEPTGraph
 from dance.transforms.graph.scmogcn_graph import ScMoGNNGraph
-from dance.transforms.graph.spatial_graph import SMEGraph, SpaGCNGraph, SpaGCNGraph2D, StagateGraph
+from dance.transforms.graph.stringdb_graph import StringDBGraph
+from dance.transforms.graph.spatial_graph import SMEGraph, SpaGCNGraph, SpaGCNGraph2D, StagateGraph, CalSpatialNet
+from dance.transforms.graph.graphcs import BBKNNConstruction
+from dance.transforms.graph.scgat_graph import scGATGraphTransform
 
 __all__ = [
     "CellFeatureBipartiteGraph",
@@ -21,4 +24,8 @@ __all__ = [
     "SpaGCNGraph",
     "SpaGCNGraph2D",
     "StagateGraph",
+    "CalSpatialNet",
+    'StringDBGraph',
+    "BBKNNConstruction",
+    "scGATGraphTransform"
 ]  # yapf: disable

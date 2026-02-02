@@ -1,0 +1,70 @@
+# Configuration for evolving prompts with Qwen3-8B
+# Optimized for GEPA benchmark comparison
+
+# General settings
+max_iterations: 100  # Can be overridden by command line
+checkpoint_interval: 5
+log_level: "INFO"
+diff_based_evolution: false  # Full rewrites for prompt evolution
+max_code_length: 80000
+language: "text"
+
+# LLM Configuration for Qwen3-8B via OpenRouter
+llm:
+  api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  models:
+    - name: "qwen-flash"
+      weight: 1.0
+  
+  temperature: 0.8  # Higher temperature for creative evolution
+  max_tokens: 32768
+  timeout: 60
+  retries: 3
+
+# Prompt Configuration for evolution
+prompt:
+  template_dir: "templates"
+  num_top_programs: 5  # Show top 5 prompts for inspiration
+  num_diverse_programs: 3  # Include 3 diverse prompts
+  include_artifacts: true
+  
+  system_message: |
+    You are tasked with optimizing a specific section of the provided text.
+    ### STRUCTURAL CONSTRAINTS (MUST FOLLOW):
+    Scope: Your optimization must apply exclusively to the text found between the markers #Pseudocode-START and #Pseudocode-END.
+    Preservation: You must strictly retain the #Pseudocode-START and #Pseudocode-END tags in your output. They must appear exactly as they are in the input, at the beginning and end of the optimized section.
+    No Deletions: Do not delete, translate, or modify the #Pseudocode-START and #Pseudocode-END.
+    
+    When creating new prompts:
+    1. Build on successful patterns from the examples
+    2. Be creative but maintain clarity
+    3. Consider different reasoning strategies (direct, step-by-step, few-shot)
+    4. Optimize for the specific task requirements
+
+# Database Configuration for MAP-Elites
+database:
+  population_size: 50  # Moderate population for balance
+  archive_size: 500
+  num_islands: 4  # Multiple islands for diversity
+  
+  feature_dimensions: ["prompt_length", "reasoning_strategy"]
+  feature_bins: 10
+  
+  elite_selection_ratio: 0.4  # 40% elites
+  exploration_ratio: 0.3  # 30% exploration
+  exploitation_ratio: 0.3  # 30% exploitation
+  
+  migration_interval: 20
+  migration_rate: 0.1
+
+# Evaluator Configuration
+evaluator:
+  timeout: 1800  # 30 minutes timeout for complex evaluations
+  max_retries: 3
+  parallel_evaluations: 4  # Parallel evaluation for speed
+  cascade_evaluation: true  # Use cascading to save API calls
+  cascade_thresholds: [0.1]  # Only 2 stages, must achieve 90% in stage 1 to proceed
+  
+  # Enable LLM feedback for better guidance
+  use_llm_feedback: true
+  llm_feedback_weight: 0.2  # 20% weight on qualitative feedback

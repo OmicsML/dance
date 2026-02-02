@@ -24,6 +24,9 @@ import sys
 import importlib.util
 import tempfile
 import logging
+import asyncio
+import re
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +40,10 @@ class RetrievalResult(TypedDict):
 
 class LearningResult(TypedDict):
     """Learning result"""
-    extracted_principle: str
-    counterfactual_test: str
-    verification_outcome: str  # "VERIFIED" | "REJECTED"
-    saved: bool
+    extracted_principles: List[str]  # Verified and stored principles
+    all_principles: List[str]  # All extracted principles (including rejected ones)
+    results: List[Dict]  # Detailed verification result for each principle
+    saved_count: int  # Number of principles stored
 
 
 class LamarckianKnowledgeBase:
@@ -239,8 +242,9 @@ class LamarckianKnowledgeBase:
             raise ValueError("Program code must contain EVOLVE-BLOCK-START")
         
         return program_code
-
-    def _evaluate_program_with_file(
+    
+    
+    def _single_evaluate_program_with_file(
         self, 
         program_code: str,
         evaluate_function,
@@ -263,7 +267,6 @@ class LamarckianKnowledgeBase:
 
         # Prepare program code (ensure it contains EVOLVE-BLOCK tags)
         program_code = self._prepare_program_code(program_code)
-
         # Create temporary file (reference OpenEvolve evaluator.py implementation)
         temp_file_path = None
         try:
@@ -282,6 +285,8 @@ class LamarckianKnowledgeBase:
             # Ensure return is in dictionary format
             if isinstance(result, dict):
                 return result
+            elif hasattr(result, "metrics"):
+                return result.metrics
             else:
                 logger.warning(f"Evaluator returned unexpected type: {type(result)}, converting to dict")
                 return {"combined_score": 0.0, "error": f"Unexpected return type: {type(result)}"}
@@ -297,6 +302,98 @@ class LamarckianKnowledgeBase:
                     os.unlink(temp_file_path)
                 except Exception as e:
                     logger.warning(f"Failed to delete temp file {temp_file_path}: {e}")
+
+    async def _evaluate_program_with_file(
+        self,
+        program_code: str,
+        config_path: str,
+        evaluator_file: str,
+        timeout: Optional[float] = None,
+        system_message_override: Optional[str] = None,
+        iter_over: Optional[int] = None,
+    ) -> Dict[str, float]:
+        """
+        Execute program code using the evaluate function from the evaluator file
+        Reference OpenEvolve's evaluator.py implementation
+        
+        Args:
+            program_code: Program code to execute
+            evaluate_function: evaluate function (loaded from evaluator file)
+            timeout: Optional timeout in seconds, currently not implemented but kept for future extension
+            
+        Returns:
+            Dictionary containing metrics, usually includes 'combined_score' or 'error' fields
+        """
+        
+
+        # Prepare program code (ensure it contains EVOLVE-BLOCK tags)
+        program_code = self._prepare_program_code(program_code)
+
+        # Create temporary directory with concurrent-safe approach
+        # Using mkdtemp for atomic directory creation with unique name
+        temp_dir = None
+        temp_file_path = None
+        try:
+            # mkdtemp creates directory atomically with unique name
+            temp_dir = tempfile.mkdtemp(
+                prefix="evolve_",
+                suffix="_cf",  # counterfactual suffix for easy identification
+                dir=None  # use system default temp dir
+            )
+            temp_file_path = os.path.join(temp_dir, f"program{self.program_suffix}")
+
+            # Write program code to file inside the unique directory
+            with open(temp_file_path, 'w', encoding='utf-8') as temp_file:
+                temp_file.write(program_code)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())  # Ensure content is written to disk
+
+            # Import OpenEvolve components lazily to avoid hard dependency unless used
+            from openevolve.config import load_config
+            from openevolve import OpenEvolve
+
+            # Build config using provided config_path (same as CLI behavior)
+            config = load_config(config_path)
+
+            # If caller provided a system_message override (e.g., cf_prompt), apply it
+            if system_message_override:
+                try:
+                    config.prompt.system_message = system_message_override
+                    config.llm.update_model_params({"system_message": system_message_override})
+                    logger.debug("Applied system_message_override to config.prompt.system_message")
+                except Exception as e:
+                    logger.warning(f"Failed to apply system_message_override to config: {e}")
+            if iter_over:
+                config.max_iterations = iter_over
+            # Initialize OpenEvolve using the temp program as the initial program
+            openevolve = OpenEvolve(
+                initial_program_path=temp_file_path,
+                evaluation_file=evaluator_file,
+                config=config,
+                output_dir=None,
+            )
+
+            # Run the evolution (OpenEvolve exposes async run)
+            best_program = await openevolve.run(iterations=None, target_score=None, checkpoint_path=None)
+            if isinstance(best_program, dict):
+                return best_program
+            elif hasattr(best_program, "metrics"):
+                return best_program.metrics
+
+            # Attempt to extract metrics from the returned best_program
+            return best_program.metrics
+
+        except Exception as e:
+            logger.error(f"Error during evaluation: {str(e)}")
+            # If execution fails, return error metrics (similar to OpenEvolve error handling)
+            return {"combined_score": 0.0, "error": str(e)}
+        finally:
+            # Clean up temporary directory and all its contents
+            if temp_dir and os.path.exists(temp_dir):
+                try:
+                    shutil.rmtree(temp_dir)
+                except Exception as e:
+                    logger.warning(f"Failed to delete temp directory {temp_dir}: {e}")
 
     # =========================================================================
     # Interface 1: Historical Principle and Trajectory Retrieval
@@ -400,13 +497,15 @@ class LamarckianKnowledgeBase:
     # =========================================================================
     # Interface 2: Successful Trajectory Abstraction and Counterfactual Verification Storage
     # =========================================================================
-    def learn_from_trajectory(
+    async def learn_from_trajectory(
         self,
         initial_program_path: str,
         best_program_path: str,
         original_task: str,
         evaluator_file: Optional[str] = None,
-        metrics: Optional[Dict[str, float]] = None
+        metrics: Optional[Dict[str, float]] = None,
+        config: Optional[str] = None,
+        use_llm_verification: bool = False,
     ) -> LearningResult:
         """
         Compare initial and best programs, automatically perform abstraction, generate counterfactuals, 
@@ -422,7 +521,7 @@ class LamarckianKnowledgeBase:
             metrics: Optional evaluator output metrics (e.g., combined_score, performance metrics, etc.),
                      used to provide context in prompts to help extract principles better, and to compare 
                      with counterfactual results. If not provided and evaluator_file is provided, will 
-                     automatically evaluate best_program to obtain metrics
+                     automatically evaluate the initial_program to obtain metrics
 
         Returns:
             LearningResult: Dictionary containing extracted principle, counterfactual test, 
@@ -439,20 +538,15 @@ class LamarckianKnowledgeBase:
         with open(best_program_path, 'r', encoding='utf-8') as f:
             best_program_code = f.read()
         
-        # Load evaluator function (if evaluator_file is provided)
-        evaluate_function = None
-        if evaluator_file:
-            print(f"   ↳ Loading evaluator file: {evaluator_file}")
-            evaluate_function = self._load_evaluation_function(evaluator_file)
         
-        # If metrics not provided, try to evaluate best_program to get metrics
-        if metrics is None and evaluate_function:
-            print(f"   ↳ Evaluating best program to obtain metrics...")
+        # If metrics not provided, try to evaluate the initial program to get metrics
+        if metrics is None:
+            print(f"   ↳ Evaluating initial program to obtain metrics...")
             try:
-                metrics = self._evaluate_program_with_file(best_program_code, evaluate_function)
-                print(f"   ↳ Best program Metrics: {metrics}")
+                metrics = self._single_evaluate_program_with_file(initial_program_code, evaluate_function=self._load_evaluation_function(evaluator_file))
+                print(f"   ↳ Initial program Metrics: {metrics}")
             except Exception as e:
-                logger.warning(f"Failed to evaluate best program: {e}")
+                logger.warning(f"Failed to evaluate initial program: {e}")
                 metrics = None
 
         # --- Step A: Program Comparison Abstraction (Abstraction) ---
@@ -480,36 +574,77 @@ class LamarckianKnowledgeBase:
 {best_code}
 
 # Your Task
-Compare the two programs above and extract ONE key principle that explains why the best program achieved a higher evaluator score than the initial program.
+Compare the two programs above and extract multiple key principles that explain why the best program achieved a higher evaluator score than the initial program. Note that the code changes are located exclusively between the "# EVOLVE-BLOCK-START" and "# EVOLVE-BLOCK-END" markers.
 
 ## Requirements:
 1. Focus on strategies that directly improve evaluator metrics (e.g., combined_score, performance metrics, correctness)
 2. Identify the key differences between initial and best programs
 3. Remove specific variable names, IDs, or concrete values - make it generalizable
 4. Use the format: "IF [scenario characteristics] THEN [key strategy]"
-5. The principle should be:
+5. Each principle should be:
    - Specific enough to be actionable
    - General enough to apply to similar tasks
    - Causal: following it should increase evaluator scores, violating it should decrease scores
+6. Extract 2-5 principles that are distinct from each other
 
 ## Output Format
-Provide only the principle statement, no additional explanation.
+Provide only the principle statements, one per line, no additional explanation.
 
-Principle:"""
+Principles:
+1. IF [scenario] THEN [strategy]
+2. IF [scenario] THEN [strategy]
+3. IF [scenario] THEN [strategy]
+... (more if needed)"""
         )
         chain_extract = abstract_prompt | self.llm | StrOutputParser()
-        candidate_principle = chain_extract.invoke({
+        candidate_principles_text = chain_extract.invoke({
             "task": original_task,
             "initial_code": initial_program_code,
             "best_code": best_program_code,
             "metrics_info": metrics_info
         })
-        print(f"   ↳ Candidate principle: {candidate_principle}")
+        print(f"   ↳ Candidate principles:\n{candidate_principles_text}")
 
-        # --- Step B: Counterfactual Generation (Counterfactual Generation) ---
-        # Use complete best program code as reference, generate complete counterfactual code that violates the principle
-        cf_prompt = ChatPromptTemplate.from_template(
-            """You are tasked with generating a counterfactual version of code that violates the following principle to verify its importance.
+        # Parse multiple principles from the response
+        candidate_principles = []
+        for line in candidate_principles_text.strip().split('\n'):
+            line = line.strip()
+            # Skip empty lines
+            if not line:
+                continue
+
+            # Remove leading "-" or "*" bullet points
+            if line.startswith('-') or line.startswith('*'):
+                line = line[1:].strip()
+
+            # Remove leading numbering like "1.", "2.", "3." etc.
+            # Pattern: optional whitespace + digit(s) + dot + whitespace
+            if_match = re.match(r'^\s*\d+\.\s+(.*)', line)
+            if if_match:
+                line = if_match.group(1).strip()
+
+            # Now check if line contains "IF ... THEN ..."
+            if 'IF ' in line.upper() and ' THEN ' in line.upper():
+                # Extract the part starting from "IF"
+                if_match = re.search(r'IF\s+.*', line, re.IGNORECASE)
+                if if_match:
+                    candidate_principles.append(if_match.group(0).strip())
+
+        # If parsing failed, fallback to the whole text as single principle
+        if not candidate_principles:
+            candidate_principles = [candidate_principles_text]
+
+        # Verify each principle with counterfactual testing
+        valid_principles = []
+        all_results = []
+
+        for i, candidate_principle in enumerate(candidate_principles):
+            print(f"\n   📋 Verifying principle {i+1}/{len(candidate_principles)}: {candidate_principle[:80]}...")
+
+            # --- Step B: Counterfactual Generation (Counterfactual Generation) ---
+            # Use complete best program code as reference, generate complete counterfactual code that violates the principle
+            cf_prompt = ChatPromptTemplate.from_template(
+                """You are tasked with generating a counterfactual version of code that violates the following principle to verify its importance.
 
 # Principle to Violate
 {principle}
@@ -517,10 +652,10 @@ Principle:"""
 # Original Task Context
 {task}
 
-# Best Program Code (Reference)
+# Initial Program Code (Reference)
 This is the complete best program that follows the principle. You need to modify it to violate the principle.
 
-{best_program_code}
+{initial_code}
 
 # Your Task
 Generate a modified version of the complete program that deliberately violates the principle. The goal is to test whether violating this principle leads to:
@@ -535,89 +670,92 @@ Generate a modified version of the complete program that deliberately violates t
 2. Modify the EVOLVE-BLOCK code to clearly violate the stated principle while maintaining code that can execute
 3. Keep the "# EVOLVE-BLOCK-START" and "# EVOLVE-BLOCK-END" markers exactly as they appear in the original code
 4. Output the COMPLETE program code, including all unchanged imports, functions, and the modified EVOLVE-BLOCK section
-5. Output ONLY the complete program code, no explanations, no markdown code blocks, no comments outside the code
+5. Output ONLY the complete program code, no explanations, no comments outside the code
 
 ## Output Format
 Provide only the complete modified program code, ready to be executed.
-
 Modified Counterfactual Program Code:"""
-        )
-        chain_cf = cf_prompt | self.llm | StrOutputParser()
-        cf_code_raw = chain_cf.invoke({
-            "principle": candidate_principle,
-            "task": original_task,
-            "best_program_code": best_program_code
-        })
-        
-        # Clean generated code (remove possible markdown code block markers)
-        cf_plan = cf_code_raw.strip()
-        # Remove ```python or ``` markers (if present)
-        if cf_plan.startswith("```"):
-            lines = cf_plan.split("\n")
-            # Remove first line (```python or ```)
-            if lines[0].startswith("```"):
-                lines = lines[1:]
-            # Remove last line (```)
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            cf_plan = "\n".join(lines)
-        
-        print(f"   ↳ Counterfactual code generation completed (length: {len(cf_plan)} chars)")
-
-        # --- Step C: External Verification (Verification) ---
-        # Use evaluate function from evaluator_file to execute counterfactual solution
-        # Reference OpenEvolve's evaluator.py implementation:
-        # 1. Write code to temporary file
-        # 2. Call evaluator's evaluate(program_path) function
-        # 3. Return metrics dictionary
-        # Logic assumption:
-        # - If the principle is "true", then violating the principle (cf_plan) should lead to worse performance or failure.
-        # - If performance is better or similar after violating the principle, the principle is not necessary.
-
-        print(f"   ↳ Executing counterfactual verification (calling external Evaluator)...")
-        original_metrics = metrics  # Save original trajectory's metrics
-        cf_metrics = None
-        
-        try:
-            if evaluate_function is None:
-                raise ValueError(
-                    "No evaluator available. Please provide evaluator_file parameter to learn_from_trajectory"
+            )
+            # Render the counterfactual prompt text and set it as the system message for OpenEvolve
+            try:
+                cf_prompt_text = cf_prompt.template.format(
+                    principle=candidate_principle,
+                    task=original_task,
+                    initial_code=initial_program_code,
                 )
-            
-            # Use _evaluate_program_with_file method (similar to openevolve/evaluator.py implementation)
-            # This method will:
-            # 1. Create temporary file
-            # 2. Call evaluator function
-            # 3. Clean up temporary file
-            print(f"   ↳ Using evaluator file: {evaluator_file}")
-            cf_metrics = self._evaluate_program_with_file(cf_plan, evaluate_function)
-            print(f"   ↳ Counterfactual evaluation completed, Metrics: {cf_metrics}")
-            
-        except Exception as e:
-            # If execution fails, it usually means the counterfactual solution failed, which indirectly confirms the principle is valid
-            # Reference OpenEvolve error handling approach
-            print(f"   ↳ Execution error: {e} (considered as verification passed)")
-            logger.exception("Error during counterfactual evaluation")
-            cf_metrics = {"error": str(e), "combined_score": 0.0}
+            except Exception:
+                # Fallback: naive replacement if template attribute not available
+                cf_prompt_text = (
+                    "You are tasked with generating a counterfactual version of code that violates the following principle:\n\n"
+                    f"Principle to Violate:\n{candidate_principle}\n\n"
+                    f"Original Task Context:\n{original_task}\n\n"
+                    "Initial Program Code (Reference):\n"
+                    f"{initial_program_code}\n\n"
+                    "Generate a modified version of the complete program that deliberately violates the principle."
+                )
 
-        # --- Step D: LLM Verification of Counterfactual Improvement (LLM Verification) ---
-        # Use LLM + prompt to judge whether counterfactual performs better than original trajectory
-        print(f"   ↳ Using LLM to verify if counterfactual improves...")
-        
-        # Format metrics information for prompt
-        def format_metrics(metrics_dict: Optional[Dict[str, float]], label: str) -> str:
-            if not metrics_dict:
-                return f"{label}: Not available"
-            lines = [f"{label}:"]
-            for key, value in metrics_dict.items():
-                if key != "error":
-                    lines.append(f"  - {key}: {value}")
-            if "error" in metrics_dict and metrics_dict["error"]:
-                lines.append(f"  - error: {metrics_dict['error']}")
-            return "\n".join(lines)
-        
-        verification_prompt = ChatPromptTemplate.from_template(
-            """You are an expert evaluator comparing two execution results to determine if a counterfactual execution (that violates a principle) performs better or worse than the original successful execution.
+            cf_plan = cf_prompt_text  # store prompt used as counterfactual_test placeholder
+            print(f"   ↳ Prepared counterfactual prompt (length: {len(cf_plan)} chars); OpenEvolve will use it as system_message")
+
+            # --- Step C: External Verification (Verification) ---
+            # Use evaluate function from evaluator_file to execute counterfactual solution
+            # Reference OpenEvolve's evaluator.py implementation:
+            # 1. Write code to temporary file
+            # 2. Call evaluator's evaluate(program_path) function
+            # 3. Return metrics dictionary
+            # Logic assumption:
+            # - If the principle is "true", then violating the principle (cf_plan) should lead to worse performance or failure.
+            # - If performance is better or similar after violating the principle, the principle is not necessary.
+
+            print(f"   ↳ Executing counterfactual verification (calling external Evaluator)...")
+            original_metrics = metrics  # Save original trajectory's metrics
+            cf_metrics = None
+
+            try:
+
+                # Use _evaluate_program_with_file method (similar to openevolve/evaluator.py implementation)
+                # This method will:
+                # 1. Create temporary file
+                # 2. Call evaluator function
+                # 3. Clean up temporary file
+                print(f"   ↳ Using evaluator file: {evaluator_file}")
+                cf_metrics = await self._evaluate_program_with_file(
+                    initial_program_code,
+                    config_path=config,
+                    evaluator_file=evaluator_file,
+                    system_message_override=cf_prompt_text,
+                    iter_over=5,
+                )
+                print(f"   ↳ Counterfactual evaluation completed, Metrics: {cf_metrics}")
+
+            except Exception as e:
+                # If execution fails, it usually means the counterfactual solution failed, which indirectly confirms the principle is valid
+                # Reference OpenEvolve error handling approach
+                print(f"   ↳ Execution error: {e} (considered as verification passed)")
+                logger.exception("Error during counterfactual evaluation")
+                cf_metrics = {"error": str(e), "combined_score": 0.0}
+
+            # --- Step D: Verification of Counterfactual Improvement (Verification) ---
+            # Two modes: LLM-based verification or direct score comparison
+            
+            if use_llm_verification:
+                # Use LLM + prompt to judge whether counterfactual performs better than original trajectory
+                print(f"   ↳ Using LLM to verify if counterfactual improves...")
+
+                # Format metrics information for prompt
+                def format_metrics(metrics_dict: Optional[Dict[str, float]], label: str) -> str:
+                    if not metrics_dict:
+                        return f"{label}: Not available"
+                    lines = [f"{label}:"]
+                    for key, value in metrics_dict.items():
+                        if key != "error":
+                            lines.append(f"  - {key}: {value}")
+                    if "error" in metrics_dict and metrics_dict["error"]:
+                        lines.append(f"  - error: {metrics_dict['error']}")
+                    return "\n".join(lines)
+
+                verification_prompt = ChatPromptTemplate.from_template(
+                    """You are an expert evaluator comparing two execution results to determine if a counterfactual execution (that violates a principle) performs better or worse than the original successful execution.
 
 # Principle Being Tested
 {principle}
@@ -640,48 +778,80 @@ Determine whether the counterfactual execution (which violates the principle) pe
 Respond with ONLY one word: "WORSE", "BETTER", or "SIMILAR"
 
 Your judgment:"""
-        )
-        
-        chain_verify = verification_prompt | self.llm | StrOutputParser()
-        verification_result = chain_verify.invoke({
-            "principle": candidate_principle,
-            "original_metrics": format_metrics(original_metrics, "Original"),
-            "counterfactual_metrics": format_metrics(cf_metrics, "Counterfactual")
-        }).strip().upper()
-        
-        print(f"   ↳ LLM verification result: {verification_result}")
-        
-        # Determine if principle is valid
-        # If counterfactual performs worse (WORSE), the principle is valid
-        # If counterfactual performs better or similar (BETTER/SIMILAR), the principle is not necessary
-        is_principle_valid = verification_result == "WORSE"
+                )
 
-        if is_principle_valid:
-            print("   ✅ Verification passed! Principle is a key causal factor. Storing...")
-            # 1. Store principle
-            self.vector_store.add_documents([
-                Document(
-                    page_content=candidate_principle,
-                    metadata={"type": "principle", "source_task": original_task}
-                )
-            ])
-            # 2. Store best program code as trajectory evidence
-            self.vector_store.add_documents([
-                Document(
-                    page_content=best_program_code,
-                    metadata={"type": "trajectory", "source_task": original_task}
-                )
-            ])
-            outcome = "VERIFIED"
-        else:
-            print("   ❌ Verification failed. Even violating the principle allows the task to succeed, indicating the principle is not necessary.")
-            outcome = "REJECTED"
+                chain_verify = verification_prompt | self.llm | StrOutputParser()
+                verification_result = chain_verify.invoke({
+                    "principle": candidate_principle,
+                    "original_metrics": format_metrics(original_metrics, "Original"),
+                    "counterfactual_metrics": format_metrics(cf_metrics, "Counterfactual")
+                }).strip().upper()
+
+                print(f"   ↳ LLM verification result: {verification_result}")
+
+                # Determine if principle is valid
+                # If counterfactual performs worse (WORSE), the principle is valid
+                # If counterfactual performs better or similar (BETTER/SIMILAR), the principle is not necessary
+                is_principle_valid = verification_result == "WORSE"
+            else:
+                # Direct score comparison: compare combined_score
+                print(f"   ↳ Using direct score comparison (combined_score)...")
+
+                original_score = original_metrics.get("combined_score", 0) if original_metrics else 0
+                cf_score = cf_metrics.get("combined_score", 0) if cf_metrics else 0
+                
+                # If counterfactual has error or score is lower, the principle is valid
+                has_error = cf_metrics and cf_metrics.get("error") is not None
+                is_worse = cf_score < original_score
+                
+                is_principle_valid = has_error or is_worse
+                
+                print(f"   ↳ Original score: {original_score}, Counterfactual score: {cf_score}")
+                if has_error:
+                    print("   ↳ Counterfactual has error → principle is valid")
+                elif is_worse:
+                    print("   ↳ Counterfactual score is lower → principle is valid")
+                else:
+                    print("   ↳ Counterfactual score is higher or similar → principle may not be necessary")
+
+            # Store or reject the principle based on verification result
+            if is_principle_valid:
+                print("   ✅ Verification passed! Principle is a key causal factor. Storing...")
+                # 1. Store principle
+                self.vector_store.add_documents([
+                    Document(
+                        page_content=candidate_principle,
+                        metadata={"type": "principle", "source_task": original_task}
+                    )
+                ])
+                # 2. Store best program code as trajectory evidence
+                self.vector_store.add_documents([
+                    Document(
+                        page_content=best_program_code,
+                        metadata={"type": "trajectory", "source_task": original_task}
+                    )
+                ])
+                outcome = "VERIFIED"
+                valid_principles.append(candidate_principle)
+            else:
+                outcome = "REJECTED"
+
+            # Store result for this principle
+            all_results.append({
+                "principle": candidate_principle,
+                "counterfactual_test": cf_plan,
+                "verification_outcome": outcome,
+                "saved": is_principle_valid
+            })
+
+        # Summary of all principles
+        print(f"\n   📊 Summary: {len(valid_principles)}/{len(candidate_principles)} principles verified and stored")
 
         return {
-            "extracted_principle": candidate_principle,
-            "counterfactual_test": cf_plan,
-            "verification_outcome": outcome,
-            "saved": is_principle_valid
+            "extracted_principles": valid_principles,
+            "all_principles": candidate_principles,
+            "results": all_results,
+            "saved_count": len(valid_principles)
         }
 
 
@@ -720,20 +890,29 @@ if __name__ == "__main__":
     best_program_path = "/home/common/hwluo/project/GraphEvolve/openevolve/examples/algotune/affine_transform_2d/best_program.py"
     
     # Optional: Provide evaluator metrics to help extract principles and verify counterfactuals
-    # If not provided, will automatically evaluate best_program to obtain metrics
+    # If not provided, will automatically evaluate initial_program to obtain metrics
     evaluator_metrics = {
         "combined_score": 0.85,
         "accuracy": 0.92,
         "execution_time": 1.23
     }
     
-    result = kb.learn_from_trajectory(
-        initial_program_path=initial_program_path,
-        best_program_path=best_program_path,
-        original_task=user_query,
-        evaluator_file=evaluator_file_path,  # Pass evaluator_file in learn_from_trajectory
-        metrics=evaluator_metrics  # Optional: If not provided, will automatically evaluate best_program
+    result = asyncio.run(
+        kb.learn_from_trajectory(
+            initial_program_path=initial_program_path,
+            best_program_path=best_program_path,
+            original_task=user_query,
+            evaluator_file=evaluator_file_path,  # Pass evaluator_file in learn_from_trajectory
+            metrics=evaluator_metrics  # Optional: If not provided, will automatically evaluate initial_program
+        )
     )
-    print(f"\n=== Learning Result: {result['verification_outcome']} ===")
-    print(f"Principle: {result['extracted_principle']}")
+    print(f"\n=== Learning Summary ===")
+    print(f"Total principles extracted: {len(result['all_principles'])}")
+    print(f"Verified and stored: {result['saved_count']}")
+    if result['extracted_principles']:
+        print(f"\n✅ Verified Principles:")
+        for i, principle in enumerate(result['extracted_principles'], 1):
+            print(f"  {i}. {principle}")
+    else:
+        print("\n❌ No principles were verified and stored.")
 

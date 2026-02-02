@@ -1,0 +1,24 @@
+---
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: graph.cell
+    target: scGATGraphTransform
+    params:
+      label_column: cell_type
+      log_level: INFO
+    params_to_tune:
+      n_neighbors:
+        values: [10, 15, 20, 25]
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        label_channel: cell_type
+wandb:
+  entity: xzy11632
+  project: dance-dev
+  method: grid  # try grid to provide a comprehensive search
+  metric:
+    name: combined_score  # val/acc
+    goal: maximize

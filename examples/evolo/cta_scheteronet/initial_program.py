@@ -27,6 +27,8 @@ from dance.transforms.normalize import Log1P, NormalizeTotal, UpdateSizeFactors
 from dance.typing import LogLevel
 from dance.utils import set_seed
 
+
+
 # EVOLVE-BLOCK-START
 @register_preprocessor("graph", "cell",overwrite=True)
 class HeteronetGraph(BaseTransform):
@@ -41,7 +43,6 @@ class HeteronetGraph(BaseTransform):
         self.channel = channel
         self.ignore_first = ignore_first
         self.channel_type = channel_type
-
     def build_graph(self, features_np, radius=None, knears=None, distance_metrics='l2'):
         """
         based on https://github.com/hannshu/st_datasets/blob/master/utils/preprocess.py

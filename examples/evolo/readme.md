@@ -21,3 +21,28 @@ python ../openevolve-run.py initial_program.py ../evaluator.py --config config.y
 
 
 spagcn以及louvain的指标已经修改
+
+scdeepsort的修改词又改了，看看改后怎么样，可以的话就都移走吧
+ // "Human_Brain": [
+        //     "--species",
+        //     "human",
+        //     "--tissue",
+        //     "Brain",
+        //     "--train_dataset",
+        //     "328",
+        //     "--test_dataset",
+        //     "138",
+        //     "--n_epochs",
+        //     "300",
+        //     "--num_runs",
+        //     "5",
+        //     "--device",
+        //     "cuda:0",
+        //     "--dense_dim",
+        //     "200" 
+        // ],
+
+brain暂时删掉了
+使用open-evolve的可视化
+
+#改成规则，而不是参考代码
