@@ -1,0 +1,324 @@
+algol
+begin
+  procedure ExtractImageFeatures(adata, device, model);
+  begin
+    preprocess := Compose([
+      Resize((224, 224)),
+      ToTensor(),
+      Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
+    ]);
+    dataset := SpatialImageDataset(paths = adata.obs['slices_path'], transform = preprocess);
+    data_loader := DataLoader(dataset, batch_size = 64, shuffle = false, num_workers = 4);
+    all_features := [];
+    all_spot_names := [];
+    
+    model.eval();
+    with torch.no_grad() do
+      for image_batch, spot_name_batch in data_loader do
+      begin
+        image_batch := image_batch.to(device);
+        result_batch := model(image_batch);
+        all_features.append(result_batch.cpu().numpy());
+        all_spot_names.extend(list(spot_name_batch));
+      end;
+    
+    final_features := Concatenate(all_features, axis = 0);
+    feat_df := DataFrame(final_features, index = all_spot_names);
+    return feat_df;
+  end;
+
+  procedure ComputeSpatialWeight(data, spatial_k, spatial_type);
+  begin
+    if spatial_type = "KDTree" then
+    begin
+      tree := KDTree(data, leaf_size = 2);
+      _, indices := tree.query(data, k = spatial_k + 1);
+    end
+    else if spatial_type = "NearestNeighbors" then
+    begin
+      nbrs := NearestNeighbors(n_neighbors = spatial_k + 1, algorithm = 'ball_tree').fit(data);
+      _, indices := nbrs.kneighbors(data);
+    end
+    else if spatial_type = "BallTree" then
+    begin
+      tree := BallTree(data, leaf_size = 2);
+      _, indices := tree.query(data, k = spatial_k + 1);
+    end;
+    
+    indices := indices[:, 1:];
+    spatial_weight := ZeroMatrix(data.shape[0], data.shape[0]);
+    for i := 0 to indices.shape[0] - 1 do
+    begin
+      for j in indices[i] do
+        spatial_weight[i][j] := 1;
+    end;
+    return spatial_weight;
+  end;
+
+  procedure ComputeGeneWeight(data, n_components, gene_dist_type);
+  begin
+    pca := PCA(n_components = n_components);
+    if data is csr_matrix then
+      data_pca := pca.fit_transform(data.toarray())
+    else
+      data_pca := pca.fit_transform(data);
+    gene_correlation := 1 - PairwiseDistances(data_pca, metric = gene_dist_type);
+    return gene_correlation;
+  end;
+
+  procedure ComputeWeightMatrix(adata, platform, pd_dist_type, md_dist_type, gb_dist_type,
+                                n_components, no_morphological, spatial_k, spatial_type, verbose);
+  begin
+    if platform = "Visium" then
+    begin
+      coords := adata.obsm['spatial_pixel'][["y_pixel", "x_pixel"]].values;
+      radius := 3 * UnitScale(coords, adata.obsm["spatial"]);
+      nbrs := NearestNeighbors(radius = radius, metric = pd_dist_type).fit(coords);
+      distances, indices := nbrs.radius_neighbors(coords);
+      physical_distance := SparseMatrixFromIndices(indices, data.shape[0]);
+    end
+    else
+      physical_distance := ComputeSpatialWeight(adata.obsm['spatial'], spatial_k, spatial_type);
+    
+    gene_correlation := ComputeGeneWeight(adata.X, n_components, gb_dist_type);
+    
+    if platform = "Visium" then
+    begin
+      morphological_similarity := 1 - PairwiseDistances(adata.obsm["image_feat_pca"], metric = md_dist_type);
+      morphological_similarity := Clip(morphological_similarity, min = 0, max = none);
+      weights_matrix_all := physical_distance * gene_correlation * morphological_similarity;
+      if no_morphological then
+        weights_matrix_nomd := gene_correlation * physical_distance;
+    end
+    else
+      weights_matrix_nomd := gene_correlation * physical_distance;
+    
+    if verbose then
+    begin
+      adata.obsm["gene_correlation"] := gene_correlation;
+      adata.obsm["physical_distance"] := physical_distance;
+      if platform = "Visium" then
+        adata.obsm["morphological_similarity"] := morphological_similarity;
+    end;
+    
+    if platform = "Visium" then
+      adata.obsm["weights_matrix_all"] := weights_matrix_all;
+    adata.obsm["weights_matrix_nomd"] := weights_matrix_nomd;
+    return adata;
+  end;
+
+  procedure FindAdjacentSpots(adata, use_data, neighbour_k, weights, verbose);
+  begin
+    if use_data = "raw" then
+      gene_matrix := adata.X.toarray()
+    else
+      gene_matrix := adata.obsm[use_data];
+    
+    weights_matrix := adata.obsm[weights];
+    final_coordinates := [];
+    weights_list := [];
+    
+    for i := 0 to adata.shape[0] - 1 do
+    begin
+      if weights = "physical_distance" then
+        current_spot := TopKIndices(weights_matrix[i], k = neighbour_k + 2, reverse = true)
+      else
+        current_spot := TopKIndices(weights_matrix[i], k = neighbour_k - 1, reverse = true);
+      
+      spot_weight := weights_matrix[i][current_spot];
+      spot_matrix := gene_matrix[current_spot];
+      
+      if Sum(spot_weight) > 0 then
+      begin
+        spot_weight_scaled := spot_weight / Sum(spot_weight);
+        spot_matrix_scaled := Multiply(spot_weight_scaled.reshape(-1, 1), spot_matrix);
+        spot_matrix_final := Sum(spot_matrix_scaled, axis = 0);
+        weights_list.append(spot_weight_scaled);
+      end
+      else
+      begin
+        spot_matrix_final := ZeroVector(gene_matrix.shape[1]);
+        weights_list.append(ZeroVector(length(current_spot)));
+      end;
+      
+      final_coordinates.append(spot_matrix_final);
+    end;
+    
+    adata.obsm['adjacent_data'] := Array(final_coordinates);
+    if verbose then
+      adata.obsm['adjacent_weight'] := Array(weights_list);
+    return adata;
+  end;
+
+  procedure AugmentGeneData(adata, Adj_WT);
+  begin
+    adjacent_gene_matrix := adata.obsm["adjacent_data"].astype(float);
+    if adata.X is np.ndarray then
+      augment_gene_matrix := adata.X + Adj_WT * adjacent_gene_matrix
+    else
+      augment_gene_matrix := adata.X.toarray() + Adj_WT * adjacent_gene_matrix;
+    adata.obsm["augment_gene_data"] := augment_gene_matrix;
+    return adata;
+  end;
+
+  procedure AugmentAdata(adata, platform, pd_dist_type, md_dist_type, gb_dist_type,
+                         n_components, no_morphological, use_data, neighbour_k, weights,
+                         Adj_WT, spatial_k, spatial_type);
+  begin
+    adata := ComputeWeightMatrix(adata, platform, pd_dist_type, md_dist_type, gb_dist_type,
+                                 n_components, no_morphological, spatial_k, spatial_type, verbose = false);
+    adata := FindAdjacentSpots(adata, use_data, neighbour_k, weights, verbose = false);
+    adata := AugmentGeneData(adata, Adj_WT);
+    return adata;
+  end;
+
+  procedure ImageCrop(adata, save_path, crop_size, target_size, quality);
+  begin
+    image := adata.uns["image"];
+    if image.dtype in {float32, float64} then
+      image := (image * 255).astype(uint8);
+    img_pillow := Image.fromarray(image);
+    tile_names := [];
+    
+    for (imagerow, imagecol) in zip(adata.obsm["spatial_pixel"]['x_pixel'], adata.obsm["spatial_pixel"]['y_pixel']) do
+    begin
+      imagerow_down := imagerow - crop_size / 2;
+      imagerow_up := imagerow + crop_size / 2;
+      imagecol_left := imagecol - crop_size / 2;
+      imagecol_right := imagecol + crop_size / 2;
+      tile := img_pillow.crop((imagecol_left, imagerow_down, imagecol_right, imagerow_up));
+      tile.thumbnail((target_size, target_size), LANCZOS);
+      tile.resize((target_size, target_size));
+      tile_name := Concat(str(imagecol), "-", str(imagerow), "-", str(crop_size));
+      out_tile := Path(save_path) / (tile_name + ".png");
+      tile_names.append(str(out_tile));
+      tile.save(out_tile, "PNG");
+    end;
+    
+    adata.obs["slices_path"] := tile_names;
+    return adata;
+  end;
+
+  procedure ExtractImageFeature(adata, pca_components, cnnType, device, verbose);
+  begin
+    model := EfficientNet.from_pretrained(cnnType);
+    model.to(device);
+    model.eval();
+    
+    feat_df := ExtractImageFeatures(adata, device, model);
+    adata.obsm["image_feat"] := feat_df.transpose().to_numpy();
+    
+    if verbose then
+      Print("The image feature is added to adata.obsm['image_feat'] !");
+    
+    pca := PCA(n_components = pca_components, random_state = 88);
+    pca_result := pca.fit_transform(feat_df.transpose().to_numpy());
+    adata.obsm["image_feat_pca"] := pca_result;
+    
+    if verbose then
+      Print("The pca result of image feature is added to adata.obsm['image_feat_pca'] !");
+    
+    return adata;
+  end;
+
+  procedure BuildGraph(data, distType, k, rad_cutoff);
+  begin
+    if distType = "KDTree" then
+    begin
+      tree := KDTree(data);
+      _, indices := tree.query(data, k = k + 1);
+      indices := indices[:, 1:];
+      graphList := [(i, indices[i][j]) for i in range(data.shape[0]) for j in range(indices.shape[1])];
+    end
+    else if distType = "kneighbors_graph" then
+    begin
+      A := kneighbors_graph(data, n_neighbors = k, mode = 'connectivity', include_self = false);
+      A := A.toarray();
+      graphList := [(i, j) for i in range(data.shape[0]) for j in where(A[i] == 1)];
+    end
+    else if distType = "Radius" then
+    begin
+      nbrs := NearestNeighbors(radius = rad_cutoff).fit(data);
+      distances, indices := nbrs.radius_neighbors(data);
+      graphList := [(i, indices[i][j]) for i in range(indices.shape[0]) for j in range(indices[i].shape[0]) if distances[i][j] > 0];
+    end;
+    
+    graph_dict := ListToDict(graphList, num_cell = data.shape[0]);
+    adj_org := adjacency_matrix(from_dict_of_lists(graph_dict));
+    adj_pre := adj_org - diagonal_matrix(adj_org.diagonal());
+    adj_pre.eliminate_zeros();
+    adj_norm := preprocess_graph(adj_pre);
+    adj_label := adj_pre + identity_matrix(adj_pre.shape[0]);
+    norm := compute_norm(adj_pre);
+    
+    return {
+      "adj_norm": adj_norm,
+      "adj_label": adj_label,
+      "norm_value": norm
+    };
+  end;
+
+  procedure TrainModel(adata, concat_X, graph_dict, pre_epochs, epochs, KL_WT, MSE_WT, KLD_WT, Domain_WT, use_gpu);
+  begin
+    model := EFNST_model(input_dim = concat_X.shape[1]);
+    training_config := TrainingConfig(
+      pro_data = concat_X,
+      G_dict = graph_dict,
+      model = model,
+      pre_epochs = pre_epochs,
+      epochs = epochs,
+      KL_WT = KL_WT,
+      MSE_WT = MSE_WT,
+      KLD_WT = KLD_WT,
+      Domain_WT = Domain_WT,
+      use_gpu = use_gpu
+    );
+    
+    training_config.pretrain();
+    embedding, _ := training_config.process();
+    adata.obsm["EfNST_embedding"] := embedding;
+    return adata;
+  end;
+
+  procedure RefineClusters(sample_id, pred, dis, shape);
+  begin
+    pred_df := DataFrame({"pred": pred}, index = sample_id);
+    dis_df := DataFrame(dis, index = sample_id, columns = sample_id);
+    
+    if shape = "hexagon" then
+      num_nbs := 6
+    else if shape = "square" then
+      num_nbs := 4;
+    
+    refined_pred := [];
+    for i := 0 to length(sample_id) - 1 do
+    begin
+      index := sample_id[i];
+      distances := dis_df.loc[index, :].sort_values();
+      nbs := distances.index[0:num_nbs + 1];
+      nbs_pred := pred_df.loc[nbs, "pred"];
+      self_pred := pred_df.loc[index, "pred"];
+      v_c := nbs_pred.value_counts();
+      
+      if (v_c[self_pred] < num_nbs / 2) and (max(v_c) > num_nbs / 2) then
+        refined_pred.append(v_c.idxmax())
+      else
+        refined_pred.append(self_pred);
+    end;
+    
+    return refined_pred;
+  end;
+
+  procedure DeleteTemporaryImages(adata);
+  begin
+    try
+    begin
+      first_path := adata.obs['slices_path'].iloc[0];
+      folder_path := Path(first_path).parent;
+      if folder_path.exists() and folder_path.is_dir() then
+        shutil.rmtree(folder_path);
+    end
+    except e do
+      Print("Error deleting images: ", e);
+  end;
+end.

@@ -1,0 +1,78 @@
+# Configuration for function minimization example
+max_iterations: 12 #50
+checkpoint_interval: 2
+
+# # LLM configuration
+# llm:
+#   primary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # primary_model: "llama3.1-8b"
+#   primary_model_weight: 0.6
+#   secondary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # secondary_model: "llama-4-scout-17b-16e-instruct"
+#   secondary_model_weight: 0.4
+#   api_base: "https://api.deepseek.com"
+#   # api_base: "https://api.cerebras.ai/v1"
+#   temperature: 0.8
+#   top_p: 0.95
+#   max_tokens: 8192
+#   timeout: 1200
+
+llm:
+  models:
+    - name: qwen3-coder-plus
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.99
+      temperature: 0.5
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.85
+    - name: qwen3-coder-flash
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.01
+      temperature: 0.5
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.85
+
+# Prompt configuration
+prompt:
+  system_message: |2-
+     **Role:** You are a Principal Research Scientist specializing in Computational Spatial Biology and Geometric Deep Learning. Your goal is to optimize the `# EVOLVE-BLOCK` to maximize **Adjusted Rand Index (ARI)** while ensuring the algorithm scales linearly with the number of spots.
+    **Task Objectives:** Evolve the provided Python functions to create a high-fidelity spatial affinity graph that captures both local niche consistency and global tissue architecture.
+    **1. Strategic Algorithm Enhancements:**
+    * **Adaptive Spatial Smoothing:** In `cal_spatial_weight`, replace binary neighbors with an **Adaptive Gaussian Kernel**. Use the local density (distance to the -th neighbor) to determine a spot-specific  (bandwidth). This accounts for varying cell densities across different tissue layers. * **Latent Space Refinement:** In `cal_gene_weight`, use **TruncatedSVD** for sparse inputs. To filter noise, implement a **soft-thresholding** on the correlation matrix: replace raw values with  or an exponential transformation to sharpen strong biological signals. * **Multi-Modal Multiplicative Fusion:** In `cal_weight_matrix`, implement a **Log-Domain Fusion** or a **Weighted Power Mean**. Simple multiplication of three matrices (Physical, Genetic, Morphological) often leads to 'vanishing weights' if one modality is noisy. Use: . * **Topological Pruning:** Implement a 'Mutual Nearest Neighbor' (MNN) or a rank-based pruning logic to ensure that edges only exist between spots that are mutually similar in both spatial and feature space.
+    **2. Efficiency & Sparsity Constraints:**
+    * **Stay Sparse:** Every operation MUST return or manipulate `scipy.sparse` matrices. Converting to `.toarray()` or `.dense()` inside the weight calculation is strictly forbidden to prevent memory overflow on large-scale datasets. * **Linear Algebra Ops:** Use `sklearn.metrics.pairwise.paired_distances` or optimized sparse dot products for calculations.
+    **3. Hyperparameter Search Space:**
+    * `spatial_k`: Range [15, 60] (Higher  captures broader context; lower  captures fine boundaries). * `n_components`: Range [30, 80] (Balance between signal retention and noise reduction). * `fusion_weights`: Introduce  parameters for weighting physical, genetic, and image data.
+    **4. Constraints & Freedom:**
+    * **Constraint:** Maintain function signatures: `cal_spatial_weight`, `cal_gene_weight`, and `cal_weight_matrix`. * **Constraint:** The `adata` object must be updated with `weights_matrix_all` and `weights_matrix_nomd` in `.obsm`. * **Freedom:** You are encouraged to import `sklearn.decomposition.TruncatedSVD`, `scipy.special.softmax`, or `sklearn.preprocessing.minmax_scale`. * **Freedom:** You may implement an automated 'elbow method' or heuristic to determine the optimal  or  dynamically based on the input coordinate distribution. **Freedom:**You are free to rewrite the internal logic of these functions entirely.In addition to these guidelines, feel free to improvise.
+
+    **domain_spagcn is identified as a structurally similar algorithm, sharing a similarity score of 0.8400 with the algorithm currently under optimization. Consequently, the following graph construction rules may serve as a useful reference:**
+    ```IF integrating multi-modal spatial features (e.g., morphology + coordinates) THEN augment z-axis embedding with robust variance-weighted intensity scaling and standardized dispersion control to preserve spatial topology in high-dimensional embedding space, boosting combined_score and sub_mba_score```
+
+
+
+  include_artifacts: true
+  max_artifact_bytes: 3276800
+  artifact_security_filter: true
+
+# Database configuration
+database:
+  population_size: 50
+  archive_size: 20
+  num_islands: 3
+  elite_selection_ratio: 0.2
+  exploitation_ratio: 0.7
+
+# Evaluator configuration
+evaluator:
+  timeout: 600000
+  cascade_thresholds: [0.01]
+  parallel_evaluations: 1
+
+# Evolution settings
+diff_based_evolution: true
+max_code_length: 20000000000

@@ -1,0 +1,74 @@
+# Configuration for function minimization example
+max_iterations: 20 #50
+checkpoint_interval: 2
+
+# # LLM configuration
+# llm:
+#   primary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # primary_model: "llama3.1-8b"
+#   primary_model_weight: 0.6
+#   secondary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # secondary_model: "llama-4-scout-17b-16e-instruct"
+#   secondary_model_weight: 0.4
+#   api_base: "https://api.deepseek.com"
+#   # api_base: "https://api.cerebras.ai/v1"
+#   temperature: 0.8
+#   top_p: 0.95
+#   max_tokens: 8192
+#   timeout: 1200
+
+llm:
+  models:
+    - name: qwen3-coder-plus
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.7
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+    - name: qwen3-coder-flash
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.3
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+
+# Prompt configuration
+prompt:
+  system_message: |2-
+     **Objective:** Optimize the `HeteronetGraph` class within the provided code block to enhance both the **computational efficiency** (speed/memory) and the **classification accuracy** of the downstream scHeteroNet/scGAT model. The goal is to construct a higher-quality graph representation of single-cell gene expression data.
+    **Context:** The code converts gene expression matrices into a graph structure for Graph Neural Networks. The current implementation uses `sklearn.neighbors.NearestNeighbors`, which can be slow and may produce noisy edges that hinder information propagation in single-cell data.
+    **Optimization Guidelines & Strategies:**
+    1.  **Efficiency Improvements (Speed):** *   Replace the `sklearn` implementation with **DGL native operations** (e.g., `dgl.knn_graph`) or PyTorch-based distance calculations where possible. These are generally faster and better optimized for tensors than moving data back and forth to NumPy/sklearn. *   Minimize CPU-GPU transfer overhead if applicable, though the transform typically runs on CPU.
+    2.  **Graph Topology Improvements (Accuracy):** *   **Mutual KNN (MNN):** Implement a 'Mutual Nearest Neighbors' strategy. Only keep an edge between node $u$ and node $v$ if $u$ is in $v$'s top-$k$ neighbors AND $v$ is in $u$'s top-$k$. This effectively removes noisy edges between distinct cell clusters, significantly improving classification accuracy. *   **Self-Loops:** Explicitly add self-loops (`g = dgl.add_self_loop(g)`) to the graph. This ensures that a cell's own feature information remains dominant during the message-passing aggregation steps. *   **Edge Pruning:** Consider implementing a distance threshold/radius mechanism combined with KNN. If a 'neighbor' is too far away (statistical outlier), do not create an edge, even if it is within the top $k$.
+    3.  **Robustness:** *   Ensure the code handles edge cases gracefully (e.g., disconnected components, zero-edge scenarios). *   Maintain type safety (ensure `dgl.ndata` features are float32 and labels are long).
+    **Constraints:** *   You **must** maintain the class structure inheriting from `BaseTransform`. *   The `__call__` method must accept the `data` object and store the resulting graph in `adata.uns[self.out]`. *   The input features will be provided via `data.get_feature`.
+    **Freedom of Execution:** *   You are free to refactor the `build_graph` helper method entirely or remove it in favor of logic inside `__call__`. *   You may add new hyperparameters to `__init__` (e.g., `mutual: bool`, `add_self_loop: bool`) as long as you provide sensible defaults.
+    **Output Format:** Return only the optimized Python code block between `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END`.
+
+    **cta_scdeepsort is identified as a structurally similar algorithm, sharing a similarity score of 0.7500 with the algorithm currently under optimization. Consequently, the following graph construction rules may serve as a useful reference:**
+    ```IF cell feature representation must capture both global structure and local expression weighting THEN fuse direct cell-level TruncatedSVD embeddings with weighted gene-PCA embeddings using biologically informed convex combination (0.6/0.4)```
+  include_artifacts: true
+  max_artifact_bytes: 32768
+  artifact_security_filter: true
+
+# Database configuration
+database:
+  population_size: 50
+  archive_size: 20
+  num_islands: 3
+  elite_selection_ratio: 0.2
+  exploitation_ratio: 0.7
+
+# Evaluator configuration
+evaluator:
+  timeout: 6000000
+  cascade_thresholds: [0.3]
+  parallel_evaluations: 1
+
+# Evolution settings
+diff_based_evolution: true
+max_code_length: 50000

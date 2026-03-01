@@ -1,0 +1,177 @@
+algol
+procedure LouvainClustering(graph: Graph; resolution: Real; random_state: RandomState): Partition;
+begin
+  status: Status;
+  dendrogram: List of Partition;
+  current_graph: Graph;
+  partition: Partition;
+  mod, new_mod: Real;
+
+  if graph.is_directed() then
+    raise TypeError("Only undirected graphs are supported");
+
+  if graph.number_of_edges() = 0 then
+  begin
+    partition := {};
+    for i := 0 to graph.number_of_nodes() - 1 do
+      partition[graph.nodes()[i]] := i;
+    return [partition];
+  end;
+
+  current_graph := graph.copy();
+  status := Status();
+  status.init(current_graph, weight := "weight", part := nil);
+
+  dendrogram := [];
+  _one_level(current_graph, status, "weight", resolution, random_state);
+  new_mod := _modularity(status, resolution);
+  partition := __renumber(status.node2com);
+  dendrogram.append(partition);
+  mod := new_mod;
+  current_graph := induced_graph(partition, current_graph, "weight");
+  status.init(current_graph, "weight");
+
+  while true do
+  begin
+    _one_level(current_graph, status, "weight", resolution, random_state);
+    new_mod := _modularity(status, resolution);
+    if new_mod - mod < MIN then
+      break;
+    partition := __renumber(status.node2com);
+    dendrogram.append(partition);
+    mod := new_mod;
+    current_graph := induced_graph(partition, current_graph, "weight");
+    status.init(current_graph, "weight");
+  end;
+
+  return dendrogram;
+end;
+
+procedure _one_level(graph: Graph; status: Status; weight_key: String; resolution: Real; random_state: RandomState);
+begin
+  modified: Boolean := true;
+  nb_pass_done: Integer := 0;
+  cur_mod, new_mod: Real;
+  cur_mod := _modularity(status, resolution);
+  new_mod := cur_mod;
+
+  while modified and nb_pass_done ≠ PASS_MAX do
+  begin
+    cur_mod := new_mod;
+    modified := false;
+    nb_pass_done := nb_pass_done + 1;
+
+    for node in _randomize(graph.nodes(), random_state) do
+    begin
+      com_node := status.node2com[node];
+      degc_totw := status.gdegrees[node] / (status.total_weight * 2.0);
+      neigh_communities := _neighcom(node, graph, status, weight_key);
+
+      remove_cost := -neigh_communities[com_node] +
+                     resolution * (status.degrees[com_node] - status.gdegrees[node]) * degc_totw;
+      _remove(node, com_node, neigh_communities[com_node], status);
+
+      best_com := com_node;
+      best_increase := 0.0;
+      for (com, dnc) in _randomize(neigh_communities.items(), random_state) do
+      begin
+        incr := remove_cost + dnc - resolution * status.degrees[com] * degc_totw;
+        if incr > best_increase then
+        begin
+          best_increase := incr;
+          best_com := com;
+        end;
+      end;
+
+      _insert(node, best_com, neigh_communities[best_com], status);
+      if best_com ≠ com_node then
+        modified := true;
+    end;
+
+    new_mod := _modularity(status, resolution);
+    if new_mod - cur_mod < MIN then
+      break;
+  end;
+end;
+
+function _neighcom(node: Node; graph: Graph; status: Status; weight_key: String): Map[Community, Real];
+begin
+  weights: Map[Community, Real] := {};
+  for (neighbor, data) in graph[node].items() do
+  begin
+    if neighbor ≠ node then
+    begin
+      edge_weight := data.get(weight_key, 1.0);
+      neighborcom := status.node2com[neighbor];
+      weights[neighborcom] := weights.get(neighborcom, 0.0) + edge_weight;
+    end;
+  end;
+  return weights;
+end;
+
+procedure _remove(node: Node; com: Community; weight: Real; status: Status);
+begin
+  status.degrees[com] := status.degrees.get(com, 0.0) - status.gdegrees[node];
+  status.internals[com] := status.internals.get(com, 0.0) - weight - status.loops[node];
+  status.node2com[node] := -1;
+end;
+
+procedure _insert(node: Node; com: Community; weight: Real; status: Status);
+begin
+  status.node2com[node] := com;
+  status.degrees[com] := status.degrees.get(com, 0.0) + status.gdegrees[node];
+  status.internals[com] := status.internals.get(com, 0.0) + weight + status.loops[node];
+end;
+
+function _modularity(status: Status; resolution: Real): Real;
+begin
+  links := status.total_weight;
+  result := 0.0;
+  communities := set(status.node2com.values());
+  for community in communities do
+  begin
+    in_degree := status.internals.get(community, 0.0);
+    degree := status.degrees.get(community, 0.0);
+    if links > 0.0 then
+      result := result + (in_degree * resolution / links) - ((degree / (2.0 * links)) ** 2);
+  end;
+  return result;
+end;
+
+function __renumber(dictionary: Map[Node, Community]): Map[Node, Community];
+begin
+  values := set(dictionary.values());
+  target := set(range(|values|));
+  if values = target then
+    return dictionary.copy()
+  else
+  begin
+    renumbering := map from (target ∩ values) to (target ∩ values);
+    renumbering := renumbering ∪ map from (values \ target) to (target \ values);
+    return {k → renumbering[v] | (k, v) in dictionary};
+  end;
+end;
+
+function induced_graph(partition: Partition; graph: Graph; weight: String): Graph;
+begin
+  ret := Graph();
+  ret.add_nodes_from(partition.values());
+
+  for (node1, node2, data) in graph.edges(data := true) do
+  begin
+    edge_weight := data.get(weight, 1.0);
+    com1 := partition[node1];
+    com2 := partition[node2];
+    w_prec := ret.get_edge_data(com1, com2, {weight: 0.0}).get(weight, 0.0);
+    ret.add_edge(com1, com2, weight := w_prec + edge_weight);
+  end;
+
+  return ret;
+end;
+
+function _randomize(items: Collection; random_state: RandomState): List;
+begin
+  randomized_items := list(items);
+  random_state.shuffle(randomized_items);
+  return randomized_items;
+end;

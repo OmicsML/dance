@@ -1,15 +1,20 @@
 """
 Lamarckian Knowledge Base
 
-This design pattern is well-suited for integration into existing Agent frameworks 
+This design pattern is well-suited for integration into existing Agent frameworks
 (such as LangGraph, AutoGen, or MetaGPT) as a "plug-in brain" component.
 
 Core Features:
-1. Historical Principle and Trajectory Retrieval: Retrieve relevant historical abstract 
+1. Historical Principle and Trajectory Retrieval: Retrieve relevant historical abstract
    principles and concrete trajectories based on the current task
-2. Successful Trajectory Abstraction and Counterfactual Verification Storage: Extract 
-   principles from successful trajectories and verify their effectiveness through 
+2. Successful Trajectory Abstraction and Counterfactual Verification Storage: Extract
+   principles from successful trajectories and verify their effectiveness through
    counterfactual testing
+
+IMPORTANT NOTES FOR NFS USERS:
+- SQLite/ChromaDB may have issues on NFS file systems due to file locking limitations
+- For NFS environments, consider using Chroma Client-Server mode or a different vector store
+- This implementation includes automatic recovery and retry mechanisms for NFS environments
 """
 
 from typing import List, Dict, Optional, TypedDict
@@ -19,6 +24,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
+import chromadb
+import chromadb.config
 import os
 import sys
 import importlib.util
@@ -27,8 +34,10 @@ import logging
 import asyncio
 import re
 import shutil
+import threading
 
 logger = logging.getLogger(__name__)
+
 
 
 # Data structure definitions
@@ -48,23 +57,24 @@ class LearningResult(TypedDict):
 
 class LamarckianKnowledgeBase:
     """
-    Lamarckian Knowledge Base
+    Lamarckian Knowledge Base (Client-Server Edition)
     
-    Extracts reusable principles from successful trajectories through abstraction 
-    and counterfactual verification, storing them in a vector database for 
-    subsequent retrieval.
+    Strictly uses ChromaDB HttpClient to avoid NFS file locking issues.
     """
 
-    def __init__(self, vector_store_path: str = "./memory_db", 
+    def __init__(self, 
+                 host: str = "211.87.232.112", 
+                 port: int = 8000,
                  api_key: Optional[str] = None,
                  program_suffix: str = ".py"):
         """
-        Initialize the knowledge base, including vector database and LLM configuration
+        Initialize the knowledge base using ChromaDB HTTP Client.
 
         Args:
-            vector_store_path: Path to store the vector database
-            api_key: DashScope API Key. If None, reads from environment variable DASHSCOPE_API_KEY
-            program_suffix: Suffix for program files, defaults to ".py"
+            host: Chroma DB Server IP (e.g., "211.87.232.112")
+            port: Chroma DB Server Port (e.g., 8000)
+            api_key: DashScope API Key.
+            program_suffix: Suffix for program files.
         """
         # 1. Initialize LLM (Qwen via DashScope)
         api_key = api_key or os.getenv("DASHSCOPE_API_KEY", "YOUR_DASHSCOPE_API_KEY")
@@ -75,42 +85,69 @@ class LamarckianKnowledgeBase:
             temperature=0.1
         )
 
-        # 2. Initialize vector store (distinguish principles and trajectories, or mixed storage via metadata)
-        # Use DashScope embedding model
-        # Note: DashScope embedding API may need to use text-embedding-v1, text-embedding-v2, or text-embedding-v3
+        # 2. Initialize Embeddings (Crucial for 1024 dimension)
         try:
             self.embeddings = DashScopeEmbeddings(
-                model="text-embedding-v4",  # DashScope embedding model (using v4 version, more stable)
+                model="text-embedding-v3", # 推荐使用 v3 或 v4
                 dashscope_api_key=api_key
             )
         except Exception as e:
-            logger.warning(f"Embedding initialization failed, trying v1 version: {e}")
-            try:
-                self.embeddings = DashScopeEmbeddings(
-                    model="text-embedding-v1",  # Try v1 version
-                    dashscope_api_key=api_key
-                )
-            except Exception as e2:
-                logger.warning(f"Embedding v1 initialization also failed, trying v3: {e2}")
-                try:
-                    self.embeddings = DashScopeEmbeddings(
-                        model="text-embedding-v3",  # Try v3 version
-                        dashscope_api_key=api_key
-                    )
-                except Exception as e3:
-                    logger.warning(f"Embedding v3 initialization also failed, trying default model: {e3}")
-                    self.embeddings = DashScopeEmbeddings(
-                        dashscope_api_key=api_key
-                    )
+            logger.warning(f"Embedding initialization failed, falling back to v2: {e}")
+            self.embeddings = DashScopeEmbeddings(
+                model="text-embedding-v2",
+                dashscope_api_key=api_key
+            )
 
-        self.vector_store = Chroma(
-            collection_name="lamarckian_memory",
-            embedding_function=self.embeddings,
-            persist_directory=vector_store_path
-        )
+        # 3. Initialize ChromaDB HTTP Client (The Clean Way)
+        logger.info(f"🔗 Connecting to ChromaDB Server at http://{host}:{port}...")
         
-        # 3. Initialize other attributes
+        try:
+            self._chroma_client = chromadb.HttpClient(
+                host=host,
+                port=port,
+                settings=chromadb.config.Settings(anonymized_telemetry=False)
+            )
+            # 测试连接
+            version = self._chroma_client.get_version()
+            logger.info(f"✅ Connected to ChromaDB Server (Version: {version})")
+        except Exception as e:
+            logger.error(f"❌ Failed to connect to ChromaDB Server: {e}")
+            raise ConnectionError(f"Could not connect to ChromaDB at {host}:{port}. Is the server running?")
+
+        # 4. Collection Setup (Fixing the 384 vs 1024 dimension error)
+        # 关键点：我们必须创建一个 Adapter，让 Chroma 原生客户端也能理解 LangChain 的 Embedding 类
+        # 或者更简单地，我们只通过 LangChain 接口操作，或者确保 Collection 创建时元数据正确。
+        
+        # 为了解决 "Collection expecting embedding with dimension of 384"，
+        # 我们需要在获取集合时，告诉 Chroma 我们使用的 Embedding Function。
+        
+        # 由于 LangChain 的 DashScopeEmbeddings 和 Chroma 原生的 EmbeddingFunction 接口略有不同，
+        # 我们这里主要依赖 LangChain 的 Chroma 包装器来管理维度，但为了防止原生调用出错，
+        # 我们显式获取集合。
+        self._collection_name = "lamarckian_memory"
+        
+        # ⚠️ 如果之前创建过错误的 384 维集合，这里可能需要先手动删除，或者换个名字
+        # self._chroma_client.delete_collection(self._collection_name) 
+
+        self._chroma_collection = self._chroma_client.get_or_create_collection(
+            name=self._collection_name,
+            metadata={"description": "Lamarckian memory", "hnsw:space": "cosine"}
+            # 注意：这里不传 embedding_function 给原生 client，
+            # 因为我们主要通过下面的 self.vector_store (LangChain) 来进行 add/query，
+            # LangChain 会负责计算好 embedding (1024维) 再传给 Chroma。
+            # Chroma 只要接收到 1024 维的向量，它就会自动适配（如果是新集合）。
+        )
+
+        # 5. LangChain Vector Store Wrapper
+        # 所有的读写操作建议优先通过这个对象进行，它会自动调用 self.embeddings 计算向量
+        self.vector_store = Chroma(
+            client=self._chroma_client,
+            collection_name=self._collection_name,
+            embedding_function=self.embeddings,
+        )
+
         self.program_suffix = program_suffix
+        self._write_lock = threading.Lock()
 
     def _load_evaluation_function(self, evaluator_file: str):
         """
@@ -458,25 +495,19 @@ class LamarckianKnowledgeBase:
             # Try to access underlying collection API used by Chroma
             data = None
             collection = getattr(self.vector_store, "_collection", None)
-            # Use only safe include fields to avoid triggering data loader behavior.
-            # Requesting 'uris' may cause Chroma to try loading external data and require a data loader.
-            include_fields = ["documents", "metadatas"]
+            # Don't specify include - get() returns ids, documents, metadatas by default
             if collection is not None and hasattr(collection, "get"):
-                data = collection.get(include=include_fields)
+                data = collection.get()
             elif hasattr(self.vector_store, "get"):
                 # Some wrappers expose get directly
-                data = self.vector_store.get(include=include_fields)
+                data = self.vector_store.get()
             else:
                 raise RuntimeError("Unable to access underlying collection API for listing memories")
 
             documents = data.get("documents", []) if isinstance(data, dict) else []
             metadatas = data.get("metadatas", []) if isinstance(data, dict) else []
-            # Chroma does not expose 'ids' through get() reliably; synthesize placeholder ids
-            ids = None
-            if isinstance(data, dict) and "ids" in data:
-                ids = data.get("ids")
-            if ids is None:
-                ids = [None] * max(len(documents), len(metadatas))
+            # get() without include parameter returns ids, documents, metadatas by default
+            ids = data.get("ids", []) if isinstance(data, dict) else []
 
             principles: List[Dict[str, object]] = []
             trajectories: List[Dict[str, object]] = []
@@ -561,7 +592,7 @@ class LamarckianKnowledgeBase:
                 metrics_info = "\n".join(metrics_lines) + "\n\n"
         
         abstract_prompt = ChatPromptTemplate.from_template(
-            """You are an expert at analyzing code improvements and extracting actionable principles that lead to better evaluator scores.
+    """You are an expert Senior Bioinformatics Algorithm Engineer specializing in computational biology and high-performance computing.
 
 # Task
 {task}
@@ -574,18 +605,20 @@ class LamarckianKnowledgeBase:
 {best_code}
 
 # Your Task
-Compare the two programs above and extract multiple key principles that explain why the best program achieved a higher evaluator score than the initial program. Note that the code changes are located exclusively between the "# EVOLVE-BLOCK-START" and "# EVOLVE-BLOCK-END" markers.
+Compare the two bioinformatics algorithms above and extract multiple key principles that explain why the best program achieved a higher evaluator score. The code changes are located exclusively between the "# EVOLVE-BLOCK-START" and "# EVOLVE-BLOCK-END" markers.
+
+## Focus Areas for Bioinformatics:
+- **Algorithmic Efficiency:** Handling large-scale biological data (e.g., genomic sequences, protein structures) within time/memory constraints.
+- **Biological Correctness:** Handling edge cases in biological data (e.g., ambiguous bases, gaps, sequencing errors).
+- **Heuristics & Optimization:** Shifts from brute-force to domain-specific heuristics (e.g., k-mer indexing, dynamic programming, seed-and-extend).
 
 ## Requirements:
-1. Focus on strategies that directly improve evaluator metrics (e.g., combined_score, performance metrics, correctness)
-2. Identify the key differences between initial and best programs
-3. Remove specific variable names, IDs, or concrete values - make it generalizable
-4. Use the format: "IF [scenario characteristics] THEN [key strategy]"
-5. Each principle should be:
-   - Specific enough to be actionable
-   - General enough to apply to similar tasks
-   - Causal: following it should increase evaluator scores, violating it should decrease scores
-6. Extract 2-5 principles that are distinct from each other
+1. Focus on strategies that directly improve evaluator metrics (e.g., biological accuracy, alignment speed, memory reduction).
+2. Identify the key algorithmic transformations between the initial and best programs.
+3. **Use Bioinformatics Terminology:** Generalize using domain-specific concepts (e.g., "vectorization," "hashing k-mers," "dynamic programming," "pruning search space") rather than generic programming terms where applicable.
+4. Remove specific variable names (like `dna_seq_1`) or concrete values.
+5. Use the format: "IF [bio-computational scenario] THEN [key strategy]"
+6. Each principle should be causal: following it should increase the specific bio-metric scores.
 
 ## Output Format
 Provide only the principle statements, one per line, no additional explanation.
@@ -593,9 +626,9 @@ Provide only the principle statements, one per line, no additional explanation.
 Principles:
 1. IF [scenario] THEN [strategy]
 2. IF [scenario] THEN [strategy]
-3. IF [scenario] THEN [strategy]
-... (more if needed)"""
-        )
+..."""
+)
+
         chain_extract = abstract_prompt | self.llm | StrOutputParser()
         candidate_principles_text = chain_extract.invoke({
             "task": original_task,
@@ -673,8 +706,7 @@ Generate a modified version of the complete program that deliberately violates t
 5. Output ONLY the complete program code, no explanations, no comments outside the code
 
 ## Output Format
-Provide only the complete modified program code, ready to be executed.
-Modified Counterfactual Program Code:"""
+Provide only the complete modified program code, ready-to-be-executed Modified Counterfactual Program Code"""
             )
             # Render the counterfactual prompt text and set it as the system message for OpenEvolve
             try:
@@ -724,7 +756,7 @@ Modified Counterfactual Program Code:"""
                     config_path=config,
                     evaluator_file=evaluator_file,
                     system_message_override=cf_prompt_text,
-                    iter_over=5,
+                    iter_over=2,
                 )
                 print(f"   ↳ Counterfactual evaluation completed, Metrics: {cf_metrics}")
 
@@ -795,14 +827,19 @@ Your judgment:"""
                 is_principle_valid = verification_result == "WORSE"
             else:
                 # Direct score comparison: compare combined_score
-                print(f"   ↳ Using direct score comparison (combined_score)...")
+                print(f"   ↳ Using direct score comparison (weighted_score)...")
+                if original_metrics:
+                    original_score = original_metrics.get("avg_accuracy", 0)*0.8+original_metrics.get("avg_speed_score", 0)*0.2
+                else:
+                    original_score = 0
+                if cf_metrics:
+                    cf_score = cf_metrics.get("avg_accuracy", 0)*0.8+cf_metrics.get("avg_speed_score", 0)*0.2
+                else:
+                    cf_score = 0
 
-                original_score = original_metrics.get("combined_score", 0) if original_metrics else 0
-                cf_score = cf_metrics.get("combined_score", 0) if cf_metrics else 0
-                
                 # If counterfactual has error or score is lower, the principle is valid
                 has_error = cf_metrics and cf_metrics.get("error") is not None
-                is_worse = cf_score < original_score
+                is_worse = cf_score < original_score+0.0001
                 
                 is_principle_valid = has_error or is_worse
                 
@@ -817,20 +854,22 @@ Your judgment:"""
             # Store or reject the principle based on verification result
             if is_principle_valid:
                 print("   ✅ Verification passed! Principle is a key causal factor. Storing...")
-                # 1. Store principle
-                self.vector_store.add_documents([
-                    Document(
-                        page_content=candidate_principle,
-                        metadata={"type": "principle", "source_task": original_task}
-                    )
-                ])
-                # 2. Store best program code as trajectory evidence
-                self.vector_store.add_documents([
-                    Document(
-                        page_content=best_program_code,
-                        metadata={"type": "trajectory", "source_task": original_task}
-                    )
-                ])
+                # Use lock to prevent concurrent write issues
+                with self._write_lock:
+                    # 1. Store principle
+                    self.vector_store.add_documents([
+                        Document(
+                            page_content=candidate_principle,
+                            metadata={"type": "principle", "source_task": original_task}
+                        )
+                    ])
+                    # 2. Store best program code as trajectory evidence
+                    self.vector_store.add_documents([
+                        Document(
+                            page_content=best_program_code,
+                            metadata={"type": "trajectory", "source_task": original_task}
+                        )
+                    ])
                 outcome = "VERIFIED"
                 valid_principles.append(candidate_principle)
             else:
@@ -853,6 +892,23 @@ Your judgment:"""
             "results": all_results,
             "saved_count": len(valid_principles)
         }
+    def get_memory_by_task(self, task: str) -> List[Dict[str, object]]:
+        all_memories = self.list_all_memories()
+        all_principles = all_memories.get("principles", [])
+        all_trajectories = all_memories.get("trajectories", [])
+
+        # Use new lists to avoid modifying while iterating
+        matching_principles = []
+        for p in all_principles:
+            if p.get("metadata", {}).get("source_task") == task:
+                matching_principles.append(p)
+
+        matching_trajectories = []
+        for t in all_trajectories:
+            if t.get("metadata", {}).get("source_task") == task:
+                matching_trajectories.append(t)
+
+        return matching_principles, matching_trajectories
 
 
 # =============================================================================

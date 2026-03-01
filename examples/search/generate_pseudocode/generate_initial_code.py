@@ -5,13 +5,20 @@ import os
 from datasets import concatenate_datasets, load_dataset, Dataset, DatasetDict
 import pandas as pd
 base_path="/mnt/nfs/zyxing/msu/dance_temp/dance/dance/modules/"
+# "cta_scgat","cta_scrgcl",'cta_graphcs','domain_stlearn'
 path_dict={
     "cta_scdeepsort":"single_modality/cell_type_annotation/scdeepsort.py",
     "cta_scheteronet":"single_modality/cell_type_annotation/scheteronet.py",
     "domain_efnst":"spatial/spatial_domain/EfNST.py",
     "domain_louvain":"spatial/spatial_domain/louvain.py",
     "domain_spagcn":"spatial/spatial_domain/spagcn.py",
-    "domain_stagate":"spatial/spatial_domain/stagate.py"
+    "domain_stagate":"spatial/spatial_domain/stagate.py",
+    
+    "cta_scgat":"single_modality/cell_type_annotation/scgat.py",
+    "cta_scrgcl":"single_modality/cell_type_annotation/scrgcl.py",
+    "cta_graphcs":"single_modality/cell_type_annotation/graphcs.py",
+    "domain_stlearn":"spatial/spatial_domain/stlearn.py",
+    "domain_spagra":"spatial/spatial_domain/spaGRA.py"
 }
 
 from openai import OpenAI
@@ -22,9 +29,9 @@ client = OpenAI(
     api_key=api_key,
     base_url=base_url
 )
-model_name="qwen-flash"
+model_name="qwen-plus"
 
-dataset_name="zhongyuxing/Graph_Structure_Learning_Pseudocode"  
+dataset_name="zhongyuxing/Graph_Structure_Learning_Pseudocode_new_new"  
 split="train"  
 def generate_code(file_path,method_name,num_samples=2):
     with open(file_path,"r") as f:
@@ -33,7 +40,10 @@ def generate_code(file_path,method_name,num_samples=2):
         dataset_name,split="train"
     )
     filtered_dataset=dataset.filter(lambda example: example['method'] != method_name)
-    new_data=[]
+    new_data=[{
+            'method':method_name,
+            'code':content
+        }]
     for i in range(num_samples):
         completion = client.chat.completions.create(
             model=model_name,
@@ -121,17 +131,36 @@ def generate_clrs_pseudocode(file_path,method_name):
         
 
 if __name__ == "__main__":
+    # 定义完整列表
+    ALL_METHODS = [
+        "cta_scdeepsort", "cta_scheteronet", "domain_efnst", "domain_louvain",
+        "domain_spagcn", "domain_stagate", "cta_scgat", "cta_scrgcl",
+        "cta_graphcs", "domain_stlearn",
+        "domain_spagra"
+    ]
+
     parser = argparse.ArgumentParser(description="Evaluate prompts on GEPA benchmark datasets")
     parser.add_argument(
         "--method_name",
         type=str,
-        choices=["cta_scdeepsort", "cta_scheteronet", "domain_efnst", "domain_louvain","domain_spagcn","domain_stagate"],
-        help="Method to generate",
-        default="cta_scheteronet"
+        # 允许输入 'all' 来运行所有，或者是列表中的具体某一个
+        choices=ALL_METHODS + ["all"], 
+        help="Method to generate, or 'all' for batch processing",
+        default="all" # 默认改为跑全部，或者你可以设为 None
     )
 
     args = parser.parse_args()
-    file_path=os.path.join(base_path,path_dict[args.method_name])
-    # generate_code(file_path,args.method_name)
-    generate_clrs_pseudocode(file_path,args.method_name)
+
+    # 逻辑判断：如果是 'all'，则使用完整列表；否则使用单个列表
+    target_methods = ALL_METHODS if args.method_name == "all" else [args.method_name]
+
+    for method in target_methods:
+        print(f"=== Processing: {method} ===")
+        # 确保 path_dict 里有这个 key
+        if method in path_dict:
+            file_path = os.path.join(base_path, path_dict[method])
+            generate_code(file_path, method)
+            generate_clrs_pseudocode(file_path, method)
+        else:
+            print(f"Warning: {method} not found in path_dict.")
     

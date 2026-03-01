@@ -97,6 +97,7 @@ if __name__ == "__main__":
     parser.add_argument("--neighbors", type=int, default=17, help="Number of neighbors.")
     parser.add_argument("--seed", type=int, default=202, help="Random seed.")
     parser.add_argument("--num_runs", type=int, default=1)
+    parser.add_argument("--obs_nums",type=int,default=10000)
     args = parser.parse_args()
 
     scores = []
@@ -111,7 +112,7 @@ if __name__ == "__main__":
         # Load data and perform necessary preprocessing
         dataloader = SpatialLIBDDataset(data_id=args.sample_number)
         data = dataloader.load_data(transform=None, cache=args.cache)
-        sub_data(data.data)
+        sub_data(data.data,n_cells=args.obs_nums)
         preprocessing_pipeline(data)
         (x,adj), y = data.get_data(return_type="default")
 

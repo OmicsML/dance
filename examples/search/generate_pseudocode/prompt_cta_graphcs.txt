@@ -1,0 +1,131 @@
+algol
+procedure GraphCSClassifier;
+begin
+  // Hyperparameters and configuration — all from args; no defaults or assumptions
+  batch_size := args.batch_size;
+  epochs := args.epochs;
+  lr := args.lr;
+  vat_lr := args.vat_lr;
+  patience := args.patience;
+  gpus := args.gpus;
+  layer := args.layer;
+  hidden := args.hidden;
+  dropout := args.dropout;
+  bias := args.bias;
+
+  // Device setup — use first GPU if CUDA available and gpus non-empty, else CPU
+  device := if (CUDA available AND gpus non-empty) then "cuda:" + gpus[0] else "cpu";
+
+  // Seed initialization — call SetRandomSeed with exact random_state value
+  SetRandomSeed(random_state);
+
+  // Preprocessing pipeline — exact parameters used in reference implementation
+  preprocessing := Compose(
+    SupervisedFeatureSelection(label_col="cell_type", n_features=2000, split_name="train"),
+    NormalizeTotalLog1P(),
+    HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=2000),
+    BBKNNConstruction(edge_ratio=2, key_added="temp_graph"),
+    SetConfig({"label_channel": "cell_type"})
+  );
+
+  // Model definition: GnnBP — match constructor signature and device placement precisely
+  model := GnnBP(
+    nfeat := nfeat,
+    nlayers := layer,
+    nhidden := hidden,
+    nclass := nclass,
+    dropout := dropout,
+    bias := bias
+  ).to(device);
+
+  // Multi-GPU only if exactly >1 GPU specified
+  if |gpus| > 1 then model := DataParallel(model, device_ids=gpus);
+
+  // Optimizer and loss — Adam with lr, CrossEntropyLoss
+  optimizer := Adam(model.parameters(), lr := lr);
+  loss_fn := CrossEntropyLoss();
+
+  // Training loop — include VAT regularization only when vat_lr > 0, using xi=10.0, eps=1.0, ip=1
+  best_f1 := 0; bad_counter := 0;
+  checkpt_file := GenerateUniqueCheckpointPath(prj_path);
+
+  for epoch := 1 to epochs do
+  begin
+    model.train();
+    loss_list := [];
+
+    for each (batch_x, (batch_y, _)) in train_loader do
+    begin
+      batch_x := batch_x.to(device); batch_y := batch_y.to(device);
+      optimizer.zero_grad();
+      output := model(batch_x);
+      loss_train := loss_fn(output, batch_y);
+
+      if vat_lr > 0 then
+      begin
+        vat_loss := VATLoss(xi := 10.0, eps := 1.0, ip := 1);
+        lds := vat_loss(model, batch_x);
+        loss_train := loss_train + lds * vat_lr;
+      end;
+
+      loss_train.backward(); optimizer.step();
+      loss_list.append(loss_train.item());
+    end;
+
+    // Validation — compute micro-F1 using muticlass_f1 helper
+    model.eval();
+    val_x_gpu := x_val.to(device); val_y_gpu := y_val.to(device);
+    output_val := model(val_x_gpu);
+    micro_val := muticlass_f1(output_val, val_y_gpu);
+
+    avg_loss := Mean(loss_list);
+
+    if epoch mod 10 = 0 then
+      Print("Epoch:", epoch, "| loss:", round(avg_loss, 3), "| val_f1:", round(micro_val, 6));
+
+    // Early stopping — save best model state dict, reset counter on improvement
+    if micro_val > best_f1 then
+    begin
+      best_f1 := micro_val;
+      SaveModel(model.state_dict(), checkpt_file);
+      bad_counter := 0;
+    end
+    else bad_counter := bad_counter + 1;
+
+    if bad_counter >= patience then break;
+  end;
+
+  // Finalize — load best checkpoint into model
+  model.load_state_dict(LoadModel(checkpt_file));
+
+  // Prediction methods — batched inference, no gradient computation, device-aware
+  procedure predict(x: array of real): array of integer;
+  begin
+    model.eval();
+    pred_dataset := SimpleSet(x, zeros(|x|));
+    pred_loader := DataLoader(pred_dataset, batch_size := batch_size, shuffle := false);
+    preds := [];
+    for each (batch_x, _) in pred_loader do
+    begin
+      batch_x := batch_x.to(device);
+      pred_batch := ArgMax(model(batch_x), dim := 1).cpu().numpy();
+      preds.append(pred_batch);
+    end;
+    return Concatenate(preds);
+  end;
+
+  procedure predict_proba(x: array of real): array of real;
+  begin
+    model.eval();
+    pred_dataset := SimpleSet(x, zeros(|x|));
+    pred_loader := DataLoader(pred_dataset, batch_size := batch_size, shuffle := false);
+    probs := [];
+    for each (batch_x, _) in pred_loader do
+    begin
+      batch_x := batch_x.to(device);
+      prob_batch := Softmax(model(batch_x), dim := 1).cpu().numpy();
+      probs.append(prob_batch);
+    end;
+    return Concatenate(probs, axis := 0);
+  end;
+end.

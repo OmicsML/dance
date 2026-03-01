@@ -1,0 +1,224 @@
+algol
+procedure SpaGCN;
+begin
+  // Main algorithm for spatial domain identification and SVG detection using GCN
+
+  // --- Preprocessing Pipeline ---
+  procedure Preprocess(data: AnnData);
+  begin
+    FilterGenesMatch(data, prefixes = ["ERCC", "MT-"]);
+    sc.pp.normalize_total(data, target_sum = 1e4);
+    sc.pp.log1p(data);
+    SpaGCNGraph(data, alpha, beta);
+    SpaGCNGraph2D(data);
+    CellPCA(data, n_components = dim);
+  end;
+
+  // --- Graph Construction ---
+  function CalculateAdjMatrix(x, y, x_pixel, y_pixel, image, beta, alpha, histology): matrix;
+  begin
+    if histology then
+      begin
+        // Extract local color statistics from histology image
+        g := [];
+        for i := 0 to length(x_pixel) - 1 do
+          begin
+            nbs := image[max(0, x_pixel[i] - β/2) : min(max_x, x_pixel[i] + β/2 + 1),
+                         max(0, y_pixel[i] - β/2) : min(max_y, y_pixel[i] + β/2 + 1)];
+            g[i] := mean(mean(nbs, axis=0), axis=0);
+          end;
+        c0, c1, c2 := extract_channels(g);
+        c3 := weighted_avg(c0, c1, c2, var(c0), var(c1), var(c2));
+        c4 := (c3 - mean(c3)) / std(c3);
+        z := c4 * (max(std(x), std(y)) * alpha);
+        X := [x, y, z]^T;
+      end
+    else
+      X := [x, y]^T;
+    return PairwiseDistance(X, dist_func_id = 0);
+  end;
+
+  // --- Spatial Autocorrelation Metrics ---
+  function MoranI(genes_exp, x, y, k, knn): vector;
+  begin
+    W := ConstructAdjacency(x, y, k, knn);
+    I := empty_series(length = genes_exp.columns);
+    for each gene k in genes_exp.columns do
+      begin
+        X_minus_mean := genes_exp[k] - mean(genes_exp[k]);
+        Nom := sum(W .* (X_minus_mean ⊗ X_minus_mean^T));
+        Den := sum(X_minus_mean .^2);
+        I[k] := (length(genes_exp[k]) / sum(W)) * (Nom / Den);
+      end;
+    return I;
+  end;
+
+  function GearyC(genes_exp, x, y, k, knn): vector;
+  begin
+    W := ConstructAdjacency(x, y, k, knn);
+    C := empty_series(length = genes_exp.columns);
+    for each gene k in genes_exp.columns do
+      begin
+        X := genes_exp[k];
+        X_minus_mean := X - mean(X);
+        Xij := repmat(X, length(X), 1)^T - repmat(X, 1, length(X));
+        Nom := sum(W .* (Xij .^2));
+        Den := sum(X_minus_mean .^2);
+        C[k] := (length(X) / (2 * sum(W))) * (Nom / Den);
+      end;
+    return C;
+  end;
+
+  // --- Parameter Search Routines ---
+  function SearchL(p_target, adj, start, end, tol, max_run): real;
+  begin
+    p_low := CalculateP(adj, start);
+    p_high := CalculateP(adj, end);
+    while (abs(p_low - p_target) > tol) and (abs(p_high - p_target) > tol) and (run <= max_run) do
+      begin
+        mid := (start + end) / 2;
+        p_mid := CalculateP(adj, mid);
+        if abs(p_mid - p_target) <= tol then return mid;
+        if p_mid < p_target then
+          begin start := mid; p_low := p_mid; end
+        else
+          begin end := mid; p_high := p_mid; end;
+        run := run + 1;
+      end;
+    return best_of(start, end, p_low, p_high, p_target);
+  end;
+
+  function SearchRadius(target_cluster, cell_id, x, y, pred, start, end, num_min, num_max, max_run): real;
+  begin
+    num_low := CountNbr(target_cluster, cell_id, x, y, pred, start);
+    num_high := CountNbr(target_cluster, cell_id, x, y, pred, end);
+    while (num_low < num_min) or (num_high > num_max) and (run <= max_run) do
+      begin
+        mid := (start + end) / 2;
+        num_mid := CountNbr(target_cluster, cell_id, x, y, pred, mid);
+        if num_min <= num_mid <= num_max then return mid;
+        if num_mid < num_min then start := mid else end := mid;
+        run := run + 1;
+      end;
+    return best_radius(start, end, num_low, num_high, num_min, num_max);
+  end;
+
+  // --- Clustering Refinement ---
+  function Refine(sample_id, pred, dis, shape): list;
+  begin
+    if shape = "hexagon" then num_nbs := 6 else num_nbs := 4;
+    refined_pred := [];
+    for i := 0 to length(sample_id) - 1 do
+      begin
+        index := sample_id[i];
+        nbs := top_k(dis[index, :], num_nbs + 1);
+        nbs_pred := pred[nbs.indices];
+        self_pred := pred[index];
+        counts := value_counts(nbs_pred);
+        if counts[self_pred] < num_nbs / 2 and max(counts) > num_nbs / 2 then
+          refined_pred[i] := argmax(counts)
+        else
+          refined_pred[i] := self_pred;
+      end;
+    return refined_pred;
+  end;
+
+  // --- GCN Model Definition ---
+  type GraphConvolution = object
+    weight: matrix;
+    bias: vector;
+    procedure Forward(input, adj);
+    begin
+      support := input * weight;
+      output := sparse_matmul(adj, support);
+      if bias ≠ null then output := output + bias;
+      return output;
+    end;
+  end;
+
+  type SimpleGCDEC = object
+    gc: GraphConvolution;
+    mu: matrix;  // cluster centers
+    alpha: real;
+    procedure Forward(x, adj);
+    begin
+      x := gc(x, adj);
+      q := (1 + sum((x.unsqueeze(1) - mu)^2, dim=2) / alpha)^(-1);
+      q := q^(alpha + 1) / 2;
+      q := q / sum(q, dim=1, keepdim=true);
+      return x, q;
+    end;
+
+    procedure Fit(X, adj, lr, epochs, update_interval, ...);
+    begin
+      // Initialize mu via Louvain or KMeans
+      if init = "louvain" then
+        y_pred := LouvainClustering(features, resolution = res)
+      else
+        y_pred := KMeans(features, n_clusters = n_clusters);
+
+      mu := cluster_centers_from_features(features, y_pred);
+
+      for epoch := 0 to epochs - 1 do
+        begin
+          if epoch mod update_interval = 0 then
+            begin
+              _, q := Forward(X, adj);
+              p := TargetDistribution(q);
+            end;
+          optimizer.zero_grad();
+          z, q := Forward(X, adj);
+          loss := KL_Divergence(p, q);
+          loss.backward();
+          optimizer.step();
+
+          if convergence_criterion(q, y_pred_last, tol) then break;
+        end;
+    end;
+
+    function TargetDistribution(q): matrix;
+    begin
+      p := q^2 / sum(q, dim=0);
+      p := p / sum(p, dim=1, keepdim=true);
+      return p;
+    end;
+  end;
+
+  // --- SVG Detection Pipeline ---
+  function GetSVGs(adata, target): list;
+  begin
+    x_array := adata.obsm["spatial"]["x"];
+    y_array := adata.obsm["spatial"]["y"];
+    adj_2d := CalculateAdjMatrix(x_array, y_array, histology = false);
+    r := SearchRadius(target, adata.obs.index, x_array, y_array, adata.obs["pred"], 
+                      start = quantile(adj_2d[≠0], 0.001), end = quantile(adj_2d[≠0], 0.1),
+                      num_min = 10, num_max = 14);
+    nbr_domains := FindNeighborClusters(target, adata.obs.index, x_array, y_array, 
+                                        adata.obs["pred"], radius = r, ratio = 0.5)[0:3];
+    de_genes := RankGenesGroups(adata, target, nbr_domains, label_col = "pred", log = true);
+    filtered := de_genes[
+      (pvals_adj < 0.05) ∧
+      (in_out_group_ratio > 1) ∧
+      (in_group_fraction > 0.8) ∧
+      (fold_change > 1.5)
+    ].sort(by = "in_group_fraction", descending = true);
+    return filtered.genes;
+  end;
+
+  // --- Public Interface ---
+  procedure Fit(x, y, ...);
+  begin
+    embed, adj := x;
+    adj_exp := exp(-adj^2 / (2 * l^2));
+    model := SimpleGCDEC(embed.shape[1], embed.shape[1]);
+    model.Fit(embed, adj_exp, ...);
+  end;
+
+  function Predict(x): vector;
+  begin
+    embed, adj := x;
+    adj_exp := exp(-adj^2 / (2 * l^2));
+    _, q := model.Predict(embed, adj_exp);
+    return argmax(q, dim = 1);
+  end;
+end.

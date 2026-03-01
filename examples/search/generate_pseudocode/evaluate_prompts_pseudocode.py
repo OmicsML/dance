@@ -187,7 +187,7 @@ def evaluate_pseudocode(client, prompt_template,num_samples,model,method_name):
 
     # Try test split first, then train
     split_used = "train"
-    dataset = load_dataset("zhongyuxing/Graph_Structure_Learning_Pseudocode", split=split_used)
+    dataset = load_dataset("zhongyuxing/Graph_Structure_Learning_Pseudocode_new_new", split=split_used)
     dataset=dataset.filter(lambda example: example['method'] == method_name)
     # Determine samples to process
     samples_to_process = min(num_samples, len(dataset))

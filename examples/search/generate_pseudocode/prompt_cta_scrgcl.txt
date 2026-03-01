@@ -1,0 +1,889 @@
+algol
+BEGIN
+
+  PROCEDURE collate_func(batch);
+  BEGIN
+    data0 := batch[0];
+    IF data0 IS Data THEN
+      tmp_x := [xx['x'] FOR xx IN batch];
+      tmp_y := [xx['y'] FOR xx IN batch];
+    ELSE IF data0 IS list OR data0 IS tuple THEN
+      tmp_x := [xx[0] FOR xx IN batch];
+      tmp_y := [xx[1] FOR xx IN batch];
+    END IF;
+
+    tmp_data := Data();
+    tmp_data['x'] := t.stack(tmp_x, dim := 1);
+    tmp_data['y'] := t.cat(tmp_y);
+    tmp_data['edge_index'] := data0.edge_index;
+    tmp_data['batch'] := t.zeros_like(tmp_data['y']);
+    tmp_data['num_graphs'] := 1;
+    RETURN tmp_data;
+  END collate_func;
+
+  TYPE ExprDataset = CLASS
+    BEGIN
+      PROCEDURE __init__(self, Expr, edge, y, device := 'cpu');
+      BEGIN
+        PRINT('processing dataset (on CPU)...');
+        self.gene_num := Expr.shape[1];
+
+        (* Process edge *)
+        IF edge IS list THEN
+          PRINT('multi graphs:', LENGTH(edge));
+          processed_edges := [];
+          self.edge_num := [];
+          FOR x IN edge DO
+            e_tensor := t.tensor(x).long().cpu() IF NOT x IS t.Tensor ELSE x.long().cpu();
+            IF e_tensor.shape[0] ≠ 2 AND e_tensor.shape[1] = 2 THEN
+              e_tensor := e_tensor.t();
+            END IF;
+            APPEND(processed_edges, e_tensor);
+            APPEND(self.edge_num, e_tensor.shape[1]);
+          END FOR;
+          self.common_edge := processed_edges;
+        ELSE IF edge IS np.ndarray OR edge IS t.Tensor THEN
+          edge_tensor := t.tensor(edge).long().cpu() IF NOT edge IS t.Tensor ELSE edge.long().cpu();
+          IF edge_tensor.shape[0] ≠ 2 AND edge_tensor.shape[1] = 2 THEN
+            PRINT('Warning: Transposing edge_index for PyG compat.');
+            edge_tensor := edge_tensor.t();
+          END IF;
+          self.common_edge := edge_tensor;
+          self.edge_num := self.common_edge.shape[1];
+        END IF;
+
+        (* Process Expr *)
+        IF Expr IS np.ndarray THEN
+          self.Expr := t.from_numpy(Expr).float();
+        ELSE IF Expr IS t.Tensor THEN
+          self.Expr := Expr.float().cpu();
+        ELSE
+          self.Expr := t.tensor(Expr).float();
+        END IF;
+
+        (* Process label *)
+        self.y := t.tensor(y).long().cpu();
+
+        self.num_sam := LENGTH(self.y);
+        self.sample_mapping_list := RANGE(self.num_sam);
+
+        IF LENGTH(self.Expr.shape) = 2 THEN
+          self.num_expr_feaure := 1;
+        ELSE
+          self.num_expr_feaure := self.Expr.shape[2];
+        END IF;
+      END __init__;
+
+      PROCEDURE duplicate_minor_types(self, dup_odds := 50, random_seed := 2240);
+      BEGIN
+        y_np := self.y.numpy();
+        counter := Counter(y_np);
+        max_num_types := MAX(counter.values());
+        impute_indexs := LIST(RANGE(self.num_sam));
+
+        np.random.seed(random_seed);
+
+        FOR lab IN UNIQUE(y_np) DO
+          current_count := SUM(y_np = lab);
+          IF max_num_types / current_count > dup_odds THEN
+            impute_size := FLOOR(max_num_types / dup_odds) - current_count;
+            PRINT('duplicate #celltype ', lab, ' with ', impute_size, ' cells');
+            impute_idx := RANDOM_CHOICE(WHERE(y_np = lab)[0], size := impute_size, replace := TRUE);
+            APPEND(impute_indexs, impute_idx);
+          END IF;
+        END FOR;
+
+        impute_indexs := PERMUTE(impute_indexs);
+        PRINT('org/imputed #cells:', self.num_sam, LENGTH(impute_indexs));
+        self.num_sam := LENGTH(impute_indexs);
+        self.sample_mapping_list := impute_indexs;
+      END duplicate_minor_types;
+
+      PROCEDURE __getitem__(self, idx);
+      BEGIN
+        IF idx IS int THEN
+          idx := self.sample_mapping_list[idx];
+          data := self.get(idx);
+          RETURN data;
+        ELSE
+          RAISE IndexError('Only integers are valid indices (got ' + TYPE(idx) + ').');
+        END IF;
+      END __getitem__;
+
+      PROCEDURE split(self, idx);
+      BEGIN
+        IF NOT idx IS t.Tensor THEN
+          idx := t.tensor(idx).long();
+        END IF;
+        RETURN ExprDataset(self.Expr[idx, :], self.common_edge, self.y[idx]);
+      END split;
+
+      PROCEDURE __len__(self);
+      BEGIN
+        RETURN self.num_sam;
+      END __len__;
+
+      PROCEDURE get(self, index);
+      BEGIN
+        data := Data();
+        data['x'] := self.Expr[index, :].reshape([-1, self.num_expr_feaure]);
+        data['y'] := self.y[index].reshape([1, 1]);
+        data['edge_index'] := self.common_edge;
+        RETURN data;
+      END get;
+    END CLASS;
+
+  TYPE SAGEConv = CLASS
+    BEGIN
+      PROCEDURE __init__(self, in_channels, out_channels, normalize := FALSE, bias := TRUE,
+                         activate := FALSE, alphas := [0.65, 0.35], shared_weight := FALSE,
+                         aggr := 'mean', ...);
+      BEGIN
+        SUPER().__init__(aggr := aggr, ...);
+        self.shared_weight := shared_weight;
+        self.activate := activate;
+        self.in_channels := in_channels;
+        self.out_channels := out_channels;
+        self.normalize := normalize;
+        self.weight := Parameter(t.Tensor(in_channels, out_channels));
+        IF self.shared_weight THEN
+          self.self_weight := self.weight;
+        ELSE
+          self.self_weight := Parameter(t.Tensor(in_channels, out_channels));
+        END IF;
+        self.alphas := alphas;
+
+        IF bias THEN
+          self.bias := Parameter(t.Tensor(out_channels));
+        ELSE
+          self.register_parameter('bias', NONE);
+        END IF;
+
+        self.reset_parameters();
+      END __init__;
+
+      PROCEDURE reset_parameters(self);
+      BEGIN
+        uniform(self.in_channels, self.weight);
+        uniform(self.in_channels, self.bias);
+        uniform(self.in_channels, self.self_weight);
+      END reset_parameters;
+
+      PROCEDURE forward(self, x, edge_index, edge_weight := NONE, size := NONE);
+      BEGIN
+        out := t.matmul(x, self.self_weight);
+        out2 := self.propagate(edge_index, size := size, x := x, edge_weight := edge_weight);
+        RETURN self.alphas[0] * out + self.alphas[1] * out2;
+      END forward;
+
+      PROCEDURE message(self, x_j, edge_weight);
+      BEGIN
+        RETURN x_j IF edge_weight IS NONE ELSE edge_weight.view(-1, 1) * x_j;
+      END message;
+
+      PROCEDURE update(self, aggr_out);
+      BEGIN
+        IF self.activate THEN
+          aggr_out := F.relu(aggr_out);
+        END IF;
+
+        IF aggr_out IS t.Tensor THEN
+          aggr_out := t.matmul(aggr_out, self.weight);
+        ELSE
+          aggr_out := (
+            NONE IF aggr_out[0] IS NONE ELSE t.matmul(aggr_out[0], self.weight),
+            NONE IF aggr_out[1] IS NONE ELSE t.matmul(aggr_out[1], self.weight)
+          );
+        END IF;
+
+        IF self.bias IS NOT NONE THEN
+          aggr_out := aggr_out + self.bias;
+        END IF;
+
+        IF self.normalize THEN
+          aggr_out := F.normalize(aggr_out, p := 2, dim := -1);
+        END IF;
+
+        RETURN aggr_out;
+      END update;
+    END CLASS;
+
+  PROCEDURE init_weights(m);
+  BEGIN
+    IF m IS nn.Linear THEN
+      nn.init.xavier_uniform_(m.weight);
+      m.bias.data.fill_(0.01);
+    END IF;
+  END init_weights;
+
+  PROCEDURE help_bn(bn1, x);
+  BEGIN
+    x := x.permute(1, 0, 2);
+    x := bn1(x);
+    x := x.permute(1, 0, 2);
+    RETURN x;
+  END help_bn;
+
+  PROCEDURE sup_constrive(representations, label, T, device);
+  BEGIN
+    n := label.shape[0];
+    similarity_matrix := F.cosine_similarity(
+      representations.unsqueeze(1), representations.unsqueeze(0), dim := 2
+    );
+
+    mask := (label.expand(n, n) = label.expand(n, n).t()) - t.eye(n, n).to(device);
+    mask_no_sim := t.ones_like(mask) - mask;
+    mask_dui_jiao_0 := t.ones(n, n) - t.eye(n, n);
+
+    similarity_matrix := t.exp(similarity_matrix / T);
+    similarity_matrix := similarity_matrix * mask_dui_jiao_0.to(device);
+    sim := mask * similarity_matrix;
+    no_sim := similarity_matrix - sim;
+    no_sim_sum := t.sum(no_sim, dim := 1);
+
+    no_sim_sum_expend := no_sim_sum.repeat(n, 1).T;
+    sim_sum := sim + no_sim_sum_expend;
+    loss := sim / sim_sum;
+    loss := mask_no_sim + loss + t.eye(n, n).to(device);
+    loss := -t.log(loss + 1e-8);
+
+    nonzero := t.nonzero(loss);
+    IF LENGTH(nonzero) > 0 THEN
+      loss := t.sum(t.sum(loss, dim := 1)) / LENGTH(nonzero);
+    ELSE
+      loss := t.tensor(0.0).to(device);
+    END IF;
+
+    RETURN loss;
+  END sup_constrive;
+
+  TYPE WeightFreezing = CLASS
+    BEGIN
+      PROCEDURE __init__(self, input_dim, output_dim, shared_ratio := 0.3, multiple := 0);
+      BEGIN
+        SUPER().__init__();
+        self.weight := nn.Parameter(t.Tensor(output_dim, input_dim));
+        self.bias := nn.Parameter(t.Tensor(output_dim));
+        nn.init.kaiming_uniform_(self.weight, a := sqrt(5));
+        IF self.bias IS NOT NONE THEN
+          fan_in, _ := nn.init._calculate_fan_in_and_fan_out(self.weight);
+          bound := 1 / sqrt(fan_in) IF fan_in > 0 ELSE 0;
+          nn.init.uniform_(self.bias, -bound, bound);
+        END IF;
+        mask := t.rand(input_dim, output_dim) < shared_ratio;
+        self.register_buffer('shared_mask', mask);
+        self.register_buffer('independent_mask', ~mask);
+        self.multiple := multiple;
+      END __init__;
+
+      PROCEDURE forward(self, x, shared_weight);
+      BEGIN
+        combined_weight := t.where(self.shared_mask, shared_weight * self.multiple, self.weight.t());
+        output := F.linear(x, combined_weight.t(), self.bias);
+        RETURN output;
+      END forward;
+    END CLASS;
+
+  TYPE scRGCL = CLASS
+    BEGIN
+      PROCEDURE __init__(self, in_channel := 1, mid_channel := 8, out_channel := 2,
+                         num_nodes := 2207, edge_num := 151215, ...);
+      BEGIN
+        SUPER().__init__();
+        self.mid_channel := mid_channel;
+        self.dropout_ratio := GET(args, 'dropout_ratio', 0.3);
+        PRINT('model dropout ratio:', self.dropout_ratio);
+        n_out_nodes := num_nodes;
+        self.global_conv1_dim := 4 * 3;
+        self.global_conv2_dim := GET(args, 'global_conv2_dim', 4);
+        input_dim := num_nodes;
+        self.c_layer := nn.Linear(input_dim, 63, bias := FALSE);
+
+        self.res_conv1 := t.nn.Conv2d(8, 24, [1, 1]);
+        self.res_bn1 := t.nn.BatchNorm2d(24);
+        self.res_act1 := nn.Tanh();
+
+        self.res_conv2 := t.nn.Conv2d(24, 48, [1, 1]);
+        self.res_bn2 := t.nn.BatchNorm2d(48);
+        self.res_act2 := nn.Tanh();
+
+        self.res_conv3 := t.nn.Conv2d(48, 24, [1, 1]);
+        self.res_bn3 := t.nn.BatchNorm2d(24);
+        self.res_act3 := nn.Tanh();
+
+        self.res_conv4 := t.nn.Conv2d(24, 8, [1, 1]);
+        self.res_bn4 := t.nn.BatchNorm2d(8);
+        self.res_act4 := nn.Tanh();
+
+        self.res_fc := nn.Linear(8, 8);
+
+        self.conv1 := SAGEConv(in_channel, 8);
+        self.conv2 := SAGEConv(8, mid_channel);
+
+        self.bn1 := t.nn.LayerNorm((num_nodes, 8));
+        self.bn2 := t.nn.LayerNorm((num_nodes, mid_channel));
+        self.act1 := nn.ReLU();
+        self.act2 := nn.ReLU();
+
+        self.global_conv1 := t.nn.Conv2d(mid_channel * 1, self.global_conv1_dim, [1, 1]);
+        self.global_bn1 := t.nn.BatchNorm2d(self.global_conv1_dim);
+        self.global_act1 := nn.ReLU();
+
+        self.global_conv2 := t.nn.Conv2d(self.global_conv1_dim, self.global_conv2_dim, [1, 1]);
+        self.global_bn2 := t.nn.BatchNorm2d(self.global_conv2_dim);
+        self.global_act2 := nn.ReLU();
+
+        last_feature_node := 64;
+        channel_list := [self.global_conv2_dim * n_out_nodes, 256, 64];
+        IF GET(args, 'channel_list', FALSE) THEN
+          channel_list := [self.global_conv2_dim * n_out_nodes, 128];
+          last_feature_node := 128;
+        END IF;
+
+        self.nn := [];
+        FOR idx, num IN ENUMERATE(channel_list[:-1]) DO
+          APPEND(self.nn, nn.Linear(channel_list[idx], channel_list[idx+1]));
+          APPEND(self.nn, nn.BatchNorm1d(channel_list[idx+1]));
+          IF self.dropout_ratio > 0 THEN
+            APPEND(self.nn, nn.Dropout(0.3));
+          END IF;
+          APPEND(self.nn, nn.ReLU());
+        END FOR;
+        self.global_fc_nn := nn.Sequential(*self.nn);
+        self.fc1 := nn.Linear(last_feature_node, out_channel);
+        self.classifier := WeightFreezing(last_feature_node, out_channel, shared_ratio := 0.35);
+
+        self.shared_weights := nn.Parameter(t.Tensor(out_channel, last_feature_node), requires_grad := FALSE);
+        self.bias := nn.Parameter(t.Tensor(last_feature_node));
+
+        nn.init.kaiming_uniform_(self.shared_weights, a := sqrt(5));
+        IF self.bias IS NOT NONE THEN
+          fan_in, _ := nn.init._calculate_fan_in_and_fan_out(self.shared_weights);
+          bound := 1 / sqrt(fan_in) IF fan_in > 0 ELSE 0;
+          nn.init.uniform_(self.bias, -bound, bound);
+        END IF;
+
+        self.fixed_weight := self.shared_weights.t() * self.classifier.shared_mask;
+
+        self.edge_num := edge_num;
+        self.weight_edge_flag := TRUE;
+        IF self.weight_edge_flag THEN
+          self.edge_weight := nn.Parameter(t.ones(edge_num).float() * 0.01);
+        ELSE
+          self.edge_weight := NONE;
+        END IF;
+
+        self.reset_parameters();
+      END __init__;
+
+      PROCEDURE reset_parameters(self);
+      BEGIN
+        self.conv1.apply(init_weights);
+        self.conv2.apply(init_weights);
+        nn.init.kaiming_normal_(self.res_conv1.weight, mode := 'fan_out');
+        uniform(8, self.res_conv1.bias);
+        nn.init.kaiming_normal_(self.res_conv2.weight, mode := 'fan_out');
+        uniform(24, self.res_conv2.bias);
+        nn.init.kaiming_normal_(self.res_conv3.weight, mode := 'fan_out');
+        uniform(48, self.res_conv3.bias);
+        nn.init.kaiming_normal_(self.res_conv4.weight, mode := 'fan_out');
+        uniform(24, self.res_conv4.bias);
+        nn.init.kaiming_normal_(self.global_conv1.weight, mode := 'fan_out');
+        uniform(self.mid_channel, self.global_conv1.bias);
+        nn.init.kaiming_normal_(self.global_conv2.weight, mode := 'fan_out');
+        uniform(self.global_conv1_dim, self.global_conv2.bias);
+        self.global_fc_nn.apply(init_weights);
+        self.fc1.apply(init_weights);
+      END reset_parameters;
+
+      PROCEDURE forward(self, data, get_latent_varaible := FALSE, ui := NONE);
+      BEGIN
+        x, edge_index, batch := data.x, data.edge_index, data.batch;
+
+        IF self.weight_edge_flag THEN
+          one_graph_edge_weight := t.sigmoid(self.edge_weight);
+          edge_weight := one_graph_edge_weight;
+        ELSE
+          edge_weight := NONE;
+        END IF;
+
+        x := x.permute(1, 0, 2);
+        x := self.conv1(x, edge_index, edge_weight := edge_weight);
+        x := self.act1(x);
+        x := x.permute(1, 0, 2);
+
+        x := help_bn(self.bn1, x);
+
+        IF ui = TRUE THEN
+          c_x := x.permute(1, 0, 2);
+          avg_pool := F.avg_pool1d(c_x, kernel_size := 8);
+          max_pool := avg_pool.squeeze(dim := -1);
+          c_layer := self.c_layer(max_pool);
+
+          contrast_label := SQUEEZE(data.y.cpu().numpy(), -1);
+          contrast_label := t.tensor(contrast_label).to(self.device);
+          loss_hard := sup_constrive(c_layer, contrast_label, 0.07, self.device);
+        ELSE
+          loss_hard := 0;
+        END IF;
+
+        res := x;
+        IF self.dropout_ratio > 0 THEN
+          x := F.dropout(x, p := 0.1, training := self.training);
+        END IF;
+
+        x := x.permute(1, 2, 0);
+        x := x.unsqueeze(dim := -1);
+
+        h1 := self.res_act1(self.res_conv1(x));
+        h1 := self.res_bn1(h1);
+        h1 := F.dropout(h1, p := 0.3, training := self.training);
+
+        h2 := self.res_act2(self.res_conv2(h1));
+        h2 := self.res_bn2(h2);
+        h2 := F.dropout(h2, p := 0.3, training := self.training);
+
+        h3 := self.res_act3(self.res_conv3(h2));
+        h3 := self.res_bn3(h3);
+        h3 := F.dropout(h3, p := 0.3, training := self.training);
+
+        h4 := h3 + h1;
+        x := self.res_act4(self.res_conv4(h4));
+        x := self.res_bn4(x);
+        x := x.squeeze(dim := -1);
+        x := x.permute(2, 0, 1);
+        x := x + res;
+        x := self.res_fc(x);
+
+        x := x.permute(1, 0, 2);
+        x := self.conv2(x, edge_index, edge_weight := edge_weight);
+        x := self.act2(x);
+        x := x.permute(1, 0, 2);
+
+        x := help_bn(self.bn2, x);
+        x := F.dropout(x, p := 0.3, training := self.training);
+
+        x := x.permute(1, 2, 0);
+        x := x.unsqueeze(dim := -1);
+        x := self.global_conv1(x);
+        x := self.global_act1(x);
+        x := self.global_bn1(x);
+        IF self.dropout_ratio > 0 THEN
+          x := F.dropout(x, p := 0.3, training := self.training);
+        END IF;
+        x := self.global_conv2(x);
+        x := self.global_act1(x);
+        x := self.global_bn2(x);
+        IF self.dropout_ratio > 0 THEN
+          x := F.dropout(x, p := 0.3, training := self.training);
+        END IF;
+        x := x.squeeze(dim := -1);
+        num_samples := x.shape[0];
+
+        x := x.view(num_samples, -1);
+        x := self.global_fc_nn(x);
+        IF get_latent_varaible THEN
+          RETURN x;
+        ELSE
+          x := self.classifier(x, self.fixed_weight.to(x.device));
+          RETURN F.softmax(x, dim := -1), loss_hard;
+        END IF;
+      END forward;
+    END CLASS;
+
+  PROCEDURE edge_transform_func(org_edge);
+  BEGIN
+    edge := org_edge;
+    edge := t.tensor(edge.T);
+    edge := remove_self_loops(edge)[0];
+    edge := edge.numpy();
+    RETURN edge;
+  END edge_transform_func;
+
+  PROCEDURE compute_kl_loss(p, q, pad_mask := NONE);
+  BEGIN
+    p_loss := F.kl_div(F.log_softmax(p, dim := -1), F.softmax(q, dim := -1), reduction := 'none');
+    q_loss := F.kl_div(F.log_softmax(q, dim := -1), F.softmax(p, dim := -1), reduction := 'none');
+    IF pad_mask IS NOT NONE THEN
+      p_loss.masked_fill_(pad_mask, 0.);
+      q_loss.masked_fill_(pad_mask, 0.);
+    END IF;
+    p_loss := p_loss.sum();
+    q_loss := q_loss.sum();
+    loss := (p_loss + q_loss) / 2;
+    RETURN loss;
+  END compute_kl_loss;
+
+  PROCEDURE train2(model, optimizer, train_loader, epoch, device, loss_fn := NONE, scheduler := NONE, verbose := FALSE);
+  BEGIN
+    model.train();
+    loss_all := 0;
+    iters := LENGTH(train_loader);
+
+    IF iters = 0 THEN
+      PRINT('Warning: Epoch ', epoch, ' skipped because DataLoader is empty.');
+      RETURN 0;
+    END IF;
+
+    FOR idx, data IN ENUMERATE(train_loader) DO
+      data := data.to(device, non_blocking := TRUE);
+
+      IF verbose THEN
+        PRINT(data.y.shape, data.edge_index.shape);
+      END IF;
+
+      optimizer.zero_grad();
+      label := data.y.reshape(-1);
+
+      all_output := model(data, ui := TRUE);
+      all_output1 := model(data, ui := TRUE);
+
+      output := all_output[0];
+      output1 := all_output1[0];
+      c_loss := all_output[1];
+
+      IF loss_fn IS NONE THEN
+        ce_loss := 0.5 * (F.cross_entropy(output1, label) + F.cross_entropy(output, label));
+        kl_loss := compute_kl_loss(output1, output);
+        loss := ce_loss + 0.75 * kl_loss;
+      ELSE
+        ce_loss := (loss_fn(output, label) + loss_fn(output1, label)) * 0.5;
+        kl_loss := compute_kl_loss(output1, output);
+        loss := ce_loss + 0.75 * kl_loss;
+      END IF;
+
+      IF model.edge_weight IS NOT NONE THEN
+        l2_loss := 0;
+        IF model.edge_weight IS nn.Module THEN
+          FOR edge_weight IN model.edge_weight DO
+            l2_loss := l2_loss + 0.1 * t.mean((edge_weight)^2);
+          END FOR;
+        ELSE IF model.edge_weight IS t.Tensor THEN
+          l2_loss := 0.1 * t.mean((model.edge_weight)^2);
+        END IF;
+        loss := loss + l2_loss;
+      END IF;
+
+      loss := loss + c_loss.item() * 0.1;
+      loss.backward();
+
+      loss_all := loss_all + loss.item() * data.num_graphs;
+      optimizer.step();
+
+      IF scheduler IS NOT NONE THEN
+        scheduler.step((epoch - 1) + idx / iters);
+      END IF;
+    END FOR;
+
+    RETURN (loss_all / iters);
+  END train2;
+
+  PROCEDURE test2(model, loader, predicts := FALSE, device := NONE);
+  BEGIN
+    model.eval();
+    y_pred_list := [];
+    y_true_list := [];
+    y_output_list := [];
+    cell_list := [];
+
+    FOR data IN loader DO
+      data := data.to(device);
+
+      all_output := model(data, ui := FALSE);
+      output := all_output[0];
+      pred := output.argmax(dim := 1);
+
+      APPEND(y_pred_list, pred);
+      APPEND(y_true_list, data.y);
+
+      IF predicts THEN
+        APPEND(y_output_list, output);
+        APPEND(cell_list, t.squeeze(data.x));
+      END IF;
+    END FOR;
+
+    y_pred := t.cat(y_pred_list).cpu().numpy();
+    y_true := t.cat(y_true_list).cpu().numpy();
+    y_true := y_true.flatten();
+
+    acc := precision_score(y_true, y_pred, average := 'macro');
+    f1 := f1_score(y_true, y_pred, average := 'macro');
+
+    IF predicts THEN
+      y_output := t.cat(y_output_list).cpu().numpy();
+      cell_processed_list := [];
+      FOR c IN cell_list DO
+        APPEND(cell_processed_list, c.cpu().numpy().T);
+      END FOR;
+      cell_all := VSTACK(cell_processed_list) IF cell_processed_list ≠ [] ELSE ARRAY([]);
+      RETURN acc, f1, y_true, y_pred, y_output, cell_all;
+    ELSE
+      RETURN acc, f1;
+    END IF;
+  END test2;
+
+  TYPE scRGCLWrapper = CLASS
+    BEGIN
+      PROCEDURE __init__(self,
+        dropout_ratio := 0.1,
+        weight_decay := 1e-4,
+        init_lr := 0.001,
+        min_lr := 1e-6,
+        max_epoch_stage1 := 14,
+        max_epoch_stage2 := 50,
+        seed := 42,
+        out_dir := './output',
+        device := t.device("cuda:0")
+      );
+      BEGIN
+        SUPER().__init__();
+        self.dropout_ratio := dropout_ratio;
+        self.weight_decay := weight_decay;
+        self.init_lr := init_lr;
+        self.min_lr := min_lr;
+        self.max_epoch_stage1 := max_epoch_stage1;
+        self.max_epoch_stage2 := max_epoch_stage2;
+        self.seed := seed;
+        self.out_dir := out_dir;
+        self.device := device;
+        self.model := NONE;
+        self.dataset_attr := {};
+        self.str_labels := [];
+
+        MKDIR(os.path.join(self.out_dir, 'models'), exist_ok := TRUE);
+      END __init__;
+
+      PROCEDURE preprocessing_pipeline(log_level := "INFO", thres := 0.99, species := "human");
+      BEGIN
+        RETURN Compose(
+          NormalizeTotalLog1P(),
+          StringDBGraph(thres := thres, species := species),
+          SetConfig({"label_channel": "cell_type"}),
+          log_level := log_level
+        );
+      END preprocessing_pipeline;
+
+      PROCEDURE fit(self, adata, batch_size := 64);
+      BEGIN
+        logExpr := adata.X;
+        IF scipy.sparse.issparse(logExpr) THEN
+          PRINT("Converting sparse matrix to dense array for speed...");
+          logExpr := logExpr.toarray();
+        END IF;
+        logExpr := logExpr.astype(np.float32);
+
+        IF 'str_labels' IN adata.uns THEN
+          self.str_labels := adata.uns['str_labels'];
+          label := ARRAY([self.str_labels.index(ct) FOR ct IN adata.obs['cell_type']]);
+        ELSE
+          unique_labels := UNIQUE(adata.obs['cell_type']);
+          label_map := {k: v FOR v, k IN ENUMERATE(unique_labels)};
+          self.str_labels := LIST(unique_labels);
+          label := ARRAY([label_map[ct] FOR ct IN adata.obs['cell_type']]);
+        END IF;
+
+        IF 'edge_index' NOT IN adata.uns THEN
+          RAISE ValueError("adata.uns['edge_index'] is missing.");
+        END IF;
+
+        used_edge := edge_transform_func(adata.uns['edge_index']);
+        PRINT('Data preparation complete.');
+
+        label_type := UNIQUE(label.reshape(-1));
+        alpha := ARRAY([SUM(label = x) FOR x IN label_type]);
+        alpha := MAX(alpha) / alpha;
+        alpha := CLIP(alpha, 1, 50);
+        alpha := alpha / SUM(alpha);
+
+        loss_fn := t.nn.CrossEntropyLoss(weight := t.tensor(alpha).float());
+        loss_fn := loss_fn.to(self.device);
+
+        full_dataset := ExprDataset(Expr := logExpr, edge := used_edge, y := label, device := 'cpu');
+
+        self.dataset_attr := {
+          'gene_num': full_dataset.gene_num,
+          'class_num': LENGTH(UNIQUE(label)),
+          'num_expr_feature': full_dataset.num_expr_feaure,
+          'edge_num': full_dataset.edge_num,
+          'used_edge': used_edge
+        };
+
+        self.model := scRGCL(
+          in_channel := self.dataset_attr['num_expr_feature'],
+          num_nodes := self.dataset_attr['gene_num'],
+          out_channel := self.dataset_attr['class_num'],
+          edge_num := self.dataset_attr['edge_num'],
+          dropout_ratio := self.dropout_ratio
+        ).to(self.device);
+
+        PRINT('Model initialized on ', NEXT(self.model.parameters()).device);
+
+        optimizer := t.optim.Adam(self.model.parameters(), lr := self.init_lr, weight_decay := self.weight_decay);
+
+        (* Stage 1 Training *)
+        train_dataset := full_dataset;
+        train_dataset.duplicate_minor_types(dup_odds := 50);
+
+        s1_drop_last := TRUE;
+        IF LENGTH(train_dataset) < batch_size THEN
+          PRINT('Notice: Stage 1 dataset size < batch_size. Disabling drop_last.');
+          s1_drop_last := FALSE;
+        END IF;
+
+        train_loader := DataLoader(
+          train_dataset,
+          batch_size := batch_size,
+          num_workers := 0,
+          shuffle := TRUE,
+          collate_fn := collate_func,
+          drop_last := s1_drop_last,
+          pin_memory := TRUE
+        );
+
+        scheduler := CosineAnnealingWarmRestarts(optimizer, 2, 2, eta_min := INT(self.min_lr), last_epoch := -1);
+
+        PRINT('Stage 1 training (Warmup)...');
+        FOR epoch IN RANGE(1, self.max_epoch_stage1) DO
+          train_loss := train2(self.model, optimizer, train_loader, epoch, self.device, loss_fn, scheduler := scheduler);
+          train_acc, train_f1 := test2(self.model, train_loader, predicts := FALSE, device := self.device);
+          lr := optimizer.param_groups[0]['lr'];
+          PRINT('epoch ', epoch, ', lr: ', lr, ', loss: ', train_loss, ', T-acc: ', train_acc, ', T-f1: ', train_f1);
+        END FOR;
+
+        (* Stage 2 Training *)
+        PRINT('Stage 2 training (Fine-tuning)...');
+
+        raw_dataset := ExprDataset(Expr := logExpr, edge := used_edge, y := label, device := 'cpu');
+
+        sss := StratifiedShuffleSplit(n_splits := 1, test_size := 0.2, random_state := self.seed);
+        y_cpu := raw_dataset.y.numpy();
+        train_idx, valid_idx := NEXT(sss.split(y_cpu, y_cpu));
+
+        st2_train_dataset := raw_dataset.split(t.tensor(train_idx).long());
+        st2_valid_dataset := raw_dataset.split(t.tensor(valid_idx).long());
+
+        st2_train_dataset.duplicate_minor_types(dup_odds := 50);
+
+        s2_drop_last := TRUE;
+        IF LENGTH(st2_train_dataset) < batch_size THEN
+          PRINT('Notice: Stage 2 train size < batch_size. Disabling drop_last.');
+          s2_drop_last := FALSE;
+        END IF;
+
+        st2_train_loader := DataLoader(
+          st2_train_dataset,
+          batch_size := batch_size,
+          num_workers := 0,
+          shuffle := TRUE,
+          collate_fn := collate_func,
+          drop_last := s2_drop_last,
+          pin_memory := TRUE
+        );
+        st2_valid_loader := DataLoader(
+          st2_valid_dataset,
+          batch_size := batch_size,
+          num_workers := 0,
+          shuffle := TRUE,
+          collate_fn := collate_func,
+          pin_memory := TRUE
+        );
+
+        current_lr := optimizer.param_groups[0]['lr'];
+        PRINT('Stage 2 initialize lr: ', current_lr);
+        optimizer := t.optim.Adam(self.model.parameters(), lr := current_lr, weight_decay := self.weight_decay);
+        scheduler := ReduceLROnPlateau(optimizer, 'max', factor := 0.1, patience := 2, verbose := TRUE, min_lr := 0.00001);
+
+        max_metric := 0.0;
+        max_metric_count := 0;
+
+        FOR epoch IN RANGE(self.max_epoch_stage1, self.max_epoch_stage1 + self.max_epoch_stage2) DO
+          train_loss := train2(self.model, optimizer, st2_train_loader, epoch, self.device, loss_fn, verbose := FALSE);
+          train_acc, train_f1 := test2(self.model, st2_train_loader, predicts := FALSE, device := self.device);
+          valid_acc, valid_f1 := test2(self.model, st2_valid_loader, predicts := FALSE, device := self.device);
+
+          lr := optimizer.param_groups[0]['lr'];
+          PRINT('epoch ', epoch, ', lr: ', lr, ', loss: ', train_loss,
+                ', T-acc: ', train_acc, ', T-f1: ', train_f1,
+                ', V-acc: ', valid_acc, ', V-f1: ', valid_f1);
+
+          scheduler.step(valid_f1);
+
+          IF valid_f1 > max_metric THEN
+            max_metric := valid_f1;
+            max_metric_count := 0;
+            t.save(self.model.state_dict(), os.path.join(self.out_dir, 'models', 'best_model.pth'));
+          ELSE
+            max_metric_count := max_metric_count + 1;
+            IF max_metric_count > 3 THEN
+              PRINT('Early stopping triggered at epoch ', epoch);
+              BREAK;
+            END IF;
+          END IF;
+
+          IF optimizer.param_groups[0]['lr'] ≤ 0.00001 THEN
+            PRINT('Minimum learning rate reached.');
+            BREAK;
+          END IF;
+        END FOR;
+
+        best_model_path := os.path.join(self.out_dir, 'models', 'best_model.pth');
+        IF EXISTS(best_model_path) THEN
+          self.model.load_state_dict(t.load(best_model_path));
+          PRINT("Loaded best model state from Stage 2.");
+        END IF;
+
+        t.save(self.model, os.path.join(self.out_dir, 'models', 'final_model.pth'));
+      END fit;
+
+      PROCEDURE _prepare_test_loader(self, dataset);
+      BEGIN
+        IF self.model IS NONE THEN
+          RAISE RuntimeError("Model is not fitted yet.");
+        END IF;
+        IF dataset IS DataLoader THEN
+          RETURN dataset;
+        END IF;
+
+        IF HASATTR(dataset, 'X') THEN
+          expr := dataset.X;
+          y := ZEROS(expr.shape[0]);
+        ELSE IF dataset IS np.ndarray OR dataset IS torch.Tensor THEN
+          expr := dataset;
+          y := ZEROS(expr.shape[0]);
+        ELSE IF HASATTR(dataset, 'Expr') THEN
+          expr := dataset.Expr;
+          y := dataset.y;
+        ELSE
+          RAISE ValueError("Unsupported input type for prediction.");
+        END IF;
+
+        used_edge := self.dataset_attr.GET('used_edge');
+        IF used_edge IS NONE THEN
+          RAISE RuntimeError("Missing edge info.");
+        END IF;
+
+        test_dataset := ExprDataset(Expr := expr, edge := used_edge, y := y, device := 'cpu');
+        RETURN DataLoader(test_dataset, batch_size := 1, num_workers := 0, collate_fn := collate_func);
+      END _prepare_test_loader;
+
+      PROCEDURE predict_proba(self, dataset := NONE);
+      BEGIN
+        test_loader := self._prepare_test_loader(dataset);
+        _, _, _, _, probs, _ := test2(self.model, test_loader, predicts := TRUE, device := self.device);
+        RETURN probs;
+      END predict_proba;
+
+      PROCEDURE predict(self, dataset := NONE);
+      BEGIN
+        test_loader := self._prepare_test_loader(dataset);
+        _, _, _, y_pred, _, _ := test2(self.model, test_loader, predicts := TRUE, device := self.device);
+        y_pred := RESHAPE(y_pred, -1);
+        IF self.str_labels ≠ [] THEN
+          RETURN ARRAY([self.str_labels[x] FOR x IN y_pred]);
+        ELSE
+          RETURN y_pred;
+        END IF;
+      END predict;
+    END CLASS;
+
+END.

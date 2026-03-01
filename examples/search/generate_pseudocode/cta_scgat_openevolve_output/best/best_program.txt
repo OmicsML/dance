@@ -1,0 +1,153 @@
+algol
+procedure scGATAnnotator(
+    hidden_channels: integer := 8;
+    heads: integer := 8;
+    dropout: real := 0.4;
+    alpha: real := 0.2;
+    lr: real := 0.001;
+    weight_decay: real := 5e-4;
+    n_epochs: integer := 2000;
+    patience: integer := 100;
+    batch_size: integer := 256;
+    num_parts: integer := 1;
+    device: string := "cuda";
+    random_seed: integer := 42
+);
+begin
+    model: GAT;
+    label_encoder: any;
+    
+    procedure preprocessing_pipeline(label_column: string := "cell_type"; n_neighbors: integer := 15; log_level: string := "INFO");
+    begin
+        transforms := [scGATGraphTransform(label_column, n_neighbors), SetConfig({"label_channel": "cell_type"})];
+        return Compose(transforms, log_level);
+    end;
+
+    procedure _set_seed();
+    begin
+        random.seed(random_seed);
+        np.random.seed(random_seed);
+        torch.manual_seed(random_seed);
+        if device = "cuda" and torch.cuda.is_available() then
+            torch.cuda.manual_seed(random_seed);
+    end;
+
+    function _get_pyg_data(x: AnnData): Data;
+    begin
+        if not isinstance(x, sc.AnnData) then
+            raise TypeError("Input must be a scanpy.AnnData object.");
+        if not ("pyg_data" in x.uns) then
+            raise ValueError("Key 'pyg_data' not found in adata.uns.");
+        if "label_encoder" in x.uns then
+            label_encoder := x.uns["label_encoder"];
+        return x.uns["pyg_data"];
+    end;
+
+    function fit(x: AnnData; y: any := null): scGATAnnotator;
+    begin
+        _set_seed();
+        
+        (* 1. Data Preparation *)
+        data := _get_pyg_data(x);
+        
+        (* 2. Model Initialization *)
+        n_classes := int(data.y.max() + 1);
+        num_features := data.x.shape[1];
+        model := GAT(
+            in_channels := num_features;
+            hidden_channels := hidden_channels;
+            out_channels := n_classes;
+            heads := heads;
+            dropout := dropout;
+            alpha := alpha
+        ).to(device);
+        optimizer := torch.optim.Adagrad(model.parameters(), lr := lr, weight_decay := weight_decay);
+        
+        (* 3. Data Loading Strategy *)
+        if num_parts <= 1 then
+            loader := [data];
+        else
+            num_parts := min(num_parts, data.num_nodes);
+            if num_parts < 2 then num_parts := 2;
+            cd := ClusterData(data, num_parts := num_parts, recursive := false);
+            loader := ClusterLoader(cd, batch_size := batch_size, shuffle := true);
+        
+        (* 4. Training Loop *)
+        best_loss := +∞;
+        bad_counter := 0;
+        best_state_dict := null;
+        
+        for epoch := 0 to n_epochs - 1 do
+        begin
+            model.train();
+            epoch_loss := [];
+            
+            for batch in loader do
+            begin
+                batch := batch.to(device);
+                optimizer.zero_grad();
+                output := model(batch.x, batch.edge_index);
+                if batch.train_mask.sum() > 0 then
+                begin
+                    loss := masked_nll_loss(output, batch.y, batch.train_mask);
+                    loss.backward();
+                    optimizer.step();
+                    epoch_loss.append(loss.item());
+                end;
+            end;
+            
+            val_loss := _evaluate_loss(data, "val");
+            
+            if val_loss < best_loss then
+            begin
+                best_loss := val_loss;
+                bad_counter := 0;
+                best_state_dict := copy.deepcopy(model.state_dict());
+            end
+            else
+                bad_counter := bad_counter + 1;
+            
+            if bad_counter >= patience then
+                break;
+            
+            if epoch mod 10 = 0 then
+                print("Epoch ", epoch, ": Train Loss ", mean(epoch_loss), ", Val Loss ", val_loss);
+        end;
+        
+        if best_state_dict ≠ null then
+            model.load_state_dict(best_state_dict);
+        
+        return self;
+    end;
+
+    function _evaluate_loss(data: Data; split: string := "val"): real;
+    begin
+        model.eval();
+        with torch.no_grad() do
+        begin
+            data_dev := data.to(device);
+            output := model(data_dev.x, data_dev.edge_index);
+            mask := getattr(data_dev, split + "_mask");
+            if mask.sum() = 0 then
+                return +∞;
+            loss := masked_nll_loss(output, data_dev.y, mask);
+            return loss.item();
+        end;
+    end;
+
+    function predict(x: AnnData): array of integer;
+    begin
+        logits := predict_proba(x);
+        return logits.argmax(dim := 1).cpu().numpy();
+    end;
+
+    function predict_proba(x: AnnData): tensor;
+    begin
+        if model = null then
+            raise RuntimeError("Model is not trained yet.");
+        data := _get_pyg_data(x);
+        model.eval();
+        with torch.no_grad() do
+            return model(data.x.to(device), data.edge_index.to(device));
+    end;
+end;

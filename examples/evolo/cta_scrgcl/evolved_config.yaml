@@ -1,0 +1,103 @@
+# Configuration for function minimization example
+max_iterations: 20 #50
+checkpoint_interval: 2
+
+# # LLM configuration
+# llm:
+#   primary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # primary_model: "llama3.1-8b"
+#   primary_model_weight: 0.6
+#   secondary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # secondary_model: "llama-4-scout-17b-16e-instruct"
+#   secondary_model_weight: 0.4
+#   api_base: "https://api.deepseek.com"
+#   # api_base: "https://api.cerebras.ai/v1"
+#   temperature: 0.8
+#   top_p: 0.95
+#   max_tokens: 8192
+#   timeout: 1200
+
+llm:
+  models:
+    - name: qwen3-coder-plus
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.99
+      temperature: 0.5
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.85
+    - name: qwen3-coder-flash
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.01
+      temperature: 0.5
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.85
+
+    # - name: "deepseek-reasoner"
+    #   api_key: "sk-acad184f8a7848918d7c9046affd1b65"
+    #   api_base: "https://api.deepseek.com"
+    #   weight: 0.4
+    #   temperature: 0.8
+    #   max_tokens: 16000
+    #   timeout: 1200
+    #   top_p: 0.95
+
+# Prompt configuration
+prompt:
+  system_message: |2-
+
+    You are an expert AI researcher specializing in Graph Neural Networks (GNNs) and Computational Biology (Single-cell analysis).
+    **Context:** I am optimizing a semi-supervised cell-type annotation model called **scRGCL** (Single-cell Relation Graph Contrastive Learning). The model relies on a Graph Convolutional Network (GCN/SAGE) backbone. The performance of this model relies heavily on the quality of the gene-gene interaction graph.
+    **Task:** Optimize the code block between `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END`. This block contains the `StringDBGraph` class, which transforms raw STRING DB protein-protein interaction (PPI) data into an edge index for the GNN.
+    **Objectives:**
+    1. **Maximize Accuracy:** Improve the topological quality of the graph to better represent biological relationships, thereby increasing downstream classification accuracy. 2. **Optimize Efficiency:** Ensure the graph construction is fast and memory-efficient.
+    **Directions for Evolution (You have freedom to implement these or come up with better approaches):**
+    1. **Weighted Graph Construction:** * *Current State:* The code currently filters by a quantile and treats all remaining edges as binary (exist/not exist). * *Improvement:* The `scRGCL` model supports edge weights. Modify the transform to normalize the STRING DB `score` (e.g., MinMax scaling or Softmax) and store it as `edge_weight` in `adata.uns`. This allows the GNN to pay more attention to high-confidence interactions.
+
+    2. **Adaptive Pruning (Top-K vs. Quantile):** * *Current State:* It uses a global quantile threshold (`thres`). This often results in 'hub' genes having too many edges while sparse genes become isolated. * *Improvement:* Implement a **Top-K neighbors** approach (keep the top  strongest connections per gene) or a hybrid approach (Global Threshold + Top-K). This ensures a more consistent graph degree distribution.
+
+    3. **Handling Isolate Nodes:** * *Current State:* It adds self-loops to missing nodes. * *Improvement:* Consider connecting isolated genes (genes with no PPI edges) to a 'global super-node' or connecting them based on Pearson correlation of the gene expression data itself (constructing a hybrid PPI + Expression Correlation graph). *Note: If this is too computationally expensive, focus on the Weighted/Top-K approach.*
+
+    4. **Refined Mapping:** * *Current State:* It maps symbols to Entrez IDs via `mygene`. * *Improvement:* Add error handling or a local fallback. If `mygene` fails or returns nothing, check if the symbol itself exists in the network file to avoid dropping too many valid genes.
+
+
+    **Constraints:**
+    1. **Input/Output:** You must preserve the class structure `StringDBGraph(BaseTransform)`. The output must update `data.data` (the AnnData object). Specifically, `adata.uns[self.out]` must contain the `edge_index` (2 x NumEdges). 2. **Dependencies:** You may use `torch`, `pandas`, `numpy`, and `scipy`. 3. **Hyperparameters:** You are free to introduce new hyperparameters (e.g., `k_neighbors`, `weight_scale`) to the `__init__` method.
+    **Output Format:** Return **only** the optimized Python code block that should replace the content between `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END`. Do not include the imports outside the block. 
+
+    **cta_scheteronet is identified as a structurally similar algorithm, sharing a similarity score of 0.6500 with the algorithm currently under optimization. Consequently, the following graph construction rules may serve as a useful reference:**
+    ```IF constructing k-nearest neighbor graphs from high-dimensional single-cell expression features THEN replace iterative Python list comprehensions with vectorized NumPy array operations for edge list generation to reduce graph construction time and improve `avg_speed_score`
+    IF integrating preprocessing into the data loading pipeline THEN apply transformations during `load_data(transform=preprocessing_pipeline, cache=args.cache)` instead of post-hoc sequential application to eliminate redundant AnnData copying and memory reallocation, thereby increasing `reliability_score` and reducing `avg_success_time`
+    IF handling multi-dataset cell type annotation with batch effects THEN preserve `batch_id` as integer-encoded node attributes in the DGL graph rather than discarding or misaligning batch metadata, improving `Human_Spleen_inner_score` and `Human_Immune_inner_score` through consistent batch-aware propagation
+    IF evaluating model performance across heterogeneous tissue types THEN enforce strict tensor shape alignment (e.g., `y.unsqueeze(1)` for singleton label dimensions) prior to scoring to prevent silent broadcasting errors that degrade `avg_accuracy` and `Human_CD8_score`
+    IF optimizing for biological generalizability across immune tissues THEN omit dataset sub-sampling (`sub_data`) and hardcoded split indices to retain full biological heterogeneity and avoid biasing `Human_Immune_score` and `Human_CD4_score` toward artificial subset distributions```
+
+
+  include_artifacts: true
+  max_artifact_bytes: 32768
+  artifact_security_filter: true
+
+# Database configuration
+database:
+  population_size: 50
+  archive_size: 20
+  num_islands: 3
+  elite_selection_ratio: 0.2
+  exploitation_ratio: 0.7
+
+
+# Evaluator configuration
+evaluator:
+  timeout: 600000
+  cascade_thresholds: [0.3]
+  parallel_evaluations: 1
+
+# Evolution settings
+diff_based_evolution: true
+max_code_length: 20000
+
+#提取原则并且存储
+#使用反事实验证

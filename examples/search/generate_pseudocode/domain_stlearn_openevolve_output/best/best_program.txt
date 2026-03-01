@@ -1,0 +1,112 @@
+algol
+procedure StKmeans(
+    n_clusters: integer := 19;
+    init: string := "k-means++";
+    n_init: integer := 10;
+    max_iter: integer := 300;
+    tol: real := 1e-4;
+    algorithm: string := "auto";
+    verbose: boolean := false;
+    random_state: optional integer := null;
+    use_data: string := "X_pca";
+    key_added: string := "X_pca_kmeans"
+);
+begin
+    model := KMeans(
+        n_clusters := n_clusters;
+        init := init;
+        n_init := n_init;
+        max_iter := max_iter;
+        tol := tol;
+        algorithm := algorithm;
+        verbose := verbose;
+        random_state := random_state
+    );
+
+    procedure preprocessing_pipeline(
+        morph_feat_dim: integer := 50;
+        sme_feat_dim: integer := 50;
+        pca_feat_dim: integer := 10;
+        device: string := "cpu";
+        log_level: string := "INFO";
+        crop_size: integer := 10;
+        target_size: integer := 230
+    ): Compose;
+    begin
+        return Compose(
+            AnnDataTransform(sc.pp.filter_genes, min_cells := 1),
+            AnnDataTransform(sc.pp.normalize_total, target_sum := 1e4),
+            AnnDataTransform(sc.pp.log1p),
+            MorphologyFeatureCNN(n_components := morph_feat_dim, device := device,
+                crop_size := crop_size, target_size := target_size),
+            CellPCA(n_components := pca_feat_dim),
+            SMEGraph(),
+            SMEFeature(n_components := sme_feat_dim),
+            SetConfig({
+                "feature_channel": "SMEFeature",
+                "feature_channel_type": "obsm",
+                "label_channel": "label",
+                "label_channel_type": "obs"
+            }),
+            log_level := log_level
+        );
+    end;
+
+    procedure fit(x: any);
+    begin
+        model.fit(x);
+    end;
+
+    function predict(): array of integer;
+    begin
+        return model.labels_;
+    end;
+end;
+
+procedure StLouvain(resolution: real := 1; random_state: optional integer := null);
+begin
+    model := Louvain(resolution);
+
+    procedure preprocessing_pipeline(
+        morph_feat_dim: integer := 50;
+        sme_feat_dim: integer := 50;
+        pca_feat_dim: integer := 10;
+        nbrs_pcs: integer := 10;
+        n_neighbors: integer := 10;
+        device: string := "cpu";
+        log_level: string := "INFO";
+        crop_size: integer := 10;
+        target_size: integer := 230
+    ): Compose;
+    begin
+        return Compose(
+            AnnDataTransform(sc.pp.filter_genes, min_cells := 1),
+            AnnDataTransform(sc.pp.normalize_total, target_sum := 1e4),
+            AnnDataTransform(sc.pp.log1p),
+            MorphologyFeatureCNN(n_components := morph_feat_dim, device := device,
+                crop_size := crop_size, target_size := target_size),
+            CellPCA(n_components := pca_feat_dim),
+            SMEGraph(),
+            SMEFeature(n_components := sme_feat_dim),
+            NeighborGraph(n_neighbors := n_neighbors, n_pcs := nbrs_pcs, channel := "SMEFeature"),
+            SetConfig({
+                "feature_channel": "NeighborGraph",
+                "feature_channel_type": "obsp",
+                "label_channel": "label",
+                "label_channel_type": "obs"
+            }),
+            log_level := log_level
+        );
+    end;
+
+    procedure fit(adj: any; partition: optional dictionary := null;
+                  weight: string := "weight"; randomize: optional boolean := null);
+    begin
+        model.fit(adj, partition, weight, randomize, random_state);
+    end;
+
+    function predict(): array of integer;
+    begin
+        return model.predict();
+    end;
+end;

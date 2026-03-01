@@ -336,7 +336,12 @@ def evaluate_prompt(prompt, dataset, config, num_samples):
         indices = range(min(num_samples, len(dataset)))
         samples = dataset.select(indices)
         sample_iter = tqdm(samples, desc=f"Evaluating {num_samples} samples")
-    formatted_prompt = prompt.split('#Pseudocode-START')[1].split('#Pseudocode-END')[0]
+    with open(f"prompt_{method_name}.txt", "w") as f:
+        f.write(prompt)
+    if "#Pseudocode-START" in prompt:
+        formatted_prompt = prompt.split('#Pseudocode-START')[1].split('#Pseudocode-END')[0]
+    else:
+        formatted_prompt = prompt
     for example in sample_iter:
         input_text = example[input_field]
         expected = example[target_field]
@@ -363,6 +368,7 @@ def evaluate_prompt(prompt, dataset, config, num_samples):
 
 
 def evaluate_stage1(prompt_path):
+    print(f"Evaluating stage 1 for prompt: {prompt_path}")
     """
     Stage 1 evaluation: Quick evaluation with 10% of samples
 
@@ -433,6 +439,7 @@ def evaluate_stage1(prompt_path):
 
 
 def evaluate_stage2(prompt_path):
+    print(f"Evaluating stage 2 for prompt: {prompt_path}")
     """
     Stage 2 evaluation: Full evaluation with all samples
 

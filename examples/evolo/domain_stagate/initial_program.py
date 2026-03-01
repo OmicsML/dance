@@ -13,8 +13,8 @@ import numpy as np
 import scanpy as sc
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.stagate import Stagate
-from dance.utils import set_seed
-
+from dance.utils import set_seed, sub_data
+from dance.typing import Optional
 
 
 # EVOLVE-BLOCK-START
@@ -87,6 +87,8 @@ if __name__ == "__main__":
     parser.add_argument("--high_variable_genes", type=int, default=3000, help="")
     parser.add_argument("--seed", type=int, default=3, help="")
     parser.add_argument("--num_runs", type=int, default=1)
+    parser.add_argument("--device", type=str, default=None, help="Device to use (e.g., 'cuda', 'cpu', 'cuda:0').")
+    parser.add_argument("--obs_nums",type=int,default=10000)
     args = parser.parse_args()
 
     scores = []
@@ -95,19 +97,20 @@ if __name__ == "__main__":
         set_seed(seed)
 
         # Initialize model and get model specific preprocessing pipeline
-        model = Stagate([args.high_variable_genes] + args.hidden_dims)
-        preprocessing_pipeline = model.preprocessing_pipeline(n_top_hvgs=args.high_variable_genes,
+        preprocessing_pipeline = get_preprocessing_pipeline(n_top_hvgs=args.high_variable_genes,
                                                               radius=args.rad_cutoff)
 
         # Load data and perform necessary preprocessing
         dataloader = SpatialLIBDDataset(data_id=args.sample_number)
-        data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
+        data = dataloader.load_data(transform=None, cache=args.cache)
+        sub_data(data.data,args.obs_nums)
+        preprocessing_pipeline(data)
         adj, y = data.get_data(return_type="default")
         x = data.data.X.A
         edge_list_array = np.vstack(np.nonzero(adj))
 
         # Train and evaluate model
-        model = Stagate([args.high_variable_genes] + args.hidden_dims)
+        model = Stagate([min(args.high_variable_genes,x.shape[1])] + args.hidden_dims,device=args.device)
         score = model.fit_score((x, edge_list_array), y, epochs=args.epochs, random_state=seed)
         pred=model.predict()
         silhouette_score = resolve_score_func("silhouette")

@@ -1,0 +1,288 @@
+"""Reimplementation of stLearn.
+
+Extended from https://github.com/BiomedicalMachineLearning/stLearn
+
+Reference
+----------
+Pham, Duy, et al. "stLearn: integrating spatial location, tissue morphology and gene expression to find cell types,
+cell-cell interactions and spatial trajectories within undissociated tissues." BioRxiv (2020).
+
+"""
+import scanpy as sc
+from sklearn.cluster import KMeans
+
+from dance.modules.base import BaseClusteringMethod
+from dance.modules.spatial.spatial_domain.louvain import Louvain
+from dance.transforms import AnnDataTransform, CellPCA, Compose, MorphologyFeatureCNN, SetConfig, SMEFeature
+from dance.transforms.graph import NeighborGraph, SMEGraph
+from dance.typing import LogLevel, Optional
+
+
+class StKmeans(BaseClusteringMethod):
+    """StKmeans class.
+
+    Parameters
+    ----------
+    n_clusters
+        The number of clusters to form as well as the number of centroids to generate.
+    init
+        Method for initialization: {‘k-means++’, ‘random’}.
+    n_init
+        Number of time the k-means algorithm will be run with different centroid seeds.
+        The final results will be the best output of n_init consecutive runs in terms of inertia.
+    max_iter
+        Maximum number of iterations of the k-means algorithm for a single run.
+    tol
+        Relative tolerance with regards to Frobenius norm of the difference in the cluster centers of two
+        consecutive iterations to declare convergence.
+    algorithm
+        {“lloyd”, “elkan”, “auto”, “full”}, default is "auto".
+    verbose
+        Verbosity.
+    random_state
+        Determines random number generation for centroid initialization.
+    use_data
+        Default "X_pca".
+    key_added
+        Default "X_pca_kmeans".
+
+    """
+
+    def __init__(
+        self,
+        n_clusters: int = 19,
+        init: str = "k-means++",
+        n_init: int = 10,
+        max_iter: int = 300,
+        tol: float = 1e-4,
+        algorithm: str = "auto",
+        verbose: bool = False,
+        random_state: Optional[int] = None,
+        use_data: str = "X_pca",
+        key_added: str = "X_pca_kmeans",
+    ):
+        self.use_data = use_data
+        self.key_added = key_added
+        self.model = KMeans(n_clusters=n_clusters, init=init, n_init=n_init, max_iter=max_iter, tol=tol,
+                            algorithm=algorithm, verbose=verbose, random_state=random_state)
+
+    @staticmethod
+    def preprocessing_pipeline(morph_feat_dim: int = 50, sme_feat_dim: int = 50, pca_feat_dim: int = 10,
+                               device: str = "cpu", log_level: LogLevel = "INFO", crop_size=10, target_size=230):
+        return Compose(
+            AnnDataTransform(sc.pp.filter_genes, min_cells=1),
+            AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
+            AnnDataTransform(sc.pp.log1p),
+            MorphologyFeatureCNN(n_components=morph_feat_dim, device=device, crop_size=crop_size,
+                                 target_size=target_size),
+            CellPCA(n_components=pca_feat_dim),
+            SMEGraph(),
+            SMEFeature(n_components=sme_feat_dim),
+            SetConfig({
+                "feature_channel": "SMEFeature",
+                "feature_channel_type": "obsm",
+                "label_channel": "label",
+                "label_channel_type": "obs",
+            }),
+            log_level=log_level,
+        )
+
+    def fit(self, x):
+        """Fit function for model training.
+
+        Parameters
+        ----------
+        x
+            Input cell feature.
+
+        """
+        self.model.fit(x)
+
+    def predict(self, x=None):
+        """Prediction function."""
+        pred = self.model.labels_
+        return pred
+
+
+class StLouvain(BaseClusteringMethod):
+    """StLouvain class.
+
+    Parameters
+    ----------
+    resolution
+        Resolution parameter.
+
+    """
+
+    def __init__(self, resolution: float = 1,random_state=None):
+        self.model = Louvain(resolution)
+        self.random_state=random_state
+
+    @staticmethod
+    def preprocessing_pipeline(morph_feat_dim: int = 50, sme_feat_dim: int = 50, pca_feat_dim: int = 10,
+                               nbrs_pcs: int = 10, n_neighbors: int = 10, device: str = "cpu",
+                               log_level: LogLevel = "INFO", crop_size=10, target_size=230):
+        return Compose(
+            AnnDataTransform(sc.pp.filter_genes, min_cells=1),
+            AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
+            AnnDataTransform(sc.pp.log1p),
+            MorphologyFeatureCNN(n_components=morph_feat_dim, device=device, crop_size=crop_size,
+                                 target_size=target_size),
+            CellPCA(n_components=pca_feat_dim),
+            SMEGraph(),
+            SMEFeature(n_components=sme_feat_dim),
+            NeighborGraph(n_neighbors=n_neighbors, n_pcs=nbrs_pcs, channel="SMEFeature"),
+            SetConfig({
+                "feature_channel": "NeighborGraph",
+                "feature_channel_type": "obsp",
+                "label_channel": "label",
+                "label_channel_type": "obs",
+            }),
+            log_level=log_level,
+        )
+
+    def fit(self, adj, partition=None, weight="weight", randomize=None):
+        """Fit function for model training.
+
+        Parameters
+        ----------
+        adj
+            Adjacent matrix.
+        partition : dict
+            A dictionary where keys are graph nodes and values the part the node
+            belongs to
+        weight : str,
+            The key in graph to use as weight. Default to "weight"
+        resolution : float
+            Resolution.
+        randomize : boolean
+            Will randomize the node evaluation order and the community evaluation
+            order to get different partitions at each call
+        random_state : int, RandomState instance or None
+            If int, random_state is the seed used by the random number generator; If RandomState instance, random_state
+            is the random number generator; If None, the random number generator is the RandomState instance used by
+            :func:`numpy.random`.
+
+        """
+        self.model.fit(adj, partition, weight, randomize, self.random_state)
+
+    def predict(self, x=None):
+        """Prediction function."""
+        pred = self.model.predict()
+        return pred
+The following is pseudocode generated based on the above algorithm:
+
+
+#Pseudocode-START
+procedure StKmeans(
+    n_clusters: integer := 19;
+    init: string := "k-means++";
+    n_init: integer := 10;
+    max_iter: integer := 300;
+    tol: real := 1e-4;
+    algorithm: string := "auto";
+    verbose: boolean := false;
+    random_state: optional integer := null;
+    use_data: string := "X_pca";
+    key_added: string := "X_pca_kmeans"
+);
+begin
+    model := KMeans(
+        n_clusters := n_clusters;
+        init := init;
+        n_init := n_init;
+        max_iter := max_iter;
+        tol := tol;
+        algorithm := algorithm;
+        verbose := verbose;
+        random_state := random_state
+    );
+
+    procedure preprocessing_pipeline(
+        morph_feat_dim: integer := 50;
+        sme_feat_dim: integer := 50;
+        pca_feat_dim: integer := 10;
+        device: string := "cpu";
+        log_level: string := "INFO";
+        crop_size: integer := 10;
+        target_size: integer := 230
+    ): Compose;
+    begin
+        return Compose(
+            AnnDataTransform(sc.pp.filter_genes, min_cells := 1),
+            AnnDataTransform(sc.pp.normalize_total, target_sum := 1e4),
+            AnnDataTransform(sc.pp.log1p),
+            MorphologyFeatureCNN(n_components := morph_feat_dim, device := device,
+                crop_size := crop_size, target_size := target_size),
+            CellPCA(n_components := pca_feat_dim),
+            SMEGraph(),
+            SMEFeature(n_components := sme_feat_dim),
+            SetConfig({
+                "feature_channel": "SMEFeature",
+                "feature_channel_type": "obsm",
+                "label_channel": "label",
+                "label_channel_type": "obs"
+            }),
+            log_level := log_level
+        );
+    end;
+
+    procedure fit(x: any);
+    begin
+        model.fit(x);
+    end;
+
+    function predict(): array of integer;
+    begin
+        return model.labels_;
+    end;
+end;
+
+procedure StLouvain(resolution: real := 1; random_state: optional integer := null);
+begin
+    model := Louvain(resolution);
+
+    procedure preprocessing_pipeline(
+        morph_feat_dim: integer := 50;
+        sme_feat_dim: integer := 50;
+        pca_feat_dim: integer := 10;
+        nbrs_pcs: integer := 10;
+        n_neighbors: integer := 10;
+        device: string := "cpu";
+        log_level: string := "INFO";
+        crop_size: integer := 10;
+        target_size: integer := 230
+    ): Compose;
+    begin
+        return Compose(
+            AnnDataTransform(sc.pp.filter_genes, min_cells := 1),
+            AnnDataTransform(sc.pp.normalize_total, target_sum := 1e4),
+            AnnDataTransform(sc.pp.log1p),
+            MorphologyFeatureCNN(n_components := morph_feat_dim, device := device,
+                crop_size := crop_size, target_size := target_size),
+            CellPCA(n_components := pca_feat_dim),
+            SMEGraph(),
+            SMEFeature(n_components := sme_feat_dim),
+            NeighborGraph(n_neighbors := n_neighbors, n_pcs := nbrs_pcs, channel := "SMEFeature"),
+            SetConfig({
+                "feature_channel": "NeighborGraph",
+                "feature_channel_type": "obsp",
+                "label_channel": "label",
+                "label_channel_type": "obs"
+            }),
+            log_level := log_level
+        );
+    end;
+
+    procedure fit(adj: any; partition: optional dictionary := null;
+                  weight: string := "weight"; randomize: optional boolean := null);
+    begin
+        model.fit(adj, partition, weight, randomize, random_state);
+    end;
+
+    function predict(): array of integer;
+    begin
+        return model.predict();
+    end;
+end;
+#Pseudocode-END

@@ -5,6 +5,21 @@
   />
 </p>
 
+# CEAgent-GSL: Code-level Evolutionary Agent for Interpretable Graph Structure Learning on Omics
+
+> **Note to Reviewers and Users:**
+> This repository contains the official implementation of **ECAgent-GSL**. While **partially utilizing** the **DANCE 2.0** environment for infrastructure support, our contributions are concentrated in specific modules tailored for graph topology learning. The core contributions of this work are independent and strictly isolated.
+>
+> **Key Implementation Directories:**
+> - **`examples/evolo/`**: The core evolutionary loop and LLM agent interaction logic.
+> - **`examples/search/` & `examples/similarity/`**: The Intelligent Recommendation and retrieval modules.
+> - **`dance/modules/`**: A **curated benchmark suite**. From the original ~30 methods, we selectively retained **5 legacy algorithms** relevant to our task and **implemented 6 new graph-based algorithms from scratch**. This results in a specialized collection of 11 baselines strictly controlled for our experiments.
+> - **`dance/transforms/graph/`**: An existing module **significantly expanded** in this work. We injected diverse graph construction logic (extracted from the 11 baselines) into this module, transforming it into the primary **search space** for our evolutionary optimization.
+>
+> The remaining parts of this repository serve as the environmental substrate for data loading and reproducibility.
+
+---
+
 ______________________________________________________________________
 
 [![PyPI version](https://badge.fury.io/py/pydance.svg)](https://badge.fury.io/py/pydance)

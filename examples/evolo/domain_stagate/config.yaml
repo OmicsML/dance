@@ -1,25 +1,45 @@
 # Configuration for function minimization example
-max_iterations: 5 #50
+max_iterations: 20 #50
 checkpoint_interval: 5
 
-# LLM configuration
+# # LLM configuration
+# llm:
+#   primary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # primary_model: "llama3.1-8b"
+#   primary_model_weight: 0.6
+#   secondary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # secondary_model: "llama-4-scout-17b-16e-instruct"
+#   secondary_model_weight: 0.4
+#   api_base: "https://api.deepseek.com"
+#   # api_base: "https://api.cerebras.ai/v1"
+#   temperature: 0.8
+#   top_p: 0.95
+#   max_tokens: 8192
+#   timeout: 1200
+
 llm:
-  primary_model: "deepseek-reasoner" #"deepseek-reasoner"
-  # primary_model: "llama3.1-8b"
-  primary_model_weight: 0.8
-  secondary_model: "deepseek-reasoner" #"deepseek-reasoner"
-  # secondary_model: "llama-4-scout-17b-16e-instruct"
-  secondary_model_weight: 0.2
-  api_base: "https://api.deepseek.com"
-  # api_base: "https://api.cerebras.ai/v1"
-  temperature: 0.7
-  max_tokens: 8192
-  timeout: 1200
+  models:
+    - name: "qwen3-coder-plus"
+      api_key: "sk-92265d8b2c044989b10ad59e3a27b56f"
+      api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      weight: 0.8
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+    - name: "qwen3-coder-flash"
+      api_key: "sk-92265d8b2c044989b10ad59e3a27b56f"
+      api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      weight: 0.2
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+
 
 # Prompt configuration
 prompt:
-  system_message: "
-                You are an expert programmer specializing in Graph Neural Networks (GNNs) and spatial transcriptomics, with a deep understanding of algorithms like STAGATE.
+  system_message: "You are an expert programmer specializing in Graph Neural Networks (GNNs) and spatial transcriptomics, with a deep understanding of algorithms like STAGATE.
 
                 Your task is to propose and implement meaningful extensions to the `StagateGraph` preprocessor. The current implementation correctly constructs a spatial neighborhood graph (k-NN or radius) based on physical coordinates, which is faithful to the original STAGATE paper's methodology. Your goal is not to 'fix' this, but to enhance it by creating more powerful and biologically informative graph structures that can potentially improve the performance and interpretability of the STAGATE model.
 
@@ -59,9 +79,7 @@ prompt:
                 The core idea is to move beyond a purely spatial graph. You could explore building separate graphs for each modality (spatial, expression) and then combining their adjacency matrices with a weighted sum, or focus on refining the single-graph construction as proposed. The key is to generate a graph that provides a more comprehensive view of the relationships between spots.
 
                 **Constraints:**
-                You may add new parameters to the `StagateGraph.__init__` method to support these new functionalities (e.g., `use_expression`, `spatial_weight`, `expr_channel`). The final output must remain a `scipy.sparse` matrix stored in `data.data.obsp[self.out]`, representing the graph's adjacency structure for the STAGATE model to consume.
-                "
-  
+                You may add new parameters to the `StagateGraph.__init__` method to support these new functionalities (e.g., `use_expression`, `spatial_weight`, `expr_channel`). The final output must remain a `scipy.sparse` matrix stored in `data.data.obsp[self.out]`, representing the graph's adjacency structure for the STAGATE model to consume."
   include_artifacts: true
   max_artifact_bytes: 32768
   artifact_security_filter: true
@@ -78,7 +96,7 @@ database:
 evaluator:
   timeout: 600000
   cascade_thresholds: [0.3]
-  parallel_evaluations: 3
+  parallel_evaluations: 1
 
 # Evolution settings
 diff_based_evolution: true

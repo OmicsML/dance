@@ -1,0 +1,69 @@
+# Configuration for function minimization example
+max_iterations: 20 #50
+checkpoint_interval: 5
+
+# LLM configuration
+llm:
+  models:
+    - name: qwen3-coder-plus
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.8
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+    - name: qwen3-coder-flash
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.2
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+
+# Prompt configuration
+prompt:
+  system_message: |2-
+     **Prompt for the Evolve Model:**
+    You are an expert Machine Learning Engineer specializing in Geometric Deep Learning and Single-Cell Bioinformatics. Your task is to optimize the Python code block delimited by `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END`.
+    **Context:** The code defines a `scGATGraphTransform` class. This class converts Single-Cell RNA-sequencing (scRNA-seq) data (stored in `scanpy.AnnData` format) into a PyTorch Geometric (PyG) `Data` object for training a Graph Attention Network (GAT).
+    **Objective:** Optimize the code to maximize **Classification Accuracy** (Cell Type Annotation) and **Computational Efficiency** (Speed and Memory).
+    **Specific Optimization Strategies & Hints:**
+    1. **Node Feature Engineering (Crucial for Accuracy/Speed):** * *Current Approach:* The code currently uses Min-Max normalization on `adata.X`. If `adata.X` is raw high-dimensional gene expression (e.g., 20,000 genes), this is extremely noisy and computationally expensive for a GAT. * *Improvement:* Prioritize using **Principal Component Analysis (PCA)** components (e.g., `adata.obsm['X_pca']`) or Highly Variable Genes (HVG) as the node features (`x`) for the graph. This reduces noise and dimension, significantly speeding up GAT training and often improving accuracy. * *Alternative:* If using gene expression, ensure Log1p transformation and Z-score standardization (`sc.pp.scale`) are applied rather than simple Min-Max scaling.
+
+    2. **Graph Topology Construction:** * *Pruning:* The current `sc.pp.neighbors` construction might create noisy edges. Consider implementing edge weighting thresholds to prune weak connections, or allow the GAT to learn from the provided edge weights (if the GAT model supports it). * *Self-loops:* Ensure self-loops are added efficiently.
+
+    3. **Tensor Conversion Efficiency:** * Optimize `scipysparse2torchsparse`. PyTorch Geometric has native utilities (`from_scipy_sparse_matrix`) that might be faster or more robust.
+
+    4. **Hyperparameter Tuning:** * You have the freedom to introduce new `__init__` parameters (e.g., `use_pca_features`, `n_components`, `edge_weight_threshold`) to control these behaviors. * Standardize `n_neighbors` (currently 15). You may adjust the default if it helps density.
+
+
+    **Constraints:**
+    1. **Interface Integrity:** The class name `scGATGraphTransform` and its inheritance from `BaseTransform` must remain. The `__call__` method must return the data object with `adata.uns['pyg_data']` populated. 2. **Input/Output:** You must handle `scanpy.AnnData` inputs. The output PyG `Data` object must contain `x`, `edge_index`, `y`, and the train/val/test masks. 3. **Label Handling:** Maintain the robust logic for handling both categorical (obs) and one-hot (obsm) labels.
+    **Evolutionary Freedom:** You are free to restructure the internal logic of the `__call__` method entirely. You may import standard libraries (`torch_geometric.utils`, `sklearn.preprocessing`, etc.) as needed. If you choose to use PCA features, ensure you compute them inside the transform if they don't exist, or fallback gracefully.
+    **Output:** Return **only** the optimized Python code meant to replace the content between `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END`.
+
+    **cta_scdeepsort is identified as a structurally similar algorithm, sharing a similarity score of 0.8000 with the algorithm currently under optimization. Consequently, the following graph construction rules may serve as a useful reference:**
+    ```IF cell feature representation must capture both global structure and local expression weighting THEN fuse direct cell-level TruncatedSVD embeddings with weighted gene-PCA embeddings using biologically informed convex combination (0.6/0.4)```
+  include_artifacts: true
+  max_artifact_bytes: 32768
+  artifact_security_filter: true
+
+# Database configuration
+database:
+  population_size: 50
+  archive_size: 20
+  num_islands: 3
+  elite_selection_ratio: 0.2
+  exploitation_ratio: 0.7
+
+# Evaluator configuration
+evaluator:
+  timeout: 600000
+  cascade_thresholds: [0.3]
+  parallel_evaluations: 1
+
+# Evolution settings
+diff_based_evolution: true
+max_code_length: 20000

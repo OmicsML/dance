@@ -8,7 +8,7 @@ from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scgat import scGATAnnotator
 from dance.transforms import Compose, SetConfig
-from dance.utils import set_seed
+from dance.utils import set_seed, sub_data
 
 import hashlib
 import time
@@ -268,7 +268,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_dataset", nargs="+", default=[1759], type=int, help="list of dataset id")
     parser.add_argument("--tissue", default="Spleen")
     parser.add_argument("--train_dataset", nargs="+", default=[1970], type=int, help="list of dataset id")
-    parser.add_argument("--seed", type=int, default=10)
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--num_runs", type=int, default=3)
     parser.add_argument("--val_size", type=float, default=0.2, help="val size")
     
@@ -276,7 +276,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--hidden_channels", type=int, default=8)
     parser.add_argument("--n_epochs", type=int, default=5000)
-    
+    parser.add_argument("--obs_nums",type=int,default=None)
     args = parser.parse_args()
     logger.setLevel("INFO")
     logger.info(f"Running GAT with the following parameters:\n{pprint.pformat(vars(args))}")
@@ -307,6 +307,13 @@ if __name__ == "__main__":
                 n_neighbors=15,
                 log_level="INFO"
             )
+        if args.obs_nums is not None:
+            sub_data(data.data,args.obs_nums)
+            train_idx, test_idx = train_test_split(range(args.obs_nums),test_size=0.2,random_state=args.seed)
+            train_idx,val_idx = train_test_split(train_idx,test_size=args.val_size,random_state=args.seed)
+            data.set_split_idx("train", train_idx)
+            data.set_split_idx("test", test_idx)
+            data.set_split_idx("val", val_idx)
         
         print(data)
 

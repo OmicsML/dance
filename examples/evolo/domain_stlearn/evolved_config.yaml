@@ -1,0 +1,62 @@
+# Configuration for function minimization example
+max_iterations: 20 #50
+checkpoint_interval: 5
+
+# LLM configuration
+llm:
+  models:
+    - name: qwen3-coder-plus
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.8
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+    - name: qwen3-coder-flash
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.2
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+
+# Prompt configuration
+prompt:
+  system_message: |2-
+
+    **Role:** Act as an expert in Spatial Transcriptomics, Computer Vision, and Graph Neural Networks. Your goal is to evolve the provided Python code block to maximize the clustering performance (Adjusted Rand Index - ARI) and significantly reduce computational runtime.
+    **Context:** The code implements the **stLearn** algorithm pipeline. It extracts morphological features from tissue images using a CNN, constructs a Spatial Morphological Gene Expression (SME) graph, and imputes gene expression based on spatial neighbors. *   **Current Bottlenecks:** 1.  `MorphologyFeatureCNN` processes images sequentially in a loop (extremely slow). 2.  `SMEFeature` calculates neighbor smoothing using a slow Python `for` loop. 3.  `SMEGraph` combines modalities multiplicatively, which might be too aggressive/sparse.
+    **Objectives:** 1.  **Maximize Accuracy (ARI):** Refine the graph construction logic and feature extraction parameters to better separate spatial domains. 2.  **Maximize Efficiency:** **Mandatory** vectorization of loops. Remove explicit `for` loops in `MorphologyFeatureCNN` and `SMEFeature` in favor of PyTorch batch processing and NumPy/Sparse Matrix operations.
+    **Evolution Instructions & Strategies:**
+    1.  **Code Optimization (Speed):** *   **Batching in CNN:** Rewrite `MorphologyFeatureCNN` to process image crops in batches (e.g., batch size 32 or 64) using `torch.utils.data.DataLoader` or manual tensor stacking. Do not infer one by one. *   **Vectorized Imputation:** Rewrite `SMEFeature`. Instead of iterating through every sample to find neighbors, utilize the adjacency matrix (sparse matrix) directly to perform matrix multiplication for feature smoothing: $X_{imputed} = A 	imes X$.
+    2.  **Algorithmic Improvements (Accuracy):** *   **SMEGraph Logic:** The current logic (`adj_p * adj_m * adj_g`) is strictly multiplicative. Experiment with weighted addition or a softer combination to prevent one modality from zeroing out connections entirely. *   **PCA Tuning:** In `CellPCA` and `SMEFeature`, consider if `n_components` (currently 50) is optimal. Maybe try a range between 20-100 or use a variance ratio threshold. *   **Normalization:** Ensure the image features from the CNN are properly normalized before PCA.
+    3.  **Hyperparameter Search Space:** *   `n_neighbors`: Search between 10 and 50. *   `crop_size`: Critical for capturing cell context. Search between 10 and 40. *   `CNN Model`: You may switch `resnet50` to `resnet18` (faster) or `inception_v3` if it improves feature quality.
+    **Constraints:** *   You must maintain the class structure (`MorphologyFeatureCNN`, `SMEFeature`, `SMEGraph`, `CellPCA`) and the `get_preprocessing_pipeline` function signature. *   The code must remain compatible with the `dance` library interfaces used. *   Do not modify code outside the `# EVOLVE-BLOCK` markers.
+    **Freedom:** You are free to change the internal logic of the `__call__` methods, introduce helper functions within the classes, and adjust default arguments in `get_preprocessing_pipeline` to achieve the best balance of speed and accuracy.
+    **Output:** Return only the refined Python code block.
+
+    **domain_spagcn is identified as a structurally similar algorithm, sharing a similarity score of 0.7700 with the algorithm currently under optimization. Consequently, the following graph construction rules may serve as a useful reference:**
+    ```IF integrating multi-modal spatial features (e.g., morphology + coordinates) THEN augment z-axis embedding with robust variance-weighted intensity scaling and standardized dispersion control to preserve spatial topology in high-dimensional embedding space, boosting combined_score and sub_mba_score```
+  include_artifacts: true
+  max_artifact_bytes: 32768
+  artifact_security_filter: true
+
+# Database configuration
+database:
+  population_size: 50
+  archive_size: 20
+  num_islands: 3
+  elite_selection_ratio: 0.2
+  exploitation_ratio: 0.7
+
+# Evaluator configuration
+evaluator:
+  timeout: 600000
+  cascade_thresholds: [0.3]
+  parallel_evaluations: 1
+
+# Evolution settings
+diff_based_evolution: true
+max_code_length: 20000

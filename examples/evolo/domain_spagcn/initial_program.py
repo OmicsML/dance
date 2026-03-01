@@ -14,7 +14,7 @@ from dance.transforms.misc import Compose, SetConfig
 from dance.typing import LogLevel
 from dance.utils import set_seed,sub_data
 from dance.utils.metrics import calculate_unified_scores, resolve_score_func
-from dance.typing import Sequence
+from dance.typing import Sequence,Optional
 import numba
 import numpy as np
 import torch
@@ -206,6 +206,7 @@ if __name__ == "__main__":
     parser.add_argument("--device", default="cpu", help="Computation device.")
     parser.add_argument("--seed", type=int, default=100, help="")
     parser.add_argument("--num_runs", type=int, default=1)
+    parser.add_argument("--obs_nums",type=int,default=10000)
     args = parser.parse_args()
 
     scores = []
@@ -220,7 +221,7 @@ if __name__ == "__main__":
         # Load data and perform necessary preprocessing
         dataloader = SpatialLIBDDataset(data_id=args.sample_number)
         data = dataloader.load_data(transform=None, cache=args.cache)
-        sub_data(data.data)
+        sub_data(data.data,args.obs_nums)
         preprocessing_pipeline(data)
         (x, adj, adj_2d), y = data.get_train_data()
 

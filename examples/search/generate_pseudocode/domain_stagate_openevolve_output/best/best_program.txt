@@ -1,0 +1,96 @@
+algol
+procedure STAGATE(
+    in_dim: integer;
+    num_hidden: integer;
+    out_dim: integer;
+    device: string;
+    pretrain_path: optional string
+) begin
+    // Initialize symmetric encoder-decoder GAT layers with strict weight tying
+    conv1 := GATConv(in_dim, num_hidden, heads=1, concat=false, dropout=0, add_self_loops=false, bias=false);
+    conv2 := GATConv(num_hidden, out_dim, heads=1, concat=false, dropout=0, add_self_loops=false, bias=false);
+    conv3 := GATConv(out_dim, num_hidden, heads=1, concat=false, dropout=0, add_self_loops=false, bias=false);
+    conv4 := GATConv(num_hidden, in_dim, heads=1, concat=false, dropout=0, add_self_loops=false, bias=false);
+
+    // Configure device and move model
+    device := get_device(device);
+    model := to_device(this, device);
+
+    // Preprocessing pipeline: exact implementation steps (no abbreviations)
+    preprocessing_pipeline := Compose(
+        AnnDataTransform(sc.pp.highly_variable_genes, flavor="seurat_v3", n_top_genes=3000, subset=true),
+        AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
+        AnnDataTransform(sc.pp.log1p),
+        StagateGraph(model_name="radius", radius=150, n_neighbors=5),
+        SetConfig({
+            "feature_channel": "StagateGraph",
+            "feature_channel_type": "obsp",
+            "label_channel": "label",
+            "label_channel_type": "obs"
+        })
+    );
+
+    // Forward pass: encoder → latent → weight-tied decoder with attention reuse
+    procedure forward(features, edge_index) begin
+        h1 := ELU(conv1(features, edge_index));
+        h2 := conv2(h1, edge_index, attention=false);  // latent embedding z
+
+        // Enforce exact weight transposition (no learned decoder weights)
+        conv3.lin_src.data := transpose(conv2.lin_src);
+        conv3.lin_dst.data := transpose(conv2.lin_dst);
+        conv4.lin_src.data := transpose(conv1.lin_src);
+        conv4.lin_dst.data := transpose(conv1.lin_dst);
+
+        // Reuse attention coefficients from conv1 in conv3
+        h3 := ELU(conv3(h2, edge_index, attention=true, tied_attention=conv1.attentions));
+        h4 := conv4(h3, edge_index, attention=false);  // reconstruction x̂
+
+        return (h2, h4);  // output: (latent_embedding, reconstruction)
+    end;
+
+    // Pretrain: minimize MSE loss with gradient clipping and proper tensor conversion
+    procedure pretrain(x, edge_index_array, lr, weight_decay, epochs, gradient_clipping) begin
+        x_tensor := to_float32_tensor(x, device);
+        edge_index_tensor := to_int64_tensor(edge_index_array, device);
+
+        optimizer := Adam(parameters(model), lr=lr, weight_decay=weight_decay);
+        train_mode(model);
+
+        for epoch := 1 to epochs do begin
+            optimizer.zero_grad();
+            (z, x̂) := forward(x_tensor, edge_index_tensor);
+            loss := MSE_loss(x_tensor, x̂);
+            loss.backward();
+            clip_grad_norm_(parameters(model), gradient_clipping);
+            optimizer.step();
+        end;
+
+        eval_mode(model);
+        (z, _) := forward(x_tensor, edge_index_tensor);
+        rep := detach(z).cpu().numpy();  // final latent representation for clustering
+    end;
+
+    // Cluster using Gaussian Mixture Model with paper-default parameters
+    procedure fit(inputs, epochs, lr, gradient_clipping, weight_decay,
+                   num_cluster, gmm_reg_covar, gmm_n_init, gmm_max_iter, gmm_tol, random_state) begin
+        (x, edge_index_array) := inputs;
+        pretrain(x, edge_index_array, lr, weight_decay, epochs, gradient_clipping);
+
+        gmm := GaussianMixture(
+            n_components=num_cluster,
+            covariance_type="tied",
+            n_init=gmm_n_init,      // default: 10
+            tol=gmm_tol,            // default: 2e-4
+            max_iter=gmm_max_iter,  // default: 300
+            reg_covar=gmm_reg_covar, // default: 1.5e-4
+            random_state=random_state
+        );
+        clust_res := gmm.fit_predict(rep);
+    end;
+
+    // Prediction returns hard cluster assignments only (no probabilities)
+    procedure predict(x) begin
+        return clust_res;
+    end;
+
+end;

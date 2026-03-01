@@ -1,13 +1,13 @@
-
 #!/usr/bin/env python3
 """
-测试 LamarckianKnowledgeBase 的完整工作流程
+测试 LamarckianKnowledgeBase 的完整工作流程 (Client-Server 版)
 
 基于 eigenvectors_complex 例子测试：
-1. 初始化知识库
-2. 检索知识（第一次应该为空）
-3. 学习轨迹（learn_from_trajectory）
-4. 再次检索知识（应该能检索到刚学习的知识）
+1. 初始化知识库 (连接远程 Chroma Server)
+2. 清理旧数据 (防止重复)
+3. 检索知识（第一次应该为空）
+4. 学习轨迹（learn_from_trajectory）
+5. 再次检索知识（应该能检索到刚学习的知识）
 """
 
 import sys
@@ -20,134 +20,110 @@ project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, project_root)
 
 from lamarckian_knowledge_base import LamarckianKnowledgeBase
-task_query = "cta_scdeepsort"
-# 设置路径
+
+# ================= 配置区域 =================
+# Chroma Server 配置
+SERVER_HOST = "211.87.232.112"
+SERVER_PORT = 8000
+
+# 任务配置
+task_query = os.environ.get("TASK_QUERY", "eigenvectors_complex") # 提供默认值防止报错
+
+# 路径配置
 example_dir = "/mnt/nfs/zyxing/msu/dance_temp/dance/examples/evolo"
+# 注意：确保 task_query 对应的目录存在，否则下方路径会出错
+target_task_dir = os.path.join(example_dir, task_query)
+
 evaluator_file = os.path.join(example_dir, "evaluator.py")
-initial_program_file = os.path.join(example_dir,task_query,"initial_program.py")
-best_program_file = os.path.join(example_dir,task_query, "openevolve_output", "best", "best_program.py")
-config_yaml_path=os.path.join(example_dir,task_query,'config.yaml')
+initial_program_file = os.path.join(target_task_dir, "initial_program.py")
+best_program_file = os.path.join(target_task_dir, "openevolve_output", "best", "best_program.py")
+config_yaml_path = os.path.join(target_task_dir, 'config.yaml')
 
-# # 设置路径
-# example_dir = "/mnt/nfs/zyxing/msu/dance_temp/dance/examples/similarity/GraphEvolve/openevolve/examples/algotune/eigenvectors_complex"
-# evaluator_file = os.path.join(example_dir, "evaluator.py")
-# initial_program_file = os.path.join(example_dir,"initial_program.py")
-# best_program_file = os.path.join(example_dir, "best_program.py")
-# config_yaml_path=os.path.join(example_dir,'config.yaml')
-
-    # 初始化知识库
-test_db_path = "./test_db4"
+# ================= 初始化知识库 =================
 print(f"\n{'='*80}")
-print("初始化知识库")
+print("初始化知识库 (Connecting to Chroma Server)")
 print(f"{'='*80}")
-print(f"向量数据库路径: {test_db_path}")
+print(f"Server: http://{SERVER_HOST}:{SERVER_PORT}")
+
 try:
+    # 🌟 修改点：不再传递 path，而是传递 host 和 port
     kb = LamarckianKnowledgeBase(
-        vector_store_path=test_db_path
+        host=SERVER_HOST,
+        port=SERVER_PORT
     )
-    print("✅ 知识库初始化成功")
+    print("✅ 知识库连接成功")
 except Exception as e:
-    print(f"❌ 知识库初始化失败: {e}")
+    print(f"❌ 知识库连接失败: {e}")
+    print("请检查：\n1. 服务器 211.87.232.112 是否已启动 chroma run\n2. 端口 8000 是否开放")
     sys.exit(1)
+
+
 def test_full_workflow():
     """测试完整的工作流程"""
     
     print("=" * 80)
     print("测试 LamarckianKnowledgeBase 完整工作流程")
     print("=" * 80)
+    print(f"Task Query: {task_query}")
     
     # 检查 API key
     api_key = os.getenv("DASHSCOPE_API_KEY")
-    if not api_key or api_key == "YOUR_DASHSCOPE_API_KEY":
+    if not api_key:
         print("\n⚠️  警告: 未设置 DASHSCOPE_API_KEY 环境变量")
-        print("   请设置环境变量: export DASHSCOPE_API_KEY='your-api-key'")
-        print("   或者测试将在 LLM 调用时失败")
-        print()
-        
-  
+        print("   测试将在 LLM 调用环节失败")
+
     # ============================================
     print(f"\n{'='*80}")
-    print("步骤 0: 根据 task_query 删除检索到的规则")
+    print("步骤 0: 清理与当前 Task 相关的旧数据")
     print(f"{'='*80}")
 
     try:
-        # 使用 task_query 检索知识
-        retrieved = kb.retrieve_knowledge(task_query, k=10)
-        print(f"\n查询: {task_query}")
-        print(f"检索到 {len(retrieved['principles'])} 个原则, {len(retrieved['trajectories'])} 个轨迹")
-
-        # 获取所有检索到的文档的 ID
+        # 获取所有数据
         all_memories = kb.list_all_memories()
         principles = all_memories.get("principles", [])
         trajectories = all_memories.get("trajectories", [])
-
-        # 筛选出与 task_query 相关的规则（通过比较内容是否在检索结果中）
+        
         ids_to_delete = []
 
+        # 策略：只要 metadata 中的 source_task 与当前 task_query 相同，就删除
+        # 这比先检索再删除更彻底，能保证测试环境纯净
         for p in principles:
-            if p.get("content") in retrieved['principles']:
-                print(p.get("content"))
-                if p.get("id"):
-                    ids_to_delete.append(p["id"])
-
+            if p.get("metadata", {}).get("source_task") == task_query:
+                ids_to_delete.append(p["id"])
+        
         for t in trajectories:
-            if t.get("content") in retrieved['trajectories']:
-                print(t.get("content"))
-                if t.get("id"):
-                    ids_to_delete.append(t["id"])
+            if t.get("metadata", {}).get("source_task") == task_query:
+                ids_to_delete.append(t["id"])
 
-        # 删除检索到的规则
         if ids_to_delete:
-            print(f"\n删除 {len(ids_to_delete)} 条检索到的规则...")
-            # 调用底层 collection 的 delete 方法
-            collection = getattr(kb.vector_store, "_collection", None)
-            if collection and hasattr(collection, "delete"):
-                collection.delete(ids=ids_to_delete)
-                print(f"✅ 已删除 {len(ids_to_delete)} 条规则")
-            else:
-                print("⚠️  无法访问底层 collection，无法删除规则")
+            print(f"发现 {len(ids_to_delete)} 条旧数据，正在删除...")
+            # 直接调用底层 collection 删除
+            kb._chroma_collection.delete(ids=ids_to_delete)
+            print(f"✅ 已删除 {len(ids_to_delete)} 条旧数据")
         else:
-            print("没有需要删除的规则")
+            print("没有发现旧数据，环境干净")
 
     except Exception as e:
-        print(f"⚠️  删除规则过程出现错误（不影响继续执行）: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"⚠️  清理数据时出现警告: {e}")
     
     # ============================================
     # 步骤 2: 检索知识（第一次，应该为空）
     # ============================================
     print(f"\n{'='*80}")
-    print("步骤 2: 检索知识（第一次）")
+    print("步骤 2: 检索知识（第一次，预期为空）")
     print(f"{'='*80}")
-    
     
     try:
         retrieved = kb.retrieve_knowledge(task_query, k=3)
-        print(f"\n查询: {task_query}")
-        print(f"\n检索结果:")
-        print(f"  - 原则数量: {len(retrieved['principles'])}")
-        print(f"  - 轨迹数量: {len(retrieved['trajectories'])}")
+        print(f"检索结果: {len(retrieved['principles'])} 原则, {len(retrieved['trajectories'])} 轨迹")
         
-        if retrieved['principles']:
-            print(f"\n找到的原则:")
-            for i, principle in enumerate(retrieved['principles'], 1):
-                print(f"  {i}. {principle[:100]}...")
+        if len(retrieved['principles']) == 0 and len(retrieved['trajectories']) == 0:
+            print("✅ 符合预期：知识库为空")
         else:
-            print("  (没有找到相关原则，这是正常的，因为知识库是空的)")
-        
-        if retrieved['trajectories']:
-            print(f"\n找到的轨迹:")
-            for i, trajectory in enumerate(retrieved['trajectories'], 1):
-                print(f"  {i}. {trajectory[:100]}...")
-        else:
-            print("  (没有找到相关轨迹，这是正常的，因为知识库是空的)")
-        
-        print("✅ 检索完成")
+            print("⚠️  注意：知识库中仍有相关数据（可能是其他 Task 的相似内容）")
+            
     except Exception as e:
         print(f"❌ 检索失败: {e}")
-        import traceback
-        traceback.print_exc()
         return False
     
     # ============================================
@@ -156,16 +132,15 @@ def test_full_workflow():
     print(f"\n{'='*80}")
     print("步骤 3: 学习轨迹（learn_from_trajectory）")
     print(f"{'='*80}")
-    print(f"初始程序: {initial_program_file}")
-    print(f"最优程序: {best_program_file}")
+    print(f"Initial: {initial_program_file}")
+    print(f"Best:    {best_program_file}")
     
-    # 检查文件是否存在
+    # 检查文件
     if not os.path.exists(initial_program_file):
-        print(f"❌ 初始程序文件不存在: {initial_program_file}")
+        print(f"❌ 找不到初始程序: {initial_program_file}")
         return False
-    
     if not os.path.exists(best_program_file):
-        print(f"❌ 最优程序文件不存在: {best_program_file}")
+        print(f"❌ 找不到最优程序: {best_program_file}")
         return False
     
     try:
@@ -174,183 +149,64 @@ def test_full_workflow():
                 initial_program_path=initial_program_file,
                 best_program_path=best_program_file,
                 original_task=task_query,
-                evaluator_file=evaluator_file,  # 传入 evaluator 文件路径
-                metrics=None,  # 让系统自动评估 initial_program
-                config=config_yaml_path,  # 传入 config.yaml，供 OpenEvolve 使用
+                evaluator_file=evaluator_file,
+                metrics=None, # 自动评估
+                config=config_yaml_path,
             )
         )
         
-        print(f"\n学习结果:")
-        print(f"  {'-'*70}")
-        print(f"  提取的所有原则 ({len(result['all_principles'])} 条):")
-        for i, p in enumerate(result['all_principles'], 1):
-            print(f"    {i}. {p}")
-        print(f"\n  已验证并存储的原则 ({result['saved_count']} 条):")
-        if result['extracted_principles']:
-            for i, p in enumerate(result['extracted_principles'], 1):
-                print(f"    ✅ {i}. {p}")
-        else:
-            print(f"    (无)")
-        print(f"\n  各原则验证详情:")
-        for i, r in enumerate(result['results'], 1):
-            status = "✅ VERIFIED" if r['saved'] else "❌ REJECTED"
-            print(f"    {i}. {status}: {r['principle'][:60]}...")
-        print(f"  {'-'*70}")
-
+        print(f"\n学习结果摘要:")
+        print(f"  - 提取原则总数: {len(result['all_principles'])}")
+        print(f"  - 验证并通过数: {result['saved_count']}")
+        
         if result['saved_count'] > 0:
-            print(f"✅ {result['saved_count']} 条原则已验证并保存到知识库")
+            print("✅ 学习成功，数据已写入远程数据库")
         else:
-            print("⚠️  没有原则通过验证，未保存到知识库")
-        
-        print("✅ 学习流程完成")
-        
-        # 列出并打印当前知识库中保存的所有 principle / trajectory（便于快速检查）
-        try:
-            all_memories = kb.list_all_memories()
-            principles = all_memories.get("principles", [])
-            trajectories = all_memories.get("trajectories", [])
-
-            print(f"\n=== 当前知识库概览 ===")
-            print(f"  - 原则总数: {len(principles)}")
-            print(f"  - 轨迹总数: {len(trajectories)}")
-
-            if principles:
-                print("\n已保存的原则（前 5 条）：")
-                for i, p in enumerate(principles[:5], 1):
-                    meta = p.get("metadata", {})
-                    content_preview = p.get("content", "")[:300].replace("\n", " ")
-                    print(f"  {i}. {content_preview}")
-                    print(f"     source_task: {meta.get('source_task')}, id: {p.get('id')}")
-
-            if trajectories:
-                print("\n已保存的轨迹（前 3 条）：")
-                for i, t in enumerate(trajectories[:3], 1):
-                    meta = t.get("metadata", {})
-                    traj_preview = t.get("content", "")[:300].replace("\n", " ")
-                    print(f"  {i}. {traj_preview}")
-                    print(f"     source_task: {meta.get('source_task')}, id: {t.get('id')}")
-        except Exception as e:
-            print(f"无法列出知识库内容: {e}")
-        
+            print("⚠️  学习完成但未保存任何原则（可能是反事实验证未通过）")
+            
     except Exception as e:
-        print(f"❌ 学习流程失败: {e}")
+        print(f"❌ 学习流程出错: {e}")
         import traceback
-        print(f"\n详细错误信息:")
         traceback.print_exc()
         return False
     
     # ============================================
-    # 步骤 4: 测试不同的查询（语义相似）
+    # 步骤 4: 验证检索（验证是否真的存进去了）
     # ============================================
     print(f"\n{'='*80}")
-    print("步骤 4: 测试不同的查询（语义相似）")
+    print("步骤 4: 验证检索 (确认数据已入库)")
     print(f"{'='*80}")
     
-    similar_queries = [
-        task_query
-    ]
+    # 等待一秒让索引刷新
+    import time
+    time.sleep(1)
+    
+    similar_queries = [task_query]
     
     for query in similar_queries:
         try:
             retrieved = kb.retrieve_knowledge(query, k=2)
-            print(f"\n查询: {query}")
-            print(f"  找到 {len(retrieved['principles'])} 个原则, {len(retrieved['trajectories'])} 个轨迹")
+            print(f"查询: '{query}'")
+            print(f"  -> 找到 {len(retrieved['principles'])} 原则")
             
             if retrieved['principles']:
-                print(f"  原则预览: {retrieved['principles'][0][:80]}...")
-            if retrieved['trajectories']:
-                print(f"  轨迹预览: {retrieved['trajectories'][0][:80]}...")
+                print(f"  -> 内容示例: {retrieved['principles'][0][:60]}...")
+                print("✅ 验证成功：能检索到新学习的知识")
+            else:
+                if result['saved_count'] > 0:
+                    print("❌ 验证失败：已保存但无法检索（可能是 Embedding 维度问题或索引延迟）")
+                    return False
+                else:
+                    print("⚠️  验证跳过：之前没有保存任何原则")
+                    
         except Exception as e:
-            print(f"❌ 查询 '{query}' 失败: {e}")
+            print(f"❌ 查询失败: {e}")
+            return False
     
-    print("\n✅ 所有测试完成！")
+    print("\n🎉 所有流程测试通过！")
     return True
-
-
-def test_retrieve_different_queries():
-    """
-    测试不同的查询是否能检索到之前学习的知识
-    
-    Args:
-        kb: 已初始化的知识库实例（应该已经存储了一些知识）
-    """
-    print(f"\n{'='*80}")
-    print("测试: 不同的语义查询")
-    print(f"{'='*80}")
-    
-    # 不同的查询方式，验证向量搜索的语义匹配能力
-    test_queries = [
-        # 中文同义表达
-        ("中文查询1", task_query),
-        ("中文查询2", "如何计算矩阵的特征向量"),
-        ("中文查询3", "矩阵特征值分解"),
-        
-        # 英文表达
-        ("英文查询1", "eigenvalue eigenvector computation"),
-        ("英文查询2", "matrix eigenvalue decomposition"),
-        ("英文查询3", "compute eigenvectors of a matrix"),
-    ]
-    
-    all_passed = True
-    results_summary = []
-    
-    for name, query in test_queries:
-        try:
-            retrieved = kb.retrieve_knowledge(query, k=2)
-            
-            has_principles = len(retrieved['principles']) > 0
-            has_trajectories = len(retrieved['trajectories']) > 0
-            success = has_principles or has_trajectories
-            
-            status = "✅ 成功" if success else "❌ 失败"
-            print(f"\n{name}: {status}")
-            print(f"  查询: {query}")
-            print(f"  找到 {len(retrieved['principles'])} 个原则, {len(retrieved['trajectories'])} 个轨迹")
-            
-            if retrieved['principles']:
-                print(f"  原则: {retrieved['principles'][0][:60]}...")
-            if retrieved['trajectories']:
-                print(f"  轨迹: {retrieved['trajectories'][0][:60]}...")
-            
-            results_summary.append({
-                "name": name,
-                "success": success,
-                "principles_count": len(retrieved['principles']),
-                "trajectories_count": len(retrieved['trajectories'])
-            })
-            
-            if not success:
-                all_passed = False
-                
-        except Exception as e:
-            print(f"\n{name}: ❌ 异常")
-            print(f"  查询: {query}")
-            print(f"  错误: {e}")
-            results_summary.append({
-                "name": name,
-                "success": False,
-                "error": str(e)
-            })
-            all_passed = False
-    
-    # 汇总结果
-    print(f"\n{'='*80}")
-    print("测试结果汇总")
-    print(f"{'='*80}")
-    
-    passed = sum(1 for r in results_summary if r.get("success", False))
-    total = len(results_summary)
-    
-    print(f"通过: {passed}/{total}")
-    
-    for r in results_summary:
-        status = "✅" if r.get("success") else "❌"
-        print(f"  {status} {r['name']}: {r.get('principles_count', 0)} 原则, {r.get('trajectories_count', 0)} 轨迹")
-    
-    return all_passed
 
 
 if __name__ == "__main__":
     success = test_full_workflow()
     sys.exit(0 if success else 1)
-

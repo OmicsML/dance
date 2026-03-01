@@ -5,7 +5,7 @@ import numpy as np
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.spaGRA import SpaGRA
 from dance.transforms import Compose, HighlyVariableGenesRawCount, NormalizeTotalLog1P, PrefilterGenes, SetConfig
-from dance.typing import LogLevel
+from dance.typing import LogLevel,Optional
 from dance.utils import set_seed, sub_data
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
@@ -95,13 +95,14 @@ if __name__ == "__main__":
                         help="12 human dorsolateral prefrontal cortex datasets for the spatial domain task.")
     parser.add_argument("--n_components", type=int, default=50, help="Number of PC components.")
     parser.add_argument("--neighbors", type=int, default=17, help="Number of neighbors.")
-    parser.add_argument("--seed", type=int, default=202, help="Random seed.")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed.")
     parser.add_argument("--num_runs", type=int, default=3)
     parser.add_argument("--k", type=int, default=0, help="Number of clusters.")
     parser.add_argument("--n_epochs", type=int, default=100, help="Number of training epochs.")
     parser.add_argument("--method", type=str, default="louvain", choices=["kmeans", "louvain"],
                         help="Clustering method.")
     parser.add_argument("--device", type=str, default=None, help="Device to use (e.g., 'cuda', 'cpu', 'cuda:0').")
+    parser.add_argument("--obs_nums",type=int,default=10000)
     args = parser.parse_args()
     inner_scores=[]
     scores = []
@@ -115,7 +116,7 @@ if __name__ == "__main__":
         # Load data and perform necessary preprocessing
         dataloader = SpatialLIBDDataset(data_id=args.sample_number)
         data = dataloader.load_data(transform=None, cache=args.cache)
-        sub_data(data.data)
+        sub_data(data.data,args.obs_nums)
         preprocessing_pipeline(data)
         # Fit the model and evaluate
         model.fit(data.data)

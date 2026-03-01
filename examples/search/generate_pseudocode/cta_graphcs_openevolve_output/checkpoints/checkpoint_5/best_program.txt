@@ -1,0 +1,152 @@
+algol
+procedure GraphCSClassifier;
+begin
+  // Hyperparameters and configuration — all sourced from args
+  batch_size := args.batch_size;
+  epochs := args.epochs;
+  lr := args.lr;
+  vat_lr := args.vat_lr;
+  patience := args.patience;
+  gpus := args.gpus;
+  layer := args.layer;
+  hidden := args.hidden;
+  dropout := args.dropout;
+  bias := args.bias;
+
+  // Device setup — prefer CUDA if available and gpus specified
+  if CUDA available and gpus non-empty then
+    device := "cuda:" + gpus[0]
+  else
+    device := "cpu";
+
+  // Seed initialization — ensure reproducibility across all RNGs
+  SetRandomSeed(random_state);
+
+  // Preprocessing pipeline — fixed order & parameters per original implementation
+  preprocessing := Compose(
+    SupervisedFeatureSelection(label_col="cell_type", n_features=2000, split_name="train"),
+    NormalizeTotalLog1P(),
+    HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=2000),
+    BBKNNConstruction(edge_ratio=2, key_added="temp_graph"),
+    SetConfig({"label_channel": "cell_type"})
+  );
+
+  // Model definition: GnnBP — exact architecture as in Python code
+  model := GnnBP(
+    nfeat := nfeat,
+    nlayers := layer,
+    nhidden := hidden,
+    nclass := nclass,
+    dropout := dropout,
+    bias := bias
+  );
+  model := model.to(device);
+
+  if |gpus| > 1 then
+    model := DataParallel(model, device_ids=gpus);
+
+  // Optimizer and loss — Adam + CrossEntropyLoss only
+  optimizer := Adam(model.parameters(), lr := lr);
+  loss_fn := CrossEntropyLoss();
+
+  // Training loop with early stopping — strict adherence to original logic:
+  // - VAT applied only when vat_lr > 0; uses xi=10.0, eps=1.0, ip=1
+  // - Validation f1 computed via muticlass_f1 (micro-averaged)
+  // - Checkpoint saved only on f1 improvement; early stopping on patience
+  best_f1 := 0;
+  bad_counter := 0;
+  checkpt_file := GenerateUniqueCheckpointPath(prj_path);
+
+  for epoch := 1 to epochs do
+  begin
+    model.train();
+    loss_list := [];
+
+    for each (batch_x, (batch_y, _)) in train_loader do
+    begin
+      batch_x := batch_x.to(device);
+      batch_y := batch_y.to(device);
+
+      optimizer.zero_grad();
+      output := model(batch_x);
+      loss_train := loss_fn(output, batch_y);
+
+      // VAT regularization — identical to Python VATLoss usage
+      if vat_lr > 0 then
+      begin
+        vat_loss := VATLoss(xi := 10.0, eps := 1.0, ip := 1);
+        lds := vat_loss(model, batch_x);
+        loss_train := loss_train + lds * vat_lr;
+      end;
+
+      loss_train.backward();
+      optimizer.step();
+      loss_list.append(loss_train.item());
+    end;
+
+    // Validation — same device placement, same f1 computation
+    model.eval();
+    val_x_gpu := x_val.to(device);
+    val_y_gpu := y_val.to(device);
+    output_val := model(val_x_gpu);
+    micro_val := muticlass_f1(output_val, val_y_gpu);
+
+    avg_loss := Mean(loss_list);
+
+    if (epoch mod 10) = 0 then
+      Print("Epoch:", epoch, "| loss:", avg_loss, "| val_f1:", micro_val);
+
+    // Early stopping logic — exact threshold and counter behavior
+    if micro_val > best_f1 then
+    begin
+      best_f1 := micro_val;
+      SaveModel(model.state_dict(), checkpt_file);
+      bad_counter := 0;
+    end
+    else
+      bad_counter := bad_counter + 1;
+
+    if bad_counter >= patience then
+      Break;
+  end;
+
+  // Load best model — restore only the state dict from checkpoint
+  model.load_state_dict(LoadModel(checkpt_file));
+
+  // Prediction methods — batched, device-aware, no gradient, consistent with fit()
+  procedure predict(x: array of real): array of integer;
+  begin
+    model.eval();
+    pred_dataset := SimpleSet(x, zeros(|x|));
+    pred_loader := DataLoader(pred_dataset, batch_size := batch_size, shuffle := false);
+
+    preds := [];
+    for each (batch_x, _) in pred_loader do
+    begin
+      batch_x := batch_x.to(device);
+      output := model(batch_x);
+      pred_batch := ArgMax(output, dim := 1).cpu().numpy();
+      preds.append(pred_batch);
+    end;
+
+    return Concatenate(preds);
+  end;
+
+  procedure predict_proba(x: array of real): array of real;
+  begin
+    model.eval();
+    pred_dataset := SimpleSet(x, zeros(|x|));
+    pred_loader := DataLoader(pred_dataset, batch_size := batch_size, shuffle := false);
+
+    probs := [];
+    for each (batch_x, _) in pred_loader do
+    begin
+      batch_x := batch_x.to(device);
+      output := model(batch_x);
+      prob_batch := Softmax(output, dim := 1).cpu().numpy();
+      probs.append(prob_batch);
+    end;
+
+    return Concatenate(probs, axis := 0);
+  end;
+end.

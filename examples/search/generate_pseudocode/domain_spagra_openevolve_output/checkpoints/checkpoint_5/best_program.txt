@@ -1,0 +1,176 @@
+algol
+begin
+  procedure SpaGRA(k, hidden_dims, n_epochs, num_hidden, lr, key_added, a, b, c, radius, weight_decay,
+                    random_seed, feat_drop, attn_drop, negative_slope, heads, method, reso, device);
+  begin
+    set_seed(random_seed);
+    adata.X := sp.csr_matrix(adata.X);
+
+    if 'highly_variable' in adata.var.columns then
+      adata_Vars := adata[:, adata.var['highly_variable']]
+    else
+      adata_Vars := adata;
+
+    if 'Spatial_Net' not in adata.uns.keys() then
+      raise ValueError("Spatial_Net is not existed! Run Cal_Spatial_Net first!");
+
+    data := Data(adata_Vars);
+    transfer_data := TransferData();
+    adj, features := transfer_data(data);
+
+    g := dgl.from_scipy(adj);
+    g := g.int().to(device);
+    num_feats := features.shape[1];
+
+    adj_no_eye := adj - sp.eye(adj.shape[0]);
+    raw_degree := np.array(adj_no_eye.sum(1)).flatten();
+    all_nei_counts := torch.tensor(raw_degree * 2 + 1).float().to(device);
+
+    model := GAT(g, hidden_dims, 1, num_feats, num_hidden, [heads], F.elu, feat_drop, attn_drop, negative_slope);
+    features := torch.FloatTensor(features).to(device);
+    model.to(device);
+
+    optimizer := torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay);
+
+    coords := torch.tensor(adata.obsm['spatial'].values).float().to(device);
+    ari_max := 0;
+
+    print("Start Training: N=", adata.n_obs, ", Batch_Size=2048");
+    model.train();
+
+    for epoch := 0 to n_epochs - 1 do
+    begin
+      optimizer.zero_grad();
+      heads, pi, disp, mean := model(features);
+      heads0 := torch.cat(heads, axis=1);
+
+      batch_size := 2048;
+      if heads0.shape[0] > batch_size then
+        idx := torch.randperm(heads0.shape[0])[:batch_size]
+      else
+        idx := torch.arange(heads0.shape[0]);
+
+      idx := idx.to(device);
+      idx_cpu := idx.cpu().numpy();
+
+      heads_batch := [h[idx] for h in heads];
+      heads0_batch := heads0[idx];
+      coords_batch := coords[idx];
+      nei_count_batch := all_nei_counts[idx];
+
+      adj_batch_scipy := adj[idx_cpu, :][:, idx_cpu];
+      adj_batch := torch.tensor(adj_batch_scipy.todense()).float().to(device);
+
+      z_dists_batch := torch.cdist(heads0_batch, heads0_batch, p=2);
+      z_dists_batch := torch.div(z_dists_batch, torch.max(z_dists_batch) + 1e-6);
+
+      sp_dists_batch := torch.cdist(coords_batch, coords_batch, p=2);
+      sp_dists_batch := torch.div(sp_dists_batch, torch.max(sp_dists_batch) + 1e-6);
+
+      reg_loss := torch.mean(torch.mul(1.0 - z_dists_batch, sp_dists_batch));
+      loss := multihead_contrastive_loss(heads_batch, adj_batch, nei_count_batch, tau=10);
+      zinb_loss := ZINB(pi, theta=disp, ridge_lambda=1).loss(features, mean, mean=True);
+
+      total_loss := a * loss + b * reg_loss + c * zinb_loss;
+
+      total_loss.backward();
+      optimizer.step();
+
+      if epoch mod 10 = 0 then
+        print("Epoch ", epoch, ": Loss=", loss.item(), ", Reg=", reg_loss.item(), ", ZINB=", zinb_loss.item());
+
+      if method = "kmeans" and (epoch mod 20 = 0 or epoch = n_epochs - 1) then
+      begin
+        data_for_clustering := np.nan_to_num(heads0.detach().cpu().numpy());
+        kmeans := KMeans(n_clusters=k, n_init=10, random_state=random_seed).fit(data_for_clustering);
+        idx_res := kmeans.labels_;
+        adata_Vars.obs['temp'] := idx_res;
+        obs_df := adata_Vars.obs.dropna();
+
+        if 'Ground Truth' in obs_df.columns then
+        begin
+          ari_res := metrics.adjusted_rand_score(obs_df['temp'], obs_df['Ground Truth']);
+          if ari_res > ari_max then
+          begin
+            ari_max := ari_res;
+            idx_max := idx_res;
+            mean_max := mean.detach().cpu().numpy();
+            emb_max := heads0.detach().cpu().numpy();
+          end;
+        end
+        else
+        begin
+          idx_max := idx_res;
+          mean_max := mean.detach().cpu().numpy();
+          emb_max := heads0.detach().cpu().numpy();
+        end;
+      end;
+
+      if method = "louvain" and epoch = n_epochs - 1 then
+      begin
+        adata_tmp := sc.AnnData(np.nan_to_num(heads0.detach().cpu().numpy()));
+        sc.pp.neighbors(adata_tmp, n_neighbors=20, use_rep='X');
+        sc.tl.louvain(adata_tmp, resolution=reso, random_state=0);
+        idx_louvain := adata_tmp.obs['louvain'].astype(int).to_numpy();
+      end;
+    end;
+
+    if method = "kmeans" then
+    begin
+      adata.obs["cluster"] := idx_max.astype(str);
+      adata.obsm["emb"] := emb_max;
+      adata.obsm['mean'] := mean_max;
+    end;
+
+    if method = "louvain" then
+    begin
+      adata.obs["cluster"] := idx_louvain.astype(str);
+      emb := heads0.to('cpu').detach().numpy();
+      adata.obsm["emb"] := emb;
+    end;
+
+    if radius ≠ 0 then
+    begin
+      nearest_new_type := refine_label(adata, radius=radius);
+      adata.obs[key_added] := nearest_new_type;
+    end
+    else
+      adata.obs[key_added] := adata.obs["cluster"];
+
+    model.eval();
+    with torch.no_grad() do
+    begin
+      heads, pi, disp, mean := model(features);
+      z := torch.cat(heads, axis=1);
+      adata.obsm[key_added] := z.to('cpu').detach().numpy();
+      pca := PCA(n_components=50, random_state=0);
+      adata.obsm['emb_pca'] := pca.fit_transform(adata.obsm['emb'].copy());
+    end;
+
+    adata := adata;
+  end;
+
+  procedure preprocessing_pipeline(log_level);
+  begin
+    transforms := [];
+    transforms.append(PrefilterGenes(min_cells=3));
+    transforms.append(HighlyVariableGenesRawCount(n_top_genes=1000));
+    transforms.append(NormalizeTotalLog1P());
+    transforms.append(CalSpatialNet(rad_cutoff=150));
+    transforms.append(SetConfig({"label_channel": "label", "label_channel_type": "obs"}));
+    return Compose(*transforms, log_level=log_level);
+  end;
+
+  procedure fit(adata);
+  begin
+    SpaGRA(k, hidden_dims, n_epochs, num_hidden, lr, key_added, a, b, c, radius, weight_decay,
+            random_seed, feat_drop, attn_drop, negative_slope, heads, method, reso, device);
+  end;
+
+  procedure predict(x);
+  begin
+    if adata = null then
+      raise ValueError("Model has not been fitted yet. Call fit() first.");
+    return adata.obs[key_added].values;
+  end;
+end.

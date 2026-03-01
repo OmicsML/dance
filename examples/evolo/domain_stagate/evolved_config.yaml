@@ -1,0 +1,79 @@
+# Configuration for function minimization example
+max_iterations: 20 #50
+checkpoint_interval: 5
+
+# # LLM configuration
+# llm:
+#   primary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # primary_model: "llama3.1-8b"
+#   primary_model_weight: 0.6
+#   secondary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # secondary_model: "llama-4-scout-17b-16e-instruct"
+#   secondary_model_weight: 0.4
+#   api_base: "https://api.deepseek.com"
+#   # api_base: "https://api.cerebras.ai/v1"
+#   temperature: 0.8
+#   top_p: 0.95
+#   max_tokens: 8192
+#   timeout: 1200
+
+llm:
+  models:
+    - name: qwen3-coder-plus
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.8
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+    - name: qwen3-coder-flash
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.2
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+
+
+# Prompt configuration
+prompt:
+  system_message: |-
+    You are an expert programmer specializing in Graph Neural Networks (GNNs) and spatial transcriptomics, with a deep understanding of algorithms like STAGATE.
+    Your task is to propose and implement meaningful extensions to the `StagateGraph` preprocessor. The current implementation correctly constructs a spatial neighborhood graph (k-NN or radius) based on physical coordinates, which is faithful to the original STAGATE paper's methodology. Your goal is not to 'fix' this, but to enhance it by creating more powerful and biologically informative graph structures that can potentially improve the performance and interpretability of the STAGATE model.
+    The STAGATE model uses gene expression as node features but relies on a purely spatial graph for message passing. Your enhancements should focus on creating graphs where the **structure itself** is influenced by more than just physical proximity.
+    **Note:** The existing `StagateGraph` implementation is a valid and direct application of the method described in the STAGATE publication. The following suggestions are advanced extensions for exploring potentially superior graph representations.
+    **Potential Improvement Strategies:**
+    1.  **Hybrid Spatial-Expression Graph Construction (Primary Strategy):** -   **Problem:** The current graph connects spots based *only* on physical proximity, ignoring the fact that two nearby spots might belong to completely different cell types or tissue regions. The GNN must learn this entirely from node features. -   **Solution:** Construct the neighborhood graph in a **unified feature space** that combines both spatial coordinates and gene expression profiles. -   First, perform dimensionality reduction on the gene expression matrix (e.g., using PCA, as is standard). -   Create a new feature matrix for each spot by concatenating its scaled spatial coordinates with its principal components: `[weight * scaled_x, weight * scaled_y, pc_1, pc_2, ..., pc_n]`. -   Build the k-NN or radius graph using this hybrid feature matrix. The resulting graph will connect spots that are close in *both* physical and transcriptional space. -   **Implementation:** -   Add a new `spatial_weight` parameter to the `__init__` method to control the influence of the coordinates. -   Introduce parameters to specify the channel for the expression features (e.g., `expr_channel='CellPCA'`). -   **Crucially, use `sklearn.preprocessing.StandardScaler` or a similar method to scale the spatial coordinates and PCs to have comparable variance before concatenation.**
+    2.  **Continuous Edge Weighting:** -   **Problem:** The graphs produced by `kneighbors_graph` and `radius_neighbors_graph` have binary edge weights (either 0 or 1). The GATConv layer in STAGATE learns attention weights, but providing a more informative prior could regularize and guide the learning process. -   **Solution:** Instead of a binary adjacency matrix, compute a weighted adjacency matrix where edge weights are continuous and reflect the distance between spots. -   The `NearestNeighbors` object can return distances along with the graph structure. -   Use these distances to compute weights, for example, using a Gaussian kernel: `weight = exp(-distance^2 / sigma^2)`. The `sigma` could be a new tunable parameter or set to the mean distance of all connected edges. -   Store this dense or sparse weighted matrix in `data.data.obsp[self.out]`. This provides the GNN with a much richer structural signal.
+    3.  **Multi-Modal Graph with Histology Features (Advanced Extension):** -   **Problem:** Both gene expression and spatial location miss a key modality: the actual tissue morphology visible in the histology image. -   **Solution:** Integrate image-based features into the graph construction process, similar to Strategy 1. -   For each spot, extract features from the corresponding image patch (e.g., color histograms, texture features via GLCM, or embeddings from a pre-trained CNN). -   Create an even richer hybrid feature space: `[w_spatial * coords, w_expr * PCs, w_image * image_features]`. -   Build the graph on this multi-modal representation. This would allow the graph structure to be influenced by tissue morphology, potentially capturing fine-grained domain boundaries that are not obvious from expression alone. -   **Implementation:** This would require adding logic to interface with image data (potentially from `data.uns['image']`) and parameters to control the feature extraction and weighting.
+    **Creative Freedom:** The core idea is to move beyond a purely spatial graph. You could explore building separate graphs for each modality (spatial, expression) and then combining their adjacency matrices with a weighted sum, or focus on refining the single-graph construction as proposed. The key is to generate a graph that provides a more comprehensive view of the relationships between spots.
+    **Constraints:** You may add new parameters to the `StagateGraph.__init__` method to support these new functionalities (e.g., `use_expression`, `spatial_weight`, `expr_channel`). The final output must remain a `scipy.sparse` matrix stored in `data.data.obsp[self.out]`, representing the graph's adjacency structure for the STAGATE model to consume.
+
+    **domain_spagra is identified as a structurally similar algorithm, sharing a similarity score of 0.8100 with the algorithm currently under optimization. Consequently, the following graph construction rules may serve as a useful reference:**
+    ```IF constructing spatial neighbor graphs for high-resolution spatial transcriptomics data THEN replace iterative pandas DataFrame concatenation with vectorized NumPy array operations to reduce graph construction time and improve avg_speed_score
+    IF modeling spatial topology in tissue sections with irregular cell distributions THEN incorporate Delaunay triangulation as a geometric graph construction method to better preserve local spatial relationships and increase human_breast_cancer_score and pancreatic_cancer_score
+    IF spatial coordinates are sparse or degenerate (e.g., collinear points) preventing robust triangulation THEN implement graceful fallback to KNN-based neighborhood selection to maintain reliability_score and prevent pipeline failure
+    IF graph construction must balance biological fidelity with computational tractability across diverse sample sizes THEN support multiple graph models (Radius, KNN, Delaunay, Gabriel) with unified edge-list output format to enable dataset-specific optimization of combined_score and avg_inner_accuracy```
+  include_artifacts: true
+  max_artifact_bytes: 32768
+  artifact_security_filter: true
+
+# Database configuration
+database:
+  population_size: 50
+  archive_size: 20
+  num_islands: 3
+  elite_selection_ratio: 0.2
+  exploitation_ratio: 0.7
+
+# Evaluator configuration
+evaluator:
+  timeout: 600000
+  cascade_thresholds: [0.3]
+  parallel_evaluations: 1
+
+# Evolution settings
+diff_based_evolution: true
+max_code_length: 20000

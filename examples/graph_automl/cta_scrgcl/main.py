@@ -10,7 +10,7 @@ from typing import get_args
 import numpy as np
 import torch
 import wandb
-
+import tempfile
 import anndata
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
@@ -22,7 +22,7 @@ from dance.utils import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--dropout_ratio", type=float, default=0.1, help='Dropout ratio')
     parser.add_argument("--gpu", type=int, default=0, help='which gpu to use if any (default: 0)')
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     parser.add_argument("--log_level", type=str, default="INFO", choices=get_args(LogLevel))
     parser.add_argument("--num_runs", type=int, default=1, help="Number of repetitions")
     parser.add_argument("--quantile", type=float, default=0.99, help='Quantile threshold for network filtering')
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seed", type=int, default=30)
     parser.add_argument("--species", default="human", type=str)
     parser.add_argument("--test_dataset", nargs="+", type=int, default=[138], help="Testing dataset IDs")
     parser.add_argument("--tissue", default="Brain", type=str)
@@ -45,6 +45,7 @@ if __name__ == "__main__":
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
     parser.add_argument('--additional_sweep_ids', action='append', type=str, help='get prior runs')
     args = parser.parse_args()
+    start_time = time.time()
     logger.setLevel(args.log_level)
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
     logger.info(f"Running scRGCL with the following parameters:\n{pprint.pformat(vars(args))}")
@@ -67,70 +68,70 @@ if __name__ == "__main__":
         test_scores = []
 
         # Start Timer
-        start_time = time.time()
 
         for run_idx in range(args.num_runs):
-            logger.info(f"Starting Run {run_idx + 1}/{args.num_runs}")
-
             current_seed = args.seed + run_idx
             set_seed(current_seed)
+            logger.info(f"Starting Run {run_idx + 1}/{args.num_runs}")
+            with tempfile.TemporaryDirectory() as temp_dir:
+                device = torch.device("cuda:" + str(args.gpu))
+                model = scRGCLWrapper(
+                    out_dir=temp_dir,
+                    dropout_ratio=args.dropout_ratio,
+                    init_lr=args.init_lr,
+                    seed=current_seed,
+                    device=device,
+                )
 
-            # Load data and perform necessary preprocessing
-            data = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
-                                             train_dataset=args.train_dataset, valid_dataset=args.valid_dataset,
-                                             data_dir="../temp_data").load_data()
-            # Prepare preprocessing pipeline and apply it to data
-            kwargs = {tune_mode: dict(wandb.config)}
-            preprocessing_pipeline = pipeline_planer.generate(**kwargs)
-            if run_idx == 0:
-                print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
-            preprocessing_pipeline(data)
+                # Load data and perform necessary preprocessing
+                dataloader = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
+                                                species=args.species, tissue=args.tissue, val_size=args.val_size,data_dir="../temp_data")
+                data = dataloader.load_data(transform=None, cache=args.cache)
+                # Prepare preprocessing pipeline and apply it to data
+                kwargs = {tune_mode: dict(wandb.config)}
+                preprocessing_pipeline = pipeline_planer.generate(**kwargs)
+                if run_idx == 0:
+                    print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
+                preprocessing_pipeline(data)
 
-            # Extract Train/Test Data
-            x_train, y_train = data.get_train_data(return_type="torch")
-            x_val, y_val = data.get_val_data(return_type="torch")
-            x_test, y_test = data.get_test_data(return_type="torch")
+                # Extract Train/Test Data
+                x_train, y_train = data.get_train_data(return_type="torch")
+                x_val, y_val = data.get_val_data(return_type="torch")
+                x_test, y_test = data.get_test_data(return_type="torch")
 
-            # Convert Labels (One-hot -> Index)
-            y_train_indices = y_train.argmax(1).cpu().numpy()
+                # Convert Labels (One-hot -> Index)
+                y_train_indices = y_train.argmax(1).cpu().numpy()
+                
+                train_adata = anndata.AnnData(X=x_train.cpu().numpy())
+                train_adata.uns=data.data.uns
+                train_adata.obs['cell_type'] = y_train_indices
+                if hasattr(data.data, "var_names"):
+                    train_adata.var_names = data.data.var_names
 
-            # Initialize model
-            device = torch.device("cuda:" + str(args.gpu))
-            model = scRGCLWrapper(
-                out_dir=f"./temp_output_{run_idx}",
-                dropout_ratio=args.dropout_ratio,
-                init_lr=args.init_lr,
-                seed=current_seed,
-                device=device,
-            )
+                # Initialize model
+                
 
-            # Construct AnnData for Training
-            train_adata = anndata.AnnData(X=x_train.cpu().numpy())
-            train_adata.uns=data.data.uns
-            train_adata.obs['cell_type'] = y_train_indices
-            if hasattr(data.data, "var_names"):
-                train_adata.var_names = data.data.var_names
-            # Train the model
-            logger.info("Training scRGCL model...")
-            model.fit(adata=train_adata, batch_size=args.batch_size)
+                # Construct AnnData for Training
+                
+                # Train the model
+                logger.info("Training scRGCL model...")
+                model.fit(adata=train_adata, batch_size=args.batch_size)
 
-            # Evaluate the model
-            logger.info("Evaluating...")
+                # Evaluate the model
+                logger.info("Evaluating...")
 
-            # Calculate scores
-            run_train_score = model.score(x_train, y_train, score_func="acc")  # using train as proxy
-            run_valid_score = model.score(x_val, y_val, score_func="acc")
-            run_test_score = model.score(x_test, y_test, score_func="acc")
+                # Calculate scores
+                run_train_score = model.score(x_train, y_train, score_func="acc")  # using train as proxy
+                run_valid_score = model.score(x_val, y_val, score_func="acc")
+                run_test_score = model.score(x_test, y_test, score_func="acc")
 
-            train_scores.append(run_train_score)
-            valid_scores.append(run_valid_score)
-            test_scores.append(run_test_score)
+                train_scores.append(run_train_score)
+                valid_scores.append(run_valid_score)
+                test_scores.append(run_test_score)
 
-            logger.info(f"Run {run_idx + 1} finished. Valid Acc: {run_valid_score:.4f}, Test Acc: {run_test_score:.4f}")
+                logger.info(f"Run {run_idx + 1} finished. Valid Acc: {run_valid_score:.4f}, Test Acc: {run_test_score:.4f}")
 
-            del model, data
-            gc.collect()
-            if device.type != "cpu": torch.cuda.empty_cache()
+            
 
         # Stop Timer
         total_time_seconds = time.time() - start_time

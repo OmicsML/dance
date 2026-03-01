@@ -1,0 +1,70 @@
+# Configuration for function minimization example
+max_iterations: 20 #50
+checkpoint_interval: 5
+
+llm:
+  models:
+    - name: qwen3-coder-plus
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.99
+      temperature: 0.5
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.85
+    - name: qwen3-coder-flash
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.01
+      temperature: 0.5
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.85
+
+
+# Prompt configuration
+prompt:
+  system_message: |2-
+     ### Improved Agent Prompt
+    You are an expert programmer specializing in Graph Neural Networks (GNNs) and bioinformatics. Your task is to significantly improve a cell-type annotation script that uses the scDeepSort model. The primary goal is to increase the model's final prediction accuracy by enhancing the graph data representation.
+    The script uses DGL and PyTorch. The core of the data preprocessing involves building a cell-gene bipartite graph. Your modifications should focus on the data preprocessing and graph construction logic (`WeightedFeaturePCA`, `CellFeatureGraph`, `PCACellFeatureGraph`) to create a more powerful and informative graph structure that is optimized for the scDeepSort GNN.
+    ---
+    ### Context: The scDeepSort Model Architecture
+    To make informed improvements, you must understand the downstream GNN model:
+    1.  **Graph Structure:** The model consumes a large graph containing both **cell nodes** and **gene nodes**. It's fundamentally a bipartite graph. 2.  **Node Features:** *   **Gene Features:** Initialized as PCA components of the transposed (gene x cell) expression matrix. *   **Cell Features:** Initialized as a weighted sum of the gene PCA features, where weights are the cell's own expression values. 3.  **GNN Layer (`AdaptiveSAGE`):** The model does **not** use a standard GraphSAGE. It uses a custom `AdaptiveSAGE` layer which includes a learnable parameter `self.alpha`. 4.  **Specialized Self-Loops:** The `self.alpha` parameter is specifically designed to learn the importance of different message types. Crucially, it has dedicated weights for **gene-to-gene self-loops** and **cell-to-cell self-loops**. This means the model intrinsically has a mechanism to learn how much a node should listen to itself.
+    ---
+    ### Potential Improvement Strategies
+    Focus your improvements on the preprocessor classes. Here are several strategies, now tailored to the scDeepSort architecture. You are encouraged to combine them or develop your own novel approaches.
+    **1. Alternative Dimensionality Reduction (in `WeightedFeaturePCA`):** *   PCA is not always optimal for sparse, non-negative gene expression data. Replace it with more suitable techniques. *   **Truncated SVD:** An excellent choice for sparse matrices. *   **NMF (Non-negative Matrix Factorization):** Can yield more interpretable, parts-based features, which may be more biologically relevant. *   **Decouple Cell and Gene Features:** The current method derives cell features from gene features. Consider initializing cell features independently, perhaps using PCA directly on the cell-by-gene matrix without transposing, to capture cell-level variance more directly.
+    **2. Advanced Edge Weighting (in `CellFeatureGraph`):** *   The current edge weights are raw expression values. This can be improved. *   **TF-IDF Transformation:** Treat cells as 'documents' and genes as 'words'. This up-weights genes that are highly expressed in a specific cell but rare across all cells, effectively highlighting marker genes. *   **Log Transformation:** Apply `log(1 + x)` to the expression values to dampen the effect of outlier high-expression genes and stabilize variance.
+    **3. Graph Structure Modification (in `CellFeatureGraph`):** *   **Rethink Explicit Self-Loops:** The current code adds explicit self-loops with a weight of 1 for *all* nodes (`g.add_edges(g.nodes(), g.nodes())`). However, the `AdaptiveSAGE` layer **already has a learnable parameter `self.alpha`** to control the importance of self-loops. This explicit addition might be redundant, interfere with the model's learning, or 'double-dip' the self-loop information. *   **Action:** **Consider removing the explicit `g.add_edges(g.nodes(), g.nodes())` line.** Let the `AdaptiveSAGE` layer's learned parameters manage self-information entirely. This is a critical, model-aware optimization. *   **Graph Sparsification:** Instead of connecting every cell to every gene it expresses, build a k-NN graph. For each cell, only connect it to its 'k' most relevant genes (e.g., highest TF-IDF score). This can reduce noise and computational load.
+    **4. Improved Normalization (in `CellFeatureGraph`):** *   The current edge weight normalization is a manual and inefficient for-loop. *   **Action:** Replace this loop with optimized, built-in DGL functions. The best practice is to use **`dgl.nn.EdgeWeightNorm(norm='both')`**. This is faster, more robust, and applies symmetric normalization which often helps GNN performance. Apply it to the `g.edata['weight']` tensor.
+    **5. Advanced Graph Representation:** *   **Explicitly Bipartite Graph:** The current implementation creates a homogeneous graph and uses node features to distinguish cells from genes. A more modern and powerful approach in DGL is to construct a **heterograph** (`dgl.heterograph`). *   **Action:** Re-implement `CellFeatureGraph` to create a `dgl.heterograph` with two node types ('cell', 'gene') and one edge type ('expresses'). This allows for type-specific node features and potentially using heterogeneous message passing layers in the future, even if the current `AdaptiveSAGE` is homogeneous. It's a more robust and extensible design.
+    **Constraints:** Do not change the `ScDeepSort` class, the main training loop, the command-line arguments, or the final evaluation output format (i.e., the script must still print 'mean_score: ...'). Your modifications must be confined to the data preprocessing and graph construction classes. **In addition to these guidelines, feel free to improvise.
+
+    **cta_scgat is identified as a structurally similar algorithm, sharing a similarity score of 0.8000 with the algorithm currently under optimization. Consequently, the following graph construction rules may serve as a useful reference:**
+    ```IF feature preprocessing introduces numerical instability in downstream GNN training THEN replace min-max normalization with z-score standardization on log-transformed, normalized expression or PCA features to ensure unit variance and zero mean across biological replicates
+    IF memory layout inefficiencies arise during tensor conversion of large-scale omics features THEN enforce C-contiguous array storage and leverage PyTorch Geometric’s native `from_scipy_sparse_matrix` to avoid redundant sparse-to-dense conversions and reduce GPU memory footprint
+    IF label encoding must reconcile heterogeneous annotation formats (categorical vs. one-hot) across diverse scRNA-seq datasets THEN implement unified argmax-based decoding with explicit class name propagation from DataFrame columns to ensure consistent label space alignment across tissues and species
+    IF neighbor graph computation lacks robustness to unnormalized input distributions THEN condition PCA and neighbor calculation on adaptive preprocessing: verify log-transformation status, apply `sc.pp.normalize_total` and `sc.pp.log1p` only when raw counts exceed dynamic range thresholds, preserving biological variance structure```
+  include_artifacts: true
+  max_artifact_bytes: 32768
+  artifact_security_filter: true
+
+# Database configuration
+database:
+  population_size: 50
+  archive_size: 20
+  num_islands: 3
+  elite_selection_ratio: 0.2
+  exploitation_ratio: 0.7
+
+# Evaluator configuration
+evaluator:
+  timeout: 600000
+  cascade_thresholds: [0.01]
+  parallel_evaluations: 1
+
+# Evolution settings
+diff_based_evolution: true
+max_code_length: 20000

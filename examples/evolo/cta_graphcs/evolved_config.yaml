@@ -1,0 +1,66 @@
+# Configuration for function minimization example
+max_iterations: 20 #50
+checkpoint_interval: 2
+
+# LLM configuration
+llm:
+  models:
+    - name: qwen3-coder-plus
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.99
+      temperature: 0.5
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.85
+    - name: qwen3-coder-flash
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.01
+      temperature: 0.5
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.85
+
+# Prompt configuration
+prompt:
+  system_message: |2-
+
+    **System/Role:** You are a Senior Python Optimization Specialist and Computational Biologist.
+    **Objective:** Optimize the `BBKNNConstruction` class to maximize **throughput and graph quality**, specifically prioritizing the **single-batch scenario (`batch_key=None`)** as per user feedback, while also fixing the performance bottlenecks in the multi-batch path.
+    **Critical User Feedback:** > 'Actually, in most cases, there is no `batch_key`, so it doesn't count as calling multi-batch graph construction' > *Implication:* The optimization must focus on the standard KNN path. The current implementation uses a slow Python `for` loop to format millions of edge strings (`'row col'`), which is a massive bottleneck.
+    **Optimization Instructions:**
+    1.  **Massive Speedup for String Generation (Highest Priority):** *   **The Problem:** The current code iterates `for i in range(len(rows))` to append f-strings to a list. For large single-cell datasets (e.g., 50k+ cells), this is incredibly slow. *   **The Solution:** You **must** vectorize the string formatting. *   Use **NumPy vectorized string operations** (e.g., `np.char.add`) or highly optimized list comprehensions (e.g., `[f'{r} {c}' for r, c in zip(rows, cols)]`) to generate the graph list. *   Ideally, process the adjacency matrix in chunks or use map-based approaches if memory is a constraint, but generally, a vectorized approach is required.
+    2.  **Single-Batch Algorithmic Refinement:** *   **Graph Quality:** Since this is the main path, ensure the KNN graph is robust. *   Ensure `sc.pp.neighbors` is using a robust metric (Euclidean on PCA is standard, but ensure parameters like `metric='cosine'` are considered if they improve GraphCS embedding). *   Consider implicitly weighting the graph or ensuring the number of neighbors (`n_neighbors`) is sufficient for graph convolution but not so high that it introduces noise.
+    3.  **Code Structure & Constraints:** *   **Self-Loops:** The current code adds self-loops (`i i`) in a separate loop. Combine this efficiently or append them in bulk. *   **Output Format:** You **must** strictly preserve the output format in `adata.uns[key_added]`: A list of strings starting with cell count, followed by `'row_idx col_idx'`. *   **Input:** Do not change the `__call__` signature.
+    **Deliverable:** Return the optimized Python code wrapped strictly between `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END`.
+    **Example of expected vectorization logic (Conceptual):** Instead of: ```python for r, c in zip(rows, cols): list.append(f'{r} {c}') ``` Think along the lines of: ```python # Create string arrays and join them # Or efficiently map over the sparse matrix indices edges = np.vstack((rows, cols)).T edge_strings = [f'{x[0]} {x[1]}' for x in edges] # or faster equivalent ```
+    ***
+    **Prompt for the Model:**
+    ```text Please optimize the provided Python code block. The user indicates that the single-batch path (batch_key=None) is the most frequent use case. Currently, the code suffers from severe performance issues due to Python-level loops when generating the 'row col' string list required by the C++ backend.
+    Requirements: 1. VECTORIZATION: Remove the explicit 'for' loop for generating edge strings in both single-batch and multi-batch paths. Use NumPy/List Comprehension techniques to generate the output list instantly. 2. ALGORITHM: For the multi-batch path, replace the manual iteration of edges for 'edge_ratio' filtering with sparse matrix masking/vectorized operations. 3. ROBUSTNESS: Ensure the single-batch KNN graph construction is standard and efficient. 4. Keep the exact output format (List[str] in adata.uns).
+    Refactor the code between # EVOLVE-BLOCK-START and # EVOLVE-BLOCK-END. **In addition to these guidelines, feel free to improvise. ```
+
+    **cta_scdeepsort is identified as a structurally similar algorithm, sharing a similarity score of 0.7700 with the algorithm currently under optimization. Consequently, the following graph construction rules may serve as a useful reference:**
+    ```IF cell feature representation must capture both global structure and local expression weighting THEN fuse direct cell-level TruncatedSVD embeddings with weighted gene-PCA embeddings using biologically informed convex combination (0.6/0.4)```
+  include_artifacts: true
+  max_artifact_bytes: 32768
+  artifact_security_filter: true
+
+# Database configuration
+database:
+  population_size: 50
+  archive_size: 20
+  num_islands: 3
+  elite_selection_ratio: 0.2
+  exploitation_ratio: 0.7
+
+# Evaluator configuration
+evaluator:
+  timeout: 600000
+  cascade_thresholds: [0.01]
+  parallel_evaluations: 1
+
+# Evolution settings
+diff_based_evolution: true
+max_code_length: 20000

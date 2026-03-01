@@ -337,6 +337,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_dir", type=str, default='./temp_data', help='test directory')
     parser.add_argument("--sample_file", type=str, default=None)
     parser.add_argument("--num_runs", type=int, default=3)
+    parser.add_argument("--obs_nums",type=int,default=10000)
     args = parser.parse_args()
     scores = []
     inner_scores = []
@@ -357,7 +358,7 @@ if __name__ == "__main__":
                                         sample_file=args.sample_file)
         preprocessing_pipeline = get_preprocessing_pipeline(device=args.device)
         data = dataloader.load_data(transform=None,cache=args.cache)
-        sub_data(data.data)
+        sub_data(data.data,args.obs_nums)
         preprocessing_pipeline(data)
         # Prepare preprocessing pipeline and apply it to data
         x, y = data.get_data(return_type="default")

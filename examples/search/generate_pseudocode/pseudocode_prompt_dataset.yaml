@@ -1,5 +1,5 @@
 # IFEval (Instruction Following Evaluation) dataset configuration
-dataset_name: "zhongyuxing/Graph_Structure_Learning_Pseudocode"  # Official IFEval dataset from Google
+dataset_name: "zhongyuxing/Graph_Structure_Learning_Pseudocode_new_new"  # Official IFEval dataset from Google
 input_field: "code"  # The instruction to follow
 target_field: "code"  # For matching instruction requirements
 split: "train"  # IFEval only has train split

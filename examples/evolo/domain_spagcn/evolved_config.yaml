@@ -1,0 +1,81 @@
+# Configuration for function minimization example
+max_iterations: 20 #50
+checkpoint_interval: 5
+
+# # LLM configuration
+# llm:
+#   primary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # primary_model: "llama3.1-8b"
+#   primary_model_weight: 0.6
+#   secondary_model: "deepseek-reasoner" #"deepseek-reasoner"
+#   # secondary_model: "llama-4-scout-17b-16e-instruct"
+#   secondary_model_weight: 0.4
+#   api_base: "https://api.deepseek.com"
+#   # api_base: "https://api.cerebras.ai/v1"
+#   temperature: 0.8
+#   top_p: 0.95
+#   max_tokens: 8192
+#   timeout: 1200
+
+llm:
+  models:
+    - name: qwen3-coder-plus
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.8
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+    - name: qwen3-coder-flash
+      api_key: sk-92265d8b2c044989b10ad59e3a27b56f
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      weight: 0.2
+      temperature: 0.8
+      max_tokens: 16000
+      timeout: 1200
+      top_p: 0.95
+    # - name: "deepseek-reasoner"
+    #   api_key: "sk-acad184f8a7848918d7c9046affd1b65"
+    #   api_base: "https://api.deepseek.com"
+    #   weight: 0.4
+    #   temperature: 0.8
+    #   max_tokens: 16000
+    #   timeout: 1200
+    #   top_p: 0.95
+
+# Prompt configuration
+prompt:
+  system_message: |2-
+     I need to optimize the code block between `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END` in the provided Python script. The goal is to significantly improve **computational efficiency** (speed and memory usage) and **model accuracy** (better spatial clustering).
+    Please provide a refactored version of the code focusing on the following areas:
+    **1. Computational Efficiency (Speed & Scalability):** *   **Vectorize Image Feature Extraction:** In the `SpaGCNGraph` class, the histology feature extraction currently uses a Python `for` loop to slice the image and calculate means. Please replace this with vectorized NumPy operations or optimized patch-processing techniques (e.g., using `skimage.util.view_as_windows` or integral images) to eliminate the loop. *   **Optimize Distance Calculations:** Replace the manual Numba-based pairwise distance loops with highly optimized routines from `scipy.spatial.distance` or `sklearn.metrics.pairwise`. If using Numba, ensure the implementation is thread-safe to avoid the mentioned 'segfault' on Mac M-chips. *   **Memory Management:** For large datasets, $N 	imes N$ dense distance matrices are prohibitive. Suggest or implement a **Sparse Graph (k-NN)** approach where appropriate to reduce memory footprint from $O(N^2)$ to $O(N 	imes k)$.
+    **2. Model Accuracy (Feature Representation):** *   **Enhanced Histology Features:** Currently, only the RGB mean is used for the $z$-axis. Suggest adding more descriptive features like **local variance, texture (HOG/LBP)**, or a mechanism to incorporate features from a **pre-trained CNN (e.g., ResNet)**. *   **Robust Scaling:** Refine the calculation of the $z$-axis and the application of the `alpha` parameter. Ensure the scaling between spatial coordinates ($x, y$) and histology intensity ($z$) is robust to outliers and different image resolutions. *   **Numerical Stability:** Improve the `pearson_distance` and `spearman_distance` functions to handle edge cases, such as zero-variance features, to prevent `NaN` results.
+    **3. Code Quality & Integration:** *   Maintain the class structures (`SpaGCNGraph`, `SpaGCNGraph2D`) and the `register_preprocessor` decorators to ensure compatibility with the `dance` library. *   Ensure the code remains compatible with `numba` where it provides a genuine speedup over vectorized NumPy.
+
+    **domain_efnst is identified as a structurally similar algorithm, sharing a similarity score of 0.8400 with the algorithm currently under optimization. Consequently, the following graph construction rules may serve as a useful reference:**
+    ```IF spatial neighborhood graph construction requires adaptive resolution across heterogeneous tissue regions THEN use local density-adaptive bandwidth Gaussian kernel weighting instead of binary radius-based connectivity```
+
+
+  include_artifacts: true
+  max_artifact_bytes: 32768
+  artifact_security_filter: true
+
+# Database configuration
+database:
+  population_size: 50
+  archive_size: 20
+  num_islands: 3
+  elite_selection_ratio: 0.2
+  exploitation_ratio: 0.7
+
+
+# Evaluator configuration
+evaluator:
+  timeout: 600000
+  cascade_thresholds: [0.3]
+  parallel_evaluations: 1
+
+# Evolution settings
+diff_based_evolution: true
+max_code_length: 20000
