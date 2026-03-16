@@ -2,7 +2,7 @@
 # Optimized for GEPA benchmark comparison
 
 # General settings
-max_iterations: 100  # Can be overridden by command line
+max_iterations: 10  # Can be overridden by command line
 checkpoint_interval: 5
 log_level: "INFO"
 diff_based_evolution: false  # Full rewrites for prompt evolution
@@ -13,12 +13,12 @@ language: "text"
 llm:
   api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
   models:
-    - name: "qwen-flash"
+    - name: "qwen-plus"
       weight: 1.0
   
-  temperature: 0.8  # Higher temperature for creative evolution
+  temperature: 0.5  # Higher temperature for creative evolution
   max_tokens: 32768
-  timeout: 60
+  timeout: 300
   retries: 3
 
 # Prompt Configuration for evolution

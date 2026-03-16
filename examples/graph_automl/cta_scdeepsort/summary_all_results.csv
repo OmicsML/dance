@@ -1,0 +1,9 @@
+params.0.PCACellFeatureGraph.normalize_edges,params.0.PCACellFeatureGraph.n_components,test_acc_mean,test_acc_std,test_acc_count,speed_score_mean,speed_score_std,combined_score_mean,combined_score_std,weighted_score
+True,N/A,0.7594,,1,0.0468,,0.8002,,0.6168800000000001
+False,N/A,0.7594,,1,0.0247,,0.7957,,0.61246
+True,300.0,0.6774,0.2049,3,0.1547,0.0679,0.6596,0.0856,0.57286
+False,300.0,0.6774,0.2049,3,0.1538,0.0677,0.6594,0.085,0.5726800000000001
+False,200.0,0.6679,0.1915,6,0.1674,0.0668,0.658,0.0748,0.5678
+True,200.0,0.6679,0.1915,6,0.1655,0.0648,0.6576,0.075,0.56742
+False,100.0,0.5955,0.2028,3,0.1834,0.0825,0.6009,0.1229,0.5130800000000001
+True,100.0,0.5955,0.2028,3,0.1741,0.0782,0.5991,0.1215,0.51122

@@ -1,0 +1,12 @@
+﻿Input Method,Most Similar Method,LLM Score,Reason,Status,Error Message
+cta_scdeepsort,cta_scgat,0.8000,Loaded from Matrix CSV,Success (Saved to evolved_config.yaml),
+cta_scheteronet,cta_scdeepsort,0.7500,Loaded from Matrix CSV,Success (Saved to evolved_config.yaml),
+domain_efnst,domain_spagcn,0.8400,Loaded from Matrix CSV,Success (Saved to evolved_config.yaml),
+domain_louvain,domain_spagcn,0.7400,Loaded from Matrix CSV,Success (Saved to evolved_config.yaml),
+domain_spagcn,domain_efnst,0.8400,Loaded from Matrix CSV,Success (Saved to evolved_config.yaml),
+domain_stagate,domain_spagra,0.8100,"Both implement spatially aware graph neural networks (GAT-based) for unsupervised clustering of spatial transcriptomics data, jointly optimizing representation learning via contrastive/regularized reconstruction and spatial distance preservation.",Success (Saved to evolved_config.yaml),
+cta_scgat,cta_scdeepsort,0.8000,Loaded from Matrix CSV,Success (Saved to evolved_config.yaml),
+cta_scrgcl,cta_scheteronet,0.6500,Loaded from Matrix CSV,Success (Saved to evolved_config.yaml),
+cta_graphcs,cta_scdeepsort,0.7700,Loaded from Matrix CSV,Success (Saved to evolved_config.yaml),
+domain_stlearn,domain_spagcn,0.7700,"Both implement integrated spatial clustering pipelines for spatial transcriptomics that combine morphology-aware feature extraction (e.g., CNN-based), graph construction (SMEGraph/SpaGCNGraph), and unsupervised clustering (KMeans/Louvain as initialization for GCN-based refinement).",Success (Saved to evolved_config.yaml),
+domain_spagra,domain_stagate,0.8100,"Both implement spatially aware graph neural networks (GAT-based) for unsupervised clustering of spatial transcriptomics data, jointly optimizing representation learning via contrastive/regularized reconstruction and spatial distance preservation.",Success (Saved to evolved_config.yaml),

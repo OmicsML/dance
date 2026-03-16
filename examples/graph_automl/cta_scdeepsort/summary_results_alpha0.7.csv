@@ -1,0 +1,3 @@
+params.0.PCACellFeatureGraph.normalize_edges,test_acc_mean,test_acc_std,test_acc_count,speed_score_mean,speed_score_std,combined_score_mean,combined_score_std,weighted_score_mean,weighted_score_std
+True,0.6929,0.1796,4,0.242,0.123,0.714,0.0995,0.5576,0.1467
+False,0.6929,0.1796,4,0.1459,0.0815,0.6948,0.1004,0.5288,0.139

@@ -1,0 +1,228 @@
+{
+  "domain_spagcn": {
+    "folder_name": "domain_spagcn",
+    "metric_name": "ARI",
+    "total_raw_data_rows": 45,
+    "total_param_combinations": 9,
+    "best_param_combination": {
+      "combined_score_mean": 0.4925,
+      "combined_score_std": 0.0318,
+      "weighted_score_mean": 0.286,
+      "weighted_score_std": 0.0812,
+      "ARI_mean": 0.252,
+      "ARI_std": 0.0709,
+      "speed_score_mean": 0.3654,
+      "speed_score_std": 0.2063,
+      "dataset_count": 5,
+      "parameters": {
+        "params.2.SpaGCNGraph.alpha": 2.5,
+        "params.2.SpaGCNGraph.beta": 49.0
+      }
+    }
+  },
+  "cta_graphcs": {
+    "folder_name": "cta_graphcs",
+    "metric_name": "test_acc",
+    "total_raw_data_rows": 36,
+    "total_param_combinations": 9,
+    "best_param_combination": {
+      "combined_score_mean": 0.7556,
+      "combined_score_std": 0.0934,
+      "weighted_score_mean": 0.6031,
+      "weighted_score_std": 0.1788,
+      "test_acc_mean": 0.7053,
+      "test_acc_std": 0.2053,
+      "speed_score_mean": 0.3648,
+      "speed_score_std": 0.1844,
+      "dataset_count": 4,
+      "parameters": {
+        "params.3.BBKNNConstruction.edge_ratio": 2.5,
+        "params.3.BBKNNConstruction.n_neighbors": 10.0
+      }
+    }
+  },
+  "domain_stagate": {
+    "folder_name": "domain_stagate",
+    "metric_name": "ARI",
+    "total_raw_data_rows": 15,
+    "total_param_combinations": 3,
+    "best_param_combination": {
+      "combined_score_mean": 0.3485,
+      "combined_score_std": 0.0768,
+      "weighted_score_mean": 0.3872,
+      "weighted_score_std": 0.1449,
+      "ARI_mean": 0.2508,
+      "ARI_std": 0.1622,
+      "speed_score_mean": 0.7053,
+      "speed_score_std": 0.108,
+      "dataset_count": 4,
+      "parameters": {
+        "params.2.StagateGraph.radius": 100.0
+      }
+    }
+  },
+  "domain_efnst": {
+    "folder_name": "domain_efnst",
+    "metric_name": "ARI",
+    "total_raw_data_rows": 45,
+    "total_param_combinations": 12,
+    "best_param_combination": {
+      "combined_score_mean": 0.2667,
+      "combined_score_std": 0.0378,
+      "weighted_score_mean": 0.2867,
+      "weighted_score_std": 0.1021,
+      "ARI_mean": 0.3393,
+      "ARI_std": 0.1102,
+      "speed_score_mean": 0.1638,
+      "speed_score_std": 0.0898,
+      "dataset_count": 4,
+      "parameters": {
+        "params.2.EfNSTGraphTransform.distType": "kneighbors_graph",
+        "params.2.EfNSTGraphTransform.k": "8"
+      }
+    }
+  },
+  "cta_scgat": {
+    "folder_name": "cta_scgat",
+    "metric_name": "test_acc",
+    "total_raw_data_rows": 16,
+    "total_param_combinations": 4,
+    "best_param_combination": {
+      "combined_score_mean": 0.3791,
+      "combined_score_std": 0.1255,
+      "weighted_score_mean": 0.3116,
+      "weighted_score_std": 0.156,
+      "test_acc_mean": 0.2851,
+      "test_acc_std": 0.2593,
+      "speed_score_mean": 0.3733,
+      "speed_score_std": 0.1443,
+      "dataset_count": 4,
+      "parameters": {
+        "params.0.scGATGraphTransform.n_neighbors": 10.0
+      }
+    }
+  },
+  "domain_spaGRA": {
+    "folder_name": "domain_spaGRA",
+    "metric_name": "ARI",
+    "total_raw_data_rows": 15,
+    "total_param_combinations": 3,
+    "best_param_combination": {
+      "combined_score_mean": 0.3542,
+      "combined_score_std": 0.1144,
+      "weighted_score_mean": 0.2566,
+      "weighted_score_std": 0.0684,
+      "ARI_mean": 0.0858,
+      "ARI_std": 0.0902,
+      "speed_score_mean": 0.6551,
+      "speed_score_std": 0.0536,
+      "dataset_count": 5,
+      "parameters": {
+        "params.3.CalSpatialNet.rad_cutoff": 200.0
+      }
+    }
+  },
+  "cta_scheteronet": {
+    "folder_name": "cta_scheteronet",
+    "metric_name": "test_acc",
+    "total_raw_data_rows": 36,
+    "total_param_combinations": 9,
+    "best_param_combination": {
+      "combined_score_mean": 0.7675,
+      "combined_score_std": 0.0765,
+      "weighted_score_mean": 0.647,
+      "weighted_score_std": 0.1813,
+      "test_acc_mean": 0.7071,
+      "test_acc_std": 0.1904,
+      "speed_score_mean": 0.5068,
+      "speed_score_std": 0.2044,
+      "dataset_count": 4,
+      "parameters": {
+        "params.8.HeteronetGraph.distance_metrics": "cosine",
+        "params.8.HeteronetGraph.knn_num": "10"
+      }
+    }
+  },
+  "cta_scdeepsort": {
+    "folder_name": "cta_scdeepsort",
+    "metric_name": "test_acc",
+    "total_raw_data_rows": 8,
+    "total_param_combinations": 2,
+    "best_param_combination": {
+      "combined_score_mean": 0.714,
+      "combined_score_std": 0.0995,
+      "weighted_score_mean": 0.5576,
+      "weighted_score_std": 0.1467,
+      "test_acc_mean": 0.6929,
+      "test_acc_std": 0.1796,
+      "speed_score_mean": 0.242,
+      "speed_score_std": 0.123,
+      "dataset_count": 4,
+      "parameters": {
+        "params.0.PCACellFeatureGraph.normalize_edges": "True"
+      }
+    }
+  },
+  "domain_louvain": {
+    "folder_name": "domain_louvain",
+    "metric_name": "ARI",
+    "total_raw_data_rows": 15,
+    "total_param_combinations": 3,
+    "best_param_combination": {
+      "combined_score_mean": 0.5142,
+      "combined_score_std": 0.0065,
+      "weighted_score_mean": 0.4508,
+      "weighted_score_std": 0.0403,
+      "ARI_mean": 0.2585,
+      "ARI_std": 0.0316,
+      "speed_score_mean": 0.8995,
+      "speed_score_std": 0.0621,
+      "dataset_count": 3,
+      "parameters": {
+        "params.3.NeighborGraph.n_neighbors": 17.0
+      }
+    }
+  },
+  "cta_scrgcl": {
+    "folder_name": "cta_scrgcl",
+    "metric_name": "test_acc",
+    "total_raw_data_rows": 12,
+    "total_param_combinations": 3,
+    "best_param_combination": {
+      "combined_score_mean": 0.6299,
+      "combined_score_std": 0.123,
+      "weighted_score_mean": 0.4749,
+      "weighted_score_std": 0.1252,
+      "test_acc_mean": 0.64,
+      "test_acc_std": 0.191,
+      "speed_score_mean": 0.0897,
+      "speed_score_std": 0.0669,
+      "dataset_count": 4,
+      "parameters": {
+        "params.1.StringDBGraph.thres": 0.95
+      }
+    }
+  },
+  "domain_stlearn": {
+    "folder_name": "domain_stlearn",
+    "metric_name": "ARI",
+    "total_raw_data_rows": 90,
+    "total_param_combinations": 18,
+    "best_param_combination": {
+      "combined_score_mean": 0.3657,
+      "combined_score_std": 0.0425,
+      "weighted_score_mean": 0.244,
+      "weighted_score_std": 0.0565,
+      "ARI_mean": 0.1186,
+      "ARI_std": 0.0233,
+      "speed_score_mean": 0.5367,
+      "speed_score_std": 0.1371,
+      "dataset_count": 5,
+      "parameters": {
+        "params.2.MorphologyFeatureCNN.crop_size": 10.0,
+        "params.6.NeighborGraph.n_neighbors": 15.0,
+        "params.6.NeighborGraph.n_pcs": 5.0
+      }
+    }
+  }
+}

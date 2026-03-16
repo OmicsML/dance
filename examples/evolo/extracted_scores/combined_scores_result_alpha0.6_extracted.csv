@@ -1,0 +1,12 @@
+file_source,is_evoloved,alpha,folder_name,combined_score,initial_avg_speed_score,avg_speed_score,test_combined_score_std,test_combined_score,num_scores,mean_target_scores
+combined_scores_result_alpha0.6.txt,False,0.6,cta_graphcs,0.758182,0.38601,0.38601,0.148542,0.579072,4,0.70778
+combined_scores_result_alpha0.6.txt,False,0.6,cta_scdeepsort,0.755692,0.211672,0.211672,0.120274,0.513291,4,0.71437
+combined_scores_result_alpha0.6.txt,False,0.6,cta_scgat,0.767684,0.555649,0.555649,0.120086,0.626228,4,0.67328
+combined_scores_result_alpha0.6.txt,False,0.6,cta_scheteronet,0.827043,0.520363,0.520363,0.135787,0.646426,4,0.730468
+combined_scores_result_alpha0.6.txt,False,0.6,cta_scrgcl,0.638393,0.145714,0.145714,0.105124,0.450823,4,0.65423
+combined_scores_result_alpha0.6.txt,False,0.6,domain_efnst,0.275214,0.174463,0.174463,0.087433,0.284889,6,0.358507
+combined_scores_result_alpha0.6.txt,False,0.6,domain_louvain,0.509643,0.815975,0.815975,0.047437,0.533784,6,0.345657
+combined_scores_result_alpha0.6.txt,False,0.6,domain_spagcn,0.524196,0.425322,0.425322,0.073515,0.347096,6,0.294945
+combined_scores_result_alpha0.6.txt,False,0.6,domain_spagra,0.367629,0.747364,0.747364,0.098128,0.409716,6,0.184617
+combined_scores_result_alpha0.6.txt,False,0.6,domain_stagate,0.355179,0.70546,0.70546,0.089223,0.53096,6,0.414627
+combined_scores_result_alpha0.6.txt,False,0.6,domain_stlearn,0.340858,0.470631,0.470631,0.069392,0.312448,6,0.206993

@@ -1,0 +1,25 @@
+---
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: normalize
+    target: NormalizeTotalLog1P
+  - type: graph.cell
+    target: StringDBGraph
+    params:
+      species: human
+    params_to_tune:
+      thres:
+        values: [0.95, 0.99,0.995]
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        label_channel: cell_type
+wandb:
+  entity: xzy11632
+  project: dance-dev
+  method: grid  # try grid to provide a comprehensive search
+  metric:
+    name: combined_score  # val/acc
+    goal: maximize

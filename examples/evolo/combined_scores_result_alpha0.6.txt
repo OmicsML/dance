@@ -1,89 +1,89 @@
-组合得分结果 (均值*0.8 + 0.19999999999999996*avg_speed_score):
+组合得分结果 (均值*0.6 + 0.4*avg_speed_score):
 - domain_spagra:
   * 均值: 0.367629
   * 初始avg_speed_score: 0.747364
   * avg_speed_score: 0.747364
-  * 组合得分标准差: 0.122072
-  * 组合得分: 0.297166
+  * 组合得分标准差: 0.098128
+  * 组合得分: 0.409716
   * score数量: 6
   * 均值target_scores: 0.184617
 - domain_spagcn:
   * 均值: 0.524196
   * 初始avg_speed_score: 0.425322
   * avg_speed_score: 0.425322
-  * 组合得分标准差: 0.046864
-  * 组合得分: 0.321020
+  * 组合得分标准差: 0.073515
+  * 组合得分: 0.347096
   * score数量: 6
   * 均值target_scores: 0.294945
 - cta_graphcs:
   * 均值: 0.758182
   * 初始avg_speed_score: 0.386010
   * avg_speed_score: 0.386010
-  * 组合得分标准差: 0.163283
-  * 组合得分: 0.643426
+  * 组合得分标准差: 0.148542
+  * 组合得分: 0.579072
   * score数量: 4
   * 均值target_scores: 0.707780
 - domain_stagate:
   * 均值: 0.355179
   * 初始avg_speed_score: 0.705460
   * avg_speed_score: 0.705460
-  * 组合得分标准差: 0.110736
-  * 组合得分: 0.472793
+  * 组合得分标准差: 0.089223
+  * 组合得分: 0.530960
   * score数量: 6
   * 均值target_scores: 0.414627
 - domain_efnst:
   * 均值: 0.275214
   * 初始avg_speed_score: 0.174463
   * avg_speed_score: 0.174463
-  * 组合得分标准差: 0.107129
-  * 组合得分: 0.321698
+  * 组合得分标准差: 0.087433
+  * 组合得分: 0.284889
   * score数量: 6
   * 均值target_scores: 0.358507
 - cta_scgat:
   * 均值: 0.767684
   * 初始avg_speed_score: 0.555649
   * avg_speed_score: 0.555649
-  * 组合得分标准差: 0.149027
-  * 组合得分: 0.649754
+  * 组合得分标准差: 0.120086
+  * 组合得分: 0.626228
   * score数量: 4
   * 均值target_scores: 0.673280
 - cta_scheteronet:
   * 均值: 0.827043
   * 初始avg_speed_score: 0.520363
   * avg_speed_score: 0.520363
-  * 组合得分标准差: 0.148349
-  * 组合得分: 0.688447
+  * 组合得分标准差: 0.135787
+  * 组合得分: 0.646426
   * score数量: 4
   * 均值target_scores: 0.730468
 - cta_scdeepsort:
   * 均值: 0.755692
   * 初始avg_speed_score: 0.211672
   * avg_speed_score: 0.211672
-  * 组合得分标准差: 0.139850
-  * 组合得分: 0.613830
+  * 组合得分标准差: 0.120274
+  * 组合得分: 0.513291
   * score数量: 4
   * 均值target_scores: 0.714370
 - domain_louvain:
   * 均值: 0.509643
   * 初始avg_speed_score: 0.815975
   * avg_speed_score: 0.815975
-  * 组合得分标准差: 0.062044
-  * 组合得分: 0.439720
+  * 组合得分标准差: 0.047437
+  * 组合得分: 0.533784
   * score数量: 6
   * 均值target_scores: 0.345657
 - cta_scrgcl:
   * 均值: 0.638393
   * 初始avg_speed_score: 0.145714
   * avg_speed_score: 0.145714
-  * 组合得分标准差: 0.138357
-  * 组合得分: 0.552527
+  * 组合得分标准差: 0.105124
+  * 组合得分: 0.450823
   * score数量: 4
   * 均值target_scores: 0.654230
 - domain_stlearn:
   * 均值: 0.340858
   * 初始avg_speed_score: 0.470631
   * avg_speed_score: 0.470631
-  * 组合得分标准差: 0.077987
-  * 组合得分: 0.259721
+  * 组合得分标准差: 0.069392
+  * 组合得分: 0.312448
   * score数量: 6
   * 均值target_scores: 0.206993

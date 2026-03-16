@@ -1,0 +1,28 @@
+"cta_graphcs":
+    edge_ratio: 2.0
+    n_neighbors: 15
+"cta_scdeepsort":
+    normalize_edges: True
+"cta_scgat":
+   n_neighbors: 15
+"cta_scheteronet":
+  knn_num: 5
+  distance_metric: l2
+"cta_scrgcl":
+  thres: 0.99
+"domain_efnst":
+  distType: KDTree
+  k: 12
+"domain_louvain":
+  n_neighbors: 17
+"domain_spagcn":
+  alpha: 1
+  beta: 49
+"domain_spaGRA":
+  rad_cutoff: 150
+"domain_stagate":
+  radius: 150
+"domain_stlearn":
+  crop_size: 10
+  n_neighbors: 10
+  n_pcs: 10

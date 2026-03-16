@@ -24,6 +24,8 @@ if not benchmarks:
     print(f"警告: {method_name} 配置为空或未找到！")
 
 for dataset_name, args in benchmarks.items():
+    if method_name == "scrgcl_benchmarks" and dataset_name in ["Human_Immune","Human_Spleen","Human_CD8"]:
+        continue
     # 拼接参数
     args.extend(["--tune_mode", "params", "--count", "100"])
     command = [sys.executable, "main.py"] + args

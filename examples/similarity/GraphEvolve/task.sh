@@ -1,0 +1,1 @@
+export TASK_QUERY="cta_scdeepsort"

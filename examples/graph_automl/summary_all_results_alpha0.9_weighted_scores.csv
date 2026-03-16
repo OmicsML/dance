@@ -1,0 +1,12 @@
+folder_name,weighted_score_mean
+cta_scheteronet,0.687
+cta_graphcs,0.6713
+cta_scdeepsort,0.6478
+cta_scrgcl,0.585
+domain_louvain,0.3226
+domain_efnst,0.3218
+domain_stagate,0.2963
+cta_scgat,0.2939
+domain_spagcn,0.2634
+domain_stlearn,0.1604
+domain_spaGRA,0.1427

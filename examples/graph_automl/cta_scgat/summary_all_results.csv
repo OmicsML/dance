@@ -1,0 +1,5 @@
+params.0.scGATGraphTransform.n_neighbors,test_acc_mean,test_acc_std,test_acc_count,speed_score_mean,speed_score_std,combined_score_mean,combined_score_std,weighted_score
+10,0.2411,0.2452,5,0.4509,0.2139,0.3992,0.1176,0.28306000000000003
+15,0.2385,0.2459,5,0.4368,0.2243,0.3951,0.1186,0.27816
+20,0.237,0.2465,5,0.4107,0.2328,0.3882,0.1208,0.27174
+25,0.2351,0.2472,5,0.3838,0.2351,0.3816,0.1224,0.26484

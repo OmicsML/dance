@@ -1,0 +1,89 @@
+组合得分结果 (均值*0.6 + 0.4*avg_speed_score):
+- domain_spagra:
+  * 均值: 0.369778
+  * 初始avg_speed_score: 0.732994
+  * avg_speed_score: 0.732994
+  * 组合得分标准差: 0.103051
+  * 组合得分: 0.408349
+  * score数量: 6
+  * 均值target_scores: 0.191918
+- domain_spagcn:
+  * 均值: 0.535524
+  * 初始avg_speed_score: 0.494608
+  * avg_speed_score: 0.494608
+  * 组合得分标准差: 0.087140
+  * 组合得分: 0.370204
+  * score数量: 6
+  * 均值target_scores: 0.287268
+- cta_graphcs:
+  * 均值: 0.757432
+  * 初始avg_speed_score: 0.382261
+  * avg_speed_score: 0.382261
+  * 组合得分标准差: 0.148396
+  * 组合得分: 0.577572
+  * score数量: 4
+  * 均值target_scores: 0.707780
+- domain_stagate:
+  * 均值: 0.382753
+  * 初始avg_speed_score: 0.838400
+  * avg_speed_score: 0.838400
+  * 组合得分标准差: 0.085096
+  * 组合得分: 0.585539
+  * score数量: 6
+  * 均值target_scores: 0.416965
+- domain_efnst:
+  * 均值: 0.286183
+  * 初始avg_speed_score: 0.208493
+  * avg_speed_score: 0.208493
+  * 组合得分标准差: 0.073240
+  * 组合得分: 0.311894
+  * score数量: 6
+  * 均值target_scores: 0.380828
+- cta_scgat:
+  * 均值: 0.789286
+  * 初始avg_speed_score: 0.553080
+  * avg_speed_score: 0.553080
+  * 组合得分标准差: 0.126862
+  * 组合得分: 0.644655
+  * score数量: 4
+  * 均值target_scores: 0.705705
+- cta_scheteronet:
+  * 均值: 0.819600
+  * 初始avg_speed_score: 0.479060
+  * avg_speed_score: 0.479060
+  * 组合得分标准差: 0.144616
+  * 组合得分: 0.633482
+  * score数量: 4
+  * 均值target_scores: 0.736430
+- cta_scdeepsort:
+  * 均值: 0.760690
+  * 初始avg_speed_score: 0.157081
+  * avg_speed_score: 0.157081
+  * 组合得分标准差: 0.136300
+  * 组合得分: 0.513458
+  * score数量: 4
+  * 均值target_scores: 0.751043
+- domain_louvain:
+  * 均值: 0.512020
+  * 初始avg_speed_score: 0.827859
+  * avg_speed_score: 0.827859
+  * 组合得分标准差: 0.047242
+  * 组合得分: 0.538538
+  * score数量: 6
+  * 均值target_scores: 0.345657
+- cta_scrgcl:
+  * 均值: 0.645035
+  * 初始avg_speed_score: 0.182393
+  * avg_speed_score: 0.182393
+  * 组合得分标准差: 0.115816
+  * 组合得分: 0.463263
+  * score数量: 4
+  * 均值target_scores: 0.650510
+- domain_stlearn:
+  * 均值: 0.432568
+  * 初始avg_speed_score: 0.744127
+  * avg_speed_score: 0.744127
+  * 组合得分标准差: 0.071914
+  * 组合得分: 0.452429
+  * score数量: 6
+  * 均值target_scores: 0.257963

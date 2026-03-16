@@ -1,0 +1,4 @@
+params.1.StringDBGraph.thres,test_acc_mean,test_acc_std,test_acc_count,speed_score_mean,speed_score_std,combined_score_mean,combined_score_std,weighted_score_mean,weighted_score_std
+0.95,0.64,0.191,4,0.0897,0.0669,0.6299,0.123,0.4199,0.1043
+0.99,0.6435,0.194,4,0.0508,0.0349,0.6237,0.128,0.4064,0.1102
+0.995,0.6497,0.1923,4,0.035,0.0227,0.6222,0.1299,0.4038,0.1113

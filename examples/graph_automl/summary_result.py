@@ -5,8 +5,9 @@ from pathlib import Path
 import numpy as np
 import argparse  # 1. 导入 argparse 库
 import json
-dataset_names=['151507','151673','151676','human_breast_cancer','pancreatic_cancer',
-               '328_138','1013-1247-598-732-767-768-770-784-845-864_315-340-376-381-390-404-437-490-551-559',
+alpha=0.9
+dataset_names=['151507','151673','151676','human_breast_cancer','pancreatic_cancer',"328_138",
+               '1013-1247-598-732-767-768-770-784-845-864_315-340-376-381-390-404-437-490-551-559',
                '1027-1357-1641-517-706-777-850-972_245-332-377-398-405-455-470-492','3043-3777-4029-4115-4362-4657_1729-2125-2184-2724-2743',
                '11407-1519-636-713-9054-9258_1925-205-3323-6509-7572'
                ]
@@ -62,29 +63,34 @@ def summarize_best_test_acc(base_dir, metric_name):
 
     # 检查参数列是否有缺失值
     missing_params = combined_df[param_columns].isnull().any().any()
+    
     if missing_params:
         print("参数列存在缺失值，将填充为 'N/A'")
         combined_df[param_columns] = combined_df[param_columns].fillna('N/A')
-
+    combined_df.fillna({
+            metric_name: 0,
+            'speed_score': 0,
+            'combined_score': 0,
+            })
+    combined_df['weighted_score'] = combined_df[metric_name] * alpha + combined_df['speed_score'] * (1-alpha)
     # 根据参数列分组，计算每个参数组合在所有数据集上的统计信息
     grouped = combined_df.groupby(param_columns).agg({
         metric_name: ['mean', 'std', 'count'],
         'speed_score': ['mean', 'std'],
-        'combined_score': ['mean', 'std']
+        'combined_score': ['mean', 'std'],
+        'weighted_score': ['mean', 'std']
     }).round(4)
 
     # 展平多级列索引
     grouped.columns = ['_'.join(col).strip() for col in grouped.columns.values]
     grouped = grouped.reset_index()
 
-    # 计算加权得分: metric_name_mean * 0.8 + speed_score_mean * 0.2
-    grouped['weighted_score'] = grouped[f'{metric_name}_mean'] * 0.8 + grouped['speed_score_mean'] * 0.2
 
     # 按combined_score降序排序，找到内部分数最高的参数组合
     grouped_by_combined = grouped.sort_values('combined_score_mean', ascending=False).reset_index(drop=True)
 
     print(f"生成 {len(grouped)} 个不同的参数组合")
-    print(f"内部分数最高的参数组合的测试集加权得分: {grouped_by_combined.iloc[0]['weighted_score']:.4f}")
+    print(f"内部分数最高的参数组合的测试集加权得分: {grouped_by_combined.iloc[0]['weighted_score_mean']:.4f} ± {grouped_by_combined.iloc[0]['weighted_score_std']:.4f}")
 
     return combined_df, grouped_by_combined
 
@@ -141,7 +147,10 @@ if __name__ == "__main__":
             print(f"文件夹 {folder_name} 汇总了 {len(combined_df)} 行原始数据")
 
             # 保存CSV文件
-            csv_output_path = subfolder / 'summary_results.csv'
+            if alpha==0.8:
+                csv_output_path = subfolder / 'summary_results.csv'
+            else:
+                csv_output_path = subfolder / f'summary_results_alpha{alpha}.csv'
             grouped_stats_df.to_csv(csv_output_path, index=False)
             print(f"CSV结果已保存到: {csv_output_path}")
 
@@ -169,7 +178,8 @@ if __name__ == "__main__":
                 "best_param_combination": {
                     "combined_score_mean": float(best_params['combined_score_mean']),
                     "combined_score_std": float(best_params['combined_score_std']),
-                    "weighted_score": float(best_params['weighted_score']),
+                    "weighted_score_mean": float(best_params['weighted_score_mean']),
+                    "weighted_score_std": float(best_params['weighted_score_std']),
                     f"{metric_name}_mean": float(best_params[f'{metric_name}_mean']),
                     f"{metric_name}_std": float(best_params[f'{metric_name}_std']),
                     "speed_score_mean": float(best_params['speed_score_mean']),
@@ -183,7 +193,7 @@ if __name__ == "__main__":
 
             # 显示结果
             print(f"平均内部分数 (combined_score): {best_params['combined_score_mean']:.4f} ± {best_params['combined_score_std']:.4f}")
-            print(f"测试集加权得分 ({metric_name}*0.8 + speed_score*0.2): {best_params['weighted_score']:.4f}")
+            print(f"测试集加权得分 ({metric_name}*0.8 + speed_score*0.2): {best_params['weighted_score_mean']:.4f} ± {best_params['weighted_score_std']:.4f}")
             print(f"平均{metric_name}: {best_params[f'{metric_name}_mean']:.4f} ± {best_params[f'{metric_name}_std']:.4f}")
             print(f"平均速度得分: {best_params['speed_score_mean']:.4f} ± {best_params['speed_score_std']:.4f}")
             print(f"覆盖数据集数量: {int(best_params[f'{metric_name}_count'])}")
@@ -194,6 +204,8 @@ if __name__ == "__main__":
     # 保存大JSON文件
     if all_results:
         json_output_path = script_dir / args.output
+        if alpha!=0.8:
+            json_output_path = str(json_output_path).replace('.json', f'_alpha{alpha}.json')
         with open(json_output_path, 'w', encoding='utf-8') as f:
             json.dump(all_results, f, indent=2, ensure_ascii=False)
         print(f"\n所有结果已保存到 JSON 文件: {json_output_path}")

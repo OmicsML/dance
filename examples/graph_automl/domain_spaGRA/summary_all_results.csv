@@ -1,0 +1,4 @@
+params.3.CalSpatialNet.rad_cutoff,ARI_mean,ARI_std,ARI_count,speed_score_mean,speed_score_std,combined_score_mean,combined_score_std,weighted_score
+200,0.0858,0.0902,5,0.6551,0.0536,0.3542,0.1144,0.19966
+150,0.0812,0.0804,5,0.6533,0.0534,0.3484,0.1072,0.19562000000000002
+100,0.0825,0.0975,5,0.5014,0.195,0.3213,0.0717,0.16627999999999998

@@ -1,0 +1,22 @@
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lcccc}
+\toprule
+Method & CEAgent-GSL (Full Method) & CEAgent-GSL-Zero & AutoML-GSL & Original Default \\
+\midrule
+STAGATE & \textbf{0.543} & 0.502 & 0.387 & 0.410 \\
+SpaGCN & \textbf{0.349} & 0.334 & 0.286 & 0.272 \\
+Louvain & \textbf{0.490} & 0.487 & 0.451 & 0.451 \\
+ScDeepSort & \textbf{0.573} & 0.564 & 0.558 & 0.558 \\
+scHeteroNet & 0.659 & \textbf{0.667} & 0.647 & 0.620 \\
+scGAT & \textbf{0.660} & 0.638 & 0.312 & 0.304 \\
+SpaGRA & \textbf{0.354} & 0.353 & 0.257 & 0.253 \\
+EfNST & \textbf{0.329} & 0.303 & 0.287 & 0.299 \\
+scRGCL & \textbf{0.510} & 0.502 & 0.475 & 0.466 \\
+GraphCS & 0.610 & \textbf{0.611} & 0.603 & 0.595 \\
+stLearn & \textbf{0.404} & 0.286 & 0.244 & 0.302 \\
+\bottomrule
+\end{tabular}
+\caption{Alpha=0.7}
+\label{tab:exp1}
+\end{table}

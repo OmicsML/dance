@@ -1,0 +1,24 @@
+---
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: graph.cell
+    target: PCACellFeatureGraph
+    params:
+      n_components: 200
+      split_name: train
+    params_to_tune:
+      normalize_edges: 
+        values: [True,False]
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        label_channel: cell_type
+wandb:
+  entity: xzy11632
+  project: dance-dev
+  method: grid  # try grid to provide a comprehensive search
+  metric:
+    name: combined_score  # val/acc
+    goal: maximize

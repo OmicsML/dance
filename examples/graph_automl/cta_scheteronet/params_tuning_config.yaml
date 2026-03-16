@@ -1,0 +1,50 @@
+---
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: filter.cell
+    target: FilterCellsType
+  - type: filter.gene
+    target: FilterGenesScanpy
+    params: 
+      min_counts: 1
+  - type: filter.cell
+    target: FilterCellsScanpy
+    params:
+      min_counts: 1
+  - type: filter.gene
+    target: HighlyVariableGenesLogarithmizedByTopGenes
+    params:
+      n_top_genes: 4000
+      flavor: cell_ranger
+  - type: misc
+    target: SaveRaw
+
+  - type: normalize
+    target: NormalizeTotal
+
+  - type: normalize
+    target: UpdateSizeFactors
+
+  - type: normalize
+    target: Log1P
+
+  - type: graph.cell
+    target: HeteronetGraph
+    params_to_tune:
+      knn_num: 
+        values: [5,10,15]
+      distance_metrics: 
+        values: ['l1','l2','cosine']
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        label_channel: cell_type
+wandb:
+  entity: danceteam
+  project: dance-dev
+  method: grid
+  metric:
+    name: combined_score  # val/acc
+    goal: maximize

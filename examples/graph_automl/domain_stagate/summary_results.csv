@@ -1,0 +1,4 @@
+params.2.StagateGraph.radius,ARI_mean,ARI_std,ARI_count,speed_score_mean,speed_score_std,combined_score_mean,combined_score_std,weighted_score_mean,weighted_score_std
+100,0.2508,0.1622,4,0.7053,0.108,0.3485,0.0768,0.3417,0.1506
+150,0.3354,0.249,5,0.5836,0.0976,0.314,0.0679,0.385,0.2148
+200,0.3452,0.2663,5,0.5159,0.0937,0.2879,0.0552,0.3794,0.2295
