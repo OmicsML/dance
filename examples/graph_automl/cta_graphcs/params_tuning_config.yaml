@@ -1,0 +1,37 @@
+---
+type: preprocessor
+tune_mode: params
+pipeline:
+  - type: filter.gene
+    target: SupervisedFeatureSelection
+    params:
+      label_col: cell_type
+      n_features: 2000
+      split_name: train
+  - type: normalize
+    target: NormalizeTotalLog1P
+  - type: filter.gene
+    target: HighlyVariableGenesLogarithmizedByTopGenes
+    params:
+      n_top_genes: 2000
+  - type: graph.cell
+    target: BBKNNConstruction
+    params:
+      key_added: temp_graph
+    params_to_tune:
+      edge_ratio:
+        values: [1.5, 2.0, 2.5]
+      n_neighbors:
+        values: [10, 15, 20]
+  - type: misc
+    target: SetConfig
+    params:
+      config_dict:
+        label_channel: cell_type
+wandb:
+  entity: xzy11632
+  project: dance-dev
+  method: grid  # try grid to provide a comprehensive search
+  metric:
+    name: combined_score  # val/acc
+    goal: maximize

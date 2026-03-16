@@ -1,0 +1,296 @@
+================================================================================
+Principles 导出文件
+================================================================================
+导出时间: 2026-02-09 10:23:20.517042
+原则总数: 26
+================================================================================
+
+--------------------------------------------------------------------------------
+[1] Principle ID: a1b40b1a-4795-4976-8459-ba94b56a297d
+--------------------------------------------------------------------------------
+Source Task: domain_louvain
+
+Content:
+IF spatial transcriptomics data contains biologically meaningful spatial proximity constraints THEN integrate transcriptional and spatial graph construction via weighted adjacency matrix fusion to improve biological correctness of domain segmentation
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[2] Principle ID: bfbba477-9f21-42fe-bc41-254b431b66f4
+--------------------------------------------------------------------------------
+Source Task: cta_scheteronet
+
+Content:
+IF constructing k-nearest neighbor graphs from high-dimensional single-cell expression features THEN replace iterative Python list comprehensions with vectorized NumPy array operations for edge list generation to reduce graph construction time and improve `avg_speed_score`
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[3] Principle ID: a30a0d22-0890-4349-b1fe-69a930bc70a7
+--------------------------------------------------------------------------------
+Source Task: cta_scheteronet
+
+Content:
+IF integrating preprocessing into the data loading pipeline THEN apply transformations during `load_data(transform=preprocessing_pipeline, cache=args.cache)` instead of post-hoc sequential application to eliminate redundant AnnData copying and memory reallocation, thereby increasing `reliability_score` and reducing `avg_success_time`
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[4] Principle ID: 428629c6-450a-44c7-856c-d349946a7857
+--------------------------------------------------------------------------------
+Source Task: cta_scheteronet
+
+Content:
+IF handling multi-dataset cell type annotation with batch effects THEN preserve `batch_id` as integer-encoded node attributes in the DGL graph rather than discarding or misaligning batch metadata, improving `Human_Spleen_inner_score` and `Human_Immune_inner_score` through consistent batch-aware propagation
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[5] Principle ID: 90f93fb9-3e56-4fee-af4c-9f2eaa032bc7
+--------------------------------------------------------------------------------
+Source Task: cta_graphcs
+
+Content:
+IF constructing adjacency lists for single-batch scRNA-seq graphs THEN apply vectorized string generation over iterative list appending to reduce Python interpreter overhead and improve graph serialization speed
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[6] Principle ID: eb2e7294-3c91-4d5b-9439-56f1062e9746
+--------------------------------------------------------------------------------
+Source Task: cta_scheteronet
+
+Content:
+IF evaluating model performance across heterogeneous tissue types THEN enforce strict tensor shape alignment (e.g., `y.unsqueeze(1)` for singleton label dimensions) prior to scoring to prevent silent broadcasting errors that degrade `avg_accuracy` and `Human_CD8_score`
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[7] Principle ID: 340b13fa-65fe-4d59-974e-91540698b771
+--------------------------------------------------------------------------------
+Source Task: cta_scheteronet
+
+Content:
+IF optimizing for biological generalizability across immune tissues THEN omit dataset sub-sampling (`sub_data`) and hardcoded split indices to retain full biological heterogeneity and avoid biasing `Human_Immune_score` and `Human_CD4_score` toward artificial subset distributions
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[8] Principle ID: 2ea535c8-08d4-4431-b8e0-82db38256221
+--------------------------------------------------------------------------------
+Source Task: domain_louvain
+
+Content:
+IF multiple graph modalities (transcriptional + spatial) are available THEN normalize and combine adjacency matrices using tunable modality weighting to balance signal contribution and mitigate modality-specific noise, thereby increasing ARI and inner clustering metrics
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[9] Principle ID: b9804f63-3da4-457b-b82d-774531cdb1a7
+--------------------------------------------------------------------------------
+Source Task: domain_stlearn
+
+Content:
+IF aggregating spatially neighboring gene expression signals using adjacency weights THEN replace row-wise top-k selection with dense matrix-based weighted neighborhood imputation to preserve signal continuity and mitigate sparsity-induced information loss
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[10] Principle ID: 0ff19df3-5106-48e0-b56c-a73df314f452
+--------------------------------------------------------------------------------
+Source Task: domain_louvain
+
+Content:
+IF spatial coordinates are present but squidpy is unavailable or fails THEN implement graceful degradation to transcriptional-only graph construction with robust exception handling, preserving reliability_score and execution status across heterogeneous datasets
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[11] Principle ID: b323f89f-b01d-4a28-943e-5035f8d1ac5c
+--------------------------------------------------------------------------------
+Source Task: domain_louvain
+
+Content:
+IF graph construction must support diverse spatial assay geometries (e.g., irregular tissue sections, variable spot densities) THEN use radius-based spatial neighborhood definition (`coord_type='generic', radius=50.0`) instead of fixed-kNN to maintain topological fidelity in sparse or anisotropic spatial domains
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[12] Principle ID: e912941e-04a8-41e1-9741-70ab2a9cf71f
+--------------------------------------------------------------------------------
+Source Task: cta_graphcs
+
+Content:
+IF adding self-loops to graph representations for downstream GBP propagation THEN generate all self-loop strings in a single list comprehension rather than sequential append operations, minimizing memory reallocation and improving cache locality during graph I/O initialization
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[13] Principle ID: 36e190fa-e046-401f-bdee-fda74647b313
+--------------------------------------------------------------------------------
+Source Task: cta_graphcs
+
+Content:
+IF computing batch-aware edge retention thresholds in heterogeneous scRNA-seq datasets THEN avoid nested per-edge re-computation of batch indices and threshold indices by decoupling index selection from string formatting, enabling efficient NumPy boolean indexing and reducing redundant map lookups on obs columns
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[14] Principle ID: a85c6460-e2ec-474e-9998-182e732a21ff
+--------------------------------------------------------------------------------
+Source Task: domain_stlearn
+
+Content:
+IF estimating spatial scaling unit from coordinate regression residuals THEN refine radius parameter in SMEGraph using empirically tuned value (2.5×) and adapt n_neighbors in SMEFeature to scale sublinearly with graph density to balance local specificity and global robustness
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[15] Principle ID: c02d493e-1b92-4719-a7d8-196122039507
+--------------------------------------------------------------------------------
+Source Task: cta_scdeepsort
+
+Content:
+IF cell feature representation must capture both global structure and local expression weighting THEN fuse direct cell-level TruncatedSVD embeddings with weighted gene-PCA embeddings using biologically informed convex combination (0.6/0.4)
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[16] Principle ID: 58699f09-7f3e-4713-b6bd-57602e77ffd5
+--------------------------------------------------------------------------------
+Source Task: domain_stagate
+
+Content:
+IF graph construction must accommodate variable tissue density and spatial resolution across diverse spatial transcriptomics datasets THEN adaptive sigma estimation from empirical neighbor distances enables dataset-agnostic edge weighting calibration
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[17] Principle ID: 4699cde3-bb22-4f79-9a6c-0bbf12ab38ef
+--------------------------------------------------------------------------------
+Source Task: domain_spagcn
+
+Content:
+IF integrating multi-modal spatial features (e.g., morphology + coordinates) THEN augment z-axis embedding with robust variance-weighted intensity scaling and standardized dispersion control to preserve spatial topology in high-dimensional embedding space, boosting combined_score and sub_mba_score
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[18] Principle ID: f192adce-489a-457a-af0c-9f5d5aa72672
+--------------------------------------------------------------------------------
+Source Task: domain_spagra
+
+Content:
+IF constructing spatial neighbor graphs for high-resolution spatial transcriptomics data THEN replace iterative pandas DataFrame concatenation with vectorized NumPy array operations to reduce graph construction time and improve avg_speed_score
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[19] Principle ID: b2c5ffc2-f910-4ad0-b3b5-754f559f07a9
+--------------------------------------------------------------------------------
+Source Task: domain_spagra
+
+Content:
+IF modeling spatial topology in tissue sections with irregular cell distributions THEN incorporate Delaunay triangulation as a geometric graph construction method to better preserve local spatial relationships and increase human_breast_cancer_score and pancreatic_cancer_score
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[20] Principle ID: 3d21b314-443f-4065-a6a1-8b0beec25a9e
+--------------------------------------------------------------------------------
+Source Task: domain_spagra
+
+Content:
+IF spatial coordinates are sparse or degenerate (e.g., collinear points) preventing robust triangulation THEN implement graceful fallback to KNN-based neighborhood selection to maintain reliability_score and prevent pipeline failure
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[21] Principle ID: 789d926e-d8a4-4af3-99ad-ee2ca3f703f0
+--------------------------------------------------------------------------------
+Source Task: domain_spagra
+
+Content:
+IF graph construction must balance biological fidelity with computational tractability across diverse sample sizes THEN support multiple graph models (Radius, KNN, Delaunay, Gabriel) with unified edge-list output format to enable dataset-specific optimization of combined_score and avg_inner_accuracy
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[22] Principle ID: 6a6f827f-1174-42b5-832d-20638953d648
+--------------------------------------------------------------------------------
+Source Task: domain_efnst
+
+Content:
+IF spatial neighborhood graph construction requires adaptive resolution across heterogeneous tissue regions THEN use local density-adaptive bandwidth Gaussian kernel weighting instead of binary radius-based connectivity
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[23] Principle ID: 6e3372dc-bbea-48de-a72c-48be94be137f
+--------------------------------------------------------------------------------
+Source Task: cta_scgat
+
+Content:
+IF feature preprocessing introduces numerical instability in downstream GNN training THEN replace min-max normalization with z-score standardization on log-transformed, normalized expression or PCA features to ensure unit variance and zero mean across biological replicates
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[24] Principle ID: 9681336f-68a3-4d43-8223-6c9c7c1a11cc
+--------------------------------------------------------------------------------
+Source Task: cta_scgat
+
+Content:
+IF memory layout inefficiencies arise during tensor conversion of large-scale omics features THEN enforce C-contiguous array storage and leverage PyTorch Geometric’s native `from_scipy_sparse_matrix` to avoid redundant sparse-to-dense conversions and reduce GPU memory footprint
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[25] Principle ID: 8eda95f9-9fee-49e0-bad7-d7bc79ff40b2
+--------------------------------------------------------------------------------
+Source Task: cta_scgat
+
+Content:
+IF label encoding must reconcile heterogeneous annotation formats (categorical vs. one-hot) across diverse scRNA-seq datasets THEN implement unified argmax-based decoding with explicit class name propagation from DataFrame columns to ensure consistent label space alignment across tissues and species
+
+Other Metadata:
+  type: principle
+
+--------------------------------------------------------------------------------
+[26] Principle ID: 5a42559d-ce81-4178-849c-b06cab66dc69
+--------------------------------------------------------------------------------
+Source Task: cta_scgat
+
+Content:
+IF neighbor graph computation lacks robustness to unnormalized input distributions THEN condition PCA and neighbor calculation on adaptive preprocessing: verify log-transformation status, apply `sc.pp.normalize_total` and `sc.pp.log1p` only when raw counts exceed dynamic range thresholds, preserving biological variance structure
+
+Other Metadata:
+  type: principle
+
+================================================================================
+导出完成
+================================================================================
