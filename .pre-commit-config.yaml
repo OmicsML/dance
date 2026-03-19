@@ -41,6 +41,7 @@ repos:
     hooks:
       - id: docformatter
         name: Format docstring
+        language_version: python3.10
         additional_dependencies: [tomli]
         args: [--config, pyproject.toml]
   - repo: https://github.com/executablebooks/mdformat
