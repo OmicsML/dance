@@ -37,7 +37,7 @@ repos:
         name: Sort imports
         args: [--line-width, '120', --profile, black]
   - repo: https://github.com/PyCQA/docformatter
-    rev: eb1df34
+    rev: master
     hooks:
       - id: docformatter
         name: Format docstring
