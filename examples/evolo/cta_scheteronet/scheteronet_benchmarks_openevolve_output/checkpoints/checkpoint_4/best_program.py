@@ -1,4 +1,5 @@
 import argparse
+import time  # 新增：导入 time 模块
 from typing import Optional
 
 import dgl
@@ -126,6 +127,7 @@ def get_preprocessing_pipeline(log_level: LogLevel = "INFO"):
         transforms.append(HeteronetGraph())
         transforms.append(SetConfig({"label_channel": "cell_type"}))
         return Compose(*transforms, log_level=log_level)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_dataset", nargs="+", type=int, default=[1759], help="Testing dataset IDs")
@@ -178,12 +180,17 @@ if __name__ == "__main__":
     runs = args.num_runs
     results = []
     inner_scores = []
+    times = []  # 新增：用于记录每次运行的时间
+    
     if args.gpu == -1:
         device = torch.device("cpu")
     else:
         device = torch.device("cuda:" + str(args.gpu)) if torch.cuda.is_available() else torch.device("cpu")
     eval_func = eval_acc
+    
     for run in range(runs):
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
         set_seed(args.seed + run)
         dataloader = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
                                                train_dataset=args.train_dataset, data_dir=args.data_dir,
@@ -237,10 +244,22 @@ if __name__ == "__main__":
             # test_idx=dataset_ind.splits['test']
             test_score = model.score(dataset_ind, dataset_ind.y, data.test_idx)
             inner_score = model.score(dataset_ind, dataset_ind.y, data.train_idx)
+            
         results.append(test_score)
         inner_scores.append(inner_score)
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"Run {run+1} - test_score: {test_score:.4f}, time: {run_time:.2f}s")  # 新增：打印单次运行时间和得分
+
+    print(f"scHeteroNet {args.species} {args.tissue} {args.test_dataset}:")
+    # 修改：将 results 作为 scores 列表打印，加入 times，以供 evaluator 捕获
+    print(f"scores:{results},inner_scores:{inner_scores},times:{times}")
     print(f"mean_score: {np.mean(results):.5f} +/- {np.std(results):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
 
 #TODO test_score is true delete odd test以及其他评估方法，再次测试，然后将valid等和其他算法保持一致。
 """

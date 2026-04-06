@@ -212,3 +212,5 @@ examples/graph_automl/cta_scrgcl/temp_output_1/models/final_model.pth
 examples/evolo/cta_scrgcl/oo.csv
 examples/evolo/enviroment.sh
 examples/search/generate_pseudocode/.deepeval/.deepeval_telemetry.txt
+examples/idgl/cta_scgat/train
+examples/idgl/cta_scgat/map

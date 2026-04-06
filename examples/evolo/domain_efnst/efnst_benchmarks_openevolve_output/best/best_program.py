@@ -1,6 +1,7 @@
 import argparse
 import math
 import os
+import time  # 新增：导入 time 模块
 from pathlib import Path
 import random
 
@@ -18,7 +19,6 @@ from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import adjusted_rand_score, pairwise_distances
 from sklearn.neighbors import BallTree, KDTree, NearestNeighbors
-import torch
 import torch
 from torch.autograd import Variable
 import torch.nn as nn
@@ -408,98 +408,85 @@ def cal_spatial_weight(
     spatial_type="KDTree",
 ):
     from sklearn.neighbors import BallTree, KDTree, NearestNeighbors
-    from sklearn.preprocessing import normalize
-    from scipy.sparse import csr_matrix
-    import numpy as np
+    from scipy.spatial.distance import pdist, squareform
+    from sklearn.preprocessing import minmax_scale
     
+    # Find k-nearest neighbors to estimate local density
     if spatial_type == "NearestNeighbors":
-        nbrs = NearestNeighbors(n_neighbors=spatial_k + 1, algorithm='ball_tree').fit(data)
+        nbrs = NearestNeighbors(n_neighbors=min(spatial_k + 1, data.shape[0]), algorithm='ball_tree').fit(data)
         distances, indices = nbrs.kneighbors(data)
     elif spatial_type == "KDTree":
         tree = KDTree(data, leaf_size=2)
-        distances, indices = tree.query(data, k=spatial_k + 1)
+        distances, indices = tree.query(data, k=min(spatial_k + 1, data.shape[0]))
     elif spatial_type == "BallTree":
         tree = BallTree(data, leaf_size=2)
-        distances, indices = tree.query(data, k=spatial_k + 1)
+        distances, indices = tree.query(data, k=min(spatial_k + 1, data.shape[0]))
     
-    indices = indices[:, 1:]  # Exclude self-loops
-    distances = distances[:, 1:]  # Exclude self-distances
+    indices = indices[:, 1:]  # Exclude self
+    distances = distances[:, 1:]  # Exclude self distance (0)
     
-    # Calculate adaptive bandwidth based on local density (median distance to neighbors)
-    adaptive_sigma = np.median(distances, axis=1)  # Use median as adaptive bandwidth
-    adaptive_sigma = np.expand_dims(adaptive_sigma, axis=1)  # Shape: (n_spots, 1)
+    # Calculate adaptive bandwidth based on local density (distance to k-th neighbor)
+    adaptive_sigmas = np.percentile(distances, 50, axis=1)  # Median distance as sigma
     
-    # Compute adaptive Gaussian kernel weights
+    # Create sparse weight matrix
     n_spots = data.shape[0]
     row_ind = []
     col_ind = []
-    data_vals = []
+    weights = []
     
     for i in range(n_spots):
-        neighbor_indices = indices[i]
-        neighbor_distances = distances[i]
-        # Adaptive Gaussian kernel: exp(-d^2 / (2 * sigma_i^2))
-        weights = np.exp(-neighbor_distances**2 / (2 * adaptive_sigma[i]**2))
+        ind = indices[i]
+        dists = distances[i]
+        # Adaptive Gaussian kernel: exp(-d^2 / (2*sigma^2))
+        sig = max(adaptive_sigmas[i], 1e-6)  # Avoid division by zero
+        spatial_weights = np.exp(-0.5 * (dists / sig) ** 2)
         
-        # Only keep significant weights (above threshold)
-        significant_mask = weights > 1e-6
-        significant_neighbors = neighbor_indices[significant_mask]
-        significant_weights = weights[significant_mask]
-        
-        row_ind.extend([i] * len(significant_neighbors))
-        col_ind.extend(significant_neighbors)
-        data_vals.extend(significant_weights)
+        row_ind.extend([i] * len(ind))
+        col_ind.extend(ind)
+        weights.extend(spatial_weights)
     
-    # Create sparse matrix
-    spatial_weight = csr_matrix((data_vals, (row_ind, col_ind)), shape=(n_spots, n_spots))
+    from scipy.sparse import csr_matrix
+    spatial_weight = csr_matrix((weights, (row_ind, col_ind)), shape=(n_spots, n_spots))
     
     return spatial_weight
-
 def cal_gene_weight(data, n_components=50, gene_dist_type="cosine"):
     from sklearn.decomposition import TruncatedSVD
     from sklearn.preprocessing import normalize
-    from scipy.sparse import csr_matrix
+    from sklearn.metrics.pairwise import cosine_similarity
     import numpy as np
+    from scipy.sparse import csr_matrix
     
-    # Use TruncatedSVD for sparse inputs to avoid memory issues
+    # Use TruncatedSVD for sparse inputs to handle high-dimensional gene expression data efficiently
     if isinstance(data, csr_matrix):
-        # Apply TruncatedSVD directly on sparse matrix
-        svd = TruncatedSVD(n_components=n_components, random_state=42)
-        data_pca = svd.fit_transform(data)
+        # For sparse matrices, use TruncatedSVD directly
+        svd = TruncatedSVD(n_components=min(n_components, min(data.shape)-1))
+        data_reduced = svd.fit_transform(data)
     else:
-        from sklearn.decomposition import PCA
-        pca = PCA(n_components=n_components)
-        data_pca = pca.fit_transform(data)
+        # For dense matrices, still use SVD for dimensionality reduction
+        if data.shape[1] > n_components:
+            svd = TruncatedSVD(n_components=n_components)
+            data_reduced = svd.fit_transform(data)
+        else:
+            data_reduced = data
     
-    # Compute gene similarity using cosine similarity
+    # Compute gene correlation using cosine similarity (more appropriate for gene expression)
     if gene_dist_type == "cosine":
-        # Normalize vectors to unit length for cosine similarity
-        from sklearn.preprocessing import normalize
-        data_pca_norm = normalize(data_pca, norm='l2', axis=1)
-        # Compute dot product for cosine similarity
-        gene_similarity = data_pca_norm @ data_pca_norm.T
+        gene_similarity = cosine_similarity(data_reduced)
     else:
-        gene_similarity = 1 - pairwise_distances(data_pca, metric=gene_dist_type)
+        gene_similarity = 1 - pairwise_distances(data_reduced, metric=gene_dist_type)
     
-    # Apply soft thresholding to filter noise and enhance strong signals
-    threshold = np.percentile(gene_similarity, 80)  # Keep top 20% of connections
-    gene_similarity = np.where(gene_similarity >= threshold, gene_similarity, 0)
+    # Apply soft thresholding to filter noise and enhance biological signals
+    threshold = np.percentile(gene_similarity, 75)  # Only keep top 25% correlations
+    gene_similarity[gene_similarity < threshold] = 0
     
     # Convert to sparse matrix to maintain efficiency
-    gene_similarity = csr_matrix(gene_similarity)
+    gene_correlation = csr_matrix(gene_similarity)
     
-    return gene_similarity
-
+    return gene_correlation
 def cal_weight_matrix(adata, platform="Visium", pd_dist_type="euclidean", md_dist_type="cosine",
                       gb_dist_type="correlation", n_components=50, no_morphological=True, spatial_k=30,
                       spatial_type="KDTree", verbose=False):
-    from scipy.sparse import csr_matrix
-    from sklearn.preprocessing import normalize
-    from sklearn.metrics.pairwise import pairwise_distances
-    from sklearn.linear_model import LinearRegression
-    import math
-    
-    # Calculate spatial weights based on platform
+    # Calculate spatial weights with adaptive Gaussian kernel
     if platform == "Visium":
         img_row = adata.obsm['spatial_pixel']['x_pixel']
         img_col = adata.obsm['spatial_pixel']['y_pixel']
@@ -520,8 +507,11 @@ def cal_weight_matrix(adata, platform="Visium", pd_dist_type="euclidean", md_dis
         for i in range(n_spots):
             row_ind.extend([i] * len(indices[i]))
             col_ind.extend(indices[i])
-        data_vals = np.ones(len(row_ind), dtype=np.float32)
-        physical_distance = csr_matrix((data_vals, (row_ind, col_ind)), shape=(n_spots, n_spots))
+        data = np.ones(len(row_ind), dtype=np.int8)
+        physical_distance = csr_matrix((data, (row_ind, col_ind)), shape=(n_spots, n_spots))
+        
+        # Apply adaptive spatial smoothing to physical distance
+        physical_distance = cal_spatial_weight(coords, spatial_k=spatial_k, spatial_type=spatial_type)
     else:
         physical_distance = cal_spatial_weight(adata.obsm['spatial'], spatial_k=spatial_k, spatial_type=spatial_type)
 
@@ -529,66 +519,99 @@ def cal_weight_matrix(adata, platform="Visium", pd_dist_type="euclidean", md_dis
     gene_correlation = cal_gene_weight(data=gene_counts, gene_dist_type=gb_dist_type, n_components=n_components)
     del gene_counts
     
-    # Normalize each modality to [0, 1] range to prevent dominance by one modality
+    # Apply topological pruning to ensure mutual similarity
     from sklearn.preprocessing import minmax_scale
-    
-    # Normalize matrices to same scale
-    physical_distance = physical_distance.maximum(0)  # Remove negative values if any
-    gene_correlation = gene_correlation.maximum(0)
+    physical_distance = _apply_mutual_nearest_neighbor_pruning(physical_distance, gene_correlation, spatial_k//2)
     
     if verbose:
-        adata.obsm["gene_correlation"] = gene_correlation.toarray()
-        adata.obsm["physical_distance"] = physical_distance.toarray()
+        adata.obsm["gene_correlation"] = gene_correlation.toarray() if sp.issparse(gene_correlation) else gene_correlation
+        adata.obsm["physical_distance"] = physical_distance.toarray() if sp.issparse(physical_distance) else physical_distance
 
     if platform == 'Visium':
-        # Process morphological similarity
-        image_features = adata.obsm["image_feat_pca"]
-        if isinstance(image_features, np.ndarray):
-            morphological_similarity = 1 - pairwise_distances(image_features, metric=md_dist_type)
-        else:
-            morphological_similarity = 1 - pairwise_distances(np.array(image_features), metric=md_dist_type)
-        
-        morphological_similarity = np.clip(morphological_similarity, 0, None)  # Set negative values to 0
-        
-        # Convert to sparse matrix
+        # Calculate morphological similarity
+        morphological_features = np.array(adata.obsm["image_feat_pca"])
+        morphological_similarity = 1 - pairwise_distances(morphological_features, metric=md_dist_type)
+        morphological_similarity[morphological_similarity < 0] = 0
         morphological_similarity = csr_matrix(morphological_similarity)
+        
+        # Apply soft thresholding to morphological similarity
+        threshold = np.percentile(morphological_similarity.data, 75) if morphological_similarity.nnz > 0 else 0
+        morphological_similarity.data[morphological_similarity.data < threshold] = 0
+        morphological_similarity.eliminate_zeros()
         
         if verbose:
             adata.obsm["morphological_similarity"] = morphological_similarity.toarray()
         
-        # Multi-modal multiplicative fusion using log-domain fusion to prevent vanishing weights
+        # Multi-modal fusion using weighted power mean to avoid vanishing weights
+        # Using log-domain fusion to maintain numerical stability
         eps = 1e-8
-        # Convert to log space, average, then back to linear space
-        physical_log = np.log(physical_distance.toarray() + eps)
-        gene_log = np.log(gene_correlation.toarray() + eps)
-        morph_log = np.log(morphological_similarity.toarray() + eps)
+        physical_dense = physical_distance.toarray()
+        gene_dense = gene_correlation.toarray()
+        morph_dense = morphological_similarity.toarray()
         
-        # Weighted power mean fusion (geometric mean when all weights are equal)
-        combined_log = (physical_log + gene_log + morph_log) / 3
-        weights_matrix_all = np.exp(combined_log)
-        weights_matrix_all = csr_matrix(weights_matrix_all)
+        # Add small epsilon to avoid log(0)
+        physical_dense = np.log(physical_dense + eps)
+        gene_dense = np.log(gene_dense + eps)
+        morph_dense = np.log(morph_dense + eps)
         
-        adata.obsm["weights_matrix_all"] = weights_matrix_all
+        # Weighted average in log space (geometric mean)
+        combined_weights = (physical_dense + gene_dense + morph_dense) / 3.0
+        weights_matrix_all = np.exp(combined_weights)
+        
+        adata.obsm["weights_matrix_all"] = csr_matrix(weights_matrix_all)
         
         if no_morphological:
             # Fusion without morphological data
-            gene_log = np.log(gene_correlation.toarray() + eps)
-            physical_log = np.log(physical_distance.toarray() + eps)
-            combined_log = (gene_log + physical_log) / 2
-            weights_matrix_nomd = np.exp(combined_log)
-            weights_matrix_nomd = csr_matrix(weights_matrix_nomd)
-            adata.obsm["weights_matrix_nomd"] = weights_matrix_nomd
+            gene_dense = np.log(gene_correlation.toarray() + eps)
+            physical_dense = np.log(physical_distance.toarray() + eps)
+            weights_matrix_nomd = np.exp((gene_dense + physical_dense) / 2.0)
+            adata.obsm["weights_matrix_nomd"] = csr_matrix(weights_matrix_nomd)
     else:
-        # Log-domain fusion for two modalities
+        # For non-Visium platforms, just multiply gene and spatial weights
+        # Using geometric mean to avoid vanishing weights
         eps = 1e-8
-        gene_log = np.log(gene_correlation.toarray() + eps)
-        physical_log = np.log(physical_distance.toarray() + eps)
-        combined_log = (gene_log + physical_log) / 2
-        weights_matrix_nomd = np.exp(combined_log)
-        weights_matrix_nomd = csr_matrix(weights_matrix_nomd)
-        adata.obsm["weights_matrix_nomd"] = weights_matrix_nomd
+        gene_dense = np.log(gene_correlation.toarray() + eps)
+        physical_dense = np.log(physical_distance.toarray() + eps)
+        weights_matrix_nomd = np.exp((gene_dense + physical_dense) / 2.0)
+        adata.obsm["weights_matrix_nomd"] = csr_matrix(weights_matrix_nomd)
     
     return adata
+
+def _apply_mutual_nearest_neighbor_pruning(physical_weights, gene_weights, k_neighbors=10):
+    """Apply mutual nearest neighbor pruning to ensure topological consistency."""
+    from scipy.sparse import csr_matrix
+    import numpy as np
+    
+    # Convert to dense for easier manipulation, then convert back to sparse
+    physical_dense = physical_weights.toarray()
+    gene_dense = gene_weights.toarray()
+    
+    n_spots = physical_dense.shape[0]
+    
+    # Find top-k neighbors for each modality
+    physical_top_k = np.argpartition(physical_dense, -k_neighbors, axis=1)[:, -k_neighbors:]
+    gene_top_k = np.argpartition(gene_dense, -k_neighbors, axis=1)[:, -k_neighbors:]
+    
+    # Create masks for mutual nearest neighbors
+    physical_mask = np.zeros_like(physical_dense, dtype=bool)
+    gene_mask = np.zeros_like(gene_dense, dtype=bool)
+    
+    for i in range(n_spots):
+        physical_mask[i, physical_top_k[i]] = True
+        gene_mask[i, gene_top_k[i]] = True
+    
+    # Keep only edges that exist in both modalities (intersection)
+    combined_mask = physical_mask & gene_mask
+    
+    # Apply mask to both weight matrices
+    pruned_physical = physical_dense * combined_mask.astype(float)
+    pruned_gene = gene_dense * combined_mask.astype(float)
+    
+    # Combine the weights
+    combined_weights = pruned_physical * pruned_gene
+    
+    # Return as sparse matrix
+    return csr_matrix(combined_weights)
 # EVOLVE-BLOCK-END
 
 
@@ -608,16 +631,16 @@ def find_adjacent_spot(adata, use_data="raw", neighbour_k=4, weights='weights_ma
     weights_list = []
     final_coordinates = []
     for i in range(adata.shape[0]):
-        # Handle sparse matrix case properly
-        if hasattr(weights_matrix[i], 'toarray'):
+        # Convert sparse row to dense if necessary for argsort
+        if sp.issparse(weights_matrix):
             weights_row = weights_matrix[i].toarray().flatten()
         else:
-            weights_row = weights_matrix[i].flatten()
+            weights_row = weights_matrix[i]
         
         if weights == "physical_distance":
-            current_spot = np.argsort(weights_row)[-(neighbour_k + 3):(neighbour_k + 2)]
+            current_spot = weights_row.argsort()[-(neighbour_k + 3):][:(neighbour_k + 2)]
         else:
-            current_spot = np.argsort(weights_row)[-neighbour_k:][:-1]  # Remove the last element to get neighbour_k-1 elements
+            current_spot = weights_row.argsort()[-neighbour_k:][:neighbour_k - 1]
         spot_weight = weights_row[current_spot]
         spot_matrix = gene_matrix[current_spot]
         if spot_weight.sum() > 0:
@@ -717,6 +740,7 @@ def get_preprocessing_pipeline(verbose=False, cnnType='efficientnet-b0', pca_n_c
                 "label_channel": "label",
                 "label_channel_type": "obs"
             }))
+            
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
@@ -744,8 +768,13 @@ if __name__ == "__main__":
 
     scores = []
     inner_scores = []
+    times = []  # 新增：用于记录每次运行的时间
+
     for seed in range(args.seed, args.seed + args.num_runs):
-        set_seed(args.seed, extreme_mode=True)
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
+        # 修正：将 args.seed 修改为跟随循环的 seed
+        set_seed(seed, extreme_mode=True)
         try:
             EfNST = EfNsSTRunner(
                 platform=args.platform,
@@ -781,12 +810,23 @@ if __name__ == "__main__":
             
             if "adata" in locals():
                 EfNST.delete_imgs(adata)
+        
         score = adjusted_rand_score(y, y_pred)
         scores.append(score)
-        print(f"ARI: {score:.4f}")
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"ARI: {score:.4f}, time: {run_time:.2f}s")  # 修改：同时输出得分和运行时间
+
     print(f"EfNST {args.sample_number}:")
+    # 修改：加入 times 列表，以供 evaluator 捕获
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
+
 """
 python EfNST.py --sample_number 151507
 python EfNST.py --sample_number 151673

@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 import torch
 import anndata
+import time  # 新增：导入 time 模块
 
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.transforms import Compose, NormalizeTotalLog1P, SetConfig
@@ -11,10 +12,7 @@ from dance.utils import set_seed, sub_data
 from dance.modules.single_modality.cell_type_annotation.scrgcl import scRGCLWrapper
 
 # Start
-import argparse
-import os
 import pandas as pd
-import numpy as np
 import anndata as ad
 import mygene
 import requests_cache
@@ -234,6 +232,7 @@ def get_preprocessing_pipeline(log_level="INFO",thres= 0.99, species= "human"):
             }),
             log_level=log_level,
         )
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_dataset", nargs="+", type=int, default=[138], help="Testing dataset IDs")
@@ -267,7 +266,11 @@ if __name__ == "__main__":
 
     scores = []
     inner_scores=[]
+    times = []  # 新增：用于记录每次运行的时间
+    
     for run in range(runs):
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
         set_seed(args.seed + run)
         with tempfile.TemporaryDirectory() as temp_dir:
             model = scRGCLWrapper(
@@ -281,7 +284,7 @@ if __name__ == "__main__":
             preprocessing_pipeline = get_preprocessing_pipeline(thres=args.quantile, species=args.species)
             # 1. Load Data using DANCE
             dataloader = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
-                                                species=args.species, tissue=args.tissue, val_size=args.val_size)
+                                               species=args.species, tissue=args.tissue, val_size=args.val_size)
             data = dataloader.load_data(transform=None, cache=args.cache)
             if args.obs_nums is not None:
                 sub_data(data.data,args.obs_nums)
@@ -327,8 +330,16 @@ if __name__ == "__main__":
             inner_score = model.score(x_val, y_val, score_func="acc")
             scores.append(score)
             inner_scores.append(inner_score)
-            print(f"Run {run+1} Score: {score:.4f}")
+            
+            end_time = time.time()  # 新增：记录单次循环的结束时间
+            run_time = end_time - start_time
+            times.append(run_time)  # 新增：保存耗时
+            
+            print(f"Run {run+1} Score: {score:.4f}, inner_score: {inner_score:.4f}, time: {run_time:.2f}s")  # 修改：加入内部分数和运行时间打印
 
     print(f"\nscRGCL {args.species} {args.tissue} Test Set {args.test_dataset}:")
+    # 修改：加入 times 列表，以供后续捕获
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间

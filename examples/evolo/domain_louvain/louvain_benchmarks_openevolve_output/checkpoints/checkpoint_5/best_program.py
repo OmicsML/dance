@@ -1,4 +1,5 @@
 import argparse
+import time  # 新增：导入 time 模块
 from typing import Optional
 
 from dance.transforms.filter import FilterGenesMatch
@@ -6,9 +7,8 @@ import numpy as np
 import scanpy as sc
 try:
     import squidpy as sq
-    HAS_SQUIDPY = True
 except ImportError:
-    HAS_SQUIDPY = False
+    sq = None
 
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.louvain import Louvain
@@ -25,11 +25,10 @@ from dance.utils.metrics import calculate_unified_scores, resolve_score_func
 # EVOLVE-BLOCK-START
 @register_preprocessor("graph", "cell",overwrite=True)
 class NeighborGraph(BaseTransform):
-    """Construct neighborhood graph of observations with spatial awareness.
+    """Construct neighborhood graph of observations.
 
-    This implementation enhances the standard kNN graph construction by incorporating
-    spatial information from tissue coordinates, creating a more biologically meaningful
-    graph for Louvain community detection.
+    This is a thin wrapper that creates a combined graph based on both transcriptional similarity 
+    and spatial proximity using scanpy and optionally squidpy for spatial information.
 
     Parameters
     ----------
@@ -47,23 +46,18 @@ class NeighborGraph(BaseTransform):
         Distance metric.
     channel
         Name of the PC channel.
-    use_spatial
-        Whether to use spatial information when constructing the graph.
-    alpha
-        Weight for combining spatial and transcriptional graphs (0 = transcriptional only, 1 = spatial only).
-    spatial_key
-        Key for spatial coordinates in obsm.
+    spatial_weight
+        Weight for spatial graph when combining with transcriptional graph (0 to 1).
     radius
-        Radius for spatial graph construction when using squidpy.
+        Radius for spatial neighbor search if using radius-based graph construction.
 
     """
 
-    _DISPLAY_ATTRS = ("n_neighbors", "n_pcs", "knn", "random_state", "method", "metric", "use_spatial", "alpha")
+    _DISPLAY_ATTRS = ("n_neighbors", "n_pcs", "knn", "random_state", "method", "metric", "spatial_weight", "radius")
 
     def __init__(self, n_neighbors: int = 15, *, n_pcs: Optional[int] = None, knn: bool = True, random_state: int = 0,
                  method: Optional[str] = "umap", metric: str = "euclidean", channel: Optional[str] = "CellPCA",
-                 use_spatial: bool = True, alpha: float = 0.5, spatial_key: str = "spatial", radius: Optional[float] = None,
-                 **kwargs):
+                 spatial_weight: float = 0.5, radius: Optional[float] = None, **kwargs):
         super().__init__(**kwargs)
 
         self.n_neighbors = n_neighbors
@@ -73,66 +67,58 @@ class NeighborGraph(BaseTransform):
         self.method = method
         self.metric = metric
         self.channel = channel
-        self.use_spatial = use_spatial
-        self.alpha = alpha
-        self.spatial_key = spatial_key
+        self.spatial_weight = spatial_weight
         self.radius = radius
 
     def __call__(self, data):
-        self.logger.info("Start computing the kNN connectivity adjacency matrix with spatial enhancement")
+        self.logger.info("Start computing the combined transcriptional-spatial connectivity adjacency matrix")
         
-        # Get the base transcriptional graph
+        # Compute transcriptional graph using PCA features
         trans_adj = sc.pp.neighbors(data.data, copy=True, use_rep=self.channel, n_neighbors=self.n_neighbors,
-                                    n_pcs=self.n_pcs, knn=self.knn, random_state=self.random_state, method=self.method,
-                                    metric=self.metric).obsp["connectivities"]
+                                   n_pcs=self.n_pcs, knn=self.knn, random_state=self.random_state, method=self.method,
+                                   metric=self.metric).obsp["connectivities"]
         
-        if not self.use_spatial or not HAS_SQUIDPY:
-            # Fall back to standard approach if spatial not available or squidpy not installed
-            data.data.obsp[self.out] = trans_adj
-            return data
-            
-        # When spatial information is available, create spatial graph
-        if self.spatial_key in data.data.obsm:
+        # Normalize transcriptional adjacency matrix
+        trans_adj = trans_adj / np.max(trans_adj.data) if trans_adj.nnz > 0 else trans_adj
+        
+        # Compute spatial graph if possible
+        spatial_adj = None
+        if sq is not None and 'spatial' in data.data.obsm.keys():
             try:
-                # Create spatial graph using squidpy with optimized parameters for spatial data
+                # Use squidpy for spatial graph construction
                 if self.radius is not None:
-                    # Use radius-based approach for spatial graph (more robust for varying densities)
-                    sq.gr.spatial_neighbors(data.data, coord_type="generic", spatial_key=self.spatial_key, 
-                                          radius=self.radius, key_added="spatial_graph")
+                    # Create radius-based spatial graph
+                    sq.gr.spatial_neighbors(data.data, coord_type="generic", radius=self.radius)
+                    spatial_adj = data.data.obsp['spatial_connectivities']
                 else:
-                    # Use k-nearest neighbors approach with increased neighbors for better spatial coverage
-                    sq.gr.spatial_neighbors(data.data, coord_type="generic", spatial_key=self.spatial_key, 
-                                          n_neighs=self.n_neighbors * 2, key_added="spatial_graph")
+                    # Create k-nearest neighbors spatial graph
+                    sq.gr.spatial_neighbors(data.data, coord_type="generic", n_neigh=self.n_neighbors)
+                    spatial_adj = data.data.obsp['spatial_connectivities']
                 
-                # Get spatial adjacency matrix
-                spatial_adj = data.data.obsp["spatial_graph_connectivities"]
-                
-                # Combine graphs: weighted average
-                if self.alpha > 0 and self.alpha < 1:
-                    # Blend spatial and transcriptional graphs
-                    combined_adj = self.alpha * spatial_adj + (1 - self.alpha) * trans_adj
-                elif self.alpha == 1:
-                    # Use spatial graph only
-                    combined_adj = spatial_adj
-                else:
-                    # Use transcriptional graph only
-                    combined_adj = trans_adj
-                
-                # Ensure the result is properly formatted as a sparse matrix
-                from scipy.sparse import csr_matrix
-                if hasattr(combined_adj, 'toarray'):
-                    combined_adj = csr_matrix(combined_adj)
-                
-                data.data.obsp[self.out] = combined_adj
-                
+                # Normalize spatial adjacency matrix
+                spatial_adj = spatial_adj / np.max(spatial_adj.data) if spatial_adj.nnz > 0 else spatial_adj
             except Exception as e:
-                # Fallback to transcriptional graph if spatial processing fails
-                self.logger.warning(f"Spatial graph construction failed: {e}, falling back to transcriptional graph")
-                data.data.obsp[self.out] = trans_adj
+                self.logger.warning(f"Spatial graph computation failed: {e}. Using only transcriptional graph.")
+                spatial_adj = None
+        
+        # Combine the graphs based on spatial weight
+        if spatial_adj is not None:
+            # Ensure both matrices have the same shape
+            if trans_adj.shape != spatial_adj.shape:
+                self.logger.warning("Transcriptional and spatial adjacency matrices have different shapes. Using only transcriptional graph.")
+                final_adj = trans_adj
+            else:
+                # Combine with specified weights
+                final_adj = (1 - self.spatial_weight) * trans_adj + self.spatial_weight * spatial_adj
         else:
-            # No spatial coordinates available, use transcriptional graph only
-            data.data.obsp[self.out] = trans_adj
-
+            final_adj = trans_adj
+        
+        # Convert to symmetric matrix to ensure proper behavior for Louvain clustering
+        final_adj = final_adj.maximum(final_adj.T)
+        
+        # Store the final combined adjacency matrix
+        data.data.obsp[self.out] = final_adj
+        
         return data
 # EVOLVE-BLOCK-END
 
@@ -168,7 +154,10 @@ if __name__ == "__main__":
 
     scores = []
     inner_scores = []
+    times = []  # 新增：用于记录每次运行的时间
+
     for seed in range(args.seed, args.seed + args.num_runs):
+        start_time = time.time()  # 新增：记录单次循环的开始时间
         set_seed(seed)
 
         # Initialize model and get model specific preprocessing pipeline
@@ -196,10 +185,20 @@ if __name__ == "__main__":
             "davies_bouldin": davies_bouldin_score(x, pred)
         }))
         scores.append(score)
-        print(f"ARI: {score:.4f}")
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"ARI: {score:.4f}, time: {run_time:.2f}s")  # 修改：打印单次运行时间和得分
+        
     print(f"Louvain {args.sample_number}:")
+    # 修改：在打印输出中加入 times 列表，以供 evaluator 捕获
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：打印平均运行时间
+
 """ To reproduce louvain on other samples, please refer to command lines belows:
 NOTE: you have to run multiple times to get best performance.
 

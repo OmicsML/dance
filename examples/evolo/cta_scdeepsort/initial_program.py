@@ -18,6 +18,7 @@ from dance.typing import LogLevel
 from dance.utils import set_seed, sub_data
 from dance.utils.matrix import normalize
 from dance.utils.wrappers import add_mod_and_transform
+import time
 
 # EVOLVE-BLOCK-START
 @register_preprocessor("feature", "cell",overwrite=True)
@@ -212,7 +213,11 @@ if __name__ == "__main__":
 
     scores = []
     inner_scores = []
+    times = []  # 新增：用于记录每次运行的时间
+
     for seed in range(args.seed, args.seed + args.num_runs):
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
         set_seed(seed)
 
         # Initialize model and get model specific preprocessing pipeline
@@ -234,13 +239,13 @@ if __name__ == "__main__":
             data.set_split_idx("train", train_idx)
             data.set_split_idx("test", test_idx)
         preprocessing_pipeline(data)
+        
         # Obtain training and testing data
         y_train = data.get_y(split_name="train", return_type="torch")
         y_test = data.get_y(split_name="test", return_type="torch")
         num_labels = y_test.shape[1]
 
         # Get cell feature graph for scDeepSort
-        # TODO: make api for the following block?
         g = data.data.uns["CellFeatureGraph"]
         num_genes = data.shape[1]
         gene_ids = torch.arange(num_genes)
@@ -254,25 +259,26 @@ if __name__ == "__main__":
                   val_ratio=args.test_rate)
         score = model.score(g_test, y_test)
         inner_score = model.score(g_train, y_train)
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        
         scores.append(score.item())
         inner_scores.append(inner_score.item())
-        print(f"{score=:.4f}")
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"{score=:.4f}, time={run_time:.2f}s")
+        
     print(f"scDeepSort {args.species} {args.tissue} {args.test_dataset}:")
+    # 修改：在打印输出中加入 times 列表，以供 evaluator 捕获
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
+    
     mean_score = np.mean(scores)
     std_score = np.std(scores)
     mean_inner_score = np.mean(inner_scores)
     std_inner_score = np.std(inner_scores)
+    mean_time = np.mean(times)
+    
     print(f"mean_score: {mean_score:.5f} +/- {std_score:.5f}")
     print(f"mean_inner_score: {mean_inner_score:.5f} +/- {std_inner_score:.5f}")
-"""To reproduce the benchmarking results, please run the following command:
-
-Mouse Brain
-$ python scdeepsort.py --species mouse --tissue Brain --train_dataset 753 3285 --test_dataset 2695
-
-Mouse Spleen
-$ python scdeepsort.py --species mouse --tissue Spleen --train_dataset 1970 --test_dataset 1759
-
-Mouse Kidney
-$ python scdeepsort.py --species mouse --tissue Kidney --train_dataset 4682 --test_dataset 203
-
-"""
+    print(f"mean_time: {mean_time:.2f}s")

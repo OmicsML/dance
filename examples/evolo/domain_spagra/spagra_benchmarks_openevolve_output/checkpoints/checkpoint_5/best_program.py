@@ -1,4 +1,5 @@
 import argparse
+import time  # 新增：导入 time 模块
 
 import numpy as np
 
@@ -15,6 +16,7 @@ import sklearn
 from dance.utils.metrics import calculate_unified_scores, resolve_score_func
 
 
+# EVOLVE-BLOCK-START
 @register_preprocessor("graph", "spatial",overwrite=True)
 class CalSpatialNet(BaseTransform):
     """Construct the spatial neighbor networks.
@@ -26,25 +28,26 @@ class CalSpatialNet(BaseTransform):
     k_cutoff
         The number of nearest neighbors when model='KNN'
     model
-        The network construction model. When model=='Radius', the spot is connected to spots whose distance is less than rad_cutoff. 
-        When model=='KNN', the spot is connected to its first k_cutoff nearest neighbors. When model=='Delaunay', uses Delaunay triangulation.
-        When model=='Gaussian', uses KNN with Gaussian kernel weights.
+        The network construction model. Options include 'Radius', 'KNN', 'Delaunay', 'Gaussian'.
+        When model=='Radius', the spot is connected to spots whose distance is less than rad_cutoff.
+        When model=='KNN', the spot is connected to its first k_cutoff nearest neighbors.
+        When model=='Delaunay', uses Delaunay triangulation for neighbor connections.
+        When model=='Gaussian', uses Gaussian kernel weights based on distances.
     spatial_uns
         Key for storing spatial networks in adata.uns. Default is "Spatial_Net".
-    sigma
-        Standard deviation for Gaussian kernel when model=='Gaussian'. Default is 100.
     """
 
     _DISPLAY_ATTRS = ("rad_cutoff", "k_cutoff", "model", "spatial_uns")
 
     def __init__(self, rad_cutoff=None, k_cutoff=None, model='Radius', spatial_uns="Spatial_Net",
-                 out=None, log_level="WARNING", sigma=100):
+                 out=None, log_level="WARNING", sigma=None, knn_weighted=False):
         super().__init__(out=out, log_level=log_level)
         self.rad_cutoff = rad_cutoff
         self.k_cutoff = k_cutoff
         self.model = model
         self.spatial_uns = spatial_uns
         self.sigma = sigma
+        self.knn_weighted = knn_weighted  # Option to add Gaussian weights to KNN graph
 
     def __call__(self, data):
         """Construct spatial neighbor networks."""
@@ -55,16 +58,15 @@ class CalSpatialNet(BaseTransform):
         coor.index = adata.obs.index
         coor.columns = ['imagerow', 'imagecol']
         
-        # Convert coordinates to numpy for faster computation
-        coords = coor.values
+        n_cells = coor.shape[0]
         
         if self.model == 'Radius':
-            # Use Radius-based approach with vectorized operations
-            nbrs = sklearn.neighbors.NearestNeighbors(radius=self.rad_cutoff).fit(coords)
-            distances, indices = nbrs.radius_neighbors(coords, return_distance=True)
+            # Vectorized radius neighbor search
+            nbrs = sklearn.neighbors.NearestNeighbors(radius=self.rad_cutoff).fit(coor)
+            distances, indices = nbrs.radius_neighbors(coor, return_distance=True)
             
-            # Vectorized construction of edge lists
-            cell1_ids = np.concatenate([np.full(len(idx), i) for i, idx in enumerate(indices)])
+            # Vectorized edge creation
+            cell1_ids = np.concatenate([np.full(len(indices[i]), i) for i in range(n_cells)])
             cell2_ids = np.concatenate(indices)
             distances = np.concatenate(distances)
             
@@ -75,85 +77,144 @@ class CalSpatialNet(BaseTransform):
             distances = distances[mask]
             
         elif self.model == 'KNN':
-            # Use KNN-based approach with vectorized operations
-            nbrs = sklearn.neighbors.NearestNeighbors(n_neighbors=self.k_cutoff + 1).fit(coords)
-            distances, indices = nbrs.kneighbors(coords)
+            # Vectorized KNN search
+            nbrs = sklearn.neighbors.NearestNeighbors(n_neighbors=self.k_cutoff + 1).fit(coor)
+            distances, indices = nbrs.kneighbors(coor)
             
-            # Remove self-loops (first neighbor is always the point itself)
-            cell1_ids = np.repeat(np.arange(coords.shape[0]), self.k_cutoff)
-            cell2_ids = indices[:, 1:].flatten()  # Exclude first neighbor (self)
-            distances = distances[:, 1:].flatten()  # Exclude first distance (0)
+            # Remove self-loops (first neighbor is always self)
+            indices = indices[:, 1:]
+            distances = distances[:, 1:]
+            
+            # Flatten arrays for vectorized operation
+            cell1_ids = np.repeat(np.arange(n_cells), self.k_cutoff)
+            cell2_ids = indices.flatten()
+            distances = distances.flatten()
             
         elif self.model == 'Delaunay':
-            # Use Delaunay triangulation for more biologically meaningful connections
+            # Use Delaunay triangulation for better tissue topology representation
             from scipy.spatial import Delaunay
-            tri = Delaunay(coords)
-            simplex_indices = tri.simplices
+            from scipy.spatial.distance import pdist, squareform
             
-            # Get all edges from simplices (triangles)
-            edges = []
-            for simplex in simplex_indices:
-                # Generate all unique pairs from the triangle vertices
-                for i in range(3):
-                    for j in range(i+1, 3):
-                        edges.append((simplex[i], simplex[j]))
-            
-            # Remove duplicates and self-loops
-            edges = list(set(edges))
-            edges = [(u, v) for u, v in edges if u != v]
-            
-            if not edges:
-                raise ValueError("No edges found in Delaunay triangulation. Try increasing k_cutoff or using a different model.")
+            # Handle edge cases for small datasets
+            if n_cells < 4:
+                # Fall back to KNN for very small datasets
+                return self._create_knn_graph(coor, n_cells)
                 
-            cell1_ids, cell2_ids = zip(*edges)
-            # Calculate actual distances for the edges
-            distances = np.sqrt(np.sum((coords[list(cell1_ids)] - coords[list(cell2_ids)])**2, axis=1))
-            
+            try:
+                delaunay = Delaunay(coor.values)
+                simplices = delaunay.simplices
+                
+                # Get all edges from simplices (triangles)
+                edges = set()
+                for simplex in simplices:
+                    # Create edges from triangle vertices
+                    for i in range(3):
+                        for j in range(i+1, 3):
+                            edge = tuple(sorted([simplex[i], simplex[j]]))
+                            edges.add(edge)
+                
+                # Convert to arrays
+                edge_list = list(edges)
+                if len(edge_list) > 0:
+                    cell1_ids = np.array([edge[0] for edge in edge_list])
+                    cell2_ids = np.array([edge[1] for edge in edge_list])
+                    
+                    # Calculate actual distances for consistency with interface
+                    distances = np.sqrt(np.sum((coor.iloc[cell1_ids].values - coor.iloc[cell2_ids].values) ** 2, axis=1))
+                else:
+                    # If Delaunay failed to produce edges, fall back to KNN
+                    return self._create_knn_graph(coor, n_cells)
+                
+            except Exception:
+                # Fallback to KNN if Delaunay fails
+                return self._create_knn_graph(coor, n_cells)
+                
         elif self.model == 'Gaussian':
-            # Use KNN with Gaussian kernel weights
-            nbrs = sklearn.neighbors.NearestNeighbors(n_neighbors=self.k_cutoff + 1).fit(coords)
-            distances, indices = nbrs.kneighbors(coords)
+            # Use Gaussian kernel weights
+            if self.sigma is None:
+                # Adaptive sigma based on median distance
+                from scipy.spatial.distance import cdist
+                pairwise_distances = cdist(coor.values, coor.values)
+                # Set diagonal to infinity to exclude self-connections
+                np.fill_diagonal(pairwise_distances, np.inf)
+                self.sigma = np.median(pairwise_distances[pairwise_distances > 0])
             
-            # Remove self-loops and compute Gaussian weights
-            cell1_ids = np.repeat(np.arange(coords.shape[0]), self.k_cutoff)
-            cell2_ids = indices[:, 1:].flatten()
-            distances = distances[:, 1:].flatten()
+            # Compute all pairwise distances
+            from scipy.spatial.distance import cdist
+            distances_matrix = cdist(coor.values, coor.values)
             
-            # Apply Gaussian kernel: exp(-distance^2 / (2 * sigma^2))
-            weights = np.exp(-distances**2 / (2 * self.sigma**2))
+            # Apply Gaussian kernel
+            weights = np.exp(-distances_matrix ** 2 / (2 * self.sigma ** 2))
+            
+            # Set diagonal to 0 to avoid self-loops
+            np.fill_diagonal(weights, 0)
+            
+            # Get non-zero connections (threshold to reduce density)
+            threshold = 1e-5
+            mask = (weights > threshold) & (weights > 0)
+            
+            cell1_ids, cell2_ids = np.where(mask)
+            distances = distances_matrix[cell1_ids, cell2_ids]
+            
+        elif self.model == 'MNN':
+            # Mutual Nearest Neighbor approach - only connect if both are among each other's k nearest
+            from sklearn.neighbors import NearestNeighbors
+            from scipy.sparse import csr_matrix
+            
+            # Find k nearest neighbors for each cell
+            nbrs = NearestNeighbors(n_neighbors=self.k_cutoff + 1, algorithm='ball_tree').fit(coor)
+            distances, indices = nbrs.kneighbors(coor)
+            
+            # Create sparse matrix representation of KNN graph
+            row_idx = np.repeat(np.arange(n_cells), self.k_cutoff)
+            col_idx = indices[:, 1:].flatten()  # Exclude self-connections
+            data = np.ones(len(row_idx))
+            
+            knn_graph = csr_matrix((data, (row_idx, col_idx)), shape=(n_cells, n_cells))
+            
+            # Find mutual nearest neighbors: if i is in j's kNN and j is in i's kNN
+            mnn_graph = knn_graph.multiply(knn_graph.T)
+            
+            # Extract edges from MNN graph
+            cell1_ids, cell2_ids = mnn_graph.nonzero()
+            distances = np.sqrt(np.sum((coor.iloc[cell1_ids].values - coor.iloc[cell2_ids].values) ** 2, axis=1))
             
         else:
-            raise ValueError(f"Unknown model '{self.model}'. Choose from 'Radius', 'KNN', 'Delaunay', 'Gaussian'")
+            raise ValueError(f"Unknown model: {self.model}")
+
+        # Create DataFrame with consistent structure
+        KNN_df = pd.DataFrame({
+            'Cell1': cell1_ids,
+            'Cell2': cell2_ids,
+            'Distance': distances
+        })
         
-        # Create the final DataFrame
-        if self.model == 'Gaussian':
-            # For Gaussian model, we don't want to filter by distance threshold like others
-            df = pd.DataFrame({
-                'Cell1': cell1_ids,
-                'Cell2': cell2_ids,
-                'Distance': distances,
-                'Weight': weights
-            })
-        else:
-            # Filter out zero distances and self-loops
-            mask = (distances > 0) & (cell1_ids != cell2_ids)
-            cell1_ids = cell1_ids[mask]
-            cell2_ids = cell2_ids[mask]
-            distances = distances[mask]
-            
-            df = pd.DataFrame({
-                'Cell1': cell1_ids,
-                'Cell2': cell2_ids,
-                'Distance': distances
-            })
+        # Add weights if using KNN with Gaussian weights
+        if self.model == 'KNN' and self.knn_weighted:
+            weights = np.exp(-distances ** 2 / (2 * (np.std(distances) if len(distances) > 1 else 1.0) ** 2))
+            KNN_df['Weight'] = weights
         
         # Map cell IDs back to original names
-        id_cell_trans = dict(zip(range(coor.shape[0]), coor.index))
-        df['Cell1'] = df['Cell1'].map(id_cell_trans)
-        df['Cell2'] = df['Cell2'].map(id_cell_trans)
-        
-        adata.uns[self.spatial_uns] = df
+        id_cell_trans = dict(zip(range(n_cells), np.array(coor.index)))
+        KNN_df['Cell1'] = KNN_df['Cell1'].map(id_cell_trans)
+        KNN_df['Cell2'] = KNN_df['Cell2'].map(id_cell_trans)
+
+        adata.uns[self.spatial_uns] = KNN_df
         return data
+    
+    def _create_knn_graph(self, coor, n_cells):
+        """Helper method to create KNN graph for fallback cases."""
+        nbrs = sklearn.neighbors.NearestNeighbors(n_neighbors=min(10, n_cells)).fit(coor)
+        distances, indices = nbrs.kneighbors(coor)
+        
+        indices = indices[:, 1:]  # Remove self-loops
+        distances = distances[:, 1:]
+        
+        cell1_ids = np.repeat(np.arange(n_cells), indices.shape[1])
+        cell2_ids = indices.flatten()
+        distances = distances.flatten()
+        
+        return cell1_ids, cell2_ids, distances
 # EVOLVE-BLOCK-END
 
 def get_preprocessing_pipeline(log_level: LogLevel = "INFO"):
@@ -165,6 +226,7 @@ def get_preprocessing_pipeline(log_level: LogLevel = "INFO"):
     transforms.append(SetConfig({"label_channel": "label",
             "label_channel_type": "obs"}))
     return Compose(*transforms, log_level=log_level)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
@@ -181,9 +243,14 @@ if __name__ == "__main__":
     parser.add_argument("--device", type=str, default=None, help="Device to use (e.g., 'cuda', 'cpu', 'cuda:0').")
     parser.add_argument("--obs_nums",type=int,default=10000)
     args = parser.parse_args()
+    
     inner_scores=[]
     scores = []
+    times = []  # 新增：用于记录每次运行的时间
+
     for seed in range(args.seed, args.seed + args.num_runs):
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
         set_seed(seed)
 
         # Initialize model and get model specific preprocessing pipeline
@@ -210,12 +277,20 @@ if __name__ == "__main__":
             "davies_bouldin": davies_bouldin_score(x, pred)
         }))
         scores.append(score)
-        print(f"ARI: {score:.4f}")
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"ARI: {score:.4f}, time: {run_time:.2f}s")  # 修改：打印单次得分与时间
 
-    print(f"ARI: {score:.4f}")
+    # 删除了原代码中这里重复的 print(f"ARI: {score:.4f}")
     print(f"spaGRA {args.sample_number}:")
+    # 修改：加入 times 列表，以供 evaluator 捕获
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
 
 """ To reproduce SpaGRA on other samples, please refer to command lines belows:
 

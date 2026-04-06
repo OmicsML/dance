@@ -1,0 +1,43 @@
+2026-03-17 23:23:42,116 - openevolve.controller - INFO - Logging to scdeepsort_benchmarks_openevolve_output/logs/openevolve_20260317_232342.log
+2026-03-17 23:23:42,117 - openevolve.controller - INFO - Set random seed to 42 for reproducibility
+2026-03-17 23:23:42,538 - openevolve.llm.openai - INFO - Initialized OpenAI LLM with model: qwen3-coder-plus
+2026-03-17 23:23:42,667 - openevolve.llm.openai - INFO - Initialized OpenAI LLM with model: qwen3-coder-flash
+2026-03-17 23:23:42,667 - openevolve.llm.ensemble - INFO - Initialized LLM ensemble with models: qwen3-coder-plus (weight: 0.99), qwen3-coder-flash (weight: 0.01)
+2026-03-17 23:23:42,926 - openevolve.llm.ensemble - INFO - Initialized LLM ensemble with models: qwen3-coder-plus (weight: 0.99), qwen3-coder-flash (weight: 0.01)
+2026-03-17 23:23:42,959 - openevolve.prompt.sampler - INFO - Initialized prompt sampler
+2026-03-17 23:23:42,960 - openevolve.prompt.sampler - INFO - Set custom templates: system=evaluator_system_message, user=None
+2026-03-17 23:23:42,962 - openevolve.database - INFO - Initialized program database with 0 programs
+2026-03-17 23:23:47,274 - numexpr.utils - INFO - Note: NumExpr detected 48 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 16.
+2026-03-17 23:23:47,277 - numexpr.utils - INFO - NumExpr defaulting to 16 threads.
+2026-03-17 23:25:18,804 - evaluation_module - INFO - Stdout: 
+2026-03-17 23:25:18,806 - evaluation_module - INFO - Stderr: /home/common/zyxing/anaconda3/envs/dance-evolo/lib/python3.11/site-packages/louvain/__init__.py:54: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import get_distribution, DistributionNotFound
+/mnt/nfs/zyxing/msu/dance_temp/dance/dance/utils/matrix.py:178: NumbaExperimentalFeatureWarning: First-class function type feature is experimental
+  for j in numba.prange(n):
+[INFO][2026-03-17 23:25:15,687][dance][<module>] Running SVM with the following parameters:
+{'batch_size': 500,
+ 'cache': True,
+ 'dense_dim': 200,
+ 'device': 'cuda:0',
+ 'dropout': 0.1,
+ 'hidden_dim': 200,
+ 'log_level': 'INFO',
+ 'lr': 0.001,
+ 'n_epochs': 2,
+ 'n_layers': 1,
+ 'num_runs': 1,
+ 'obs_nums': None,
+ 'seed': 202,
+ 'species': 'human',
+ 'test_dataset': [138],
+ 'test_rate': 0.2,
+ 'tissue': 'Brain',
+ 'train_dataset': [328],
+ 'val_size': 0.0,
+ 'weight_decay': 0.0005}
+Traceback (most recent call last):
+  File "/tmp/tmp66i_w9gf.py", line 218, in <module>
+    start_time = time.time()  # 新增：记录单次循环的开始时间
+                 ^^^^
+NameError: name 'time' is not defined. Did you mean: 'times'?
+

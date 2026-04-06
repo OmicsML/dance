@@ -1,6 +1,7 @@
 import argparse
 import math
 import os
+import time  # 新增：导入 time 模块
 from pathlib import Path
 import random
 
@@ -18,7 +19,6 @@ from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import adjusted_rand_score, pairwise_distances
 from sklearn.neighbors import BallTree, KDTree, NearestNeighbors
-import torch
 import torch
 from torch.autograd import Variable
 import torch.nn as nn
@@ -451,8 +451,8 @@ def cal_weight_matrix(adata, platform="Visium", pd_dist_type="euclidean", md_dis
         reg_col = LinearRegression().fit(array_col.values.reshape(-1, 1), img_col)
         unit = math.sqrt(reg_row.coef_**2 + reg_col.coef_**2)
 
-        #   physical_distance = pairwise_distances(adata.obsm['spatial_pixel'][["y_pixel", "x_pixel"]], metric=pd_dist_type,n_jobs=-1)
-        #   physical_distance = np.where(physical_distance >= rate * unit, 0, 1)
+        #  physical_distance = pairwise_distances(adata.obsm['spatial_pixel'][["y_pixel", "x_pixel"]], metric=pd_dist_type,n_jobs=-1)
+        #  physical_distance = np.where(physical_distance >= rate * unit, 0, 1)
         coords = adata.obsm['spatial_pixel'][["y_pixel", "x_pixel"]].values
         n_spots = coords.shape[0]
         radius = rate * unit
@@ -608,6 +608,7 @@ def get_preprocessing_pipeline(verbose=False, cnnType='efficientnet-b0', pca_n_c
                 "label_channel": "label",
                 "label_channel_type": "obs"
             }))
+            
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
@@ -635,8 +636,13 @@ if __name__ == "__main__":
 
     scores = []
     inner_scores = []
+    times = []  # 新增：用于记录每次运行的时间
+
     for seed in range(args.seed, args.seed + args.num_runs):
-        set_seed(args.seed, extreme_mode=True)
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
+        # 修正：将 args.seed 修改为跟随循环的 seed
+        set_seed(seed, extreme_mode=True)
         try:
             EfNST = EfNsSTRunner(
                 platform=args.platform,
@@ -672,12 +678,23 @@ if __name__ == "__main__":
             
             if "adata" in locals():
                 EfNST.delete_imgs(adata)
+        
         score = adjusted_rand_score(y, y_pred)
         scores.append(score)
-        print(f"ARI: {score:.4f}")
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"ARI: {score:.4f}, time: {run_time:.2f}s")  # 修改：同时输出得分和运行时间
+
     print(f"EfNST {args.sample_number}:")
+    # 修改：加入 times 列表，以供 evaluator 捕获
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
+
 """
 python EfNST.py --sample_number 151507
 python EfNST.py --sample_number 151673

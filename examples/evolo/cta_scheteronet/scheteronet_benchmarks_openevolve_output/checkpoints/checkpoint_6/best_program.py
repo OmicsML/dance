@@ -1,14 +1,13 @@
 import argparse
+import time  # 新增：导入 time 模块
 from typing import Optional
 
 import dgl
 import numpy as np
 import scanpy as sc
-from sklearn.neighbors import NearestNeighbors
 import torch
 import torch.nn as nn
 from sklearn.model_selection import train_test_split
-import pandas as pd
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scheteronet import (
     convert_dgl_to_original_format,
@@ -35,7 +34,7 @@ class HeteronetGraph(BaseTransform):
 
     def __init__(self, knn_num: int = 5, distance_metrics: str = 'l2', random_state: int = 0,
                  channel: Optional[str] = None, channel_type: Optional[str] = "X", ignore_first: bool = False,
-                 **kwargs):
+                 mutual: bool = True, add_self_loop: bool = True, **kwargs):
         super().__init__(**kwargs)
         self.knn_num = knn_num
         self.distance_metrics = distance_metrics
@@ -43,30 +42,14 @@ class HeteronetGraph(BaseTransform):
         self.channel = channel
         self.ignore_first = ignore_first
         self.channel_type = channel_type
-    def build_graph(self, features_np, radius=None, knears=None, distance_metrics='l2'):
-        """
-        based on https://github.com/hannshu/st_datasets/blob/master/utils/preprocess.py
-        """
-        coor = pd.DataFrame(features_np)
-        if (radius):
-            nbrs = NearestNeighbors(radius=radius, metric=distance_metrics).fit(coor)
-            _, indices = nbrs.radius_neighbors(coor, return_distance=True)
-        else:
-            nbrs = NearestNeighbors(n_neighbors=knears + 1, metric=distance_metrics).fit(coor)
-            _, indices = nbrs.kneighbors(coor)
-
-        edge_list = np.array([[i, j] for i, sublist in enumerate(indices) for j in sublist])
-        return edge_list
+        self.mutual = mutual
+        self.add_self_loop = add_self_loop
 
     def __call__(self, data):
         """Builds a DGL graph from an AnnData object.
 
         Args:
-            adata: The AnnData object containing features, labels, and splits.
-            ref_adata_name: Name for the dataset (used if needed later).
-            knn_num: Number of nearest neighbors for graph construction.
-            distance_metrics: Distance metric for KNN.
-            ignore_first: If True, sets label 0 to -1.
+            data: The data object containing features, labels, and splits.
 
         Returns:
             dgl.DGLGraph: A DGL graph with node features ('feat'), labels ('label'),
@@ -90,22 +73,52 @@ class HeteronetGraph(BaseTransform):
         if self.ignore_first:
             labels[labels == 0] = -1  # Apply ignore_first logic
 
-        # 3. Build Edges using the provided build_graph function
-        # Note: DGL also has dgl.knn_graph, which could be an alternative
-        edge_list_np = self.build_graph(features_np, knears=self.knn_num, distance_metrics=self.distance_metrics)
-        if edge_list_np.shape[0] == 0:
-            # Create an empty graph if no edges
+        # 3. Build Edges using DGL's native KNN function for better performance
+        if num_nodes <= 1:
+            # Handle edge case with insufficient nodes
             src = torch.tensor([], dtype=torch.long)
             dst = torch.tensor([], dtype=torch.long)
         else:
-            # DGL expects source and destination node tensors
-            edge_list_tensor = torch.tensor(edge_list_np.T, dtype=torch.long)
-            src, dst = edge_list_tensor[0], edge_list_tensor[1]
+            # Use DGL's optimized KNN function instead of full distance matrix computation
+            # Convert features to tensor if needed
+            features_tensor = features if isinstance(features, torch.Tensor) else torch.tensor(features_np, dtype=torch.float32)
+            
+            # Use DGL's KNN graph construction for better performance
+            g_knn = dgl.knn_graph(features_tensor, k=self.knn_num, algorithm='bruteforce-blas')
+            src_knn, dst_knn = g_knn.edges()
+
+            # Apply mutual KNN filtering if requested
+            if self.mutual:
+                # Find mutual nearest neighbors
+                # Create bidirectional edge mask
+                edges_set = set(zip(src_knn.tolist(), dst_knn.tolist()))
+                mutual_edges = []
+                
+                for i in range(len(src_knn)):
+                    u, v = src_knn[i].item(), dst_knn[i].item()
+                    # Check if the reverse edge exists
+                    if (v, u) in edges_set:
+                        mutual_edges.append(i)
+                
+                if mutual_edges:
+                    src = src_knn[mutual_edges]
+                    dst = dst_knn[mutual_edges]
+                else:
+                    # If no mutual edges exist, fall back to regular KNN
+                    src = src_knn
+                    dst = dst_knn
+            else:
+                src = src_knn
+                dst = dst_knn
 
         # 4. Create DGL Graph
         g = dgl.graph((src, dst), num_nodes=num_nodes)
 
-        # 5. Add Node Features and Labels
+        # 5. Add self-loops if requested
+        if self.add_self_loop:
+            g = dgl.add_self_loop(g)
+
+        # 6. Add Node Features and Labels
         g.ndata['feat'] = features
         g.ndata['label'] = labels
         if batchs is not None:
@@ -126,6 +139,7 @@ def get_preprocessing_pipeline(log_level: LogLevel = "INFO"):
         transforms.append(HeteronetGraph())
         transforms.append(SetConfig({"label_channel": "cell_type"}))
         return Compose(*transforms, log_level=log_level)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_dataset", nargs="+", type=int, default=[1759], help="Testing dataset IDs")
@@ -178,12 +192,17 @@ if __name__ == "__main__":
     runs = args.num_runs
     results = []
     inner_scores = []
+    times = []  # 新增：用于记录每次运行的时间
+    
     if args.gpu == -1:
         device = torch.device("cpu")
     else:
         device = torch.device("cuda:" + str(args.gpu)) if torch.cuda.is_available() else torch.device("cpu")
     eval_func = eval_acc
+    
     for run in range(runs):
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
         set_seed(args.seed + run)
         dataloader = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
                                                train_dataset=args.train_dataset, data_dir=args.data_dir,
@@ -237,10 +256,22 @@ if __name__ == "__main__":
             # test_idx=dataset_ind.splits['test']
             test_score = model.score(dataset_ind, dataset_ind.y, data.test_idx)
             inner_score = model.score(dataset_ind, dataset_ind.y, data.train_idx)
+            
         results.append(test_score)
         inner_scores.append(inner_score)
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"Run {run+1} - test_score: {test_score:.4f}, time: {run_time:.2f}s")  # 新增：打印单次运行时间和得分
+
+    print(f"scHeteroNet {args.species} {args.tissue} {args.test_dataset}:")
+    # 修改：将 results 作为 scores 列表打印，加入 times，以供 evaluator 捕获
+    print(f"scores:{results},inner_scores:{inner_scores},times:{times}")
     print(f"mean_score: {np.mean(results):.5f} +/- {np.std(results):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
 
 #TODO test_score is true delete odd test以及其他评估方法，再次测试，然后将valid等和其他算法保持一致。
 """

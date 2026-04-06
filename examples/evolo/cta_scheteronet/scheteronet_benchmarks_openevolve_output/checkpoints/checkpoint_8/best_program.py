@@ -1,4 +1,5 @@
 import argparse
+import time  # 新增：导入 time 模块
 from typing import Optional
 
 import dgl
@@ -34,23 +35,94 @@ from dance.utils import set_seed, sub_data
 class HeteronetGraph(BaseTransform):
 
     def __init__(self, knn_num: int = 5, distance_metrics: str = 'l2', random_state: int = 0,
+                 mutual: bool = True, add_self_loop: bool = True, threshold: Optional[float] = None,
                  channel: Optional[str] = None, channel_type: Optional[str] = "X", ignore_first: bool = False,
-                 mutual: bool = True, add_self_loop: bool = True, **kwargs):
+                 **kwargs):
         super().__init__(**kwargs)
         self.knn_num = knn_num
         self.distance_metrics = distance_metrics
         self.random_state = random_state
+        self.mutual = mutual
+        self.add_self_loop = add_self_loop
+        self.threshold = threshold  # Distance threshold for edge pruning
         self.channel = channel
         self.ignore_first = ignore_first
         self.channel_type = channel_type
-        self.mutual = mutual
-        self.add_self_loop = add_self_loop
+
+    def _compute_mutual_knn_indices(self, features_tensor, k, threshold=None):
+        """Computes mutual KNN indices for more robust graph construction."""
+        # Use DGL's built-in KNN function for efficiency
+        g_knn = dgl.knn_graph(features_tensor, k, algorithm='bruteforce-blas')
+        src, dst = g_knn.edges()
+
+        if self.mutual:
+            # Efficient mutual KNN computation using tensor operations
+            num_nodes = features_tensor.shape[0]
+            
+            # Create CSR-like sparse matrix for neighbor lookups
+            row_indices = src
+            col_indices = dst
+            
+            # For each edge (u,v), check if (v,u) also exists
+            edge_pairs = torch.stack([src, dst], dim=1)
+            reversed_edge_pairs = torch.stack([dst, src], dim=1)
+            
+            # Sort both edge sets to efficiently find mutual neighbors
+            sorted_indices = torch.argsort(row_indices)
+            sorted_row_indices = row_indices[sorted_indices]
+            sorted_col_indices = col_indices[sorted_indices]
+            
+            # Create a map of each node to its neighbors for mutual checking
+            node_to_neighbors = {}
+            for i in range(len(sorted_row_indices)):
+                u = sorted_row_indices[i].item()
+                v = sorted_col_indices[i].item()
+                if u not in node_to_neighbors:
+                    node_to_neighbors[u] = set()
+                node_to_neighbors[u].add(v)
+            
+            # Find mutual neighbors
+            mutual_src_list = []
+            mutual_dst_list = []
+            
+            for u in node_to_neighbors:
+                neighbors = node_to_neighbors[u]
+                for v in neighbors:
+                    # Check if u is also in v's neighbors (mutual)
+                    if u in node_to_neighbors.get(v, set()):
+                        mutual_src_list.append(u)
+                        mutual_dst_list.append(v)
+            
+            if mutual_src_list:
+                src = torch.tensor(mutual_src_list, dtype=torch.long)
+                dst = torch.tensor(mutual_dst_list, dtype=torch.long)
+        
+        # Apply distance threshold if provided
+        if threshold is not None and len(src) > 0:
+            # Calculate distances for current edges
+            coords_selected = features_tensor[src]
+            neighbor_coords = features_tensor[dst]
+            distances = torch.sqrt(torch.sum((coords_selected - neighbor_coords) ** 2, dim=1))
+            
+            # Keep only edges within threshold
+            mask = distances <= threshold
+            src = src[mask]
+            dst = dst[mask]
+        
+        return src, dst
 
     def __call__(self, data):
         """Builds a DGL graph from an AnnData object.
 
         Args:
-            data: The data object containing features, labels, and splits.
+            adata: The AnnData object containing features, labels, and splits.
+            ref_adata_name: Name for the dataset (used if needed later).
+            knn_num: Number of nearest neighbors for graph construction.
+            distance_metrics: Distance metric for KNN.
+            mutual: Whether to use mutual KNN for more robust connections.
+            add_self_loop: Whether to add self loops to preserve original features.
+            threshold: Distance threshold to prune noisy edges.
+            ignore_first: If True, sets label 0 to -1.
 
         Returns:
             dgl.DGLGraph: A DGL graph with node features ('feat'), labels ('label'),
@@ -61,7 +133,18 @@ class HeteronetGraph(BaseTransform):
         adata = data.data
         # 1. Extract Features
         features_np = data.get_feature(return_type="numpy", channel=self.channel, channel_type=self.channel_type)
-        features = torch.as_tensor(features_np, dtype=torch.float32)  # Ensure float32 common for features
+        
+        # Apply biologically informed convex combination of gene embeddings if available
+        # Based on cta_scdeepsort reference: fuse direct cell-level TruncatedSVD embeddings 
+        # with weighted gene-PCA embeddings using biologically informed convex combination (0.6/0.4)
+        if hasattr(adata, 'obsm') and 'X_pca' in adata.obsm.keys():
+            pca_features = adata.obsm['X_pca']
+            # Convex combination of original features and PCA features
+            combined_features = 0.6 * features_np + 0.4 * pca_features
+            features = torch.as_tensor(combined_features, dtype=torch.float32)
+        else:
+            features = torch.as_tensor(features_np, dtype=torch.float32)  # Ensure float32 common for features
+        
         num_nodes = features.shape[0]
 
         # 2. Extract Labels
@@ -74,48 +157,23 @@ class HeteronetGraph(BaseTransform):
         if self.ignore_first:
             labels[labels == 0] = -1  # Apply ignore_first logic
 
-        # 3. Build Edges using DGL's native knn_graph for better performance
-        if self.knn_num > 0:
-            # Create KNN graph using DGL's native function
-            g_knn = dgl.knn_graph(features, k=self.knn_num, algorithm='bruteforce-blas', dist=self.distance_metrics)
-            
-            if self.mutual:
-                # Create mutual KNN by ensuring bidirectional connectivity
-                # Convert the knn graph to bidirectional edges
-                src, dst = g_knn.edges()
-                
-                # Find mutual nearest neighbors
-                # For each edge (i,j), check if there's also edge (j,i) in the knn graph
-                edge_pairs = set(zip(src.tolist(), dst.tolist()))
-                
-                # Keep only mutual edges
-                mutual_src_list = []
-                mutual_dst_list = []
-                
-                for s, d in zip(src.tolist(), dst.tolist()):
-                    if (d, s) in edge_pairs:  # Check if reverse edge exists
-                        mutual_src_list.append(s)
-                        mutual_dst_list.append(d)
-                        
-                if len(mutual_src_list) > 0:
-                    src_tensor = torch.tensor(mutual_src_list, dtype=torch.long)
-                    dst_tensor = torch.tensor(mutual_dst_list, dtype=torch.long)
-                    g = dgl.graph((src_tensor, dst_tensor), num_nodes=num_nodes)
-                else:
-                    # If no mutual edges found, fall back to regular knn
-                    g = g_knn
-            else:
-                g = g_knn
-        else:
-            # If no knn, create an empty graph
-            g = dgl.graph((torch.tensor([], dtype=torch.long), torch.tensor([], dtype=torch.long)), 
-                         num_nodes=num_nodes)
+        # 3. Build Edges using mutual KNN for more robust graph
+        src, dst = self._compute_mutual_knn_indices(features, self.knn_num, self.threshold)
 
-        # 4. Add Self-Loops to improve information propagation
+        # Handle case where no edges exist after mutual KNN and threshold
+        if len(src) == 0:
+            # Create minimal graph with self loops only
+            src = torch.arange(num_nodes, dtype=torch.long)
+            dst = torch.arange(num_nodes, dtype=torch.long)
+
+        # 4. Create DGL Graph
+        g = dgl.graph((src, dst), num_nodes=num_nodes)
+        
+        # 5. Add self-loops if specified
         if self.add_self_loop:
             g = dgl.add_self_loop(g)
 
-        # 5. Add Node Features and Labels
+        # 6. Add Node Features and Labels
         g.ndata['feat'] = features
         g.ndata['label'] = labels
         if batchs is not None:
@@ -136,6 +194,7 @@ def get_preprocessing_pipeline(log_level: LogLevel = "INFO"):
         transforms.append(HeteronetGraph())
         transforms.append(SetConfig({"label_channel": "cell_type"}))
         return Compose(*transforms, log_level=log_level)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_dataset", nargs="+", type=int, default=[1759], help="Testing dataset IDs")
@@ -188,12 +247,17 @@ if __name__ == "__main__":
     runs = args.num_runs
     results = []
     inner_scores = []
+    times = []  # 新增：用于记录每次运行的时间
+    
     if args.gpu == -1:
         device = torch.device("cpu")
     else:
         device = torch.device("cuda:" + str(args.gpu)) if torch.cuda.is_available() else torch.device("cpu")
     eval_func = eval_acc
+    
     for run in range(runs):
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
         set_seed(args.seed + run)
         dataloader = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
                                                train_dataset=args.train_dataset, data_dir=args.data_dir,
@@ -247,10 +311,22 @@ if __name__ == "__main__":
             # test_idx=dataset_ind.splits['test']
             test_score = model.score(dataset_ind, dataset_ind.y, data.test_idx)
             inner_score = model.score(dataset_ind, dataset_ind.y, data.train_idx)
+            
         results.append(test_score)
         inner_scores.append(inner_score)
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"Run {run+1} - test_score: {test_score:.4f}, time: {run_time:.2f}s")  # 新增：打印单次运行时间和得分
+
+    print(f"scHeteroNet {args.species} {args.tissue} {args.test_dataset}:")
+    # 修改：将 results 作为 scores 列表打印，加入 times，以供 evaluator 捕获
+    print(f"scores:{results},inner_scores:{inner_scores},times:{times}")
     print(f"mean_score: {np.mean(results):.5f} +/- {np.std(results):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
 
 #TODO test_score is true delete odd test以及其他评估方法，再次测试，然后将valid等和其他算法保持一致。
 """

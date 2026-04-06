@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import time  # 新增：导入 time 模块
 from pathlib import Path
 from typing import Literal
 
@@ -299,7 +300,7 @@ class NeighborGraph(BaseTransform):
 
         return data
      
-          
+         
 def get_preprocessing_pipeline(morph_feat_dim: int = 50, sme_feat_dim: int = 50, pca_feat_dim: int = 10,
                             nbrs_pcs: int = 10, n_neighbors: int = 10, device: str = "cpu",
                             log_level: LogLevel = "INFO", crop_size=10, target_size=230):
@@ -341,8 +342,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     scores = []
     inner_scores = []
+    times = []  # 新增：用于记录每次运行的时间
+
     for seed in range(args.seed, args.seed + args.num_runs):
-        set_seed(args.seed)
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
+        set_seed(seed)  # 修正：之前是 args.seed，会导致每次跑出来的随机性相同，这里改成跟随循环变量 seed
 
         # Initialize model and get model specific preprocessing pipeline
         if args.mode == "kmeans":
@@ -373,10 +378,19 @@ if __name__ == "__main__":
             "davies_bouldin": davies_bouldin_score(x.toarray(), pred)
         }))
         scores.append(score)
-        print(f"ARI: {score:.4f}")
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"ARI: {score:.4f}, time: {run_time:.2f}s")  # 修改：同时输出得分与时间
+
     print(f"STAGATE {args.sample_number}:")
+    # 修改：加入 times 列表，以供 evaluator 捕获
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
         
 
 """ To reproduce stlearn on other samples, please refer to command lines belows:

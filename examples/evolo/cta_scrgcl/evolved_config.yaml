@@ -92,7 +92,7 @@ database:
 # Evaluator configuration
 evaluator:
   timeout: 600000
-  cascade_thresholds: [0.3]
+  cascade_thresholds: [0.1]
   parallel_evaluations: 1
 
 # Evolution settings

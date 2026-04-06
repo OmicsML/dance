@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import time  # 新增：导入 time 模块
 from pathlib import Path
 from typing import Literal
 
@@ -55,7 +56,7 @@ class MorphologyFeatureCNN(BaseTransform):
     def __init__(self, *, model_name: str = "resnet50", n_components: int = 50, random_state: int = 0,
                  crop_size: int = 20, target_size: int = 299, device: str = "cpu",
                  channels: Sequence[str] = ("spatial_pixel", "image"), channel_types: Sequence[str] = ("obsm", "uns"),
-                 batch_size: int = 64, **kwargs):
+                 batch_size: int = 32, **kwargs):
         import torchvision as tv
 
         super().__init__(**kwargs)
@@ -78,56 +79,41 @@ class MorphologyFeatureCNN(BaseTransform):
         self.model = getattr(tv.models, self.model_name)(pretrained=True)
         self.model.fc = torch.nn.Sequential()
         self.model = self.model.to(self.device)
-        self.model.eval()
 
     def _crop_and_process_batch(self, image, coords):
-        """Crop and process multiple patches in batch"""
-        crops = []
+        """Process a batch of coordinates efficiently."""
+        cs = self.crop_size
+        ts = self.target_size
+        batch_images = []
+
         for x, y in coords:
-            cs = self.crop_size
-            ts = self.target_size
-            
-            # Handle boundary conditions
-            x_start = max(0, int(x - cs))
-            x_end = int(x + cs)
-            y_start = max(0, int(y - cs))
-            y_end = int(y + cs)
-            
-            # Extract patch
-            patch = image[y_start:y_end, x_start:x_end, :]
-            
-            # Resize patch to target size
-            if patch.shape[0] > 0 and patch.shape[1] > 0:  # Check if valid patch
-                patch = cv2.resize(patch, (ts, ts))
-            else:
-                # Create black patch if crop fails
-                patch = np.zeros((ts, ts, 3), dtype=np.uint8)
-                
-            # Normalize
-            patch = (patch - self.mean) / self.std
-            patch = patch.transpose((2, 0, 1))
-            crops.append(patch)
-        
-        return torch.FloatTensor(np.stack(crops))
+            img = image[max(0, int(x - cs)):int(x + cs), max(0, int(y - cs)):int(y + cs), :]
+            img = cv2.resize(img, (ts, ts))
+            img = (img - self.mean) / self.std
+            img = img.transpose((2, 0, 1))
+            batch_images.append(img)
+
+        batch_tensor = torch.FloatTensor(batch_images).to(self.device)
+        return batch_tensor
 
     def __call__(self, data):
         xy_pixel = data.get_feature(return_type="numpy", channel=self.channels[0], channel_type=self.channel_types[0])
         image = data.get_feature(return_type="numpy", channel=self.channels[1], channel_type=self.channel_types[1])
 
-        # Process in batches for computational efficiency
+        # Process in batches for better efficiency
         features = []
         n_samples = len(xy_pixel)
         
-        for i in trange(0, n_samples, self.batch_size, desc="Extracting morphology features", 
-                       bar_format="{l_bar}{bar} [ time left: {remaining} ]"):
+        for i in range(0, n_samples, self.batch_size):
             batch_coords = xy_pixel[i:i+self.batch_size]
-            batch_images = self._crop_and_process_batch(image, batch_coords).to(self.device)
+            batch_tensor = self._crop_and_process_batch(image, batch_coords)
             
-            with torch.no_grad():  # Disable gradient computation for inference
-                batch_features = self.model(batch_images).detach().cpu().numpy()
-                features.extend(batch_features)
-        
+            with torch.no_grad():
+                batch_features = self.model(batch_tensor).view(len(batch_coords), -1).detach().cpu().numpy()
+            features.extend(batch_features)
+
         morth_feat = np.array(features)
+        
         if self.n_components > 0:
             pca = PCA(n_components=self.n_components, random_state=self.random_state)
             morth_feat = pca.fit_transform(morth_feat)
@@ -152,7 +138,7 @@ class SMEFeature(BaseTransform):
 
     """
 
-    def __init__(self, n_neighbors: int = 5, n_components: int = 50, random_state: int = 0, *,
+    def __init__(self, n_neighbors: int = 3, n_components: int = 50, random_state: int = 0, *,
                  channels: Sequence[Optional[str]] = (None, "SMEGraph"),
                  channel_types: Sequence[Optional[str]] = (None, "obsp"), **kwargs):
         super().__init__(**kwargs)
@@ -167,29 +153,27 @@ class SMEFeature(BaseTransform):
         x = data.get_feature(return_type="numpy", channel=self.channels[0], channel_type=self.channel_types[0])
         adj = data.get_feature(return_type="numpy", channel=self.channels[1], channel_type=self.channel_types[1])
 
-        # Vectorized operation using sparse matrix operations to efficiently calculate neighbor imputation
-        num_samples, num_genes = x.shape
-        
-        # Find top-k neighbors for each sample
+        # Use top-k neighbors to create a sparse adjacency matrix
+        n_samples = adj.shape[0]
         top_k_indices = np.argpartition(adj, -self.n_neighbors, axis=1)[:, -self.n_neighbors:]
         top_k_values = np.take_along_axis(adj, top_k_indices, axis=1)
         
-        # Normalize weights to sum to 1 for each sample
-        sums = top_k_values.sum(axis=1, keepdims=True)
-        sums[sums == 0] = 1  # Prevent division by zero
-        normalized_weights = top_k_values / sums
+        # Normalize the weights for each sample
+        top_k_weights = np.zeros_like(adj)
+        rows = np.repeat(np.arange(n_samples), self.n_neighbors)
+        cols = top_k_indices.flatten()
+        vals = top_k_values.flatten()
+        top_k_weights[rows, cols] = vals
         
-        # Create a result array for imputed values
-        imputed = np.zeros_like(x)
+        # Normalize weights for each row
+        row_sums = top_k_weights.sum(axis=1)
+        mask = row_sums > 0
+        top_k_weights[mask] /= row_sums[mask, np.newaxis]
         
-        # Efficiently compute weighted averages using broadcasting
-        for i in range(num_samples):
-            neighbor_indices = top_k_indices[i]
-            neighbor_weights = normalized_weights[i, :, np.newaxis]  # Add dimension for broadcasting
-            neighbor_values = x[neighbor_indices]
-            imputed[i] = np.sum(neighbor_weights * neighbor_values, axis=0)
-
+        # Compute imputed values using matrix multiplication
+        imputed = top_k_weights @ x
         sme_feat = (x + imputed) / 2
+        
         if self.n_components > 0:
             sme_feat = normalize(sme_feat, mode="standardize", axis=0)
             pca = PCA(n_components=self.n_components, random_state=self.random_state)
@@ -254,12 +238,14 @@ class CellPCA(BaseTransform):
 class SMEGraph(BaseTransform):
     """Spatial Morphological gene Expression graph."""
 
-    def __init__(self, radius: float = 3, *,
+    def __init__(self, radius: float = 3, alpha: float = 0.5, beta: float = 0.3, *,
                  channels: Sequence[str] = ("spatial", "spatial_pixel", "MorphologyFeatureCNN", "CellPCA"),
                  channel_types: Sequence[str] = ("obsm", "obsm", "obsm", "obsm"), **kwargs):
         super().__init__(**kwargs)
 
         self.radius = radius
+        self.alpha = alpha  # Weight for spatial proximity
+        self.beta = beta    # Weight for morphological similarity
         self.channels = channels
         self.channel_types = channel_types
 
@@ -273,18 +259,23 @@ class SMEGraph(BaseTransform):
         reg_y = LinearRegression().fit(xy[:, 1:2], xy_pixel[:, 1:2])
         unit = np.sqrt(reg_x.coef_**2 + reg_y.coef_**2)
 
-        # Calculate pairwise distances
+        # Calculate distances
         pdist = pairwise_distances(xy_pixel, metric="euclidean")
-        
-        # Create adjacency matrices for each modality
         adj_p = np.where(pdist >= self.radius * unit, 0, 1)
+        
         adj_m = (1 - pairwise_distances(morph_feat, metric="cosine")).clip(0)
         adj_g = 1 - pairwise_distances(gene_feat, metric="correlation")
         
-        # Use weighted combination instead of multiplicative to prevent over-sparsification
-        alpha, beta, gamma = 0.4, 0.3, 0.3  # Adjusted weights
-        adj = alpha * adj_p + beta * adj_m + gamma * adj_g
-        adj = np.clip(adj, 0, 1)  # Ensure values are in [0,1]
+        # Use a weighted combination instead of strict multiplication
+        adj = self.alpha * adj_p + (1 - self.alpha) * (self.beta * adj_m + (1 - self.beta) * adj_g)
+        
+        # Apply threshold to keep top-k connections per node
+        k = int(min(10, adj.shape[0] * 0.1))  # Use 10% of nodes or 10, whichever is smaller
+        for i in range(adj.shape[0]):
+            top_k_indices = np.argpartition(adj[i], -k)[-k:]
+            mask = np.ones(adj.shape[1], dtype=bool)
+            mask[top_k_indices] = False
+            adj[i, mask] = 0
 
         data.data.obsp[self.out] = adj
         
@@ -339,19 +330,19 @@ class NeighborGraph(BaseTransform):
 
         return data
      
-          
-def get_preprocessing_pipeline(morph_feat_dim: int = 50, sme_feat_dim: int = 50, pca_feat_dim: int = 50,
-                            nbrs_pcs: int = 50, n_neighbors: int = 15, device: str = "cpu",
-                            log_level: LogLevel = "INFO", crop_size=15, target_size=224):
+         
+def get_preprocessing_pipeline(morph_feat_dim: int = 50, sme_feat_dim: int = 50, pca_feat_dim: int = 10,
+                            nbrs_pcs: int = 10, n_neighbors: int = 10, device: str = "cpu",
+                            log_level: LogLevel = "INFO", crop_size=10, target_size=230):
     return Compose(
         AnnDataTransform(sc.pp.filter_genes, min_cells=1),
         AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
         AnnDataTransform(sc.pp.log1p),
         MorphologyFeatureCNN(n_components=morph_feat_dim, device=device, crop_size=crop_size,
-                                target_size=target_size, batch_size=64),
+                                target_size=target_size, batch_size=32),
         CellPCA(n_components=pca_feat_dim),
-        SMEGraph(),
-        SMEFeature(n_components=sme_feat_dim, n_neighbors=5),
+        SMEGraph(alpha=0.4, beta=0.3),
+        SMEFeature(n_components=sme_feat_dim),
         NeighborGraph(n_neighbors=n_neighbors, n_pcs=nbrs_pcs, channel="SMEFeature"),
         SetConfig({
             "feature_channel": "NeighborGraph",
@@ -381,8 +372,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     scores = []
     inner_scores = []
+    times = []  # 新增：用于记录每次运行的时间
+
     for seed in range(args.seed, args.seed + args.num_runs):
-        set_seed(args.seed)
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
+        set_seed(seed)  # 修正：之前是 args.seed，会导致每次跑出来的随机性相同，这里改成跟随循环变量 seed
 
         # Initialize model and get model specific preprocessing pipeline
         if args.mode == "kmeans":
@@ -413,10 +408,19 @@ if __name__ == "__main__":
             "davies_bouldin": davies_bouldin_score(x.toarray(), pred)
         }))
         scores.append(score)
-        print(f"ARI: {score:.4f}")
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"ARI: {score:.4f}, time: {run_time:.2f}s")  # 修改：同时输出得分与时间
+
     print(f"STAGATE {args.sample_number}:")
+    # 修改：加入 times 列表，以供 evaluator 捕获
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
         
 
 """ To reproduce stlearn on other samples, please refer to command lines belows:

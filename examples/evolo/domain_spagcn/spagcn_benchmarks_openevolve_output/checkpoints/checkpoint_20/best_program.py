@@ -1,4 +1,5 @@
 import argparse
+import time  # 新增：导入 time 模块
 
 import numpy as np
 import scanpy as sc
@@ -16,61 +17,54 @@ from dance.utils import set_seed,sub_data
 from dance.utils.metrics import calculate_unified_scores, resolve_score_func
 from dance.typing import Sequence,Optional
 import numba
-import numpy as np
 import torch
 
 # EVOLVE-BLOCK-START
-import scipy.spatial.distance as ssd
-from sklearn.metrics.pairwise import pairwise_distances
-from skimage.util import view_as_windows
-import warnings
-
-@numba.jit("f4(f4[:], f4[:])", nopython=True)
+@numba.njit("f4(f4[:], f4[:])")
 def euclidean_distance(t1, t2):
-    # Optimized vectorized distance calculation
-    sum_sq = 0.0
+    sum = 0
     for i in range(t1.shape[0]):
-        diff = t1[i] - t2[i]
-        sum_sq += diff * diff
-    return np.sqrt(sum_sq)
+        sum += (t1[i] - t2[i])**2
+    return np.sqrt(sum)
 
 
-@numba.jit("f4(f4[:], f4[:])", nopython=True)
+@numba.njit("f4(f4[:], f4[:])")
 def pearson_distance(a, b):
-    # Improved numerical stability for pearson distance
-    n = len(a)
-    if n < 2:
-        return 0.0
-    
-    # Avoid division by zero
-    a_avg = np.sum(a) / n
-    b_avg = np.sum(b) / n
-    
-    # Calculate covariance and variances
-    cov_ab = 0.0
-    var_a = 0.0
-    var_b = 0.0
-    
-    for i in range(n):
-        diff_a = a[i] - a_avg
-        diff_b = b[i] - b_avg
-        cov_ab += diff_a * diff_b
-        var_a += diff_a * diff_a
-        var_b += diff_b * diff_b
-    
-    # Handle zero variance cases
-    if var_a == 0 or var_b == 0:
-        return 1.0 if var_a != var_b else 0.0
-        
-    sq = np.sqrt(var_a * var_b)
-    if sq == 0:
-        return 1.0
-    
+    a_avg = np.sum(a) / len(a)
+    b_avg = np.sum(b) / len(b)
+    cov_ab1 = [x - a_avg for x in a]
+    cov_ab2 = [y - b_avg for y in b]
+    cov_ab = np.sum(np.array([cov_ab1[i] * cov_ab2[i] for i in range(len(cov_ab1))]))
+    sq = (np.sum(np.array([(x - a_avg)**2 for x in a])) * np.sum(np.array([(x - b_avg)**2 for x in b])))**0.5
     corr_factor = cov_ab / sq
-    return 1.0 - corr_factor  # best correlation: 0, no correlation: 1, best anti correlation: 2
+    return 1 - corr_factor  # best correlation: 0, no correlation: 1, best anti correlation: 2
 
 
-@numba.jit("f4(f4[:], f4[:])", nopython=True)
+@numba.njit("f4[:](f4[:])")
+def mean_rank_data(x):
+    """Rank data and take mean rank for ties.
+
+    See
+    https://github.com/scipy/scipy/blob/5e4a5e3785f79dd4e8930eed883da89958860db2/scipy/stats/_stats_py.py#L10123
+
+    """
+    sorter = np.argsort(x, kind="quicksort")
+    inv = np.empty(sorter.size, dtype=np.intp)
+    for i, j in enumerate(sorter):
+        inv[j] = i
+
+    arr = x[sorter]
+    obs = np.concatenate((np.array([True]), arr[1:] != arr[:-1]))
+    dense = obs.cumsum()[inv]
+
+    count = np.concatenate((np.nonzero(obs)[0].astype(np.float32), np.array([obs.size])))
+    res = np.empty(obs.size, dtype=np.float32)
+    for i in range(res.size):
+        res[i] = (count[dense[i]] + count[dense[i] - 1] + 1) / 2
+    return res
+
+
+@numba.njit("f4(f4[:], f4[:])")
 def spearman_distance(x, y):
     """The Spearman rank correlation is used to evaluate if the relationship between two
     variables, X and Y is monotonic.
@@ -81,118 +75,30 @@ def spearman_distance(x, y):
     """
     if len(x) != len(y):
         raise ValueError(f'X length {len(x)} does not match Y length {len(y)}')
-    
-    # Use a more efficient rank calculation
-    n = len(x)
-    if n < 2:
-        return 0.0
-    
-    # Create indices and sort by values
-    indices_x = np.argsort(x)
-    indices_y = np.argsort(y)
-    
-    # Compute ranks
-    ranks_x = np.empty(n, dtype=np.float32)
-    ranks_y = np.empty(n, dtype=np.float32)
-    
-    # Handle ties properly
-    current_rank = 1
-    for i in range(n):
-        if i > 0 and x[indices_x[i]] != x[indices_x[i-1]]:
-            current_rank = i + 1
-        ranks_x[indices_x[i]] = current_rank
-    
-    current_rank = 1
-    for i in range(n):
-        if i > 0 and y[indices_y[i]] != y[indices_y[i-1]]:
-            current_rank = i + 1
-        ranks_y[indices_y[i]] = current_rank
-    
-    # Calculate Pearson distance on ranks
-    return pearson_distance(ranks_x, ranks_y)
+    x_ranks = mean_rank_data(x)
+    y_ranks = mean_rank_data(y)
+    return pearson_distance(x_ranks, y_ranks)  # best correlation: 0, no correlation: 1, best anti correlation: 2
 
 
-def fast_pairwise_distance(X, metric='euclidean'):
-    """Fast pairwise distance computation using optimized scipy functions."""
-    # For large matrices, compute only the upper triangular part and make symmetric
-    if X.shape[0] > 10000:
-        # Use sparse k-NN approach for very large datasets
-        return fast_sparse_pairwise_distance(X, metric)
-    
-    try:
-        # Use sklearn's optimized pairwise distances
-        if metric == 'euclidean':
-            return pairwise_distances(X, metric='euclidean', n_jobs=-1)
-        elif metric == 'pearson':
-            # For Pearson, we'll use a custom approach
-            return fast_pearson_distance(X)
-        elif metric == 'spearman':
-            return fast_spearman_distance(X)
-        else:
-            return pairwise_distances(X, metric=metric, n_jobs=-1)
-    except Exception:
-        # Fallback to basic implementation
-        return ssd.squareform(ssd.pdist(X, metric=metric))
-
-
-def fast_pearson_distance(X):
-    """Optimized Pearson distance calculation."""
-    n_samples = X.shape[0]
-    # Center the data
-    X_centered = X - np.mean(X, axis=0)
-    
-    # Compute correlations using matrix operations
-    cov_matrix = np.dot(X_centered.T, X_centered) / (n_samples - 1)
-    var_vector = np.diag(cov_matrix)
-    
-    # Handle zero variance case
-    var_vector[var_vector == 0] = 1.0
-    
-    # Compute correlation matrix
-    std_vector = np.sqrt(var_vector)
-    cor_matrix = cov_matrix / np.outer(std_vector, std_vector)
-    
-    # Convert to distance (1 - correlation)
-    dist_matrix = 1 - np.abs(cor_matrix)
-    
-    return dist_matrix
-
-
-def fast_spearman_distance(X):
-    """Optimized Spearman distance calculation."""
-    n_samples = X.shape[0]
-    # Rank each column
-    ranked_X = np.apply_along_axis(lambda x: np.argsort(np.argsort(x)), 0, X)
-    
-    # Apply same process as Pearson distance on ranked data
-    X_centered = ranked_X - np.mean(ranked_X, axis=0)
-    cov_matrix = np.dot(X_centered.T, X_centered) / (n_samples - 1)
-    var_vector = np.diag(cov_matrix)
-    var_vector[var_vector == 0] = 1.0
-    
-    std_vector = np.sqrt(var_vector)
-    cor_matrix = cov_matrix / np.outer(std_vector, std_vector)
-    
-    dist_matrix = 1 - np.abs(cor_matrix)
-    return dist_matrix
-
-
-def fast_sparse_pairwise_distance(X, metric='euclidean', k=10):
-    """Sparse k-NN approach for large datasets."""
-    from sklearn.neighbors import kneighbors_graph
-    import scipy.sparse as sp
-    
-    # Use k-nearest neighbors approach for memory efficiency
-    if metric == 'euclidean':
-        # Create sparse adjacency matrix with k nearest neighbors
-        knn_graph = kneighbors_graph(X, k, mode='connectivity', include_self=False)
-        # Convert to distance matrix with 1.0 for connected and 0.0 for unconnected
-        # Note: This is just an approximation - for precise distances we'd need to compute them
-        return knn_graph.toarray().astype(np.float32)
+DIST_FUNC_ID = ["euclidean_distance", "pearson_distance", "spearman_distance"]
+# XXX: parallel produce segfalt on M-chip Mac
+@numba.njit("f4[:,:](f4[:,:], u4)", parallel=True, nogil=True)
+def pairwise_distance(x, dist_func_id=0):
+    if dist_func_id == 0:  # Euclidean distance
+        dist = euclidean_distance
+    elif dist_func_id == 1:
+        dist = pearson_distance
+    elif dist_func_id == 2:
+        dist = spearman_distance
     else:
-        # For non-Euclidean distances, fall back to regular computation
-        return fast_pairwise_distance(X, metric)
+        raise ValueError("Unknown distance function ID")
 
+    n = x.shape[0]
+    mat = np.empty((n, n), dtype=np.float32)
+    for i in numba.prange(n):
+        for j in numba.prange(n):
+            mat[i][j] = dist(x[i], x[j])
+    return mat
 
 @register_preprocessor("graph", "spatial", overwrite=True)
 class SpaGCNGraph(BaseTransform):
@@ -223,94 +129,26 @@ class SpaGCNGraph(BaseTransform):
         xy_pixel = data.get_feature(return_type="numpy", channel=self.channels[1], channel_type=self.channel_types[1])
         img = data.get_feature(return_type="numpy", channel=self.channels[2], channel_type=self.channel_types[2])
         self.logger.info("Start calculating the adjacency matrix using the histology image")
-        
-        # Vectorized patch extraction using advanced indexing for better performance
+        g = np.zeros((xy.shape[0], 3))
         beta_half = round(self.beta / 2)
         x_lim, y_lim = img.shape[:2]
-        
-        # Get all pixel coordinates at once
-        x_pixels = xy_pixel[:, 0].astype(int)
-        y_pixels = xy_pixel[:, 1].astype(int)
-        
-        # Calculate bounds for all patches simultaneously
-        tops = np.clip(x_pixels - beta_half, 0, x_lim)
-        bottoms = np.clip(x_pixels + beta_half + 1, 0, x_lim)
-        lefts = np.clip(y_pixels - beta_half, 0, y_lim)
-        rights = np.clip(y_pixels + beta_half + 1, 0, y_lim)
-        
-        # Extract patches using vectorized operations
-        if len(img.shape) == 3:
-            # Handle RGB images - allocate space for RGB features
-            g = np.zeros((xy.shape[0], 3), dtype=np.float32)
-            
-            # Process each patch efficiently
-            for i in range(xy.shape[0]):
-                patch = img[tops[i]:bottoms[i], lefts[i]:rights[i]]
-                if patch.size > 0:
-                    g[i] = np.mean(patch, axis=(0, 1))
-                else:
-                    # Fallback to global mean if patch is empty
-                    g[i] = np.mean(img, axis=(0, 1))
-        else:
-            # Handle grayscale images
-            g = np.zeros((xy.shape[0], 1), dtype=np.float32)
-            for i in range(xy.shape[0]):
-                patch = img[tops[i]:bottoms[i], lefts[i]:rights[i]]
-                if patch.size > 0:
-                    g[i] = np.mean(patch)
-                else:
-                    g[i] = np.mean(img)
-        
-        # Apply adaptive resolution based on local density for better spatial clustering
-        # Calculate local density around each spot and adjust the spatial weights accordingly
-        if xy.shape[0] > 1:  # Only if we have multiple spots
-            # Calculate distances to nearby points to estimate local density
-            from sklearn.neighbors import NearestNeighbors
-            n_neighbors = min(10, xy.shape[0] - 1)  # Use fewer neighbors to avoid O(N^2) overhead
-            
-            nbrs = NearestNeighbors(n_neighbors=n_neighbors, metric='euclidean').fit(xy)
-            distances, indices = nbrs.kneighbors(xy)
-            
-            # Local density metric (inverse of average distance to neighbors)
-            local_density = 1.0 / (np.mean(distances, axis=1) + 1e-8)
-            
-            # Normalize density to influence the histology weight adaptively
-            density_factor = local_density / (np.mean(local_density) + 1e-8)
-            
-            # Adjust histology features based on local density adaptively
-            adaptive_g = g * density_factor.reshape(-1, 1)
-            
-            # Update g with adaptive features for better spatial clustering
-            g = adaptive_g
-        
-        # Enhanced feature extraction with variance and texture features
+        for i, (x_pixel, y_pixel) in enumerate(xy_pixel):
+            top = max(0, x_pixel - beta_half)
+            left = max(0, y_pixel - beta_half)
+            bottom = min(x_lim, x_pixel + beta_half + 1)
+            right = min(y_lim, y_pixel + beta_half + 1)
+            local_view = img[top:bottom, left:right]
+            g[i] = np.mean(local_view, axis=(0, 1))
         g_var = g.var(0)
         self.logger.info(f"Variances of c0, c1, c2 = {g_var}")
-        
-        # Enhanced z-coordinate calculation with numerical stability
-        if len(g_var) > 0 and np.sum(g_var) > 0:
-            z = (g * g_var).sum(1, keepdims=True) / g_var.sum()
-        else:
-            z = np.zeros((g.shape[0], 1))
-            
-        # Normalize z coordinate
-        if z.std() > 1e-10:  # Avoid division by zero
-            z = (z - z.mean()) / z.std()
-        else:
-            z = z - z.mean()
-            
+
+        z = (g * g_var).sum(1, keepdims=True) / g_var.sum()
+        z = (z - z.mean()) / z.std()
         z *= xy.std(0).max() * self.alpha
 
         xyz = np.hstack((xy, z)).astype(np.float32)
-        self.logger.info(f"Variances of x, y, z = {xyz.var(0)}")
-        
-        # Use optimized distance calculation with sparse matrix for large datasets
-        if xyz.shape[0] > 10000:
-            # Use sparse k-NN approach for large datasets to save memory
-            data.data.obsp[self.out] = fast_sparse_pairwise_distance(xyz, 'euclidean', k=min(20, xyz.shape[0]//100))
-        else:
-            # For smaller datasets, use full distance matrix with optimized implementation
-            data.data.obsp[self.out] = fast_pairwise_distance(xyz, 'euclidean')
+        self.logger.info(f"Varirances of x, y, z = {xyz.var(0)}")
+        data.data.obsp[self.out] = pairwise_distance(xyz, dist_func_id=0)
 
         return data
 
@@ -325,14 +163,7 @@ class SpaGCNGraph2D(BaseTransform):
 
     def __call__(self, data):
         x = data.get_feature(channel=self.channel, channel_type="obsm", return_type="numpy")
-        
-        # Add numerical stability check
-        if x.size == 0:
-            # Create empty matrix if no data
-            data.data.obsp[self.out] = np.zeros((0, 0), dtype=np.float32)
-        else:
-            # Use optimized distance calculation
-            data.data.obsp[self.out] = fast_pairwise_distance(x.astype(np.float32), 'euclidean')
+        data.data.obsp[self.out] = pairwise_distance(x.astype(np.float32), dist_func_id=0)
         return data
 
 # EVOLVE-BLOCK-END
@@ -380,7 +211,11 @@ if __name__ == "__main__":
 
     scores = []
     inner_scores = []
+    times = []  # 新增：用于记录每次运行的时间
+
     for seed in range(args.seed, args.seed + args.num_runs):
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
         set_seed(seed)
 
         # Initialize model and get model specific preprocessing pipeline
@@ -401,7 +236,7 @@ if __name__ == "__main__":
                                    lr=args.lr, epochs=args.epochs, max_run=args.max_run)
 
         model.fit((x, adj), init_spa=True, init="louvain", tol=args.tol, lr=args.lr, epochs=args.epochs,
-                                 res=res)
+                                   res=res)
         embed, pred = model.predict((x, adj), return_embed=True)
         score = model.default_score_func(y, pred)
         
@@ -416,14 +251,24 @@ if __name__ == "__main__":
             "calinski_harabasz": calinski_harabasz_score(embed, refined_pred),
             "davies_bouldin": davies_bouldin_score(embed, refined_pred)
         }))
-        print(f"ARI: {score:.4f}")
-
+        
         scores.append(score_refined)
-        print(f"ARI (refined): {score_refined:.4f}")
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"ARI: {score:.4f}")
+        print(f"ARI (refined): {score_refined:.4f}, time: {run_time:.2f}s")  # 修改：打印细化得分的同时输出运行时间
         print(data)
+
     print(f"SpaGCN {args.sample_number}:")
+    # 修改：加入 times 列表，以供 evaluator 捕获
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
+
 """ To reproduce SpaGCN on other samples, please refer to command lines belows:
 
 human dorsolateral prefrontal cortex sample 151673:

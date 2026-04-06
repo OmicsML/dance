@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 import torch
 import anndata
+import time  # 新增：导入 time 模块
 
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.transforms import Compose, NormalizeTotalLog1P, SetConfig
@@ -11,10 +12,7 @@ from dance.utils import set_seed, sub_data
 from dance.modules.single_modality.cell_type_annotation.scrgcl import scRGCLWrapper
 
 # Start
-import argparse
-import os
 import pandas as pd
-import numpy as np
 import anndata as ad
 import mygene
 import requests_cache
@@ -37,9 +35,8 @@ class StringDBGraph(BaseTransform):
     a reference network (e.g., STRING) and mapping it to the gene expression features.
 
     Features:
-    - Filters reference graph by score quantile or top-k neighbors.
+    - Filters reference graph by score quantile.
     - Maps Gene Symbols to Entrez IDs using MyGeneInfo.
-    - Creates weighted edges based on STRING confidence scores.
     - Adds self-loops to the graph.
     - Encodes cell type labels.
 
@@ -49,24 +46,18 @@ class StringDBGraph(BaseTransform):
         Path to the network CSV file (columns: node1, node2, score).
     thres : float
         Quantile threshold for network filtering (default: 0.99).
-    k_neighbors : int
-        Number of top neighbors to keep per node (default: None, use quantile only).
-    weight_scale : str
-        Method to scale edge weights ('minmax', 'softmax', or None for raw scores).
     species : str
         Species for gene mapping (e.g., 'human', 'mouse').
     out : str
         Key in `adata.uns` where the edge index will be stored.
     """
 
-    _DISPLAY_ATTRS: Tuple[str] = ('net_file', 'thres', 'k_neighbors', 'weight_scale', 'species')
+    _DISPLAY_ATTRS: Tuple[str] = ('net_file', 'thres', 'species')
 
     def __init__(
         self,
         net_file=os.path.join(DANCEPKGDIR, "metadata", "STRINGDB.graph.csv"),
         thres: float = 0.99,
-        k_neighbors: int = 10,
-        weight_scale: str = 'minmax',
         species: str = "human",
         out: str = "edge_index",
         log_level: LogLevel = "INFO"
@@ -74,53 +65,11 @@ class StringDBGraph(BaseTransform):
         super().__init__(out=out, log_level=log_level)
         self.net_file = net_file
         self.thres = thres
-        self.k_neighbors = k_neighbors
-        self.weight_scale = weight_scale
         self.species = species
-        self.out = out
+        self.out=out
         
         # Validate threshold
         assert 0 <= thres <= 1, "quantile should be a float value in [0,1]."
-        if weight_scale is not None:
-            assert weight_scale in ['minmax', 'softmax'], "weight_scale must be 'minmax', 'softmax', or None"
-
-    def _scale_weights(self, scores: np.ndarray, method: str = 'minmax') -> np.ndarray:
-        """Scale edge weights using specified method."""
-        if method == 'minmax':
-            min_score, max_score = scores.min(), scores.max()
-            if max_score == min_score:
-                return np.ones_like(scores)
-            return (scores - min_score) / (max_score - min_score)
-        elif method == 'softmax':
-            exp_scores = np.exp(scores - scores.max())  # Subtract max for numerical stability
-            return exp_scores / exp_scores.sum()
-        else:
-            return scores
-
-    def _apply_top_k_filter(self, df: pd.DataFrame, k: int) -> pd.DataFrame:
-        """Apply top-k filtering per node to create a more balanced graph."""
-        if k is None:
-            return df
-        
-        # Create both directions for undirected graph
-        df_bidir = pd.concat([
-            df[['node1', 'node2', 'score']],
-            df.rename(columns={'node1': 'node2', 'node2': 'node1'})[['node1', 'node2', 'score']]
-        ], ignore_index=True)
-        
-        # For each node, keep top-k highest scoring connections
-        result_edges = []
-        for node in df_bidir['node1'].unique():
-            node_edges = df_bidir[df_bidir['node1'] == node].nlargest(k, 'score')
-            result_edges.append(node_edges)
-        
-        if result_edges:
-            result_df = pd.concat(result_edges, ignore_index=True)
-            # Remove duplicates (bidirectional edges)
-            result_df = result_df.drop_duplicates(subset=['node1', 'node2'], keep='first')
-            return result_df
-        else:
-            return df
 
     def _add_remaining_self_loop(self, edge_df: pd.DataFrame, num_nodes: int, fill_value: float = 1.0) -> pd.DataFrame:
         """Adds self-loops (node_i, node_i) to nodes that don't have them."""
@@ -143,20 +92,21 @@ class StringDBGraph(BaseTransform):
         new_df = pd.DataFrame()
         new_df['node1'] = added_index
         new_df['node2'] = added_index
-        new_df['score'] = fill_value  # Use score column for self-loops
+        
+        if 'score' in edge_df.columns:
+            new_df['score'] = fill_value
             
         edge_df = pd.concat([edge_df, new_df], ignore_index=True)
         return edge_df
 
-    def _map_graph_to_genes(self, graph_df: pd.DataFrame, gene_list: List[str]) -> tuple:
+    def _map_graph_to_genes(self, graph_df: pd.DataFrame, gene_list: List[str]) -> np.ndarray:
         """
         Maps graph edges (Symbols/Entrez) to the indices of the provided gene_list.
-        Returns both edge index and edge weights.
         """
         # 1. Prepare Graph
         graph_edge_df = graph_df.copy()
-        graph_edge_df.columns = ['node1', 'node2', 'score']
-        graph_edge_df = graph_edge_df.astype({'node1': str, 'node2': str, 'score': float})
+        graph_edge_df.columns = ['node1', 'node2']
+        graph_edge_df = graph_edge_df.astype(str)
         
         # 2. Prepare MyGene Query
         symbol_to_idx_dict = {g.strip(): idx for idx, g in enumerate(gene_list)}
@@ -177,57 +127,41 @@ class StringDBGraph(BaseTransform):
             verbose=False
         )
         
-        # 3. Build Mapping (Symbol -> Index in gene_list)
-        symbol_to_index_dict = {}
+        # 3. Build Mapping (Entrez -> Index in gene_list)
+        entrez_to_index_dict = {}
         for item in res:
             if 'entrezgene' in item and 'query' in item:
+                entrez_id = str(item['entrezgene'])
                 original_symbol = item['query']
                 
                 if original_symbol in symbol_to_idx_dict:
                     idx = symbol_to_idx_dict[original_symbol]
-                    symbol_to_index_dict[original_symbol] = idx
-            # Also try direct symbol mapping as fallback
-            elif 'query' in item and item['query'] in symbol_to_idx_dict:
-                original_symbol = item['query']
-                idx = symbol_to_idx_dict[original_symbol]
-                symbol_to_index_dict[original_symbol] = idx
+                    entrez_to_index_dict[entrez_id] = idx
 
-        self.logger.info(f"Mapping complete: {len(symbol_to_idx_dict)} symbols mapped to {len(symbol_to_index_dict)} indices.")
+        self.logger.info(f"Mapping complete: {len(symbol_to_idx_dict)} symbols mapped to {len(entrez_to_index_dict)} Entrez IDs.")
         
         # 4. Apply Mapping
-        graph_edge_df['node1'] = graph_edge_df['node1'].map(symbol_to_index_dict)
-        graph_edge_df['node2'] = graph_edge_df['node2'].map(symbol_to_index_dict)
+        graph_edge_df['node1'] = graph_edge_df['node1'].map(entrez_to_index_dict)
+        graph_edge_df['node2'] = graph_edge_df['node2'].map(entrez_to_index_dict)
         
         # Remove edges where nodes weren't found in the gene list
-        graph_edge_df = graph_edge_df.dropna().astype({'node1': int, 'node2': int, 'score': float})
+        graph_edge_df = graph_edge_df.dropna().astype(int)
         
-        # 5. Apply top-k filtering if specified
-        if self.k_neighbors is not None and self.k_neighbors > 0:
-            graph_edge_df = self._apply_top_k_filter(graph_edge_df, self.k_neighbors)
-        
-        # 6. Scale weights if specified
-        if self.weight_scale is not None and len(graph_edge_df) > 0:
-            graph_edge_df['score'] = self._scale_weights(graph_edge_df['score'].values, self.weight_scale)
-        
-        # 7. Add Self Loops
+        # 5. Add Self Loops
         graph_edge_df = self._add_remaining_self_loop(
             graph_edge_df, 
             num_nodes=len(gene_list),
             fill_value=1.0
         )
         
-        # Return both edge index and weights
-        edge_index = graph_edge_df[['node1', 'node2']].values.T
-        edge_weights = graph_edge_df['score'].values if 'score' in graph_edge_df.columns else np.ones(len(graph_edge_df))
-        
-        return edge_index, edge_weights
+        return graph_edge_df.values
 
     def __call__(self, data: Data) -> Data:
         """
         Process the AnnData object: load graph, filter, map, and update adata.uns.
         """
-        self.logger.info(f"Processing data with threshold {self.thres}, k_neighbors={self.k_neighbors}, weight_scale={self.weight_scale}")
-        adata = data.data
+        self.logger.info(f"Processing data with threshold {self.thres}")
+        adata=data.data
         # 1. Load and Filter Network
         if not os.path.exists(self.net_file):
             raise FileNotFoundError(f"Network file not found: {self.net_file}")
@@ -243,15 +177,15 @@ class StringDBGraph(BaseTransform):
         
         # Quantile filtering
         cutoff_value = graph_df['score'].quantile(self.thres)
-        filtered_graph = graph_df.loc[graph_df['score'].ge(cutoff_value)]
+        filtered_graph = graph_df.loc[graph_df['score'].ge(cutoff_value), ['node1', 'node2']]
         
-        self.logger.info(f"Graph filtered. Retained {len(filtered_graph)} edges with score >= {cutoff_value:.4f}")
+        self.logger.info(f"Graph filtered. Retained edges with score >= {cutoff_value:.4f}")
 
         # 2. Extract Gene Names and Process Graph
         # Check for gene names in .var_names or .var.index
         gene_names = adata.var_names.tolist()
         
-        edge_index, edge_weights = self._map_graph_to_genes(filtered_graph, gene_names)
+        edge_index = self._map_graph_to_genes(filtered_graph, gene_names)
         
         # 3. Process Cell Labels (if 'cell_type' exists)
         if 'cell_type' in adata.obs:
@@ -273,11 +207,9 @@ class StringDBGraph(BaseTransform):
         # 4. Log statistics
         self.logger.info(f'Shape of expression matrix: {adata.shape}')
         self.logger.info(f'Shape of backbone network: {edge_index.shape}')
-        self.logger.info(f'Edge weights shape: {edge_weights.shape}')
 
         # 5. Save results to adata.uns
         adata.uns[self.out] = edge_index
-        adata.uns[f'{self.out}_weights'] = edge_weights  # Store edge weights
         adata.uns['thres'] = self.thres
         
         # If strict compatibility with `gen_data` output structure is required:
@@ -300,6 +232,7 @@ def get_preprocessing_pipeline(log_level="INFO",thres= 0.99, species= "human"):
             }),
             log_level=log_level,
         )
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_dataset", nargs="+", type=int, default=[138], help="Testing dataset IDs")
@@ -333,7 +266,11 @@ if __name__ == "__main__":
 
     scores = []
     inner_scores=[]
+    times = []  # 新增：用于记录每次运行的时间
+    
     for run in range(runs):
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
         set_seed(args.seed + run)
         with tempfile.TemporaryDirectory() as temp_dir:
             model = scRGCLWrapper(
@@ -347,7 +284,7 @@ if __name__ == "__main__":
             preprocessing_pipeline = get_preprocessing_pipeline(thres=args.quantile, species=args.species)
             # 1. Load Data using DANCE
             dataloader = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
-                                                species=args.species, tissue=args.tissue, val_size=args.val_size)
+                                               species=args.species, tissue=args.tissue, val_size=args.val_size)
             data = dataloader.load_data(transform=None, cache=args.cache)
             if args.obs_nums is not None:
                 sub_data(data.data,args.obs_nums)
@@ -393,8 +330,16 @@ if __name__ == "__main__":
             inner_score = model.score(x_val, y_val, score_func="acc")
             scores.append(score)
             inner_scores.append(inner_score)
-            print(f"Run {run+1} Score: {score:.4f}")
+            
+            end_time = time.time()  # 新增：记录单次循环的结束时间
+            run_time = end_time - start_time
+            times.append(run_time)  # 新增：保存耗时
+            
+            print(f"Run {run+1} Score: {score:.4f}, inner_score: {inner_score:.4f}, time: {run_time:.2f}s")  # 修改：加入内部分数和运行时间打印
 
     print(f"\nscRGCL {args.species} {args.tissue} Test Set {args.test_dataset}:")
+    # 修改：加入 times 列表，以供后续捕获
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间

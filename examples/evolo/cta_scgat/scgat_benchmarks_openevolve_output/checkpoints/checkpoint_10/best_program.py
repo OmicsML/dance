@@ -44,7 +44,7 @@ class scGATGraphTransform(BaseTransform):
     Supports labels in adata.obs (categorical) or adata.obsm (one-hot).
     """
 
-    _DISPLAY_ATTRS: Tuple[str] = ("label_column", "n_neighbors")
+    _DISPLAY_ATTRS: Tuple[str] = ("label_column", "n_neighbors", "use_pca_features", "n_components")
 
     def __init__(
         self,
@@ -78,38 +78,37 @@ class scGATGraphTransform(BaseTransform):
         self.logger.info("Starting GAT Graph Construction...")
         start_time = time.time()
 
-        # 1. Feature Engineering: Use PCA if available or perform PCA
+        # 1. Feature Engineering: Use PCA or highly variable genes
         self.logger.info("Processing features...")
         if self.use_pca_features and 'X_pca' in adata.obsm:
-            self.logger.info("Using existing PCA features...")
-            features = adata.obsm['X_pca'][:, :self.n_components].copy()
+            # Use existing PCA features
+            features = adata.obsm['X_pca'][:, :self.n_components]
+            self.logger.info(f"Using existing PCA features with {features.shape[1]} components")
         elif self.use_pca_features:
+            # Compute PCA features if not available
             self.logger.info("Computing PCA features...")
-            # Apply log transformation and scale
-            sc.pp.log1p(adata)
-            sc.pp.scale(adata)
-            
-            # Compute PCA with appropriate number of components
-            n_comps = min(self.n_components, adata.shape[1] - 1)
-            sc.tl.pca(adata, n_comps=n_comps)
-            features = adata.obsm['X_pca'][:, :self.n_components].copy()
+            sc.tl.pca(adata, n_comps=self.n_components)
+            features = adata.obsm['X_pca']
         else:
-            # Use raw gene expression with proper preprocessing
-            self.logger.info("Using raw gene expression features with preprocessing...")
+            # Use log-normalized gene expression with HVG selection
+            self.logger.info("Preparing gene expression features...")
+            if not adata.var_names.is_unique:
+                adata.var_names_make_unique()
+            sc.pp.normalize_total(adata, target_sum=1e4)
             sc.pp.log1p(adata)
+            sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
+            adata = adata[:, adata.var.highly_variable]
             sc.pp.scale(adata)
-            if sparse.issparse(adata.X):
-                features = adata.X.toarray()
-            else:
-                features = adata.X
-
+            features = adata.X
+            
         # 2. Compute Neighbors if missing
         if 'neighbors' not in adata.uns:
             self.logger.info(f"Computing neighbors (k={self.n_neighbors})...")
-            use_rep = 'X_pca' if self.use_pca_features and 'X_pca' in adata.obsm else 'X'
+            # Use PCA features when available for neighbor computation
+            use_rep = 'X_pca' if 'X_pca' in adata.obsm and self.use_pca_features else 'X'
             sc.pp.neighbors(adata, n_neighbors=self.n_neighbors, use_rep=use_rep)
 
-        # 3. Process Adjacency Matrix with edge pruning
+        # 3. Process Adjacency Matrix with optional pruning
         self.logger.info("Processing adjacency matrix...")
         if 'connectivities' in adata.uns['neighbors']:
             adj = adata.uns['neighbors']['connectivities']
@@ -119,19 +118,15 @@ class scGATGraphTransform(BaseTransform):
         else:
             raise ValueError("Could not find connectivities matrix in neighbors")
 
-        # Apply edge weight threshold if specified
+        # Prune weak edges if threshold is set
         if self.edge_weight_threshold > 0:
-            self.logger.info(f"Pruning edges with threshold {self.edge_weight_threshold}...")
-            adj = adj.copy()
             adj.data[adj.data < self.edge_weight_threshold] = 0
             adj.eliminate_zeros()
 
         # Add self-loops (A_hat = A + I)
         adj = adj + sparse.diags([1] * adata.shape[0]).tocsr()
 
-        # ---------------------------------------------------------
         # 4. Handle Labels (Modified for One-Hot in obsm)
-        # ---------------------------------------------------------
         self.logger.info(f"Processing label column: {self.label_column}")
         
         le = LabelEncoder()
@@ -165,89 +160,72 @@ class scGATGraphTransform(BaseTransform):
 
         self.logger.info(f"Encoded {len(le.classes_)} classes: {le.classes_}")
 
-        # ---------------------------------------------------------
-        # 5. Create Train/Val/Test Masks with proper defaults
+        # 5. Create Train/Val/Test Masks
         self.logger.info("Creating train/val/test splits...")
-        train_ratio = 0.8
-        val_ratio = 0.1
-
+        
+        # Simplified approach - use provided indices or create from scratch
+        train_indices = np.zeros(len(adata), dtype=bool)
+        val_indices = np.zeros(len(adata), dtype=bool)
+        test_indices = np.zeros(len(adata), dtype=bool)
+        
         # Check if indices are provided directly
-        if self.train_indices is not None or self.val_indices is not None or self.test_indices is not None:
-            self.logger.info("Using provided train/val/test indices...")
-            n_cells = len(adata)
+        if self.train_indices is not None:
+            train_indices[self.train_indices] = True
+        if self.val_indices is not None:
+            val_indices[self.val_indices] = True
+        if self.test_indices is not None:
+            test_indices[self.test_indices] = True
+            
+        # If no indices provided, create from data
+        if not (train_indices.any() or val_indices.any() or test_indices.any()):
+            if 'train_test_split' in adata.obs.columns:
+                train_indices = (adata.obs['train_test_split'] == 'train').values
+                test_indices = (adata.obs['train_test_split'] == 'test').values
+                val_indices = (adata.obs['train_test_split'] == 'val').values
 
-            # Convert indices to boolean masks
-            train_mask = np.zeros(n_cells, dtype=bool)
-            val_mask = np.zeros(n_cells, dtype=bool)
-            test_mask = np.zeros(n_cells, dtype=bool)
-
-            if self.train_indices is not None:
-                train_mask[self.train_indices] = True
-            if self.val_indices is not None:
-                val_mask[self.val_indices] = True
-            if self.test_indices is not None:
-                test_mask[self.test_indices] = True
-
-            train_indices = train_mask
-            val_indices = val_mask
-            test_indices = test_mask
-
-        elif 'train_test_split' in adata.obs.columns:
-            train_indices = (adata.obs['train_test_split'] == 'train').values
-            test_indices = (adata.obs['train_test_split'] == 'test').values
-            val_indices = (adata.obs['train_test_split'] == 'val').values
-
-            if not val_indices.any():
-                self.logger.info("Splitting test set to create validation set...")
-                test_idx_loc = np.where(test_indices)[0]
-                val_idx_loc, test_idx_loc = train_test_split(
-                    test_idx_loc,
-                    test_size=0.5,
-                    random_state=42,
-                    stratify=labels[test_idx_loc]
-                )
-                val_indices = np.zeros(len(adata), dtype=bool)
-                val_indices[val_idx_loc] = True
-                test_indices = np.zeros(len(adata), dtype=bool)
-                test_indices[test_idx_loc] = True
-        else:
-            # Random stratified split
-            idx_all = np.arange(adata.shape[0])
-            idx_train, idx_test = train_test_split(
-                idx_all,
-                test_size=1 - train_ratio,
-                random_state=42,
-                stratify=labels
-            )
-
-            remaining_ratio = 1 - train_ratio
-            if remaining_ratio > 0:
-                val_relative_size = val_ratio / remaining_ratio
-                idx_test, idx_val = train_test_split(
-                    idx_test,
-                    test_size=val_relative_size,
-                    random_state=42,
-                    stratify=labels[idx_test]
-                )
+                if not val_indices.any():
+                    self.logger.info("Splitting test set to create validation set...")
+                    test_idx_loc = np.where(test_indices)[0]
+                    val_idx_loc, test_idx_loc = train_test_split(
+                        test_idx_loc,
+                        test_size=0.5,
+                        random_state=42,
+                        stratify=labels[test_idx_loc]
+                    )
+                    val_indices = np.zeros(len(adata), dtype=bool)
+                    val_indices[val_idx_loc] = True
+                    test_indices = np.zeros(len(adata), dtype=bool)
+                    test_indices[test_idx_loc] = True
             else:
-                idx_val = []
+                # Random stratified split (simplified version)
+                train_indices, temp_indices = train_test_split(
+                    np.arange(len(adata)), 
+                    test_size=0.3, 
+                    random_state=42, 
+                    stratify=labels
+                )
+                val_indices, test_indices = train_test_split(
+                    temp_indices, 
+                    test_size=0.5, 
+                    random_state=42, 
+                    stratify=labels[temp_indices]
+                )
+                
+                train_indices = np.zeros(len(adata), dtype=bool)
+                val_indices = np.zeros(len(adata), dtype=bool)
+                test_indices = np.zeros(len(adata), dtype=bool)
+                train_indices[train_idx] = True
+                val_indices[val_idx] = True
+                test_indices[test_idx] = True
 
-            train_indices = np.zeros(len(adata), dtype=bool)
-            val_indices = np.zeros(len(adata), dtype=bool)
-            test_indices = np.zeros(len(adata), dtype=bool)
-
-            train_indices[idx_train] = True
-            val_indices[idx_val] = True
-            test_indices[idx_test] = True
+        # Fix negative stride issue by ensuring contiguous arrays
+        if features.flags['WRITEABLE'] is False or not np.array_equal(features.strides, features.itemsize * np.arange(features.ndim - 1, -1, -1)):
+            features = features.copy()
 
         # 6. Convert to PyTorch Geometric Data
         self.logger.info("Converting to PyG Data object...")
         edge_index, edge_attr = scipysparse2torchsparse(adj)
 
-        # Ensure features are contiguous to avoid stride issues
-        if not features.flags.c_contiguous:
-            features = np.ascontiguousarray(features)
-            
         pyg_data = PyGData(
             x=torch.from_numpy(features).float(),
             edge_index=edge_index,
@@ -274,6 +252,7 @@ class scGATGraphTransform(BaseTransform):
 
         return data
 # EVOLVE-BLOCK-END
+
 def get_get_preprocessing_pipeline(label_column: str = 'cell_type',
                             n_neighbors: int = 15,log_level="INFO") -> BaseTransform:
     transforms=[]
@@ -283,6 +262,7 @@ def get_get_preprocessing_pipeline(label_column: str = 'cell_type',
             "label_channel": "cell_type"
         }),)
     return Compose(*transforms, log_level=log_level)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
@@ -306,7 +286,11 @@ if __name__ == "__main__":
 
     scores = []
     inner_scores = []
+    times = []  # 新增：用于记录每次运行的时间
+
     for seed in range(args.seed, args.seed + args.num_runs):
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
         set_seed(seed)
         
         # 1. 初始化模型 (参数需要显式传递，不能直接传 args)
@@ -387,12 +371,22 @@ if __name__ == "__main__":
         inner_score = (y_pred_val == y_val.cpu().numpy()).mean()
         scores.append(score)
         inner_scores.append(inner_score)
-        print(f"{score=:.4f}")
-        print(f"{inner_score=:.4f}")
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"score: {score:.4f}, inner_score: {inner_score:.4f}, time: {run_time:.2f}s")  # 修改：将原本的两行输出合并为一行并加入运行时间
+
     print(f"GAT {args.species} {args.tissue} {args.test_dataset}:")
+    # 修改：加入 times 列表，以供后续捕获
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
+    
     mean_score = np.mean(scores)
     std_score = np.std(scores)
     mean_inner_score = np.mean(inner_scores)
     std_inner_score = np.std(inner_scores)
+    
     print(f"mean_score: {mean_score:.5f} +/- {std_score:.5f}")
     print(f"mean_inner_score: {mean_inner_score:.5f} +/- {std_inner_score:.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间

@@ -18,6 +18,7 @@ from dance.typing import LogLevel
 from dance.utils import set_seed, sub_data
 from dance.utils.matrix import normalize
 from dance.utils.wrappers import add_mod_and_transform
+import time
 
 # EVOLVE-BLOCK-START
 @register_preprocessor("feature", "cell",overwrite=True)
@@ -63,34 +64,38 @@ class WeightedFeaturePCA(BaseTransform):
                 f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='full'"
             )
             self.n_components = min(feat.shape)
-        gene_pca = PCA(n_components=self.n_components)  # genes x components
+        
+        # Use Truncated SVD instead of PCA for sparse gene expression matrices
+        from sklearn.decomposition import TruncatedSVD
+        gene_svd = TruncatedSVD(n_components=self.n_components)  # genes x components
 
-        gene_feat = gene_pca.fit_transform(feat.T)  # decompose into gene features
-        # self.logger.info(f"Decomposing {self.split_name} features {feat.shape} (k={gene_pca.n_components_})")
-        # self.logger.info(f"Total explained variance: {gene_pca.explained_variance_ratio_.sum():.2%}")
+        gene_feat = gene_svd.fit_transform(feat.T)  # decompose into gene features
+        # self.logger.info(f"Decomposing {self.split_name} features {feat.shape} (k={gene_svd.n_components_})")
+        # self.logger.info(f"Total explained variance: {gene_svd.explained_variance_ratio_.sum():.2%}")
 
         x = data.get_x()
         cell_feat = normalize(x, mode="normalize", axis=1) @ gene_feat  # cells x components
         data.data.obsm[self.out] = cell_feat.astype(np.float32)
         data.data.varm[self.out] = gene_feat.astype(np.float32)
         # if self.save_info:
-        #     data.data.uns["pca_components"] = gene_pca.components_
-        #     data.data.uns["pca_mean"] = gene_pca.mean_
-        #     data.data.uns["pca_explained_variance"] = gene_pca.explained_variance_
-        #     data.data.uns["pca_explained_variance_ratio"] = gene_pca.explained_variance_ratio_
+        #     data.data.uns["pca_components"] = gene_svd.components_
+        #     data.data.uns["pca_mean"] = gene_svd.mean_
+        #     data.data.uns["pca_explained_variance"] = gene_svd.explained_variance_
+        #     data.data.uns["pca_explained_variance_ratio"] = gene_svd.explained_variance_ratio_
         return data
 
 @register_preprocessor("graph", "cell",overwrite=True)
 class CellFeatureGraph(BaseTransform):
 
     def __init__(self, cell_feature_channel: str, gene_feature_channel: Optional[str] = None, *,
-                 mod: Optional[str] = None, normalize_edges: bool = True, **kwargs):
+                 mod: Optional[str] = None, normalize_edges: bool = True, use_tfidf: bool = False, **kwargs):
         super().__init__(**kwargs)
 
         self.cell_feature_channel = cell_feature_channel
         self.gene_feature_channel = gene_feature_channel or cell_feature_channel
         self.mod = mod
         self.normalize_edges = normalize_edges
+        self.use_tfidf = use_tfidf
 
     def _alternative_construction(self, data):
         # TODO: Try this alternative construction
@@ -106,6 +111,22 @@ class CellFeatureGraph(BaseTransform):
     def __call__(self, data):
         feat = data.get_feature(return_type="default", mod=self.mod)
         num_cells, num_feats = feat.shape
+
+        # Apply TF-IDF transformation if specified
+        if self.use_tfidf:
+            from sklearn.feature_extraction.text import TfidfTransformer
+            from scipy.sparse import issparse
+            
+            # Apply log transformation first to dampen high expression values
+            if not issparse(feat):
+                feat = np.log1p(feat)  # log(1 + x) transformation
+            else:
+                feat = feat.copy()
+                feat.data = np.log1p(feat.data)
+            
+            # Treat cells as documents and genes as words
+            tfidf = TfidfTransformer()
+            feat = tfidf.fit_transform(feat).toarray()
 
         row, col = np.nonzero(feat)
         edata = np.array(feat[row, col]).ravel()[:, None]
@@ -130,15 +151,17 @@ class CellFeatureGraph(BaseTransform):
         g.ndata["feat_id"] = torch.concat((-torch.ones(num_feats, dtype=torch.int32),
                                            torch.arange(num_cells, dtype=torch.int32)))  # yapf: disable
 
-        # Normalize edges and add self-loop
+        # Use DGL's built-in edge normalization instead of manual loop
+        # Ensure edge weights are 1D for normalization
         if self.normalize_edges:
-            in_deg = g.in_degrees()
-            for i in range(g.number_of_nodes()):
-                src, dst, eidx = g.in_edges(i, form="all")
-                if src.shape[0] > 0:
-                    edge_w = g.edata["weight"][eidx]
-                    g.edata["weight"][eidx] = in_deg[i] * edge_w / edge_w.sum()
-        g.add_edges(g.nodes(), g.nodes(), {"weight": torch.ones(g.number_of_nodes())[:, None]})
+            # Flatten the edge weights to 1D before normalization
+            edge_weights_1d = g.edata['weight'].squeeze(-1)  # Convert from [N, 1] to [N,]
+            norm = dgl.nn.EdgeWeightNorm(norm='both')
+            normalized_weights = norm(g, edge_weights_1d)
+            g.edata['weight'] = normalized_weights.unsqueeze(-1)  # Convert back to [N, 1]
+        
+        # Remove explicit self-loops since AdaptiveSAGE has its own learnable self-loop mechanism
+        # g.add_edges(g.nodes(), g.nodes(), {"weight": torch.ones(g.number_of_nodes())[:, None]})
 
         gene_feature = data.get_feature(return_type="torch", channel=self.gene_feature_channel, mod=self.mod,
                                         channel_type="varm")
@@ -162,6 +185,7 @@ class PCACellFeatureGraph(BaseTransform):
         split_name: Optional[str] = None,
         *,
         normalize_edges: bool = True,
+        use_tfidf: bool = False,
         feat_norm_mode: Optional[str] = None,
         feat_norm_axis: int = 0,
         mod: Optional[str] = None,
@@ -172,6 +196,7 @@ class PCACellFeatureGraph(BaseTransform):
         self.n_components = n_components
         self.split_name = split_name
         self.normalize_edges = normalize_edges
+        self.use_tfidf = use_tfidf
         self.feat_norm_mode = feat_norm_mode
         self.feat_norm_axis = feat_norm_axis
         self.mod = mod
@@ -180,7 +205,7 @@ class PCACellFeatureGraph(BaseTransform):
         WeightedFeaturePCA(self.n_components, self.split_name, feat_norm_mode=self.feat_norm_mode,
                            feat_norm_axis=self.feat_norm_axis, log_level=self.log_level)(data)
         CellFeatureGraph(cell_feature_channel="WeightedFeaturePCA", mod=self.mod, normalize_edges=self.normalize_edges,
-                         log_level=self.log_level)(data)
+                         use_tfidf=self.use_tfidf, log_level=self.log_level)(data)
         return data
 # EVOLVE-BLOCK-END
     
@@ -212,7 +237,11 @@ if __name__ == "__main__":
 
     scores = []
     inner_scores = []
+    times = []  # 新增：用于记录每次运行的时间
+
     for seed in range(args.seed, args.seed + args.num_runs):
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
         set_seed(seed)
 
         # Initialize model and get model specific preprocessing pipeline
@@ -234,13 +263,13 @@ if __name__ == "__main__":
             data.set_split_idx("train", train_idx)
             data.set_split_idx("test", test_idx)
         preprocessing_pipeline(data)
+        
         # Obtain training and testing data
         y_train = data.get_y(split_name="train", return_type="torch")
         y_test = data.get_y(split_name="test", return_type="torch")
         num_labels = y_test.shape[1]
 
         # Get cell feature graph for scDeepSort
-        # TODO: make api for the following block?
         g = data.data.uns["CellFeatureGraph"]
         num_genes = data.shape[1]
         gene_ids = torch.arange(num_genes)
@@ -254,25 +283,26 @@ if __name__ == "__main__":
                   val_ratio=args.test_rate)
         score = model.score(g_test, y_test)
         inner_score = model.score(g_train, y_train)
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        
         scores.append(score.item())
         inner_scores.append(inner_score.item())
-        print(f"{score=:.4f}")
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"{score=:.4f}, time={run_time:.2f}s")
+        
     print(f"scDeepSort {args.species} {args.tissue} {args.test_dataset}:")
+    # 修改：在打印输出中加入 times 列表，以供 evaluator 捕获
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
+    
     mean_score = np.mean(scores)
     std_score = np.std(scores)
     mean_inner_score = np.mean(inner_scores)
     std_inner_score = np.std(inner_scores)
+    mean_time = np.mean(times)
+    
     print(f"mean_score: {mean_score:.5f} +/- {std_score:.5f}")
     print(f"mean_inner_score: {mean_inner_score:.5f} +/- {std_inner_score:.5f}")
-"""To reproduce the benchmarking results, please run the following command:
-
-Mouse Brain
-$ python scdeepsort.py --species mouse --tissue Brain --train_dataset 753 3285 --test_dataset 2695
-
-Mouse Spleen
-$ python scdeepsort.py --species mouse --tissue Spleen --train_dataset 1970 --test_dataset 1759
-
-Mouse Kidney
-$ python scdeepsort.py --species mouse --tissue Kidney --train_dataset 4682 --test_dataset 203
-
-"""
+    print(f"mean_time: {mean_time:.2f}s")

@@ -1,6 +1,7 @@
 import argparse
 import pprint
 from typing import get_args
+import time  # 新增：导入 time 模块
 
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -18,7 +19,6 @@ from dance.typing import LogLevel
 from dance.utils import set_seed, sub_data
 import scanpy as sc
 import bbknn
-import numpy as np
 import logging
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Union, Any
@@ -106,9 +106,9 @@ class BBKNNConstruction(BaseTransform):
 
             kept_edges_count = len(rows)
 
-            # 添加所有 KNN 边
-            for i in range(len(rows)):
-                temp_graph.append(f"{rows[i]} {cols[i]}")
+            # Vectorized string generation instead of loop
+            edge_strings = [f"{r} {c}" for r, c in zip(rows, cols)]
+            temp_graph.extend(edge_strings)
 
         else:
             # 多批次数据：使用 BBKNN
@@ -151,16 +151,29 @@ class BBKNNConstruction(BaseTransform):
             cols = graph_mtx.col
             ratio_values = graph_mtx.data
 
-            # 5. 统计边权重用于计算阈值
+            # 5. 统计边权重用于计算阈值 - vectorized approach
             inter_ratio = [[[] for _ in range(batch_num)] for _ in range(batch_num)]
 
-            for i in range(len(rows)):
-                b_row = batch_indices[rows[i]]
-                b_col = batch_indices[cols[i]]
-
-                if b_row != b_col:
-                    x, y = max(b_row, b_col), min(b_row, b_col)
-                    inter_ratio[x][y].append(ratio_values[i])
+            # Vectorized computation of batch assignments for each edge
+            batch_rows = batch_indices[rows]
+            batch_cols = batch_indices[cols]
+            
+            # Find cross-batch edges
+            cross_batch_mask = batch_rows != batch_cols
+            
+            # Process cross-batch edges
+            cross_rows = rows[cross_batch_mask]
+            cross_cols = cols[cross_batch_mask]
+            cross_vals = ratio_values[cross_batch_mask]
+            cross_batch_rows = batch_rows[cross_batch_mask]
+            cross_batch_cols = batch_cols[cross_batch_mask]
+            
+            for i in range(len(cross_rows)):
+                b_row = cross_batch_rows[i]
+                b_col = cross_batch_cols[i]
+                
+                x, y = max(b_row, b_col), min(b_row, b_col)
+                inter_ratio[x][y].append(cross_vals[i])
 
             # 排序
             for i in range(batch_num):
@@ -168,46 +181,48 @@ class BBKNNConstruction(BaseTransform):
                     if len(inter_ratio[i][j]) > 0:
                         inter_ratio[i][j].sort(reverse=True)
 
-            # 6. 生成 temp_graph 列表 (直接生成字符串)
+            # 6. 生成 temp_graph 列表 (vectorized approach)
             self.logger.info(f"Generating graph string list (Ratio: {self.edge_ratio})...")
 
             # 初始化列表，第一行为节点数
             temp_graph = [str(cell_count)]
 
-            kept_edges_count = 0
-
-            # 遍历边并应用筛选逻辑
+            # Determine which edges to keep
+            within_batch_mask = batch_rows == batch_cols
+            keep_mask = within_batch_mask.copy()  # Start with within-batch edges
+            
+            # Process cross-batch edges with threshold
             for i in range(len(rows)):
-                b_row = batch_indices[rows[i]]
-                b_col = batch_indices[cols[i]]
+                if not keep_mask[i]:  # Only check cross-batch edges
+                    b_row = batch_rows[i]
+                    b_col = batch_cols[i]
+                    
+                    if b_row != b_col:
+                        x, y = max(b_row, b_col), min(b_row, b_col)
+                        
+                        # Calculate truncation threshold
+                        limit_idx = int(self.edge_ratio * max(batch_info[x], batch_info[y]))
+                        threshold_index = min(limit_idx, len(inter_ratio[x][y]) - 1)
+                        
+                        if len(inter_ratio[x][y]) > 0:
+                            ratio_threshold = inter_ratio[x][y][threshold_index]
+                            
+                            if ratio_values[i] > ratio_threshold:
+                                keep_mask[i] = True
 
-                keep_edge = False
+            # Extract kept edges
+            kept_rows = rows[keep_mask]
+            kept_cols = cols[keep_mask]
+            kept_edges_count = len(kept_rows)
 
-                if b_row == b_col:
-                    # 同批次：直接保留
-                    keep_edge = True
-                else:
-                    # 跨批次：判断阈值
-                    x, y = max(b_row, b_col), min(b_row, b_col)
+            # Vectorized string generation for kept edges
+            edge_strings = [f"{r} {c}" for r, c in zip(kept_rows, kept_cols)]
+            temp_graph.extend(edge_strings)
 
-                    # 计算截断阈值
-                    limit_idx = int(self.edge_ratio * max(batch_info[x], batch_info[y]))
-                    threshold_index = min(limit_idx, len(inter_ratio[x][y]) - 1)
-
-                    ratio_threshold = inter_ratio[x][y][threshold_index]
-
-                    if ratio_values[i] > ratio_threshold:
-                        keep_edge = True
-
-                if keep_edge:
-                    # 直接格式化为 "row col" 字符串
-                    temp_graph.append(f"{rows[i]} {cols[i]}")
-                    kept_edges_count += 1
-
-        # 7. 添加自环 (Self-loops)
-        # 根据你的需求，显式添加 i i
-        for index in range(cell_count):
-            temp_graph.append(f"{index} {index}")
+        # 7. 添加自环 (Self-loops) - vectorized approach
+        # Generate all self-loop strings at once
+        self_loop_strings = [f"{i} {i}" for i in range(cell_count)]
+        temp_graph.extend(self_loop_strings)
 
         self.logger.info(f"Graph list generated. Kept {kept_edges_count} edges + {cell_count} self-loops.")
 
@@ -229,6 +244,7 @@ def get_preprocessing_pipeline(edge_ratio: float = 2, log_level: LogLevel = "INF
             "label_channel": "cell_type"
         }))
         return Compose(*transforms, log_level=log_level)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     
@@ -275,7 +291,11 @@ if __name__ == "__main__":
 
     scores = []
     inner_scores=[]
+    times = []  # 新增：用于记录每次运行的时间
+
     for seed in range(args.seed, args.seed + args.num_runs):
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
         set_seed(seed)
         
         # Initialize model: args are passed here, so self.batch_size etc are set now
@@ -290,8 +310,8 @@ if __name__ == "__main__":
         data = dataloader.load_data(transform=None, cache=args.cache)
         if args.obs_nums is not None:
             sub_data(data.data,args.obs_nums)
-            train_idx, test_idx = train_test_split(range(args.obs_nums),test_size=0.2,random_state=args.seed)
-            train_idx,val_idx = train_test_split(train_idx,test_size=args.val_size,random_state=args.seed)
+            train_idx, test_idx = train_test_split(range(args.obs_nums),test_size=0.2,random_state=seed)  # 修改：将 args.seed 改为 seed
+            train_idx,val_idx = train_test_split(train_idx,test_size=args.val_size,random_state=seed)    # 修改：将 args.seed 改为 seed
             data.set_split_idx("train", train_idx)
             data.set_split_idx("test", test_idx)
             data.set_split_idx("val", val_idx)
@@ -329,15 +349,24 @@ if __name__ == "__main__":
         score = model.score(x_test, y_test)
         inner_scores.append(inner_score)
         scores.append(score)
-        print(f"{score=:.4f}")
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"score: {score:.4f}, inner_score: {inner_score:.4f}, time: {run_time:.2f}s")  # 修改：同时打印三个指标
 
     print(f"GraphCS {args.species} {args.tissue} {args.test_dataset}:")
+    # 修改：打印供 evaluator 捕获的列表
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
+    
     mean_score = np.mean(scores)
     std_score = np.std(scores)
     mean_inner_score = np.mean(inner_scores)
     std_inner_score = np.std(inner_scores)
     print(f"mean_score: {mean_score:.5f} +/- {std_score:.5f}")
     print(f"mean_inner_score: {mean_inner_score:.5f} +/- {std_inner_score:.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
 
 """To reproduce GraphCS benchmarks, please refer to command lines below:
 

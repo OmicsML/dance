@@ -9,15 +9,13 @@ import time
 import numpy as np
 import os
 import traceback
+import ast  # 新增：导入 ast 模块以避免 literal_eval 报错
 from openevolve.evaluation_result import EvaluationResult
 import logging
 
 from dance.modules.spatial.spatial_domain import spagcn
-# Define the benchmarks based on the script's documentation.
-# We use a reduced number of epochs (20) for faster evaluation compared to the
-# original 300, while still being substantial enough to measure performance.
-
 from dance.settings import EXAMPLESDIR
+
 stage1_args=os.getenv("stage1_args")
 BENCHMARKS_args=os.getenv("BENCHMARKS_args")
 with open(f"{EXAMPLESDIR}/evolo/benchmarks_config.json", "r") as f:
@@ -25,14 +23,11 @@ with open(f"{EXAMPLESDIR}/evolo/benchmarks_config.json", "r") as f:
 stage1_args = BENCHMARKS[stage1_args]
 BENCHMARKS = BENCHMARKS[BENCHMARKS_args]
 
-# Timeout for each benchmark run in seconds.
-# Training these models can take time, especially for data download on the first run.
 BENCHMARK_TIMEOUT = 600000  # 1000 minutes
 logger = logging.getLogger(__name__)
 
 def _run_benchmark(program_path, benchmark_name, benchmark_args, timeout):
     """Helper function to run a single benchmark command."""
-    # Use --cache to speed up subsequent runs by not reprocessing data.
     command = ["python", program_path, "--cache"] + benchmark_args
     
     start_time = time.time()
@@ -42,13 +37,12 @@ def _run_benchmark(program_path, benchmark_name, benchmark_args, timeout):
             capture_output=True,
             text=True,
             timeout=timeout,
-            check=False  # Do not raise an exception on non-zero exit codes
+            check=False  
         )
         
         end_time = time.time()
         execution_time = end_time - start_time
         
-        # Check if the script crashed
         if process.returncode != 0:
             return {
                 "status": "error", "score": 0.0, "time": execution_time,
@@ -56,22 +50,49 @@ def _run_benchmark(program_path, benchmark_name, benchmark_args, timeout):
                 "stdout": process.stdout, "stderr": process.stderr,
             }
 
-        # Parse the output to find the mean score
         output = process.stdout
-        match = re.search(r"mean_score:\s*([\d\.-]+)", output)
-        inner_match = re.search(r"mean_inner_score:\s*([\d\.-]+)", output)
-        if not match:
+        
+        # 1. 增加对 times 列表的捕获
+        scores_match = re.search(r"scores:\s*(\[.*?\])", output)
+        inner_scores_match = re.search(r"inner_scores:\s*(\[.*?\])", output)
+        times_match = re.search(r"times:\s*(\[.*?\])", output)
+
+        # 2. 如果缺少任意一个，返回 error
+        if not scores_match or not inner_scores_match or not times_match:
             return {
-                "status": "error", "score": 0.0, "time": execution_time,
-                "error": "Could not parse 'mean_score' from output.",
+                "status": "error", "scores": [], "inner_scores": [], "times": [], "time": execution_time,
+                "error": "Could not parse 'scores', 'inner_scores', or 'times' lists from output.",
                 "stdout": output, "stderr": process.stderr,
             }
+
+        try:
+            # 3. 提取并转换字符串为 Python 列表
+            scores_list = ast.literal_eval(scores_match.group(1))
+            inner_scores_list = ast.literal_eval(inner_scores_match.group(1))
+            times_list = ast.literal_eval(times_match.group(1))
             
-        score = float(match.group(1))
-        inner_score = float(inner_match.group(1))
+        except (ValueError, SyntaxError) as e:
+            return {
+                "status": "error", "scores": [], "inner_scores": [], "times": [], "time": execution_time,
+                "error": f"Error parsing list string to Python list: {str(e)}",
+                "stdout": output, "stderr": process.stderr,
+            }
+
+        # 4. 成功时，将计算出的内部平均时间赋给 'time'
+        internal_mean_time = np.mean(times_list) if times_list else execution_time
+        
         return {
-            "status": "success", "score": score, "inner_score": inner_score, "time": execution_time,
-            "error": None, "stdout": output, "stderr": process.stderr,
+            "status": "success", 
+            "scores": scores_list, 
+            "inner_scores": inner_scores_list, 
+            "times": times_list,
+            "score": np.mean(scores_list),
+            "inner_score": np.mean(inner_scores_list),
+            "time": internal_mean_time,  # 使用内部时间
+            "total_execution_time": execution_time, # 保留外部执行时间做备份参考
+            "error": None, 
+            "stdout": output, 
+            "stderr": process.stderr,
         }
 
     except subprocess.TimeoutExpired as e:
@@ -87,23 +108,16 @@ def _run_benchmark(program_path, benchmark_name, benchmark_args, timeout):
             "stdout": "", "stderr": traceback.format_exc(),
         }
 
-import numpy as np
-
 def evaluate(program_path):
-    """
-    Evaluates the script by running it against multiple benchmark datasets.
-    Failures result in a score of 0 for that benchmark, effectively penalizing reliability issues.
-    """
-    
     results = {}
     successful_runs = []
     failed_runs = []
     
-    # 用于计算全局平均值的列表（包含成功和失败）
+    # 只保留用于计算全局平均值的标量列表
     all_inner_scores = []
     all_speed_scores = []
-    all_accuracy_scores = [] # 外部评分，备用
-    all_times = [] # 仅作记录，不参与核心分数计算（失败者时间可能不准）
+    all_accuracy_scores = [] 
+    all_times = [] 
 
     for name, args in BENCHMARKS.items():
         print(f"--- Running benchmark: {name} ---")
@@ -113,57 +127,41 @@ def evaluate(program_path):
         if result["status"] == "success":
             successful_runs.append(result)
             
-            # 1. 获取准确率
             i_score = result.get("inner_score", 0.0)
             e_score = result.get("score", 0.0)
             
-            # 2. 计算单项速度分 (Normalized around 300s)
             t = result.get("time", 300.0)
             s_score = 1.0 / (1.0 + t / 300.0)
             
-            # 3. 记录数据
             all_inner_scores.append(i_score)
             all_accuracy_scores.append(e_score)
             all_speed_scores.append(s_score)
             all_times.append(t)
             
-            print(f"Success! Inner Score: {i_score:.4f}, Speed Score: {s_score:.4f}, Time: {t:.2f}s")
+            print(f"Success! Inner Score: {i_score:.4f}, Speed Score: {s_score:.4f}, Mean Run Time: {t:.2f}s")
             
         else:
             failed_runs.append(result)
-            
-            # 1. 失败者，所有分数为 0
             all_inner_scores.append(0.0)
             all_accuracy_scores.append(0.0)
             all_speed_scores.append(0.0)
-            # 时间对于失败者来说通常没有意义（可能是超时或秒崩），不计入 all_times 以免拉低成功的平均时间统计
             
             print(f"Failed! Error: {result['error']}")
             logger.info(f"Stdout: {result['stdout']}")
             logger.info(f"Stderr: {result['stderr']}")
 
-    # Calculate Global Metrics (分母为总任务数 len(BENCHMARKS))
     total_benchmarks = len(BENCHMARKS)
     if total_benchmarks == 0:
         return EvaluationResult(metrics={"combined_score": 0.0, "error": "No benchmarks defined."}, artifacts={})
 
-    # 使用 np.mean 计算全局平均（包含0值）
-    avg_inner_accuracy = np.mean(all_inner_scores) # 这就是原本的 accuracy * reliability
+    avg_inner_accuracy = np.mean(all_inner_scores) 
     avg_accuracy = np.mean(all_accuracy_scores)
     avg_speed_score = np.mean(all_speed_scores)
-    
-    # 显式计算 reliability 仅供展示
     reliability_score = len(successful_runs) / total_benchmarks
-
-    # 计算成功任务的平均耗时（仅供参考，不影响分数）
     avg_success_time = np.mean(all_times) if all_times else 0.0
 
-    # Combined Score 计算
-    # 逻辑：Reliability 已经内含在 avg_inner_accuracy 和 avg_speed_score 中了。
-    # 权重分配：80% 看准确率，20% 看速度。
     combined_score = (0.8 * avg_inner_accuracy) + (0.2 * avg_speed_score)
 
-    # 准备返回数据
     artifacts = {
         "benchmark_summary": {
             name: {
@@ -181,7 +179,6 @@ def evaluate(program_path):
         )
     }
 
-    # 如果全部失败，添加详细报错建议
     if not successful_runs:
         artifacts["error_details"] = {
             "error_type": "AllBenchmarksFailed",
@@ -192,37 +189,43 @@ def evaluate(program_path):
     metrics = {
         "combined_score": float(combined_score),
         "avg_accuracy": float(avg_accuracy),
-        "avg_inner_accuracy": float(avg_inner_accuracy), # 全局平均，含0
+        "avg_inner_accuracy": float(avg_inner_accuracy), 
         "reliability_score": float(reliability_score),
-        "avg_speed_score": float(avg_speed_score),       # 全局平均，含0
+        "avg_speed_score": float(avg_speed_score),       
         "avg_success_time": float(avg_success_time)
     }
 
-    # 展开每个 benchmark 的分数到 metrics 中
+    # 重点在这里：直接从结果字典 res 中提取标量和列表，统一放入 metrics 中
     for name, res in results.items():
+        # 记录整体平均值和状态（标量）
         metrics[f"{name}_score"] = float(res.get("score", 0))
         metrics[f"{name}_inner_score"] = float(res.get("inner_score", 0))
         metrics[f"{name}_time"] = float(res.get("time", 0))
         metrics[f"{name}_status"] = 1.0 if res["status"] == "success" else 0.0
+        
+        # 提取列表数据，若失败或不存在则用 [] 兜底
+        scores_list = res.get("scores", [])
+        inner_scores_list = res.get("inner_scores", [])
+        times_list = res.get("times", [])
+        
+        # 将列表展平为独立的标量 metric
+        for i, val in enumerate(scores_list):
+            metrics[f"{name}_score_{i}"] = float(val)
+            
+        for i, val in enumerate(inner_scores_list):
+            metrics[f"{name}_inner_score_{i}"] = float(val)
+            
+        for i, val in enumerate(times_list):
+            metrics[f"{name}_time_{i}"] = float(val)
 
     return EvaluationResult(
         metrics=metrics,
         artifacts=artifacts
     )
     
-    
 def evaluate_stage1(program_path):
-    """
-    A quick first-stage evaluation. It runs a single, simple benchmark with very
-    few epochs to check if the script is syntactically correct and runs without
-    crashing. This acts as a fast filter for invalid programs.
-    """
     print("--- Running Stage 1 Evaluation ---")
-    
-    # Use the simplest benchmark with only 2 epochs for a quick check.
-    
-    timeout = 240000 # 400 minutes timeout for the initial run (data download can be slow)
-
+    timeout = 240000 
     result = _run_benchmark(program_path, "Stage1_Check", stage1_args, timeout)
     if result["status"] == "success":
         return EvaluationResult(
@@ -256,9 +259,5 @@ def evaluate_stage1(program_path):
         )
 
 def evaluate_stage2(program_path):
-    """
-    Second stage evaluation with more thorough testing across all benchmarks.
-    This is the main evaluation function.
-    """
     print("--- Running Stage 2 Evaluation ---")
     return evaluate(program_path)

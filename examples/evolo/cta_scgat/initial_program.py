@@ -251,6 +251,7 @@ class scGATGraphTransform(BaseTransform):
 
         return data
 # EVOLVE-BLOCK-END
+
 def get_get_preprocessing_pipeline(label_column: str = 'cell_type',
                             n_neighbors: int = 15,log_level="INFO") -> BaseTransform:
     transforms=[]
@@ -260,6 +261,7 @@ def get_get_preprocessing_pipeline(label_column: str = 'cell_type',
             "label_channel": "cell_type"
         }),)
     return Compose(*transforms, log_level=log_level)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
@@ -283,7 +285,11 @@ if __name__ == "__main__":
 
     scores = []
     inner_scores = []
+    times = []  # 新增：用于记录每次运行的时间
+
     for seed in range(args.seed, args.seed + args.num_runs):
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
         set_seed(seed)
         
         # 1. 初始化模型 (参数需要显式传递，不能直接传 args)
@@ -364,12 +370,22 @@ if __name__ == "__main__":
         inner_score = (y_pred_val == y_val.cpu().numpy()).mean()
         scores.append(score)
         inner_scores.append(inner_score)
-        print(f"{score=:.4f}")
-        print(f"{inner_score=:.4f}")
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"score: {score:.4f}, inner_score: {inner_score:.4f}, time: {run_time:.2f}s")  # 修改：将原本的两行输出合并为一行并加入运行时间
+
     print(f"GAT {args.species} {args.tissue} {args.test_dataset}:")
+    # 修改：加入 times 列表，以供后续捕获
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
+    
     mean_score = np.mean(scores)
     std_score = np.std(scores)
     mean_inner_score = np.mean(inner_scores)
     std_inner_score = np.std(inner_scores)
+    
     print(f"mean_score: {mean_score:.5f} +/- {std_score:.5f}")
     print(f"mean_inner_score: {mean_inner_score:.5f} +/- {std_inner_score:.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间

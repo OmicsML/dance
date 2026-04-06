@@ -1,4 +1,5 @@
 import argparse
+import time  # 新增：导入 time 模块
 
 from sklearn.neighbors import NearestNeighbors
 
@@ -93,12 +94,16 @@ if __name__ == "__main__":
 
     scores = []
     inner_scores = []
+    times = []  # 新增：用于记录每次运行的时间
+
     for seed in range(args.seed, args.seed + args.num_runs):
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
         set_seed(seed)
 
         # Initialize model and get model specific preprocessing pipeline
         preprocessing_pipeline = get_preprocessing_pipeline(n_top_hvgs=args.high_variable_genes,
-                                                              radius=args.rad_cutoff)
+                                                            radius=args.rad_cutoff)
 
         # Load data and perform necessary preprocessing
         dataloader = SpatialLIBDDataset(data_id=args.sample_number)
@@ -122,10 +127,20 @@ if __name__ == "__main__":
             "davies_bouldin": davies_bouldin_score(x, pred)
         }))
         scores.append(score)
-        print(f"ARI: {score:.4f}")
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"ARI: {score:.4f}, time: {run_time:.2f}s")  # 修改：同时输出得分与时间
+        
     print(f"STAGATE {args.sample_number}:")
+    # 修改：加入 times 列表，以供 evaluator 捕获
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
+
 """ To reproduce Stagate on other samples, please refer to command lines belows:
 NOTE: since the stagate method is unstable, you have to run at least 5 times to get
       best performance. (same with original Stagate paper)

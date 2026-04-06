@@ -1,6 +1,7 @@
 import argparse
 import pprint
 from typing import get_args
+import time  # 新增：导入 time 模块
 
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -18,7 +19,6 @@ from dance.typing import LogLevel
 from dance.utils import set_seed, sub_data
 import scanpy as sc
 import bbknn
-import numpy as np
 import logging
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Union, Any
@@ -106,7 +106,7 @@ class BBKNNConstruction(BaseTransform):
 
             kept_edges_count = len(rows)
 
-            # 使用高度优化的向量化操作生成边字符串
+            # Vectorized string generation instead of loop
             edge_strings = [f"{r} {c}" for r, c in zip(rows, cols)]
             temp_graph.extend(edge_strings)
 
@@ -151,21 +151,29 @@ class BBKNNConstruction(BaseTransform):
             cols = graph_mtx.col
             ratio_values = graph_mtx.data
 
-            # 5. 统计边权重用于计算阈值
+            # 5. 统计边权重用于计算阈值 - vectorized approach
             inter_ratio = [[[] for _ in range(batch_num)] for _ in range(batch_num)]
 
-            # 向量化统计跨批次边权重
-            b_rows = batch_indices[rows]
-            b_cols = batch_indices[cols]
-            cross_batch_mask = b_rows != b_cols
+            # Vectorized computation of batch assignments for each edge
+            batch_rows = batch_indices[rows]
+            batch_cols = batch_indices[cols]
             
-            # 向量化收集跨批次边权重
-            cross_batch_indices = np.where(cross_batch_mask)[0]
-            for idx in cross_batch_indices:
-                b_row = b_rows[idx]
-                b_col = b_cols[idx]
+            # Find cross-batch edges
+            cross_batch_mask = batch_rows != batch_cols
+            
+            # Process cross-batch edges
+            cross_rows = rows[cross_batch_mask]
+            cross_cols = cols[cross_batch_mask]
+            cross_vals = ratio_values[cross_batch_mask]
+            cross_batch_rows = batch_rows[cross_batch_mask]
+            cross_batch_cols = batch_cols[cross_batch_mask]
+            
+            for i in range(len(cross_rows)):
+                b_row = cross_batch_rows[i]
+                b_col = cross_batch_cols[i]
+                
                 x, y = max(b_row, b_col), min(b_row, b_col)
-                inter_ratio[x][y].append(ratio_values[idx])
+                inter_ratio[x][y].append(cross_vals[i])
 
             # 排序
             for i in range(batch_num):
@@ -173,57 +181,46 @@ class BBKNNConstruction(BaseTransform):
                     if len(inter_ratio[i][j]) > 0:
                         inter_ratio[i][j].sort(reverse=True)
 
-            # 6. 生成 temp_graph 列表 (直接生成字符串)
+            # 6. 生成 temp_graph 列表 (vectorized approach)
             self.logger.info(f"Generating graph string list (Ratio: {self.edge_ratio})...")
 
             # 初始化列表，第一行为节点数
             temp_graph = [str(cell_count)]
 
-            # 向量化处理边的筛选逻辑
-            # 同批次边直接保留
-            same_batch_mask = b_rows == b_cols
+            # Determine which edges to keep
+            within_batch_mask = batch_rows == batch_cols
+            keep_mask = within_batch_mask.copy()  # Start with within-batch edges
             
-            # 处理跨批次边的筛选 with improved efficiency
-            filtered_cross_batch_indices = []
-            
-            # Precompute thresholds for each batch pair to avoid repeated calculations
-            thresholds = {}
-            for i in range(batch_num):
-                for j in range(i):  # Only compute for upper triangle since it's symmetric
-                    if len(inter_ratio[i][j]) > 0:
-                        limit_idx = int(self.edge_ratio * max(batch_info[i], batch_info[j]))
-                        threshold_index = min(limit_idx, len(inter_ratio[i][j]) - 1)
-                        thresholds[(i, j)] = inter_ratio[i][j][threshold_index]
-                        thresholds[(j, i)] = inter_ratio[i][j][threshold_index]  # Symmetric
-            
-            # Apply threshold filtering to cross-batch edges
-            for idx in cross_batch_indices:
-                b_row = b_rows[idx]
-                b_col = b_cols[idx]
-                
-                # Determine the batch pair key
-                x, y = max(b_row, b_col), min(b_row, b_col)
-                threshold_key = (x, y)
-                
-                if threshold_key in thresholds and ratio_values[idx] > thresholds[threshold_key]:
-                    filtered_cross_batch_indices.append(idx)
+            # Process cross-batch edges with threshold
+            for i in range(len(rows)):
+                if not keep_mask[i]:  # Only check cross-batch edges
+                    b_row = batch_rows[i]
+                    b_col = batch_cols[i]
+                    
+                    if b_row != b_col:
+                        x, y = max(b_row, b_col), min(b_row, b_col)
+                        
+                        # Calculate truncation threshold
+                        limit_idx = int(self.edge_ratio * max(batch_info[x], batch_info[y]))
+                        threshold_index = min(limit_idx, len(inter_ratio[x][y]) - 1)
+                        
+                        if len(inter_ratio[x][y]) > 0:
+                            ratio_threshold = inter_ratio[x][y][threshold_index]
+                            
+                            if ratio_values[i] > ratio_threshold:
+                                keep_mask[i] = True
 
-            # 构建最终的边索引数组
-            final_edge_indices = np.concatenate([
-                np.where(same_batch_mask)[0],
-                np.array(filtered_cross_batch_indices)
-            ])
-            
-            kept_edges_count = len(final_edge_indices)
+            # Extract kept edges
+            kept_rows = rows[keep_mask]
+            kept_cols = cols[keep_mask]
+            kept_edges_count = len(kept_rows)
 
-            # 使用向量化操作生成保留边的字符串
-            kept_rows = rows[final_edge_indices]
-            kept_cols = cols[final_edge_indices]
+            # Vectorized string generation for kept edges
             edge_strings = [f"{r} {c}" for r, c in zip(kept_rows, kept_cols)]
             temp_graph.extend(edge_strings)
 
-        # 7. 添加自环 (Self-loops) - 使用向量化方法
-        # 根据你的需求，显式添加 i i
+        # 7. 添加自环 (Self-loops) - vectorized approach
+        # Generate all self-loop strings at once
         self_loop_strings = [f"{i} {i}" for i in range(cell_count)]
         temp_graph.extend(self_loop_strings)
 
@@ -247,6 +244,7 @@ def get_preprocessing_pipeline(edge_ratio: float = 2, log_level: LogLevel = "INF
             "label_channel": "cell_type"
         }))
         return Compose(*transforms, log_level=log_level)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     
@@ -293,7 +291,11 @@ if __name__ == "__main__":
 
     scores = []
     inner_scores=[]
+    times = []  # 新增：用于记录每次运行的时间
+
     for seed in range(args.seed, args.seed + args.num_runs):
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
         set_seed(seed)
         
         # Initialize model: args are passed here, so self.batch_size etc are set now
@@ -308,8 +310,8 @@ if __name__ == "__main__":
         data = dataloader.load_data(transform=None, cache=args.cache)
         if args.obs_nums is not None:
             sub_data(data.data,args.obs_nums)
-            train_idx, test_idx = train_test_split(range(args.obs_nums),test_size=0.2,random_state=args.seed)
-            train_idx,val_idx = train_test_split(train_idx,test_size=args.val_size,random_state=args.seed)
+            train_idx, test_idx = train_test_split(range(args.obs_nums),test_size=0.2,random_state=seed)  # 修改：将 args.seed 改为 seed
+            train_idx,val_idx = train_test_split(train_idx,test_size=args.val_size,random_state=seed)    # 修改：将 args.seed 改为 seed
             data.set_split_idx("train", train_idx)
             data.set_split_idx("test", test_idx)
             data.set_split_idx("val", val_idx)
@@ -347,15 +349,24 @@ if __name__ == "__main__":
         score = model.score(x_test, y_test)
         inner_scores.append(inner_score)
         scores.append(score)
-        print(f"{score=:.4f}")
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"score: {score:.4f}, inner_score: {inner_score:.4f}, time: {run_time:.2f}s")  # 修改：同时打印三个指标
 
     print(f"GraphCS {args.species} {args.tissue} {args.test_dataset}:")
+    # 修改：打印供 evaluator 捕获的列表
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
+    
     mean_score = np.mean(scores)
     std_score = np.std(scores)
     mean_inner_score = np.mean(inner_scores)
     std_inner_score = np.std(inner_scores)
     print(f"mean_score: {mean_score:.5f} +/- {std_score:.5f}")
     print(f"mean_inner_score: {mean_inner_score:.5f} +/- {std_inner_score:.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
 
 """To reproduce GraphCS benchmarks, please refer to command lines below:
 

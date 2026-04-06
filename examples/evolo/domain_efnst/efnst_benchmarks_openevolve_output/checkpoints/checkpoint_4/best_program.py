@@ -1,6 +1,7 @@
 import argparse
 import math
 import os
+import time  # 新增：导入 time 模块
 from pathlib import Path
 import random
 
@@ -18,7 +19,6 @@ from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import adjusted_rand_score, pairwise_distances
 from sklearn.neighbors import BallTree, KDTree, NearestNeighbors
-import torch
 import torch
 from torch.autograd import Variable
 import torch.nn as nn
@@ -408,51 +408,80 @@ def cal_spatial_weight(
     spatial_type="KDTree",
 ):
     from sklearn.neighbors import BallTree, KDTree, NearestNeighbors
-    if spatial_type == "NearestNeighbors":
-        nbrs = NearestNeighbors(n_neighbors=spatial_k + 1, algorithm='ball_tree').fit(data)
-        _, indices = nbrs.kneighbors(data)
-    elif spatial_type == "KDTree":
-        tree = KDTree(data, leaf_size=2)
-        _, indices = tree.query(data, k=spatial_k + 1)
-    elif spatial_type == "BallTree":
-        tree = BallTree(data, leaf_size=2)
-        _, indices = tree.query(data, k=spatial_k + 1)
-    indices = indices[:, 1:]
-    spatial_weight = np.zeros((data.shape[0], data.shape[0]))
-    for i in range(indices.shape[0]):
-        ind = indices[i]
-        for j in ind:
-            spatial_weight[i][j] = 1
+    from scipy.spatial.distance import pdist, squareform
+    
+    # Calculate k-th neighbor distance for each point to determine local density
+    nbrs = NearestNeighbors(n_neighbors=min(spatial_k + 1, data.shape[0]), algorithm='ball_tree').fit(data)
+    distances, indices = nbrs.kneighbors(data)
+    
+    # Use the distance to the k-th neighbor as an estimate of local density
+    # This creates spot-specific bandwidths
+    kth_distances = distances[:, -1]  # Distance to k-th nearest neighbor
+    
+    # Adaptive Gaussian kernel: weight decreases with distance, scaled by local density
+    n_spots = data.shape[0]
+    spatial_weight = np.zeros((n_spots, n_spots))
+    
+    for i in range(n_spots):
+        # Use local density (kth neighbor distance) as bandwidth for this spot
+        local_bandwidth = max(kth_distances[i], 1e-6)  # Avoid division by zero
+        
+        # Calculate distances to neighbors
+        neighbor_indices = indices[i, 1:]  # Exclude self
+        neighbor_distances = distances[i, 1:]  # Exclude self
+        
+        # Apply adaptive Gaussian kernel
+        weights = np.exp(- (neighbor_distances ** 2) / (2 * local_bandwidth ** 2))
+        spatial_weight[i, neighbor_indices] = weights
+    
     return spatial_weight
 def cal_gene_weight(data, n_components=50, gene_dist_type="cosine"):
-
-    pca = PCA(n_components=n_components)
-    if isinstance(data, np.ndarray):
-        data_pca = pca.fit_transform(data)
-    elif isinstance(data, csr_matrix):
-        data = data.toarray()
-        data_pca = pca.fit_transform(data)
-    gene_correlation = 1 - pairwise_distances(data_pca, metric=gene_dist_type)
-    return gene_correlation
+    from sklearn.decomposition import TruncatedSVD
+    from sklearn.preprocessing import minmax_scale
+    from scipy.special import softmax
+    
+    # Use TruncatedSVD for sparse inputs to maintain efficiency
+    if isinstance(data, csr_matrix):
+        # For sparse matrices, use TruncatedSVD instead of PCA
+        svd = TruncatedSVD(n_components=min(n_components, min(data.shape)-1))
+        data_reduced = svd.fit_transform(data)
+    else:
+        # For dense matrices, we can use PCA
+        from sklearn.decomposition import PCA
+        pca = PCA(n_components=n_components)
+        data_reduced = pca.fit_transform(data)
+    
+    # Compute correlation matrix
+    if gene_dist_type == "cosine":
+        from sklearn.metrics.pairwise import cosine_similarity
+        gene_similarity = cosine_similarity(data_reduced)
+    else:
+        gene_similarity = 1 - pairwise_distances(data_reduced, metric=gene_dist_type)
+    
+    # Apply soft-thresholding to filter noise and sharpen biological signals
+    # Replace small correlations with exponentially weighted values
+    threshold = np.percentile(np.abs(gene_similarity), 80)  # Dynamic threshold
+    gene_similarity = np.where(np.abs(gene_similarity) < threshold, 0, gene_similarity)
+    
+    # Apply exponential transformation to sharpen strong signals
+    gene_similarity = np.exp(gene_similarity) - 1  # Exponential transformation
+    gene_similarity = minmax_scale(gene_similarity.ravel()).reshape(gene_similarity.shape)  # Normalize
+    
+    return gene_similarity
 def cal_weight_matrix(adata, platform="Visium", pd_dist_type="euclidean", md_dist_type="cosine",
                       gb_dist_type="correlation", n_components=50, no_morphological=True, spatial_k=30,
                       spatial_type="KDTree", verbose=False):
+    # Calculate spatial weights using adaptive Gaussian kernel
     if platform == "Visium":
         img_row = adata.obsm['spatial_pixel']['x_pixel']
         img_col = adata.obsm['spatial_pixel']['y_pixel']
         array_row = adata.obsm["spatial"]['x']
         array_col = adata.obsm["spatial"]['y']
-        # img_row = adata.obs["imagerow"]
-        # img_col = adata.obs["imagecol"]
-        # array_row = adata.obs["array_row"]
-        # array_col = adata.obs["array_col"]
         rate = 3
         reg_row = LinearRegression().fit(array_row.values.reshape(-1, 1), img_row)
         reg_col = LinearRegression().fit(array_col.values.reshape(-1, 1), img_col)
         unit = math.sqrt(reg_row.coef_**2 + reg_col.coef_**2)
 
-        #   physical_distance = pairwise_distances(adata.obsm['spatial_pixel'][["y_pixel", "x_pixel"]], metric=pd_dist_type,n_jobs=-1)
-        #   physical_distance = np.where(physical_distance >= rate * unit, 0, 1)
         coords = adata.obsm['spatial_pixel'][["y_pixel", "x_pixel"]].values
         n_spots = coords.shape[0]
         radius = rate * unit
@@ -465,26 +494,84 @@ def cal_weight_matrix(adata, platform="Visium", pd_dist_type="euclidean", md_dis
             col_ind.extend(indices[i])
         data = np.ones(len(row_ind), dtype=np.int8)
         physical_distance = csr_matrix((data, (row_ind, col_ind)), shape=(n_spots, n_spots))
+        
+        # Convert to dense for compatibility with new spatial weight calculation
+        physical_distance_dense = physical_distance.toarray()
+        # Recalculate with adaptive spatial weights
+        spatial_coords = coords
+        spatial_weight_dense = cal_spatial_weight(spatial_coords, spatial_k=spatial_k, spatial_type=spatial_type)
+        # Combine both spatial aspects
+        physical_distance_dense = np.multiply(physical_distance_dense, spatial_weight_dense)
+        physical_distance = csr_matrix(physical_distance_dense)
     else:
-        physical_distance = cal_spatial_weight(adata.obsm['spatial'], spatial_k=spatial_k, spatial_type=spatial_type)
+        physical_distance_dense = cal_spatial_weight(adata.obsm['spatial'], spatial_k=spatial_k, spatial_type=spatial_type)
+        physical_distance = csr_matrix(physical_distance_dense)
 
     gene_counts = adata.X.copy()
     gene_correlation = cal_gene_weight(data=gene_counts, gene_dist_type=gb_dist_type, n_components=n_components)
     del gene_counts
+    
+    # Apply topological pruning: keep mutual nearest neighbors
+    # Find top-k connections for both spatial and gene similarities
+    top_k_spatial = min(15, physical_distance.shape[0] - 1)  # Reasonable number for spatial
+    top_k_gene = min(15, gene_correlation.shape[0] - 1)      # Reasonable number for gene
+    
+    # Create masks for top-k connections
+    spatial_mask = np.zeros_like(physical_distance_dense)
+    gene_mask = np.zeros_like(gene_correlation)
+    
+    for i in range(physical_distance_dense.shape[0]):
+        # Get top-k spatial neighbors
+        top_spatial_idx = np.argsort(physical_distance_dense[i])[::-1][:top_k_spatial]
+        spatial_mask[i, top_spatial_idx] = 1
+        
+        # Get top-k gene neighbors
+        top_gene_idx = np.argsort(gene_correlation[i])[::-1][:top_k_gene]
+        gene_mask[i, top_gene_idx] = 1
+    
+    # Apply masks
+    physical_distance_dense = physical_distance_dense * spatial_mask
+    gene_correlation = gene_correlation * gene_mask
+    
     if verbose:
         adata.obsm["gene_correlation"] = gene_correlation
-        adata.obsm["physical_distance"] = physical_distance
+        adata.obsm["physical_distance"] = csr_matrix(physical_distance_dense)
 
+    # Multi-modal fusion using log-domain or power mean approach
+    # Instead of simple multiplication, use weighted geometric mean
     if platform == 'Visium':
         morphological_similarity = 1 - pairwise_distances(np.array(adata.obsm["image_feat_pca"]), metric=md_dist_type)
-        morphological_similarity[morphological_similarity < 0] = 0
-        if verbose:
-            adata.obsm["morphological_similarity"] = morphological_similarity
-        adata.obsm["weights_matrix_all"] = (physical_distance * gene_correlation * morphological_similarity)
+        morphological_similarity = np.clip(morphological_similarity, 0, None)  # Ensure non-negative
+        
+        # Log-domain fusion to avoid vanishing weights
+        # Add small epsilon to avoid log(0)
+        eps = 1e-8
+        log_fusion = (
+            0.4 * np.log(physical_distance_dense + eps) + 
+            0.4 * np.log(gene_correlation + eps) + 
+            0.2 * np.log(morphological_similarity + eps)
+        )
+        weights_matrix_all = np.exp(log_fusion)  # Back to original domain
+        
+        # Apply topological consistency: mutual nearest neighbors
+        weights_matrix_all = weights_matrix_all * spatial_mask * gene_mask
+        
+        adata.obsm["weights_matrix_all"] = weights_matrix_all
         if no_morphological:
-            adata.obsm["weights_matrix_nomd"] = (gene_correlation * physical_distance)
+            # For nomd version, use same fusion principle
+            log_fusion_nomd = 0.5 * np.log(physical_distance_dense + eps) + 0.5 * np.log(gene_correlation + eps)
+            weights_matrix_nomd = np.exp(log_fusion_nomd)
+            weights_matrix_nomd = weights_matrix_nomd * spatial_mask * gene_mask
+            adata.obsm["weights_matrix_nomd"] = weights_matrix_nomd
     else:
-        adata.obsm["weights_matrix_nomd"] = (gene_correlation * physical_distance)
+        # For non-Visium platforms, use two-modal fusion
+        eps = 1e-8
+        log_fusion = 0.5 * np.log(physical_distance_dense + eps) + 0.5 * np.log(gene_correlation + eps)
+        weights_matrix_nomd = np.exp(log_fusion)
+        # Apply topological consistency
+        weights_matrix_nomd = weights_matrix_nomd * spatial_mask * gene_mask
+        adata.obsm["weights_matrix_nomd"] = weights_matrix_nomd
+    
     return adata
 # EVOLVE-BLOCK-END
 
@@ -608,6 +695,7 @@ def get_preprocessing_pipeline(verbose=False, cnnType='efficientnet-b0', pca_n_c
                 "label_channel": "label",
                 "label_channel_type": "obs"
             }))
+            
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
@@ -635,8 +723,13 @@ if __name__ == "__main__":
 
     scores = []
     inner_scores = []
+    times = []  # 新增：用于记录每次运行的时间
+
     for seed in range(args.seed, args.seed + args.num_runs):
-        set_seed(args.seed, extreme_mode=True)
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
+        # 修正：将 args.seed 修改为跟随循环的 seed
+        set_seed(seed, extreme_mode=True)
         try:
             EfNST = EfNsSTRunner(
                 platform=args.platform,
@@ -672,12 +765,23 @@ if __name__ == "__main__":
             
             if "adata" in locals():
                 EfNST.delete_imgs(adata)
+        
         score = adjusted_rand_score(y, y_pred)
         scores.append(score)
-        print(f"ARI: {score:.4f}")
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"ARI: {score:.4f}, time: {run_time:.2f}s")  # 修改：同时输出得分和运行时间
+
     print(f"EfNST {args.sample_number}:")
+    # 修改：加入 times 列表，以供 evaluator 捕获
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
+
 """
 python EfNST.py --sample_number 151507
 python EfNST.py --sample_number 151673

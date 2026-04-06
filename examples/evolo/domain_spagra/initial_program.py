@@ -1,4 +1,5 @@
 import argparse
+import time  # 新增：导入 time 模块
 
 import numpy as np
 
@@ -88,6 +89,7 @@ def get_preprocessing_pipeline(log_level: LogLevel = "INFO"):
     transforms.append(SetConfig({"label_channel": "label",
             "label_channel_type": "obs"}))
     return Compose(*transforms, log_level=log_level)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
@@ -104,9 +106,14 @@ if __name__ == "__main__":
     parser.add_argument("--device", type=str, default=None, help="Device to use (e.g., 'cuda', 'cpu', 'cuda:0').")
     parser.add_argument("--obs_nums",type=int,default=10000)
     args = parser.parse_args()
+    
     inner_scores=[]
     scores = []
+    times = []  # 新增：用于记录每次运行的时间
+
     for seed in range(args.seed, args.seed + args.num_runs):
+        start_time = time.time()  # 新增：记录单次循环的开始时间
+        
         set_seed(seed)
 
         # Initialize model and get model specific preprocessing pipeline
@@ -133,12 +140,20 @@ if __name__ == "__main__":
             "davies_bouldin": davies_bouldin_score(x, pred)
         }))
         scores.append(score)
-        print(f"ARI: {score:.4f}")
+        
+        end_time = time.time()  # 新增：记录单次循环的结束时间
+        run_time = end_time - start_time
+        times.append(run_time)  # 新增：保存耗时
+        
+        print(f"ARI: {score:.4f}, time: {run_time:.2f}s")  # 修改：打印单次得分与时间
 
-    print(f"ARI: {score:.4f}")
+    # 删除了原代码中这里重复的 print(f"ARI: {score:.4f}")
     print(f"spaGRA {args.sample_number}:")
+    # 修改：加入 times 列表，以供 evaluator 捕获
+    print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
+    print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
 
 """ To reproduce SpaGRA on other samples, please refer to command lines belows:
 
