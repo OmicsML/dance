@@ -66,7 +66,7 @@ prompt:
 
     **Constraints:**
     1. **Input/Output:** You must preserve the class structure `StringDBGraph(BaseTransform)`. The output must update `data.data` (the AnnData object). Specifically, `adata.uns[self.out]` must contain the `edge_index` (2 x NumEdges). 2. **Dependencies:** You may use `torch`, `pandas`, `numpy`, and `scipy`. 3. **Hyperparameters:** You are free to introduce new hyperparameters (e.g., `k_neighbors`, `weight_scale`) to the `__init__` method.
-    **Output Format:** Return **only** the optimized Python code block that should replace the content between `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END`. Do not include the imports outside the block. 
+    **Output Format:** Return **only** the optimized Python code block that should replace the content between `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END`. Do not include the imports outside the block.
 
     **cta_scheteronet is identified as a structurally similar algorithm, sharing a similarity score of 0.6500 with the algorithm currently under optimization. Consequently, the following graph construction rules may serve as a useful reference:**
     ```IF constructing k-nearest neighbor graphs from high-dimensional single-cell expression features THEN replace iterative Python list comprehensions with vectorized NumPy array operations for edge list generation to reduce graph construction time and improve `avg_speed_score`

@@ -6,21 +6,20 @@ from typing import Literal
 
 import cv2
 import numpy as np
+import scanpy as sc
+import torch
+import wandb
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import pairwise_distances
-import torch
 from tqdm import tqdm, trange
-import wandb
 
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.stlearn import StLouvain
 from dance.registry import register_preprocessor
-from dance.utils import set_seed, sub_data
-import scanpy as sc
-
 from dance.transforms import AnnDataTransform, BaseTransform, Compose, SetConfig
 from dance.typing import LogLevel, Optional, Sequence, Union
+from dance.utils import set_seed, sub_data
 from dance.utils.matrix import normalize
 from dance.utils.metrics import calculate_unified_scores, resolve_score_func
 from dance.utils.wrappers import add_mod_and_transform
@@ -28,7 +27,8 @@ from dance.utils.wrappers import add_mod_and_transform
 MODES = ["louvain", "kmeans"]
 # EVOLVE-BLOCK-START
 
-@register_preprocessor("feature", "spatial",overwrite=True)
+
+@register_preprocessor("feature", "spatial", overwrite=True)
 class MorphologyFeatureCNN(BaseTransform):
     """Cell morphological features extracted from CNN.
 
@@ -108,7 +108,7 @@ class MorphologyFeatureCNN(BaseTransform):
         data.data.obsm[self.out] = morth_feat
 
 
-@register_preprocessor("feature", "spatial",overwrite=True)
+@register_preprocessor("feature", "spatial", overwrite=True)
 class SMEFeature(BaseTransform):
     """Spatial Morphological gene Expression normalization feature from stLearn.
 
@@ -162,9 +162,9 @@ class SMEFeature(BaseTransform):
             sme_feat = pca.fit_transform(sme_feat)
 
         data.data.obsm[self.out] = sme_feat
-        
 
-@register_preprocessor("feature", "cell",overwrite=True)
+
+@register_preprocessor("feature", "cell", overwrite=True)
 @add_mod_and_transform
 class CellPCA(BaseTransform):
     """Reduce cell feature matrix with PCA.
@@ -214,9 +214,10 @@ class CellPCA(BaseTransform):
             data.data.uns["pca_explained_variance_ratio"] = pca.explained_variance_ratio_
             # data.data.uns["pca"] = pca
 
-        return data    
+        return data
 
-@register_preprocessor("graph", "spatial",overwrite=True)
+
+@register_preprocessor("graph", "spatial", overwrite=True)
 class SMEGraph(BaseTransform):
     """Spatial Morphological gene Expression graph."""
 
@@ -247,8 +248,9 @@ class SMEGraph(BaseTransform):
         adj = adj_p * adj_m * adj_g
 
         data.data.obsp[self.out] = adj
-        
-@register_preprocessor("graph", "cell",overwrite=True)
+
+
+@register_preprocessor("graph", "cell", overwrite=True)
 class NeighborGraph(BaseTransform):
     """Construct neighborhood graph of observations.
 
@@ -298,17 +300,16 @@ class NeighborGraph(BaseTransform):
         data.data.obsp[self.out] = adj
 
         return data
-     
-          
+
+
 def get_preprocessing_pipeline(morph_feat_dim: int = 50, sme_feat_dim: int = 50, pca_feat_dim: int = 10,
-                            nbrs_pcs: int = 10, n_neighbors: int = 10, device: str = "cpu",
-                            log_level: LogLevel = "INFO", crop_size=10, target_size=230):
+                               nbrs_pcs: int = 10, n_neighbors: int = 10, device: str = "cpu",
+                               log_level: LogLevel = "INFO", crop_size=10, target_size=230):
     return Compose(
         AnnDataTransform(sc.pp.filter_genes, min_cells=1),
         AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
         AnnDataTransform(sc.pp.log1p),
-        MorphologyFeatureCNN(n_components=morph_feat_dim, device=device, crop_size=crop_size,
-                                target_size=target_size),
+        MorphologyFeatureCNN(n_components=morph_feat_dim, device=device, crop_size=crop_size, target_size=target_size),
         CellPCA(n_components=pca_feat_dim),
         SMEGraph(),
         SMEFeature(n_components=sme_feat_dim),
@@ -321,6 +322,8 @@ def get_preprocessing_pipeline(morph_feat_dim: int = 50, sme_feat_dim: int = 50,
         }),
         log_level=log_level,
     )
+
+
 # EVOLVE-BLOCK-END
 
 if __name__ == "__main__":
@@ -347,7 +350,7 @@ if __name__ == "__main__":
         if args.mode == "kmeans":
             raise NotImplementedError("--------")
         elif args.mode == "louvain":
-            model = StLouvain(resolution=0.6,random_state=seed)
+            model = StLouvain(resolution=0.6, random_state=seed)
         else:
             raise ValueError(f"Unknown mode {args.mode!r}, available options are {MODES}")
         # preprocessing_pipeline = model.preprocessing_pipeline(device=args.device)
@@ -356,28 +359,27 @@ if __name__ == "__main__":
         dataloader = SpatialLIBDDataset(data_id=args.sample_number, data_dir=args.data_dir,
                                         sample_file=args.sample_file)
         preprocessing_pipeline = get_preprocessing_pipeline(device=args.device)
-        data = dataloader.load_data(transform=None,cache=args.cache)
+        data = dataloader.load_data(transform=None, cache=args.cache)
         sub_data(data.data)
         preprocessing_pipeline(data)
         # Prepare preprocessing pipeline and apply it to data
         x, y = data.get_data(return_type="default")
         score = model.fit_score(x, y.values.ravel())
-        pred=model.predict()
+        pred = model.predict()
         silhouette_score = resolve_score_func("silhouette")
         calinski_harabasz_score = resolve_score_func("calinski_harabasz")
         davies_bouldin_score = resolve_score_func("davies_bouldin")
-        inner_scores.append(calculate_unified_scores({
-            "silhouette": silhouette_score(x.toarray(), pred),
-            "calinski_harabasz": calinski_harabasz_score(x.toarray(), pred),
-            "davies_bouldin": davies_bouldin_score(x.toarray(), pred)
-        }))
+        inner_scores.append(
+            calculate_unified_scores({
+                "silhouette": silhouette_score(x.toarray(), pred),
+                "calinski_harabasz": calinski_harabasz_score(x.toarray(), pred),
+                "davies_bouldin": davies_bouldin_score(x.toarray(), pred)
+            }))
         scores.append(score)
         print(f"ARI: {score:.4f}")
     print(f"STAGATE {args.sample_number}:")
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
-        
-
 """ To reproduce stlearn on other samples, please refer to command lines belows:
 NOTE: since the stlearn method is unstable, you have to run multiple times to get
       best performance.

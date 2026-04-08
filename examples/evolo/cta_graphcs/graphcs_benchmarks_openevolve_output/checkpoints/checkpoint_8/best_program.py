@@ -1,38 +1,37 @@
 import argparse
-import pprint
-from typing import get_args
-import time  # 新增：导入 time 模块
-
-import numpy as np
-from sklearn.model_selection import train_test_split
-import torch
+import logging
 import math
+import pprint
+import time  # 新增：导入 time 模块
+from abc import ABC, abstractmethod
+from typing import Any, Optional, Tuple, Union, get_args
+
+import bbknn
+import numpy as np
+import scanpy as sc
+import torch
+from sklearn.model_selection import train_test_split
+
 from dance import logger
 from dance.data import Data
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.graphcs import GraphCSClassifier, load_GBP_data
+from dance.registry import register_preprocessor
+from dance.transforms.base import BaseTransform
 from dance.transforms.filter import HighlyVariableGenesLogarithmizedByTopGenes, SupervisedFeatureSelection
 from dance.transforms.graph.graphcs import BBKNNConstruction
 from dance.transforms.misc import Compose, SetConfig
 from dance.transforms.normalize import NormalizeTotalLog1P
 from dance.typing import LogLevel
 from dance.utils import set_seed, sub_data
-import scanpy as sc
-import bbknn
-import logging
-from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Union, Any
-
-from dance.transforms.base import BaseTransform
-from dance.registry import register_preprocessor
 
 
 # EVOLVE-BLOCK-START
-@register_preprocessor("graph", "cell",overwrite=True)
+@register_preprocessor("graph", "cell", overwrite=True)
 class BBKNNConstruction(BaseTransform):
-    """
-    Constructs a graph using BBKNN (for multi-batch data) or KNN (for single-batch data),
-    trims edges based on ratio, and saves the graph structure as a list of strings in `adata.uns`.
+    """Constructs a graph using BBKNN (for multi-batch data) or KNN (for single-batch
+    data), trims edges based on ratio, and saves the graph structure as a list of
+    strings in `adata.uns`.
 
     For multi-batch data, uses BBKNN to handle batch effects. For single-batch data,
     uses standard KNN neighbor graph construction.
@@ -56,19 +55,13 @@ class BBKNNConstruction(BaseTransform):
         The key in `adata.uns` where the graph list will be stored. Default: 'temp_graph'.
     n_neighbors
         Number of neighbors for KNN (used for single-batch data). Default: 15.
+
     """
 
     _DISPLAY_ATTRS: Tuple[str] = ("batch_key", "edge_ratio", "key_added", "n_neighbors")
 
-    def __init__(
-        self,
-        batch_key: Optional[str] = None,
-        edge_ratio: float = 2.0,
-        key_added: str = 'temp_graph',
-        n_neighbors: int = 15,
-        out: Optional[str] = None,
-        log_level: LogLevel = "WARNING"
-    ):
+    def __init__(self, batch_key: Optional[str] = None, edge_ratio: float = 2.0, key_added: str = 'temp_graph',
+                 n_neighbors: int = 15, out: Optional[str] = None, log_level: LogLevel = "WARNING"):
         super().__init__(out=out, log_level=log_level)
         self.batch_key = batch_key
         self.edge_ratio = edge_ratio
@@ -141,7 +134,7 @@ class BBKNNConstruction(BaseTransform):
 
             # 4. 提取原始连接信息
             if 'connectivities' not in adata.obsp:
-                 raise ValueError("BBKNN did not generate 'connectivities' in adata.obsp")
+                raise ValueError("BBKNN did not generate 'connectivities' in adata.obsp")
 
             cell_count = adata.shape[0]
             # 获取 COO 格式以便遍历
@@ -157,21 +150,21 @@ class BBKNNConstruction(BaseTransform):
             # Vectorized computation of batch assignments for each edge
             batch_rows = batch_indices[rows]
             batch_cols = batch_indices[cols]
-            
+
             # Find cross-batch edges
             cross_batch_mask = batch_rows != batch_cols
-            
+
             # Process cross-batch edges
             cross_rows = rows[cross_batch_mask]
             cross_cols = cols[cross_batch_mask]
             cross_vals = ratio_values[cross_batch_mask]
             cross_batch_rows = batch_rows[cross_batch_mask]
             cross_batch_cols = batch_cols[cross_batch_mask]
-            
+
             for i in range(len(cross_rows)):
                 b_row = cross_batch_rows[i]
                 b_col = cross_batch_cols[i]
-                
+
                 x, y = max(b_row, b_col), min(b_row, b_col)
                 inter_ratio[x][y].append(cross_vals[i])
 
@@ -190,23 +183,23 @@ class BBKNNConstruction(BaseTransform):
             # Determine which edges to keep
             within_batch_mask = batch_rows == batch_cols
             keep_mask = within_batch_mask.copy()  # Start with within-batch edges
-            
+
             # Process cross-batch edges with threshold
             for i in range(len(rows)):
                 if not keep_mask[i]:  # Only check cross-batch edges
                     b_row = batch_rows[i]
                     b_col = batch_cols[i]
-                    
+
                     if b_row != b_col:
                         x, y = max(b_row, b_col), min(b_row, b_col)
-                        
+
                         # Calculate truncation threshold
                         limit_idx = int(self.edge_ratio * max(batch_info[x], batch_info[y]))
                         threshold_index = min(limit_idx, len(inter_ratio[x][y]) - 1)
-                        
+
                         if len(inter_ratio[x][y]) > 0:
                             ratio_threshold = inter_ratio[x][y][threshold_index]
-                            
+
                             if ratio_values[i] > ratio_threshold:
                                 keep_mask[i] = True
 
@@ -232,22 +225,23 @@ class BBKNNConstruction(BaseTransform):
 
         return data
 
+
 # EVOLVE-BLOCK-END
 
+
 def get_preprocessing_pipeline(edge_ratio: float = 2, log_level: LogLevel = "INFO"):
-        transforms = []
-        transforms.append(SupervisedFeatureSelection(label_col="cell_type", n_features=2000,split_name="train"))
-        transforms.append(NormalizeTotalLog1P())
-        transforms.append(HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=2000))
-        transforms.append(BBKNNConstruction(edge_ratio=edge_ratio, key_added="temp_graph"))
-        transforms.append(SetConfig({
-            "label_channel": "cell_type"
-        }))
-        return Compose(*transforms, log_level=log_level)
+    transforms = []
+    transforms.append(SupervisedFeatureSelection(label_col="cell_type", n_features=2000, split_name="train"))
+    transforms.append(NormalizeTotalLog1P())
+    transforms.append(HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=2000))
+    transforms.append(BBKNNConstruction(edge_ratio=edge_ratio, key_added="temp_graph"))
+    transforms.append(SetConfig({"label_channel": "cell_type"}))
+    return Compose(*transforms, log_level=log_level)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    
+
     # Base Dance arguments
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--dense_dim", type=int, default=400, help="dim of PCA")
@@ -260,106 +254,109 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--num_runs", type=int, default=2)
     parser.add_argument("--val_size", type=float, default=0.2, help="val size")
-    
+
     # Training parameters (passed to GraphCSClassifier.__init__)
     parser.add_argument("--batch_size", type=int, default=128, help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
     parser.add_argument("--vat_lr", type=float, default=0.1, help="VAT learning rate")
     parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
     parser.add_argument("--patience", type=int, default=20, help="early stopping patience")
-    
+
     # Model architecture parameters
     parser.add_argument("--layer", type=int, default=2, help="number of layers")
     parser.add_argument("--hidden", type=int, default=256, help="hidden dimensions")
     parser.add_argument("--dropout", type=float, default=0, help="dropout rate")
     parser.add_argument("--bias", default='none', help="bias usage")
-    
+
     # GraphCS specific parameters (if used in preprocessing or internal logic)
     parser.add_argument("--alpha", type=float, default=0.05, help="decay factor (GraphCS)")
     parser.add_argument("--rmax", type=float, default=1e-5, help="threshold (GraphCS)")
     parser.add_argument("--rrz", type=float, default=0.5, help="gamma/rrz (GraphCS)")
-    parser.add_argument("--obs_nums",type=int,default=None)
+    parser.add_argument("--obs_nums", type=int, default=None)
 
     args = parser.parse_args()
-    
+
     # Update GPU argument for the model wrapper expectations
     # The class expects args.gpus to be a list
     args.gpus = [args.gpu] if args.gpu != -1 else []
-    
+
     logger.setLevel(args.log_level)
     logger.info(f"Running GraphCS with the following parameters:\n{pprint.pformat(vars(args))}")
 
     scores = []
-    inner_scores=[]
+    inner_scores = []
     times = []  # 新增：用于记录每次运行的时间
 
     for seed in range(args.seed, args.seed + args.num_runs):
         start_time = time.time()  # 新增：记录单次循环的开始时间
-        
+
         set_seed(seed)
-        
+
         # Initialize model: args are passed here, so self.batch_size etc are set now
         model = GraphCSClassifier(args, random_state=seed)
-        
+
         # Get preprocessing pipeline
         preprocessing_pipeline = get_preprocessing_pipeline(log_level=args.log_level)
-        
+
         dataloader = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
                                                species=args.species, tissue=args.tissue, val_size=args.val_size)
-        
+
         data = dataloader.load_data(transform=None, cache=args.cache)
         if args.obs_nums is not None:
-            sub_data(data.data,args.obs_nums)
-            train_idx, test_idx = train_test_split(range(args.obs_nums),test_size=0.2,random_state=seed)  # 修改：将 args.seed 改为 seed
-            train_idx,val_idx = train_test_split(train_idx,test_size=args.val_size,random_state=seed)    # 修改：将 args.seed 改为 seed
+            sub_data(data.data, args.obs_nums)
+            train_idx, test_idx = train_test_split(range(args.obs_nums), test_size=0.2,
+                                                   random_state=seed)  # 修改：将 args.seed 改为 seed
+            train_idx, val_idx = train_test_split(train_idx, test_size=args.val_size,
+                                                  random_state=seed)  # 修改：将 args.seed 改为 seed
             data.set_split_idx("train", train_idx)
             data.set_split_idx("test", test_idx)
             data.set_split_idx("val", val_idx)
         preprocessing_pipeline(data)
-        X,y=data.get_data(return_type="torch")
-        temp_graph=data.data.uns["temp_graph"]
-        dataset_name=f"{args.species}_{args.tissue}"
-        features=load_GBP_data(dataset_name, args.alpha, args.rmax, args.rrz, X, temp_graph)
+        X, y = data.get_data(return_type="torch")
+        temp_graph = data.data.uns["temp_graph"]
+        dataset_name = f"{args.species}_{args.tissue}"
+        features = load_GBP_data(dataset_name, args.alpha, args.rmax, args.rrz, X, temp_graph)
         # Obtain training and testing data
-        x_train=features[data.train_idx]
-        x_val=features[data.val_idx]
-        x_test=features[data.test_idx]
-        y_train=y[data.train_idx]
-        y_val=y[data.val_idx]
-        y_test=y[data.test_idx]
-        
+        x_train = features[data.train_idx]
+        x_val = features[data.val_idx]
+        x_test = features[data.test_idx]
+        y_train = y[data.train_idx]
+        y_val = y[data.val_idx]
+        y_test = y[data.test_idx]
+
         # Convert OneHot labels to Integer labels for PyTorch CrossEntropy
         if y_train.shape[1] > 1:
             y_train_converted = y_train.argmax(1)
         else:
             y_train_converted = y_train.flatten()
-        
+
         if y_val.shape[1] > 1:
             y_val_converted = y_val.argmax(1)
         else:
             y_val_converted = y_val.flatten()
-            
+
         nfeat = x_train.shape[1]
-        nclass = max(int(y_train_converted.max()),int(y_val_converted.max())) + 1
+        nclass = max(int(y_train_converted.max()), int(y_val_converted.max())) + 1
         # Train: fit() uses self.batch_size initialized earlier
-        model.fit(torch.FloatTensor(x_train),torch.LongTensor(y_train_converted),torch.FloatTensor(x_val),torch.LongTensor(y_val_converted),nfeat,nclass)
-        
+        model.fit(torch.FloatTensor(x_train), torch.LongTensor(y_train_converted), torch.FloatTensor(x_val),
+                  torch.LongTensor(y_val_converted), nfeat, nclass)
+
         # Predict/Score: uses self.batch_size
-        inner_score=model.score(x_val,y_val)
+        inner_score = model.score(x_val, y_val)
         score = model.score(x_test, y_test)
         inner_scores.append(inner_score)
         scores.append(score)
-        
+
         end_time = time.time()  # 新增：记录单次循环的结束时间
         run_time = end_time - start_time
         times.append(run_time)  # 新增：保存耗时
-        
+
         print(f"score: {score:.4f}, inner_score: {inner_score:.4f}, time: {run_time:.2f}s")  # 修改：同时打印三个指标
 
     print(f"GraphCS {args.species} {args.tissue} {args.test_dataset}:")
     # 修改：打印供 evaluator 捕获的列表
     print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
-    
+
     mean_score = np.mean(scores)
     std_score = np.std(scores)
     mean_inner_score = np.mean(inner_scores)
@@ -367,7 +364,6 @@ if __name__ == "__main__":
     print(f"mean_score: {mean_score:.5f} +/- {std_score:.5f}")
     print(f"mean_inner_score: {mean_inner_score:.5f} +/- {std_inner_score:.5f}")
     print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
-
 """To reproduce GraphCS benchmarks, please refer to command lines below:
 
 Mouse Brain

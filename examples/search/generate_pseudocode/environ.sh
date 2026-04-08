@@ -22,11 +22,11 @@ ALL_METHODS=(
 for TASK_NAME in "${ALL_METHODS[@]}"; do
     echo "------------------------------------------------"
     echo "Starting task: $TASK_NAME"
-    
+
     # 根据当前的 TASK_NAME 设置变量
     PROMPT_FILE="pseudocode_${TASK_NAME}_prompt.txt"
     OUTPUT_DIR="${TASK_NAME}_openevolve_output"
-    
+
     # 导出环境变量
     export TASK_NAME
     export OPENEVOLVE_PROMPT=$PROMPT_FILE
@@ -35,7 +35,7 @@ for TASK_NAME in "${ALL_METHODS[@]}"; do
     python ../openevolve-run.py "$PROMPT_FILE" evaluator_pseudocode.py \
       --config config_pseudocode.yaml \
       --output "$OUTPUT_DIR"
-      
+
     echo "Finished task: $TASK_NAME"
 done
 

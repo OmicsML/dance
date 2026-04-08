@@ -3,12 +3,13 @@ from typing import Optional
 
 import dgl
 import numpy as np
+import pandas as pd
 import scanpy as sc
-from sklearn.neighbors import NearestNeighbors
 import torch
 import torch.nn as nn
 from sklearn.model_selection import train_test_split
-import pandas as pd
+from sklearn.neighbors import NearestNeighbors
+
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scheteronet import (
     convert_dgl_to_original_format,
@@ -28,9 +29,8 @@ from dance.typing import LogLevel
 from dance.utils import set_seed
 
 
-
 # EVOLVE-BLOCK-START
-@register_preprocessor("graph", "cell",overwrite=True)
+@register_preprocessor("graph", "cell", overwrite=True)
 class HeteronetGraph(BaseTransform):
 
     def __init__(self, knn_num: int = 5, distance_metrics: str = 'l2', random_state: int = 0,
@@ -43,6 +43,7 @@ class HeteronetGraph(BaseTransform):
         self.channel = channel
         self.ignore_first = ignore_first
         self.channel_type = channel_type
+
     def build_graph(self, features_np, radius=None, knears=None, distance_metrics='l2'):
         """
         based on https://github.com/hannshu/st_datasets/blob/master/utils/preprocess.py
@@ -111,21 +112,26 @@ class HeteronetGraph(BaseTransform):
         if batchs is not None:
             g.ndata['batch_id'] = torch.from_numpy(batchs.values.astype(int)).long()
         adata.uns[self.out] = g
+
+
 # EVOLVE-BLOCK-END
 
+
 def get_preprocessing_pipeline(log_level: LogLevel = "INFO"):
-        transforms = []
-        transforms.append(FilterCellsType())
-        transforms.append(AnnDataTransform(sc.pp.filter_genes, min_counts=3))
-        transforms.append(FilterCellsScanpy(min_counts=1))
-        transforms.append(HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=4000, flavor="cell_ranger"))
-        transforms.append(SaveRaw())
-        transforms.append(NormalizeTotal())
-        transforms.append(UpdateSizeFactors())
-        transforms.append(Log1P())
-        transforms.append(HeteronetGraph())
-        transforms.append(SetConfig({"label_channel": "cell_type"}))
-        return Compose(*transforms, log_level=log_level)
+    transforms = []
+    transforms.append(FilterCellsType())
+    transforms.append(AnnDataTransform(sc.pp.filter_genes, min_counts=3))
+    transforms.append(FilterCellsScanpy(min_counts=1))
+    transforms.append(HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=4000, flavor="cell_ranger"))
+    transforms.append(SaveRaw())
+    transforms.append(NormalizeTotal())
+    transforms.append(UpdateSizeFactors())
+    transforms.append(Log1P())
+    transforms.append(HeteronetGraph())
+    transforms.append(SetConfig({"label_channel": "cell_type"}))
+    return Compose(*transforms, log_level=log_level)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_dataset", nargs="+", type=int, default=[1759], help="Testing dataset IDs")

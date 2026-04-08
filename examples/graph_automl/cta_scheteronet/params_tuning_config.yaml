@@ -6,7 +6,7 @@ pipeline:
     target: FilterCellsType
   - type: filter.gene
     target: FilterGenesScanpy
-    params: 
+    params:
       min_counts: 1
   - type: filter.cell
     target: FilterCellsScanpy
@@ -32,9 +32,9 @@ pipeline:
   - type: graph.cell
     target: HeteronetGraph
     params_to_tune:
-      knn_num: 
+      knn_num:
         values: [5,10,15]
-      distance_metrics: 
+      distance_metrics:
         values: ['l1','l2','cosine']
   - type: misc
     target: SetConfig

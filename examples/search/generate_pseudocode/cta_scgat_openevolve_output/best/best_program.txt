@@ -16,7 +16,7 @@ procedure scGATAnnotator(
 begin
     model: GAT;
     label_encoder: any;
-    
+
     procedure preprocessing_pipeline(label_column: string := "cell_type"; n_neighbors: integer := 15; log_level: string := "INFO");
     begin
         transforms := [scGATGraphTransform(label_column, n_neighbors), SetConfig({"label_channel": "cell_type"})];
@@ -46,10 +46,10 @@ begin
     function fit(x: AnnData; y: any := null): scGATAnnotator;
     begin
         _set_seed();
-        
+
         (* 1. Data Preparation *)
         data := _get_pyg_data(x);
-        
+
         (* 2. Model Initialization *)
         n_classes := int(data.y.max() + 1);
         num_features := data.x.shape[1];
@@ -62,7 +62,7 @@ begin
             alpha := alpha
         ).to(device);
         optimizer := torch.optim.Adagrad(model.parameters(), lr := lr, weight_decay := weight_decay);
-        
+
         (* 3. Data Loading Strategy *)
         if num_parts <= 1 then
             loader := [data];
@@ -71,17 +71,17 @@ begin
             if num_parts < 2 then num_parts := 2;
             cd := ClusterData(data, num_parts := num_parts, recursive := false);
             loader := ClusterLoader(cd, batch_size := batch_size, shuffle := true);
-        
+
         (* 4. Training Loop *)
         best_loss := +∞;
         bad_counter := 0;
         best_state_dict := null;
-        
+
         for epoch := 0 to n_epochs - 1 do
         begin
             model.train();
             epoch_loss := [];
-            
+
             for batch in loader do
             begin
                 batch := batch.to(device);
@@ -95,9 +95,9 @@ begin
                     epoch_loss.append(loss.item());
                 end;
             end;
-            
+
             val_loss := _evaluate_loss(data, "val");
-            
+
             if val_loss < best_loss then
             begin
                 best_loss := val_loss;
@@ -106,17 +106,17 @@ begin
             end
             else
                 bad_counter := bad_counter + 1;
-            
+
             if bad_counter >= patience then
                 break;
-            
+
             if epoch mod 10 = 0 then
                 print("Epoch ", epoch, ": Train Loss ", mean(epoch_loss), ", Val Loss ", val_loss);
         end;
-        
+
         if best_state_dict ≠ null then
             model.load_state_dict(best_state_dict);
-        
+
         return self;
     end;
 

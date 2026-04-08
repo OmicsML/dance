@@ -1,8 +1,8 @@
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import numpy as np
 
 path = "similarity_matrix.csv"
 
@@ -41,21 +41,20 @@ df = df.rename(index=label_mapping, columns=label_mapping)
 np.fill_diagonal(df.values, 0)
 
 # 6. 设置绘图风格
-sns.set(font_scale=1.0) # 建议稍微调大一点，比如 1.1 或 1.2，适应论文阅读
+sns.set(font_scale=1.0)  # 建议稍微调大一点，比如 1.1 或 1.2，适应论文阅读
 plt.figure(figsize=(12, 10))
 
 # 7. 绘制热度图
-ax = sns.heatmap(df, cmap="Blues", annot=True, fmt=".2f", 
-                 cbar_kws={'label': 'Semantic Similarity Score'},
-                 linewidths=1, linecolor='white')
+ax = sns.heatmap(df, cmap="Blues", annot=True, fmt=".2f", cbar_kws={'label': 'Semantic Similarity Score'}, linewidths=1,
+                 linecolor='white')
 
 # 8. 在每行的最大值处画红框
 for i, row_name in enumerate(df.index):
     max_val = df.loc[row_name].max()
     # 防止全0行报错（虽然不太可能）
-    if max_val > 0: 
+    if max_val > 0:
         max_cols = df.columns[df.loc[row_name] == max_val].tolist()
-        
+
         for col_name in max_cols:
             j = df.columns.get_loc(col_name)
             # 添加红框
@@ -67,7 +66,7 @@ plt.xlabel("Reference Model (Historical Knowledge)", fontsize=12)
 plt.ylabel("Target Model (Current Task)", fontsize=12)
 
 # 旋转 X 轴标签以防重叠，且对齐
-plt.xticks(rotation=45, ha='right') 
+plt.xticks(rotation=45, ha='right')
 plt.yticks(rotation=0)
 
 plt.tight_layout()

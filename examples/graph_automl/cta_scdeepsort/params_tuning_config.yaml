@@ -8,7 +8,7 @@ pipeline:
       n_components: 200
       split_name: train
     params_to_tune:
-      normalize_edges: 
+      normalize_edges:
         values: [True,False]
   - type: misc
     target: SetConfig

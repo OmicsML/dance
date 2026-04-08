@@ -31,11 +31,11 @@ The initial implementation was a simple random search that had no memory between
 def search_algorithm(iterations=1000, bounds=(-5, 5)):
     """
     A simple random search algorithm that often gets stuck in local minima.
-    
+
     Args:
         iterations: Number of iterations to run
         bounds: Bounds for the search space (min, max)
-        
+
     Returns:
         Tuple of (best_x, best_y, best_value)
     """
@@ -43,17 +43,17 @@ def search_algorithm(iterations=1000, bounds=(-5, 5)):
     best_x = np.random.uniform(bounds[0], bounds[1])
     best_y = np.random.uniform(bounds[0], bounds[1])
     best_value = evaluate_function(best_x, best_y)
-    
+
     for _ in range(iterations):
         # Simple random search
         x = np.random.uniform(bounds[0], bounds[1])
         y = np.random.uniform(bounds[0], bounds[1])
         value = evaluate_function(x, y)
-        
+
         if value < best_value:
             best_value = value
             best_x, best_y = x, y
-    
+
     return best_x, best_y, best_value
 ```
 
@@ -65,7 +65,7 @@ After running OpenEvolve, it discovered a simulated annealing algorithm with a c
 def search_algorithm(bounds=(-5, 5), iterations=2000, initial_temperature=100, cooling_rate=0.97, step_size_factor=0.2, step_size_increase_threshold=20):
     """
     Simulated Annealing algorithm for function minimization.
-    
+
     Args:
         bounds: Bounds for the search space (min, max)
         iterations: Number of iterations to run
@@ -138,48 +138,53 @@ def search_algorithm(bounds=(-5, 5), iterations=2000, initial_temperature=100, c
 Through evolutionary iterations, OpenEvolve discovered several key algorithmic concepts:
 
 1. **Exploration via Temperature**: Simulated annealing uses a `temperature` parameter to allow uphill moves early in the search, helping escape local minima that would trap simpler methods.
-    ```python
-    probability = np.exp((current_value - new_value) / temperature)
-    ```
 
-2. **Adaptive Step Size**: The step size is adjusted dynamically—shrinking as the search converges and expanding if progress stalls—leading to better coverage and faster convergence.
-    ```python
-    if i > iterations * 0.75:  # Reduce step size towards the end
-        step_size *= 0.5
-    if no_improvement_count > step_size_increase_threshold: # Increase step size if stuck
-        step_size *= 1.1
-        no_improvement_count = 0 # Reset the counter
-    ```
+   ```python
+   probability = np.exp((current_value - new_value) / temperature)
+   ```
 
-3. **Bounded Moves**: The algorithm ensures all candidate solutions remain within the feasible domain, avoiding wasted evaluations.
-    ```python
-    # Keep the new points within the bounds
-    new_x = max(bounds[0], min(new_x, bounds[1]))
-    new_y = max(bounds[0], min(new_y, bounds[1]))
-    ```
+1. **Adaptive Step Size**: The step size is adjusted dynamically—shrinking as the search converges and expanding if progress stalls—leading to better coverage and faster convergence.
 
-4. **Stagnation Handling**: By counting iterations without improvement, the algorithm responds by boosting exploration when progress stalls.
-    ```python
-    if no_improvement_count > step_size_increase_threshold: # Increase step size if stuck
-        step_size *= 1.1
-        no_improvement_count = 0 # Reset the counter
-    ```
+   ```python
+   if i > iterations * 0.75:  # Reduce step size towards the end
+       step_size *= 0.5
+   if no_improvement_count > step_size_increase_threshold: # Increase step size if stuck
+       step_size *= 1.1
+       no_improvement_count = 0 # Reset the counter
+   ```
+
+1. **Bounded Moves**: The algorithm ensures all candidate solutions remain within the feasible domain, avoiding wasted evaluations.
+
+   ```python
+   # Keep the new points within the bounds
+   new_x = max(bounds[0], min(new_x, bounds[1]))
+   new_y = max(bounds[0], min(new_y, bounds[1]))
+   ```
+
+1. **Stagnation Handling**: By counting iterations without improvement, the algorithm responds by boosting exploration when progress stalls.
+
+   ```python
+   if no_improvement_count > step_size_increase_threshold: # Increase step size if stuck
+       step_size *= 1.1
+       no_improvement_count = 0 # Reset the counter
+   ```
 
 ## Results
 
 The evolved algorithm shows substantial improvement in finding better solutions:
 
-| Metric | Value |
-|--------|-------|
-| Value Score | 0.990 |
-| Distance Score | 0.921 |
+| Metric                   | Value |
+| ------------------------ | ----- |
+| Value Score              | 0.990 |
+| Distance Score           | 0.921 |
 | Standard Deviation Score | 0.900 |
-| Speed Score | 0.466 |
-| Reliability Score | 1.000 |
-| Overall Score | 0.984 |
-| Combined Score | 0.922 |
+| Speed Score              | 0.466 |
+| Reliability Score        | 1.000 |
+| Overall Score            | 0.984 |
+| Combined Score           | 0.922 |
 
 The simulated annealing algorithm:
+
 - Achieves higher quality solutions (closer to the global minimum)
 - Has perfect reliability (100% success rate in completing runs)
 - Maintains a good balance between performance and reliability
@@ -196,6 +201,7 @@ This example demonstrates key features of OpenEvolve:
 ## Next Steps
 
 Try modifying the config.yaml file to:
+
 - Increase the number of iterations
 - Change the LLM model configuration
 - Adjust the evaluator settings to prioritize different metrics

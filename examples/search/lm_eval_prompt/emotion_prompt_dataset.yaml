@@ -11,7 +11,7 @@ max_samples: 200  # Larger sample for 6-class problem
 # Labels mapping for reference
 label_names:
   0: "sadness"
-  1: "joy" 
+  1: "joy"
   2: "love"
   3: "anger"
   4: "fear"

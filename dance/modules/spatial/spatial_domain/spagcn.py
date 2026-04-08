@@ -878,7 +878,7 @@ class SpaGCN(BaseClusteringMethod):
         embed, pred_prob = self.model.predict(embed, adj_exp)
         return embed, pred_prob
 
-    def predict(self, x,return_embed=False):
+    def predict(self, x, return_embed=False):
         """Prediction function.
 
         Returns
@@ -887,7 +887,7 @@ class SpaGCN(BaseClusteringMethod):
             The predicted labels and the predicted probabilities.
 
         """
-        embed,pred_prob = self.predict_proba(x)
+        embed, pred_prob = self.predict_proba(x)
         pred = torch.argmax(pred_prob, dim=1).data.cpu().numpy()
         if return_embed:
             return embed, pred

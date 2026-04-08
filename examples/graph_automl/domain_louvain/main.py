@@ -2,11 +2,11 @@ import argparse
 import gc
 import os
 import time
-
-import numpy as np
 from pathlib import Path
 
+import numpy as np
 import wandb
+
 from dance import logger
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.louvain import Louvain
@@ -36,7 +36,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     file_root_path = Path(args.root_path, args.sample_number).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
-    pipeline_planer = PipelinePlaner.from_config_file(f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
+    pipeline_planer = PipelinePlaner.from_config_file(
+        f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
 
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
@@ -99,7 +100,9 @@ if __name__ == "__main__":
         speed_score = 1.0 / (1.0 + total_time_seconds / 300.0)
         combined_score = 0.8 * avg_inner_score + 0.2 * speed_score
 
-        print(f"Averaged over {args.num_runs} runs - ARI: {avg_score:.4f}, Inner Score: {avg_inner_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}")
+        print(
+            f"Averaged over {args.num_runs} runs - ARI: {avg_score:.4f}, Inner Score: {avg_inner_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}"
+        )
 
         wandb.log({
             "ARI": avg_score,
@@ -113,8 +116,6 @@ if __name__ == "__main__":
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path,
                       additional_sweep_ids=args.additional_sweep_ids)
-
-
 """ To reproduce Louvain on other samples, please refer to command lines belows:
 
 human dorsolateral prefrontal cortex sample 151673:

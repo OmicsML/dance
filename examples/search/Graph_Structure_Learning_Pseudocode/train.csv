@@ -359,7 +359,7 @@ import torch
 import torch.nn as nn
 from dgl.dataloading import DataLoader, NeighborSampler
 
-#      dance       ò  䣬ȷ     Ĳ   Ϊһ  
+#      dance       ò  䣬ȷ     Ĳ   Ϊһ
 from dance.models.nn import AdaptiveSAGE
 from dance.modules.base import BaseClassificationMethod
 from dance.transforms import Compose, SetConfig
@@ -369,10 +369,10 @@ from dance.typing import LogLevel, Optional
 
 class GraphSortNet(nn.Module):
     """"""
-    scDeepSort  ĺ   ͼ      ṹ  
-    
-            AdaptiveSAGE     ھۺ ϸ   ͻ   ڵ    Ϣ  
-    Gene  ڵ          PCA   ά  Cell  ڵ     ͨ   ھӾۺϻ á 
+    scDeepSort  ĺ   ͼ      ṹ
+
+            AdaptiveSAGE     ھۺ ϸ   ͻ   ڵ    Ϣ
+    Gene  ڵ          PCA   ά  Cell  ڵ     ͨ   ھӾۺϻ á
     """"""
 
     def __init__(
@@ -391,11 +391,11 @@ class GraphSortNet(nn.Module):
         self.num_genes = num_genes
 
         #   ʼ    ѧϰ  Ȩ ز    (  Ӧԭ     е  alpha)
-        # ǰ num_genes   Ϊ     Ի Ȩ أ    num_genes+1   Ϊϸ   Ի Ȩ أ        ھۺ 
+        # ǰ num_genes   Ϊ     Ի Ȩ أ    num_genes+1   Ϊϸ   Ի Ȩ أ        ھۺ
         initial_weights = torch.ones(self.num_genes + 2, dtype=torch.float32).unsqueeze(-1)
         self.agg_weights = nn.Parameter(initial_weights)
 
-        #             
+        #
         drop = nn.Dropout(p=dropout_rate) if dropout_rate > 0 else nn.Identity()
         act = act_fn or nn.Identity()
         norm = norm_fn or nn.Identity()
@@ -410,28 +410,28 @@ class GraphSortNet(nn.Module):
 
         #    շ   ͷ
         self.classifier = nn.Linear(hidden_dim, num_classes)
-        # Xavier   ʼ  
+        # Xavier   ʼ
         nn.init.xavier_uniform_(self.classifier.weight, gain=nn.init.calculate_gain(""relu""))
 
     def forward(self, mfgs, x):
         """"""ǰ 򴫲   mfgs Ϊ DGL     Ϣ  ͼ б  (blocks)""""""
         if len(mfgs) != len(self.gnn_layers):
             raise ValueError(f""Block count ({len(mfgs)}) matches not layer count ({len(self.gnn_layers)})."")
-        
+
         h = x
         for mfg, layer in zip(mfgs, self.gnn_layers):
             h = layer(mfg, h)
-            
+
         return self.classifier(h)
 
 
 class DeepSortAnnotator(BaseClassificationMethod):
     """"""
     scDeepSort ϸ      ע     ķ װ ࡣ
-            Ԥ     ģ  ѵ  ѭ           ƶϡ 
+            Ԥ     ģ  ѵ  ѭ           ƶϡ
     """"""
 
-    def __init__(self, input_dim: int, hidden_dim: int, n_layers: int, species: str, tissue: str, *, 
+    def __init__(self, input_dim: int, hidden_dim: int, n_layers: int, species: str, tissue: str, *,
                  dropout: int = 0, batch_size: int = 500, device: str = ""cpu""):
         self.feat_dim = input_dim
         self.hid_dim = hidden_dim
@@ -439,8 +439,8 @@ class DeepSortAnnotator(BaseClassificationMethod):
         self.drop_rate = dropout
         self.batch_size = batch_size
         self.compute_device = device
-        
-        # ·     ü 
+
+        # ·     ü
         self.species_name = species
         self.tissue_name = tissue
         root = Path().resolve()
@@ -455,7 +455,7 @@ class DeepSortAnnotator(BaseClassificationMethod):
 
     @staticmethod
     def preprocessing_pipeline(n_components: int = 400, log_level: LogLevel = ""INFO""):
-        #     Ԥ     ߼     
+        #     Ԥ     ߼
         return Compose(
             PCACellFeatureGraph(n_components=n_components, split_name=""train""),
             SetConfig({""label_channel"": ""cell_type""}),
@@ -465,47 +465,47 @@ class DeepSortAnnotator(BaseClassificationMethod):
     def fit(self, g: dgl.DGLGraph, y: torch.Tensor, epochs: int = 300, lr: float = 1e-3,
             weight_decay: float = 0, val_ratio: float = 0.2):
         """"""
-        ѵ  ģ    ѭ    
-        g: DGL ͼ    
+        ѵ  ģ    ѭ
+        g: DGL ͼ
         y:   ǩ Tensor (-1        ڵ )
         """"""
-        # ʶ  ڵ     
+        # ʶ  ڵ
         is_cell = g.ndata[""cell_id""] == -1
         n_cells = is_cell.sum().item()
         n_genes = (~is_cell).sum().item()
-        
+
         self.num_class_labels = y.max().item() + 1
 
-        #     ѵ        ֤  
-        # ƫ   n_genes     Ϊϸ   ڵ         ڻ   ڵ ֮  
+        #     ѵ        ֤
+        # ƫ   n_genes     Ϊϸ   ڵ         ڻ   ڵ ֮
         shuffled_indices = torch.randperm(n_cells) + n_genes
         split_point = int(n_cells * val_ratio)
-        
+
         val_nodes = shuffled_indices[:split_point].to(self.compute_device)
         train_nodes = shuffled_indices[split_point:].to(self.compute_device)
 
         #    ϱ ǩ      ڵ  ǩ  Ϊ -1 (  Ч)  ϸ   ڵ       ʵ  ǩ
         combined_labels = torch.full((n_genes + n_cells,), -1, dtype=torch.long)
         combined_labels[-n_cells:] = y
-        
+
         g = g.to(self.compute_device)
         g.ndata[""label""] = combined_labels.to(self.compute_device)
 
-        #   ʼ  ģ  
+        #   ʼ  ģ
         self.model = GraphSortNet(
             self.feat_dim, self.num_class_labels, self.hid_dim, self.layers_count, n_genes,
             act_fn=nn.ReLU(), dropout_rate=self.drop_rate
         ).to(self.compute_device)
-        
+
         print(self.model)
 
-        #     ѵ     
+        #     ѵ
         self.graph_sampler = NeighborSampler(fanouts=[-1] * self.layers_count, edge_dir=""in"")
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
         self.criterion = nn.CrossEntropyLoss(reduction=""sum"")
 
         print(f""Training Info - Train Size: {len(train_nodes)}, Val Size: {len(val_nodes)}"")
-        
+
         best_val_acc = 0.0
         recorded_train_acc = 0.0
         best_epoch = 0
@@ -514,10 +514,10 @@ class DeepSortAnnotator(BaseClassificationMethod):
         for epoch in range(epochs):
             epoch_loss = self._train_step(g, train_nodes)
             epoch_train_acc = self.evaluate(g, train_nodes)[-1]
-            
-            #   ֤      
+
+            #   ֤
             v_corr, v_unsure, v_acc = self.evaluate(g, val_nodes)
-            
+
             if v_acc >= best_val_acc:
                 best_val_acc = v_acc
                 recorded_train_acc = epoch_train_acc
@@ -526,16 +526,16 @@ class DeepSortAnnotator(BaseClassificationMethod):
                 final_metrics = (v_corr, v_unsure)
                 self.save_model()
                 best_model_weights = deepcopy(self.model.state_dict())
-            
+
             print(f"">>>>Epoch {epoch:04d}: Train Acc {epoch_train_acc:.4f}, ""
                   f""Avg Loss {epoch_loss:.4f}, Val Acc {v_acc:.4f} ""
                   f""(Correct: {v_corr}, Unsure: {v_unsure})"")
 
-        #  ָ    Ȩ  
+        #  ָ    Ȩ
         if best_model_weights:
             self.model.load_state_dict(best_model_weights)
 
-        #    ձ   
+        #    ձ
         f_corr, f_unsure = final_metrics
         print(f""---{self.species_name} {self.tissue_name} Optimization Finished---"")
         print(f""Best Epoch: {best_epoch:04d} | Train Acc: {recorded_train_acc:.4f} | ""
@@ -546,7 +546,7 @@ class DeepSortAnnotator(BaseClassificationMethod):
         self.model.train()
         sum_loss = 0.0
         total_samples = 0
-        
+
         use_cpu_affinity = (self.compute_device == ""cpu"")
         loader_kwargs = {
             ""batch_size"": self.batch_size,
@@ -556,17 +556,17 @@ class DeepSortAnnotator(BaseClassificationMethod):
         }
 
         loader = DataLoader(g, indices, **loader_kwargs)
-        
-        #      Ĺ     ѡ  
+
+        #      Ĺ     ѡ
         ctx = loader.enable_cpu_affinity() if use_cpu_affinity else nullcontext()
-        
+
         with ctx:
             for _, _, blocks in loader:
                 blocks = [b.to(self.compute_device) for b in blocks]
-                
+
                 x_in = blocks[0].srcdata[""features""]
                 y_target = blocks[-1].dstdata[""label""]
-                
+
                 logits = self.model(blocks, x_in)
                 loss = self.criterion(logits, y_target)
 
@@ -583,32 +583,32 @@ class DeepSortAnnotator(BaseClassificationMethod):
     @torch.no_grad()
     def evaluate(self, g: dgl.DGLGraph, indices: torch.Tensor, uncertainty_threshold: float = 2.0):
         """"""
-            ģ     ܡ 
+            ģ     ܡ
             : (  ȷ  ,   ȷ    , ׼ȷ  )
         """"""
         self.model.eval()
         count_correct = 0
         count_uncertain = 0
-        
+
         loader = DataLoader(g, indices, self.graph_sampler, batch_size=self.batch_size, shuffle=True)
-        
+
         threshold_prob = uncertainty_threshold / self.num_class_labels
 
         for _, _, blocks in loader:
             blocks = [b.to(self.compute_device) for b in blocks]
             x_in = blocks[0].srcdata[""features""]
             y_target = blocks[-1].dstdata[""label""]
-            
+
             logits = self.model(blocks, x_in)
-            
-            #    Tensor      CPU     ͳ  
+
+            #    Tensor      CPU     ͳ
             preds_cpu = logits.cpu()
             targets_cpu = y_target.cpu()
 
             for pred_vec, true_lbl in zip(preds_cpu, targets_cpu):
                 max_p = pred_vec.max().item()
                 predicted_class = pred_vec.argmax().item()
-                
+
                 if max_p < threshold_prob:
                     count_uncertain += 1
                 elif predicted_class == true_lbl:
@@ -628,11 +628,11 @@ class DeepSortAnnotator(BaseClassificationMethod):
     def load_model(self):
         filename = f""{self.species_name}-{self.tissue_name}.pt""
         path = self.model_dir / filename
-        #     ԭ     key            Ҫ   ݾ ģ   ļ         Ҫ    key  
+        #     ԭ     key            Ҫ   ݾ ģ   ļ         Ҫ    key
         #     Ȼ   reimplementation     Ǽ     ص    Լ   ĸ ʽ
         checkpoint = torch.load(path, map_location=self.compute_device)
-        
-        #       ܵ  key   һ £ Ϊ ˼    ԣ 
+
+        #       ܵ  key   һ £ Ϊ ˼    ԣ
         model_key = ""model"" if ""model"" in checkpoint else ""model_state""
         self.model.load_state_dict(checkpoint[model_key])
 
@@ -641,23 +641,23 @@ class DeepSortAnnotator(BaseClassificationMethod):
         """"""Ԥ      ϸ   ڵ ĸ  ʷֲ """"""
         self.model.eval()
 
-        #   ȡϸ   ڵ     
+        #   ȡϸ   ڵ
         cell_mask = g.ndata[""cell_id""] == -1
         target_indices = torch.where(cell_mask)[0].to(self.compute_device)
         g = g.to(self.compute_device)
 
-        # Ԥ          
+        # Ԥ
         total_nodes = g.number_of_nodes()
         all_logits = torch.zeros(total_nodes, self.num_class_labels)
-        
+
         loader = DataLoader(g, target_indices, self.graph_sampler, batch_size=self.batch_size)
-        
+
         for _, dst_nodes, blocks in loader:
             blocks = [b.to(self.compute_device) for b in blocks]
             feat = blocks[0].srcdata[""features""]
-            
+
             output = self.model(blocks, feat)
-            #        ض Ӧ Ĵ    
+            #        ض Ӧ Ĵ
             all_logits[dst_nodes] = output.detach().cpu()
 
         #   ȡϸ     ֵ  logits    softmax
@@ -667,19 +667,19 @@ class DeepSortAnnotator(BaseClassificationMethod):
 
     def predict(self, g: dgl.DGLGraph, uncertainty_factor: float = 2.0, return_uncertainty_mask: bool = False):
         """"""
-          ͼ     ƶϡ 
-        uncertainty_factor:      ж  Ƿ񡰲 ȷ        ֵϵ  
+          ͼ     ƶϡ
+        uncertainty_factor:      ж  Ƿ񡰲 ȷ        ֵϵ
         """"""
         probs = self.predict_proba(g)
-        
+
         predictions = probs.argmax(axis=1)
-        
+
         if return_uncertainty_mask:
             threshold = uncertainty_factor / self.num_class_labels
-            # max probability С    ֵ    Ϊ  ȷ  
+            # max probability С    ֵ    Ϊ  ȷ
             is_uncertain = probs.max(axis=1) < threshold
             return predictions, is_uncertain
-        
+
         return predictions",cta_scdeepsort
 "import time
 from contextlib import nullcontext
@@ -691,7 +691,7 @@ import torch
 import torch.nn as nn
 from dgl.dataloading import DataLoader, NeighborSampler
 
-#      dance ģ         ȷ        
+#      dance ģ         ȷ
 from dance.models.nn import AdaptiveSAGE
 from dance.modules.base import BaseClassificationMethod
 from dance.transforms import Compose, SetConfig
@@ -701,9 +701,9 @@ from dance.typing import LogLevel, Optional
 
 class WeightedGraphEncoder(nn.Module):
     """"""
-    scDeepSort  ĵײ ͼ      ʵ ֡ 
-    
-             ü Ȩͼ     AdaptiveSAGE     ۺϻ       Ϣ  
+    scDeepSort  ĵײ ͼ      ʵ ֡
+
+             ü Ȩͼ     AdaptiveSAGE     ۺϻ       Ϣ
      Ӷ     ϸ    Ƕ   ʾ     з  ࡣ
     """"""
 
@@ -728,7 +728,7 @@ class WeightedGraphEncoder(nn.Module):
         init_alpha = torch.ones(self.num_genes + 2, dtype=torch.float32).unsqueeze(-1)
         self.edge_weights = nn.Parameter(init_alpha)
 
-        #          
+        #
         dropout = nn.Dropout(dropout_prob) if dropout_prob > 0 else nn.Identity()
         activation = act_func or nn.Identity()
         normalization = norm_func or nn.Identity()
@@ -737,57 +737,57 @@ class WeightedGraphEncoder(nn.Module):
         for idx in range(num_layers):
             #  ײ     ά  Ϊ input_size      Ϊ hidden_size
             curr_in_dim = input_size if idx == 0 else hidden_size
-            
+
             layer = AdaptiveSAGE(
-                curr_in_dim, 
-                hidden_size, 
-                self.edge_weights, 
-                dropout, 
-                activation, 
+                curr_in_dim,
+                hidden_size,
+                self.edge_weights,
+                dropout,
+                activation,
                 normalization
             )
             self.conv_stack.append(layer)
 
-        #         
+        #
         self.head = nn.Linear(hidden_size, num_classes)
-        # ʹ   Xavier Uniform   ʼ  Ȩ  
+        # ʹ   Xavier Uniform   ʼ  Ȩ
         nn.init.xavier_uniform_(self.head.weight, gain=nn.init.calculate_gain(""relu""))
 
     def forward(self, block_list, feature_matrix):
         """"""
-        ǰ 򴫲  ߼   
-        
+        ǰ 򴫲  ߼
+
         Args:
-            block_list: DGL Block  б     ڷֲ      
-            feature_matrix:             
+            block_list: DGL Block  б     ڷֲ
+            feature_matrix:
         """"""
         if len(block_list) != len(self.conv_stack):
             raise RuntimeError(f""Layer mismatch: blocks={len(block_list)}, layers={len(self.conv_stack)}"")
-            
+
         h = feature_matrix
         for block, conv_layer in zip(block_list, self.conv_stack):
             h = conv_layer(block, h)
-            
+
         return self.head(h)
 
 
 class ScDeepSortClassifier(BaseClassificationMethod):
     """"""
-    scDeepSort ϸ      ע  ģ ͵ĸ߼   װ  
-    
-        ģ ͵ ѵ      ֤        ؼ Ԥ   ߼   
+    scDeepSort ϸ      ע  ģ ͵ĸ߼   װ
+
+        ģ ͵ ѵ      ֤        ؼ Ԥ   ߼
     """"""
 
     def __init__(
-        self, 
-        dim_in: int, 
-        dim_hid: int, 
-        num_layers: int, 
-        species: str, 
-        tissue: str, 
-        *, 
+        self,
+        dim_in: int,
+        dim_hid: int,
+        num_layers: int,
+        species: str,
+        tissue: str,
+        *,
         dropout: int = 0,
-        batch_size: int = 500, 
+        batch_size: int = 500,
         device: str = ""cpu""
     ):
         self.input_dim = dim_in
@@ -796,19 +796,19 @@ class ScDeepSortClassifier(BaseClassificationMethod):
         self.dropout_rate = dropout
         self.batch_size = batch_size
         self.device = device
-        
+
         self.species = species
         self.tissue = tissue
 
-        #     ģ ͱ   ·  
+        #     ģ ͱ   ·
         root_dir = Path().resolve()
         self.ckpt_dir = (
-            root_dir / ""saved_models"" / ""single_modality"" / 
+            root_dir / ""saved_models"" / ""single_modality"" /
             ""cell_type_annotation"" / ""pretrained"" / self.species / ""models""
         )
         self.ckpt_dir.mkdir(parents=True, exist_ok=True)
 
-        #  ڲ ״̬ռλ  
+        #  ڲ ״̬ռλ
         self.network = None
         self.sampler = None
         self.optimizer = None
@@ -826,41 +826,41 @@ class ScDeepSortClassifier(BaseClassificationMethod):
     def fit(self, graph: dgl.DGLGraph, labels: torch.Tensor, epochs: int = 300, lr: float = 1e-3,
             weight_decay: float = 0, val_ratio: float = 0.2):
         """"""
-        ѵ  ģ ͡ 
-        
+        ѵ  ģ ͡
+
         Args:
-            graph:     ϸ   ͻ   ڵ   DGL ͼ  
-            labels:   ǩ      
-            epochs: ѵ   ִΡ 
-            lr: ѧϰ ʡ 
-            weight_decay: Ȩ  ˥  ϵ    
-            val_ratio:   ֤        
+            graph:     ϸ   ͻ   ڵ   DGL ͼ
+            labels:   ǩ
+            epochs: ѵ   ִΡ
+            lr: ѧϰ ʡ
+            weight_decay: Ȩ  ˥  ϵ
+            val_ratio:   ֤
         """"""
-        # ͳ ƽڵ     
+        # ͳ ƽڵ
         node_ids = graph.ndata[""cell_id""]
         #  ڸ    ݼ  У cell_id Ϊ -1   ʾϸ        Ϊ     ID
         n_genes = (node_ids != -1).sum().item()
         n_cells = (node_ids == -1).sum().item()
-        
+
         self.n_classes = labels.max().item() + 1
 
-        #           ֵ     
+        #           ֵ
         # ע ⣺ϸ   ڵ        ͼ       ڻ   ڵ ֮  ģ       Ҫ     n_genes
         rand_perm = torch.randperm(n_cells) + n_genes
         n_val = int(n_cells * val_ratio)
-        
+
         val_indices = rand_perm[:n_val].to(self.device)
         train_indices = rand_perm[n_val:].to(self.device)
 
         #     ȫͼ  ǩ      ڵ   Ϊ -1  ϸ   ڵ ʹ    ʵ  ǩ
         full_node_labels = torch.full((n_genes + n_cells,), -1, dtype=torch.long)
         full_node_labels[-n_cells:] = labels
-        
+
         #   ͼ ͱ ǩ ƶ   ָ   豸
         graph = graph.to(self.device)
         graph.ndata[""label""] = full_node_labels.to(self.device)
 
-        #   ʼ      
+        #   ʼ
         self.network = WeightedGraphEncoder(
             input_size=self.input_dim,
             num_classes=self.n_classes,
@@ -870,42 +870,42 @@ class ScDeepSortClassifier(BaseClassificationMethod):
             act_func=nn.ReLU(),
             dropout_prob=self.dropout_rate
         ).to(self.device)
-        
+
         print(self.network)
 
-        #     ѵ     
+        #     ѵ
         self.sampler = NeighborSampler(fanouts=[-1] * self.n_gnn_layers, edge_dir=""in"")
         self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr, weight_decay=weight_decay)
         # reduction='sum'   ζ        Ҫ ֶ                   ƽ   loss
         self.loss_func = nn.CrossEntropyLoss(reduction=""sum"")
 
         print(f""Train set size: {len(train_indices)}, Validation set size: {len(val_indices)}"")
-        
+
         best_acc = 0.0
         saved_train_acc = 0.0
         best_epoch_idx = 0
         best_params = None
 
         for epoch in range(epochs):
-            # ѵ   ׶ 
+            # ѵ   ׶
             avg_loss = self._run_epoch(graph, train_indices, is_train=True)
-            
-            #      ׶ 
+
+            #      ׶
             train_acc_score = self._evaluate_metrics(graph, train_indices)[-1]
             val_correct, val_unsure, val_acc_score = self._evaluate_metrics(graph, val_indices)
-            
-            #   ¼   ģ  
+
+            #   ¼   ģ
             if val_acc_score >= best_acc:
                 best_acc = val_acc_score
                 saved_train_acc = train_acc_score
                 best_epoch_idx = epoch
-                
+
                 #         ָ     ڴ ӡ
                 final_val_stats = (val_correct, val_unsure)
-                
+
                 self.save_model()
                 best_params = deepcopy(self.network.state_dict())
-            
+
             print(f"">>>>Epoch {epoch:04d}: Train Acc {train_acc_score:.4f}, ""
                   f""Loss {avg_loss:.4f}, Val Correct {val_correct}, ""
                   f""Val Unsure {val_unsure}, Val Acc {val_acc_score:.4f}"")
@@ -926,28 +926,28 @@ class ScDeepSortClassifier(BaseClassificationMethod):
             self.network.train()
         else:
             self.network.eval()
-            
+
         total_loss = 0.0
         total_count = 0
-        
+
         #      DataLoader
         num_workers = 4 if self.device == ""cpu"" else 0
         loader = DataLoader(
-            graph, indices, self.sampler, 
-            batch_size=self.batch_size, 
-            shuffle=is_train, 
+            graph, indices, self.sampler,
+            batch_size=self.batch_size,
+            shuffle=is_train,
             num_workers=num_workers
         )
-        
+
         ctx = loader.enable_cpu_affinity() if self.device == ""cpu"" else nullcontext()
-        
+
         with ctx:
             for _, _, blocks in loader:
                 blocks = [b.to(self.device) for b in blocks]
-                
+
                 inputs = blocks[0].srcdata[""features""]
                 targets = blocks[-1].dstdata[""label""]
-                
+
                 logits = self.network(blocks, inputs)
                 loss = self.loss_func(logits, targets)
 
@@ -955,10 +955,10 @@ class ScDeepSortClassifier(BaseClassificationMethod):
                     self.optimizer.zero_grad()
                     loss.backward()
                     self.optimizer.step()
-                
-                # ͳ  
+
+                # ͳ
                 batch_size = blocks[-1].num_dst_nodes()
-                total_loss += loss.item() * batch_size # loss  sum        ԭ     ߼    ۼ  ٳ       Ϊ    һ    
+                total_loss += loss.item() * batch_size # loss  sum        ԭ     ߼    ۼ  ٳ       Ϊ    һ
                 total_count += batch_size
 
         return total_loss / total_count if total_count > 0 else 0
@@ -969,23 +969,23 @@ class ScDeepSortClassifier(BaseClassificationMethod):
         self.network.eval()
         correct_count = 0
         unsure_count = 0
-        
+
         loader = DataLoader(
-            graph, indices, self.sampler, 
-            batch_size=self.batch_size, 
+            graph, indices, self.sampler,
+            batch_size=self.batch_size,
             shuffle=True
         )
-        
+
         thresh = unsure_threshold / self.n_classes
 
         for _, _, blocks in loader:
             blocks = [b.to(self.device) for b in blocks]
             inputs = blocks[0].srcdata[""features""]
             labels = blocks[-1].dstdata[""label""]
-            
+
             preds = self.network(blocks, inputs)
-            
-            #       ת   CPU         ȶԣ     ԭ ߼ 
+
+            #       ת   CPU         ȶԣ     ԭ ߼
             preds_cpu = preds.cpu()
             labels_cpu = labels.cpu()
 
@@ -995,7 +995,7 @@ class ScDeepSortClassifier(BaseClassificationMethod):
                     unsure_count += 1
                 elif p.argmax().item() == l:
                     correct_count += 1
-        
+
         acc = correct_count / len(indices) if len(indices) > 0 else 0
         return correct_count, unsure_count, acc
 
@@ -1019,24 +1019,24 @@ class ScDeepSortClassifier(BaseClassificationMethod):
         """""" ƶϽ׶Σ       ʾ   """"""
         self.network.eval()
 
-        #   ȡϸ   ڵ 
+        #   ȡϸ   ڵ
         is_cell = graph.ndata[""cell_id""] == -1
         cell_indices = torch.where(is_cell)[0].to(self.device)
         graph = graph.to(self.device)
 
         n_nodes = graph.number_of_nodes()
         logits_matrix = torch.zeros(n_nodes, self.n_classes)
-        
+
         loader = DataLoader(graph, cell_indices, self.sampler, batch_size=self.batch_size)
-        
+
         for _, dst_nodes, blocks in loader:
             blocks = [b.to(self.device) for b in blocks]
             inputs = blocks[0].srcdata[""features""]
-            
+
             out = self.network(blocks, inputs)
             logits_matrix[dst_nodes] = out.detach().cpu()
 
-        #       ϸ   ڵ   softmax     
+        #       ϸ   ڵ   softmax
         cell_logits = logits_matrix[is_cell]
         probs = nn.functional.softmax(cell_logits, dim=-1).numpy()
         return probs
@@ -1044,21 +1044,21 @@ class ScDeepSortClassifier(BaseClassificationMethod):
     def predict(self, graph: dgl.DGLGraph, unsure_rate: float = 2.0, return_unsure: bool = False):
         """"""
          Ը   ͼ    Ԥ ⡣
-        
+
         Args:
-            graph:     ͼ  
-            unsure_rate:   ȷ      ֵϵ    
+            graph:     ͼ
+            unsure_rate:   ȷ      ֵϵ
             return_unsure:  Ƿ񷵻ز ȷ       롣
         """"""
         prob_matrix = self.predict_proba(graph)
-        
+
         predictions = prob_matrix.argmax(axis=1)
-        
+
         if return_unsure:
             threshold = unsure_rate / self.n_classes
             is_unsure = prob_matrix.max(axis=1) < threshold
             return predictions, is_unsure
-            
+
         return predictions",cta_scdeepsort
 "import time
 from contextlib import nullcontext
@@ -1070,7 +1070,7 @@ import torch
 import torch.nn as nn
 from dgl.dataloading import DataLoader, NeighborSampler
 
-#      Dance   ܵı Ҫ   
+#      Dance   ܵı Ҫ
 from dance.models.nn import AdaptiveSAGE
 from dance.modules.base import BaseClassificationMethod
 from dance.transforms import Compose, SetConfig
@@ -1080,10 +1080,10 @@ from dance.typing import LogLevel, Optional
 
 class CellGeneGraphNetwork(nn.Module):
     """"""
-    scDeepSort  ĵײ ͼ    ģ ͡ 
-    
-    ͨ   AdaptiveSAGE     ϸ  -     칹ͼ Ͻ     Ϣ   ݡ 
-        һ   ѧϰ Ļ  ϵ   (mix_coeff)     ڶ ̬     ۺ Ȩ ء 
+    scDeepSort  ĵײ ͼ    ģ ͡
+
+    ͨ   AdaptiveSAGE     ϸ  -     칹ͼ Ͻ     Ϣ   ݡ
+        һ   ѧϰ Ļ  ϵ   (mix_coeff)     ڶ ̬     ۺ Ȩ ء
     """"""
 
     def __init__(
@@ -1107,7 +1107,7 @@ class CellGeneGraphNetwork(nn.Module):
         params = torch.ones(self.total_genes + 2, dtype=torch.float32).unsqueeze(-1)
         self.mix_coeff = nn.Parameter(params)
 
-        #               
+        #
         drop_layer = nn.Dropout(dropout_p) if dropout_p > 0 else nn.Identity()
         act_layer = activation or nn.Identity()
         norm_layer = normalization or nn.Identity()
@@ -1125,49 +1125,49 @@ class CellGeneGraphNetwork(nn.Module):
             for i in range(n_layers)
         ])
 
-        #     ͶӰ  
+        #     ͶӰ
         self.output_layer = nn.Linear(hidden_feats, n_classes)
-        #       ʼ  
+        #       ʼ
         nn.init.xavier_uniform_(self.output_layer.weight, gain=nn.init.calculate_gain(""relu""))
 
     def forward(self, subgraphs, features):
         """"""
         ǰ    㡣
         :param subgraphs: DGL     Ϣ   ݿ  (MFGs)
-        :param features:             
+        :param features:
         """"""
         if len(subgraphs) != len(self.gnn_stack):
             raise ValueError(f""Block depth {len(subgraphs)} != Model depth {len(self.gnn_stack)}"")
-        
+
         h = features
         for subgraph, layer in zip(subgraphs, self.gnn_stack):
             h = layer(subgraph, h)
-            
+
         return self.output_layer(h)
 
 
 class SingleCellSorter(BaseClassificationMethod):
     """"""
-    scDeepSort  㷨  ѵ               
+    scDeepSort  㷨  ѵ
     """"""
 
-    def __init__(self, dim_in: int, dim_hid: int, num_layers: int, species: str, tissue: str, *, 
+    def __init__(self, dim_in: int, dim_hid: int, num_layers: int, species: str, tissue: str, *,
                  dropout: int = 0, batch_size: int = 500, device: str = ""cpu""):
-        
+
         self.input_dim = dim_in
         self.hidden_dim = dim_hid
         self.layer_count = num_layers
         self.dropout_ratio = dropout
         self.batch_size = batch_size
         self.target_device = device
-        
+
         self.species = species
         self.tissue = tissue
 
-        # ·      
+        # ·
         base_path = Path().resolve()
         self.model_save_dir = (
-            base_path / ""saved_models"" / ""single_modality"" / 
+            base_path / ""saved_models"" / ""single_modality"" /
             ""cell_type_annotation"" / ""pretrained"" / self.species / ""models""
         )
         self.model_save_dir.mkdir(parents=True, exist_ok=True)
@@ -1190,32 +1190,32 @@ class SingleCellSorter(BaseClassificationMethod):
     def fit(self, graph: dgl.DGLGraph, labels: torch.Tensor, epochs: int = 300, lr: float = 1e-3,
             weight_decay: float = 0, val_ratio: float = 0.2):
         """"""
-        ģ     /ѵ    ڡ 
+        ģ     /ѵ    ڡ
         """"""
-        #    ֻ   ڵ  ϸ   ڵ 
-        #     Լ    cell_id != -1    ǻ    == -1     ϸ  
+        #    ֻ   ڵ  ϸ   ڵ
+        #     Լ    cell_id != -1    ǻ    == -1     ϸ
         is_gene = graph.ndata[""cell_id""] != -1
         num_genes = is_gene.sum().item()
         num_cells = (~is_gene).sum().item()
-        
+
         self.num_unique_labels = labels.max().item() + 1
 
-        #        ݼ 
-        # ϸ   ڵ       Ǵ  num_genes   ʼ  
+        #        ݼ
+        # ϸ   ڵ       Ǵ  num_genes   ʼ
         shuffled_ids = torch.randperm(num_cells) + num_genes
         val_size = int(num_cells * val_ratio)
-        
+
         idx_val = shuffled_ids[:val_size].to(self.target_device)
         idx_train = shuffled_ids[val_size:].to(self.target_device)
 
-        #     ȫͼ  ǩ    
+        #     ȫͼ  ǩ
         global_labels = torch.full((num_genes + num_cells,), -1, dtype=torch.long)
         global_labels[-num_cells:] = labels
-        
+
         graph = graph.to(self.target_device)
         graph.ndata[""label""] = global_labels.to(self.target_device)
 
-        # ʵ        
+        # ʵ
         self.net = CellGeneGraphNetwork(
             in_feats=self.input_dim,
             n_classes=self.num_unique_labels,
@@ -1225,17 +1225,17 @@ class SingleCellSorter(BaseClassificationMethod):
             activation=nn.ReLU(),
             dropout_p=self.dropout_ratio
         ).to(self.target_device)
-        
+
         print(self.net)
 
-        #  Ż          
+        #  Ż
         self.graph_sampler = NeighborSampler(fanouts=[-1] * self.layer_count, edge_dir=""in"")
         self.opt = torch.optim.Adam(self.net.parameters(), lr=lr, weight_decay=weight_decay)
         # Sum reduction   Ϻ        batch size
         self.crit = nn.CrossEntropyLoss(reduction=""sum"")
 
         print(f""Training Samples: {len(idx_train)}, Validation Samples: {len(idx_val)}"")
-        
+
         best_acc = 0.0
         saved_epoch_info = {}
         best_weights = None
@@ -1243,12 +1243,12 @@ class SingleCellSorter(BaseClassificationMethod):
         for epoch in range(epochs):
             #     ѵ     Loss
             train_loss = self._compute_epoch_loss(graph, idx_train)
-            
-            #     ׼ȷ  
+
+            #     ׼ȷ
             train_acc = self._run_inference_stats(graph, idx_train)[-1]
             val_corr, val_unsure, val_acc = self._run_inference_stats(graph, idx_val)
-            
-            #        ģ  
+
+            #        ģ
             if val_acc >= best_acc:
                 best_acc = val_acc
                 saved_epoch_info = {
@@ -1260,15 +1260,15 @@ class SingleCellSorter(BaseClassificationMethod):
                 }
                 self.save_checkpoint()
                 best_weights = deepcopy(self.net.state_dict())
-            
+
             print(f"">>>>Epoch {epoch:04d}: Train Acc {train_acc:.4f}, Loss {train_loss:.4f}, ""
                   f""Val Correct {val_corr}, Val Unsure {val_unsure}, Val Acc {val_acc:.4f}"")
 
-        #        Ȩ  
+        #        Ȩ
         if best_weights:
             self.net.load_state_dict(best_weights)
 
-        #   ӡ   ս  
+        #   ӡ   ս
         print(f""---{self.species} {self.tissue} Final Report:---"")
         if saved_epoch_info:
             print(f""Epoch {saved_epoch_info['epoch']:04d}, ""
@@ -1284,47 +1284,47 @@ class SingleCellSorter(BaseClassificationMethod):
         cumulative_loss = 0
         total_items = 0
 
-        # CPU  ׺       
+        # CPU  ׺
         num_workers = 4 if self.target_device == ""cpu"" else 0
         dl = DataLoader(
-            graph, indices, self.graph_sampler, 
-            batch_size=self.batch_size, 
-            num_workers=num_workers, 
+            graph, indices, self.graph_sampler,
+            batch_size=self.batch_size,
+            num_workers=num_workers,
             shuffle=True
         )
-        
+
         ctx = dl.enable_cpu_affinity() if self.target_device == ""cpu"" else nullcontext()
-        
+
         with ctx:
             for _, _, subgraphs in dl:
                 subgraphs = [g.to(self.target_device) for g in subgraphs]
-                
+
                 x_input = subgraphs[0].srcdata[""features""]
                 y_true = subgraphs[-1].dstdata[""label""]
-                
+
                 y_pred = self.net(subgraphs, x_input)
 
                 loss = self.crit(y_pred, y_true)
-                
+
                 self.opt.zero_grad()
                 loss.backward()
                 self.opt.step()
 
                 #  ۻ  loss
                 batch_n = subgraphs[-1].num_dst_nodes()
-                #     ԭ     ߼  ǽ  reduction='sum'    loss      batch_n  ۼ  (ʵ    ԭ       loss.item() * size, 
-                #   ԭ     loss reduction    sum       loss.item()  Ѿ    sum  ˣ 
-                #    ¼  ԭ   룺loss = reduction=""sum"", total_loss += loss.item() * size  ǲ  Եġ 
-                # ԭ       total_loss += loss.item() * size? 
-                #     ԭ     CrossEntropyLoss(reduction=""sum"")     loss.item()  Ǹ  batch      loss  
-                #     ٳ  size   ߼    е   ֡ 
+                #     ԭ     ߼  ǽ  reduction='sum'    loss      batch_n  ۼ  (ʵ    ԭ       loss.item() * size,
+                #   ԭ     loss reduction    sum       loss.item()  Ѿ    sum  ˣ
+                #    ¼  ԭ   룺loss = reduction=""sum"", total_loss += loss.item() * size  ǲ  Եġ
+                # ԭ       total_loss += loss.item() * size?
+                #     ԭ     CrossEntropyLoss(reduction=""sum"")     loss.item()  Ǹ  batch      loss
+                #     ٳ  size   ߼    е   ֡
                 #        ٿ һ   reference code:
                 # loss = self.loss_fn(...) -> sum
                 # total_loss += loss.item() * size
                 # return total_loss / total_size
-                #     reference code ȷʵ      д ģ Ϊ ˡ   ȫһ µ   ѧ ߼      ұ    ճ    ""   ""   ߼   
-                #      ⿴        ԭ    д   ˣ ͨ  Ӧ     total_loss += loss.item()    
-                
+                #     reference code ȷʵ      д ģ Ϊ ˡ   ȫһ µ   ѧ ߼      ұ    ճ    ""   ""   ߼
+                #      ⿴        ԭ    д   ˣ ͨ  Ӧ     total_loss += loss.item()
+
                 cumulative_loss += loss.item() * batch_n
                 total_items += batch_n
 
@@ -1338,22 +1338,22 @@ class SingleCellSorter(BaseClassificationMethod):
         n_unsure = 0
 
         dl = DataLoader(graph, indices, self.graph_sampler, batch_size=self.batch_size, shuffle=True)
-        
+
         thresh = uncertainty_factor / self.num_unique_labels
 
         for _, _, subgraphs in dl:
             subgraphs = [g.to(self.target_device) for g in subgraphs]
-            
+
             x_in = subgraphs[0].srcdata[""features""]
             y_target = subgraphs[-1].dstdata[""label""]
-            
+
             logits = self.net(subgraphs, x_in)
 
-            # ת Ƶ  CPU     ͳ  
+            # ת Ƶ  CPU     ͳ
             for logit, label in zip(logits.cpu(), y_target.cpu()):
                 max_logit = logit.max().item()
                 pred_cls = logit.argmax().item()
-                
+
                 if max_logit < thresh:
                     n_unsure += 1
                 elif pred_cls == label:
@@ -1376,7 +1376,7 @@ class SingleCellSorter(BaseClassificationMethod):
         fname = f""{self.species}-{self.tissue}.pt""
         fpath = self.model_save_dir / fname
         loaded = torch.load(fpath, map_location=self.target_device)
-        
+
         #    ݾɴ     key (model)    ´     key (network)
         key = ""model"" if ""model"" in loaded else ""network""
         self.net.load_state_dict(loaded[key])
@@ -1384,46 +1384,46 @@ class SingleCellSorter(BaseClassificationMethod):
     @torch.no_grad()
     def predict_proba(self, graph: dgl.DGLGraph):
         """"""
-            Ԥ    ʾ   
+            Ԥ    ʾ
         """"""
         self.net.eval()
 
-        #  ҵ     ϸ   ڵ 
+        #  ҵ     ϸ   ڵ
         cell_mask = graph.ndata[""cell_id""] == -1
         target_ids = torch.where(cell_mask)[0].to(self.target_device)
         graph = graph.to(self.target_device)
 
         num_nodes = graph.number_of_nodes()
-        #   ʼ  ȫ     
+        #   ʼ  ȫ
         full_logits = torch.zeros(num_nodes, self.num_unique_labels)
-        
+
         dl = DataLoader(graph, target_ids, self.graph_sampler, batch_size=self.batch_size)
-        
+
         for _, dst, subgraphs in dl:
             subgraphs = [g.to(self.target_device) for g in subgraphs]
             feat = subgraphs[0].srcdata[""features""]
-            
+
             out = self.net(subgraphs, feat)
-            #       
+            #
             full_logits[dst] = out.detach().cpu()
 
-        #      Softmax   ֻ    ϸ      
+        #      Softmax   ֻ    ϸ
         cell_probs = nn.functional.softmax(full_logits[cell_mask], dim=-1).numpy()
         return cell_probs
 
     def predict(self, graph: dgl.DGLGraph, unsure_rate: float = 2.0, return_unsure: bool = False):
         """"""
-        Ԥ  ӿڡ 
+        Ԥ  ӿڡ
         """"""
         probs = self.predict_proba(graph)
-        
+
         preds = probs.argmax(axis=1)
-        
+
         if return_unsure:
             limit = unsure_rate / self.num_unique_labels
             is_unsure = probs.max(axis=1) < limit
             return preds, is_unsure
-        
+
         return preds",cta_scdeepsort
 "import time
 from contextlib import nullcontext
@@ -1435,7 +1435,7 @@ import torch
 import torch.nn as nn
 from dgl.dataloading import DataLoader, NeighborSampler
 
-#      Dance       
+#      Dance
 from dance.models.nn import AdaptiveSAGE
 from dance.modules.base import BaseClassificationMethod
 from dance.transforms import Compose, SetConfig
@@ -1445,10 +1445,10 @@ from dance.typing import LogLevel, Optional
 
 class AdaptiveGraphNetwork(nn.Module):
     """"""
-    scDeepSort  ĵײ ͼ      ģ ͡ 
-    
-    ʹ      ӦȨ ص  GraphSAGE  ܹ  (AdaptiveSAGE)  
-        ά  һ  ȫ ֵĿ ѧϰȨ             ھۺϹ    ж ̬      ͬ     ϸ  ֮  ߵ Ȩ ء 
+    scDeepSort  ĵײ ͼ      ģ ͡
+
+    ʹ      ӦȨ ص  GraphSAGE  ܹ  (AdaptiveSAGE)
+        ά  һ  ȫ ֵĿ ѧϰȨ             ھۺϹ    ж ̬      ͬ     ϸ  ֮  ߵ Ȩ ء
     """"""
 
     def __init__(
@@ -1467,95 +1467,95 @@ class AdaptiveGraphNetwork(nn.Module):
         self.num_genes = num_genes
 
         #      ѧϰ ı Ȩ ز    (  Ӧԭ      alpha)
-        #      0 ~ num_genes-1:     ڵ   Ի Ȩ  
-        #      num_genes: ϸ   ڵ   Ի Ȩ  
+        #      0 ~ num_genes-1:     ڵ   Ի Ȩ
+        #      num_genes: ϸ   ڵ   Ի Ȩ
         #      num_genes+1:          ߵ Ȩ   (beta)
         weight_init = torch.ones(self.num_genes + 2, dtype=torch.float32).unsqueeze(-1)
         self.adaptive_edge_weights = nn.Parameter(weight_init)
 
-        #            
+        #
         act = activation or nn.Identity()
         norm = normalization or nn.Identity()
         drop = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
 
-        #      GNN   ѵ 
+        #      GNN   ѵ
         self.layers = nn.ModuleList()
         for i in range(num_layers):
-            #   һ  н  PCA    룬      н  Hidden ά  
+            #   һ  н  PCA    룬      н  Hidden ά
             curr_in = input_dim if i == 0 else hidden_dim
-            
+
             self.layers.append(
                 AdaptiveSAGE(
-                    curr_in, 
-                    hidden_dim, 
-                    self.adaptive_edge_weights, 
-                    drop, 
-                    act, 
+                    curr_in,
+                    hidden_dim,
+                    self.adaptive_edge_weights,
+                    drop,
+                    act,
                     norm
                 )
             )
 
-        #    շ   ӳ   
+        #    շ   ӳ
         self.prediction_head = nn.Linear(hidden_dim, output_dim)
-        
-        #       ʼ  
+
+        #       ʼ
         nn.init.xavier_uniform_(
-            self.prediction_head.weight, 
+            self.prediction_head.weight,
             gain=nn.init.calculate_gain(""relu"")
         )
 
     def forward(self, message_flow_graphs, x):
         """"""
-        ǰ 򴫲   
-        
+        ǰ 򴫲
+
         Args:
             message_flow_graphs: DGL        ɵĿ  б  (blocks)
-            x:         
+            x:
         """"""
         if len(message_flow_graphs) != len(self.layers):
             raise RuntimeError(f""Graph blocks depth ({len(message_flow_graphs)}) mismatch with model depth ({len(self.layers)})"")
-        
+
         h = x
         for block, layer_fn in zip(message_flow_graphs, self.layers):
             h = layer_fn(block, h)
-            
+
         return self.prediction_head(h)
 
 
 class ScDeepSort(BaseClassificationMethod):
     """"""
-    scDeepSort ϸ      ע    ʵ ֡ 
-    
-           ݼ  ء ģ  ѵ      ֤   ԡ ģ ͳ־û    ƶ  ߼   
+    scDeepSort ϸ      ע    ʵ ֡
+
+           ݼ  ء ģ  ѵ      ֤   ԡ ģ ͳ־û    ƶ  ߼
     """"""
 
     def __init__(
-        self, 
-        dim_in: int, 
-        dim_hid: int, 
-        num_layers: int, 
-        species: str, 
-        tissue: str, 
-        *, 
+        self,
+        dim_in: int,
+        dim_hid: int,
+        num_layers: int,
+        species: str,
+        tissue: str,
+        *,
         dropout: int = 0,
-        batch_size: int = 500, 
+        batch_size: int = 500,
         device: str = ""cpu""
     ):
-        #       
+        #
         self.pca_input_dim = dim_in
         self.hidden_dim = dim_hid
         self.gnn_layers = num_layers
         self.dropout_rate = dropout
         self.batch_size = batch_size
         self.compute_device = device
-        
+
         self.species = species
         self.tissue = tissue
 
-        # ·      
+        # ·
         self.workspace = Path().resolve()
         self.artifact_dir = (
-            self.workspace / ""saved_models"" / ""single_modality"" / 
+            self.workspace / ""saved_models"" / ""single_modality"" /
             ""cell_type_annotation"" / ""pretrained"" / self.species / ""models""
         )
         self.artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -1579,34 +1579,34 @@ class ScDeepSort(BaseClassificationMethod):
     def fit(self, graph: dgl.DGLGraph, labels: torch.Tensor, epochs: int = 300, lr: float = 1e-3,
             weight_decay: float = 0, val_ratio: float = 0.2):
         """"""
-        ѵ  ģ ͵     ڡ 
+        ѵ  ģ ͵     ڡ
         """"""
-        # 1. ׼          
+        # 1. ׼
         node_ids = graph.ndata[""cell_id""]
         is_cell_node = (node_ids == -1)
-        
+
         num_gene_nodes = (~is_cell_node).sum().item()
         num_cell_nodes = is_cell_node.sum().item()
-        
+
         self.n_classes = labels.max().item() + 1
 
-        #        ݼ     
+        #        ݼ
         # ע ⣺DGLͼ У ϸ   ڵ    ڻ   ڵ ֮        ƫ   num_gene_nodes
         indices_perm = torch.randperm(num_cell_nodes) + num_gene_nodes
         split_idx = int(num_cell_nodes * val_ratio)
-        
+
         val_idx = indices_perm[:split_idx].to(self.compute_device)
         train_idx = indices_perm[split_idx:].to(self.compute_device)
 
-        # 2. ׼    ǩ    
+        # 2. ׼    ǩ
         #     ȫͼ  ǩ      ڵ  ǩ  Ϊ -1
         full_labels = torch.full((num_gene_nodes + num_cell_nodes,), -1, dtype=torch.long)
         full_labels[-num_cell_nodes:] = labels
-        
+
         graph = graph.to(self.compute_device)
         graph.ndata[""label""] = full_labels.to(self.compute_device)
 
-        # 3.   ʼ  ģ     
+        # 3.   ʼ  ģ
         self.model = AdaptiveGraphNetwork(
             input_dim=self.pca_input_dim,
             output_dim=self.n_classes,
@@ -1616,34 +1616,34 @@ class ScDeepSort(BaseClassificationMethod):
             activation=nn.ReLU(),
             dropout=self.dropout_rate
         ).to(self.compute_device)
-        
+
         print(f""Model Structure:\n{self.model}"")
 
         self.sampler = NeighborSampler(fanouts=[-1] * self.gnn_layers, edge_dir=""in"")
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
-        #  趨 loss reduction Ϊ sum       ֶ     ƽ  
+        #  趨 loss reduction Ϊ sum       ֶ     ƽ
         self.criterion = nn.CrossEntropyLoss(reduction=""sum"")
 
         print(f""Dataset Split -> Train: {len(train_idx)} | Val: {len(val_idx)}"")
-        
-        # 4. ѵ  ѭ  
+
+        # 4. ѵ  ѭ
         best_val_metric = -1.0
         best_epoch_state = None
         best_weights = None
 
         for epoch in range(epochs):
-            # ѵ    
+            # ѵ
             avg_loss = self._train_one_epoch(graph, train_idx)
-            
-            #       
+
+            #
             _, _, train_acc = self._evaluate_subset(graph, train_idx)
             val_correct, val_unsure, val_acc = self._evaluate_subset(graph, val_idx)
-            
-            #     Ƿ Ϊ   ģ  
+
+            #     Ƿ Ϊ   ģ
             if val_acc >= best_val_metric:
                 best_val_metric = val_acc
-                
-                #   ¼    
+
+                #   ¼
                 best_epoch_state = {
                     ""epoch"": epoch,
                     ""train_acc"": train_acc,
@@ -1652,14 +1652,14 @@ class ScDeepSort(BaseClassificationMethod):
                     ""val_acc"": val_acc,
                     ""val_total"": len(val_idx)
                 }
-                
+
                 self._save_checkpoint()
                 best_weights = deepcopy(self.model.state_dict())
-            
+
             print(f"">>>>Epoch {epoch:04d}: Train Acc {train_acc:.4f}, Loss {avg_loss:.4f}, ""
                   f""Val Acc {val_acc:.4f} (Corr: {val_correct}, Unsure: {val_unsure})"")
 
-        # 5.  ָ    ״̬      
+        # 5.  ָ    ״̬
         if best_weights:
             self.model.load_state_dict(best_weights)
 
@@ -1676,37 +1676,37 @@ class ScDeepSort(BaseClassificationMethod):
         self.model.train()
         accumulated_loss = 0.0
         processed_samples = 0
-        
+
         #      DataLoader
         num_workers = 4 if self.compute_device == ""cpu"" else 0
         loader = DataLoader(
-            g, indices, self.sampler, 
-            batch_size=self.batch_size, 
-            shuffle=True, 
+            g, indices, self.sampler,
+            batch_size=self.batch_size,
+            shuffle=True,
             num_workers=num_workers
         )
-        
-        # CPU  ׺        Ĵ   
+
+        # CPU  ׺        Ĵ
         ctx = loader.enable_cpu_affinity() if self.compute_device == ""cpu"" else nullcontext()
-        
+
         with ctx:
             for _, _, blocks in loader:
                 blocks = [b.to(self.compute_device) for b in blocks]
-                
+
                 input_feat = blocks[0].srcdata[""features""]
                 target_labels = blocks[-1].dstdata[""label""]
-                
-                # ǰ 򴫲 
+
+                # ǰ 򴫲
                 logits = self.model(blocks, input_feat)
                 loss = self.criterion(logits, target_labels)
 
-                #    򴫲 
+                #    򴫲
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
 
                 #   ¼ Loss
-                # ע  ԭ 㷨 ߼  У loss reduction='sum'  
+                # ע  ԭ 㷨 ߼  У loss reduction='sum'
                 #       Ϊ ˴ ӡ  һ   ԣ    ǰ   ׼  ʽ ۻ  loss.item() (   batch    sum)
                 batch_size = blocks[-1].num_dst_nodes()
                 accumulated_loss += loss.item()
@@ -1721,37 +1721,37 @@ class ScDeepSort(BaseClassificationMethod):
         self.model.eval()
         count_correct = 0
         count_unsure = 0
-        
+
         loader = DataLoader(
-            g, indices, self.sampler, 
-            batch_size=self.batch_size, 
+            g, indices, self.sampler,
+            batch_size=self.batch_size,
             shuffle=True
         )
-        
-        #   ȷ      ֵ = K /      
+
+        #   ȷ      ֵ = K /
         threshold = unsure_k / self.n_classes
 
         for _, _, blocks in loader:
             blocks = [b.to(self.compute_device) for b in blocks]
-            
+
             x_in = blocks[0].srcdata[""features""]
             y_true = blocks[-1].dstdata[""label""]
-            
+
             logits = self.model(blocks, x_in)
-            
-            #      CPU     ͳ Ƽ   
+
+            #      CPU     ͳ Ƽ
             logits_cpu = logits.cpu()
             y_true_cpu = y_true.cpu()
 
             for pred_vec, true_label in zip(logits_cpu, y_true_cpu):
                 prob_max = pred_vec.max().item()
                 pred_cls = pred_vec.argmax().item()
-                
+
                 if prob_max < threshold:
                     count_unsure += 1
                 elif pred_cls == true_label:
                     count_correct += 1
-        
+
         acc = count_correct / len(indices) if len(indices) > 0 else 0.0
         return count_correct, count_unsure, acc
 
@@ -1759,7 +1759,7 @@ class ScDeepSort(BaseClassificationMethod):
         """"""    ģ ͺ  Ż   ״̬""""""
         file_name = f""{self.species}-{self.tissue}.pt""
         save_path = self.artifact_dir / file_name
-        
+
         state_dict = {
             ""model"": self.model.state_dict(),
             ""optimizer"": self.optimizer.state_dict()
@@ -1770,41 +1770,41 @@ class ScDeepSort(BaseClassificationMethod):
         """""" Ӵ  ̼   ģ  """"""
         file_name = f""{self.species}-{self.tissue}.pt""
         load_path = self.artifact_dir / file_name
-        
+
         checkpoint = torch.load(load_path, map_location=self.compute_device)
         self.model.load_state_dict(checkpoint[""model""])
 
     @torch.no_grad()
     def predict_proba(self, graph: dgl.DGLGraph):
         """"""
-        Ԥ  ϸ   ķ     ʡ 
-        
+        Ԥ  ϸ   ķ     ʡ
+
         Returns:
-            np.ndarray:   ״Ϊ (N_cells, N_classes)  ĸ  ʾ   
+            np.ndarray:   ״Ϊ (N_cells, N_classes)  ĸ  ʾ
         """"""
         self.model.eval()
 
-        # ɸѡϸ   ڵ 
+        # ɸѡϸ   ڵ
         is_cell = graph.ndata[""cell_id""] == -1
         target_nodes = torch.where(is_cell)[0].to(self.compute_device)
         graph = graph.to(self.compute_device)
 
         num_total_nodes = graph.number_of_nodes()
         logits_store = torch.zeros(num_total_nodes, self.n_classes)
-        
+
         loader = DataLoader(
-            graph, target_nodes, self.sampler, 
+            graph, target_nodes, self.sampler,
             batch_size=self.batch_size
         )
-        
+
         for _, dst_nodes, blocks in loader:
             blocks = [b.to(self.compute_device) for b in blocks]
             inputs = blocks[0].srcdata[""features""]
-            
+
             outputs = self.model(blocks, inputs)
             logits_store[dst_nodes] = outputs.detach().cpu()
 
-        #       ϸ   ڵ ĸ  ʣ        Softmax   һ  
+        #       ϸ   ڵ ĸ  ʣ        Softmax   һ
         cell_logits = logits_store[is_cell]
         probabilities = nn.functional.softmax(cell_logits, dim=-1).numpy()
         return probabilities
@@ -1812,23 +1812,23 @@ class ScDeepSort(BaseClassificationMethod):
     def predict(self, graph: dgl.DGLGraph, unsure_rate: float = 2.0, return_unsure: bool = False):
         """"""
         ִ  Ԥ ⡣
-        
+
         Args:
             graph: DGL ͼ
-            unsure_rate:   ȷ     ж ϵ  
+            unsure_rate:   ȷ     ж ϵ
             return_unsure:  Ƿ񷵻ز ȷ     Mask
-            
+
         Returns:
             predictions (np.ndarray)    (predictions, unsure_mask)
         """"""
         probs = self.predict_proba(graph)
-        
+
         preds = probs.argmax(axis=1)
-        
+
         if return_unsure:
             limit = unsure_rate / self.n_classes
-            #          С    ֵ      Ϊ  ȷ  
+            #          С    ֵ      Ϊ  ȷ
             is_unsure = probs.max(axis=1) < limit
             return preds, is_unsure
-        
+
         return preds",cta_scdeepsort

@@ -18,8 +18,6 @@ from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summa
 from dance.typing import LogLevel
 from dance.utils import set_seed
 
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=256)
@@ -54,7 +52,8 @@ if __name__ == "__main__":
             if (dataset is not None and dataset != [])
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
-    pipeline_planer = PipelinePlaner.from_config_file(f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
+    pipeline_planer = PipelinePlaner.from_config_file(
+        f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
 
     # ================= MODIFIED FUNCTION STARTS HERE =================
@@ -87,13 +86,8 @@ if __name__ == "__main__":
 
             # Initialize model
             device = f"cuda:{args.gpu}" if args.gpu >= 0 and torch.cuda.is_available() else "cpu"
-            model = scGATAnnotator(
-                hidden_channels=args.hidden_channels,
-                batch_size=args.batch_size,
-                n_epochs=args.n_epochs,
-                device=device,
-                random_seed=current_seed
-            )
+            model = scGATAnnotator(hidden_channels=args.hidden_channels, batch_size=args.batch_size,
+                                   n_epochs=args.n_epochs, device=device, random_seed=current_seed)
 
             # Train the model
             logger.info("Training scGAT model...")
@@ -155,7 +149,9 @@ if __name__ == "__main__":
         speed_score = 1.0 / (1.0 + total_time_seconds / 300.0)
         combined_score = 0.8 * avg_valid_score + 0.2 * speed_score
 
-        logger.info(f"Averaged over {args.num_runs} runs - Valid Acc: {avg_valid_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}")
+        logger.info(
+            f"Averaged over {args.num_runs} runs - Valid Acc: {avg_valid_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}"
+        )
 
         wandb.log({
             "train_acc": avg_train_score,
@@ -166,6 +162,7 @@ if __name__ == "__main__":
             "combined_score": combined_score
         })
         wandb.finish()
+
     # ================= MODIFIED FUNCTION ENDS HERE =================
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(

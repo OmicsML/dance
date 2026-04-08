@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-测试多服务器间共享 ChromaDB (Client-Server 模式专用)
+"""测试多服务器间共享 ChromaDB (Client-Server 模式专用)
 
 使用前请确保：
 1. 服务器 A (211.87.232.112) 已启动 Chroma Server
@@ -8,12 +7,14 @@
 
 启动 Server 命令：
     chroma run --host 0.0.0.0 --port 8000 --path /mnt/nfs/zyxing/msu/dance_temp/dance/chroma_server_data
+
 """
 
 import sys
 import time
-from langchain_core.documents import Document
+
 from lamarckian_knowledge_base import LamarckianKnowledgeBase
+from langchain_core.documents import Document
 
 # 配置
 SERVER_HOST = "211.87.232.112"
@@ -24,22 +25,19 @@ TEST_TASK = "test_shared_database_v2"
 
 
 def test_connection():
-    """测试 1: 连接到 Chroma Server"""
+    """测试 1: 连接到 Chroma Server."""
     print("\n" + "=" * 60)
     print("测试 1: 连接到 Chroma Server")
     print("=" * 60)
 
     try:
         # 实例化：直接指定 Host 和 Port
-        kb = LamarckianKnowledgeBase(
-            host=SERVER_HOST,
-            port=SERVER_PORT
-        )
+        kb = LamarckianKnowledgeBase(host=SERVER_HOST, port=SERVER_PORT)
         print(f"✅ 成功连接到 Chroma Server: http://{SERVER_HOST}:{SERVER_PORT}")
 
         # 检查当前知识库中的数据量
         all_memories = kb.list_all_memories()
-        
+
         # 检查是否有错误
         if isinstance(all_memories, dict) and "error" in all_memories:
             print(f"❌ 读取列表失败: {all_memories['error']}")
@@ -47,7 +45,7 @@ def test_connection():
 
         p_count = len(all_memories.get('principles', []))
         t_count = len(all_memories.get('trajectories', []))
-        
+
         print(f"   当前知识库状态:")
         print(f"   - 原则数量: {p_count}")
         print(f"   - 轨迹数量: {t_count}")
@@ -71,21 +69,21 @@ def test_write_and_read(kb):
     try:
         all_memories = kb.list_all_memories()
         ids_to_delete = []
-        
+
         for p in all_memories.get("principles", []):
             if p.get("metadata", {}).get("source_task") == TEST_TASK:
                 ids_to_delete.append(p["id"])
-        
+
         for t in all_memories.get("trajectories", []):
             if t.get("metadata", {}).get("source_task") == TEST_TASK:
                 ids_to_delete.append(t["id"])
-        
+
         if ids_to_delete:
             kb._chroma_collection.delete(ids=ids_to_delete)
             print(f"   已清理 {len(ids_to_delete)} 条旧数据")
         else:
             print("   无旧数据需清理")
-            
+
     except Exception as e:
         print(f"   ⚠️ 清理时警告: {e}")
 
@@ -97,25 +95,26 @@ def test_write_and_read(kb):
     test_trajectory = "测试轨迹: 这是一个用于验证远程写入的测试记录"
 
     try:
-        # 重要：使用 vector_store.add_documents 
+        # 重要：使用 vector_store.add_documents
         # 这会自动调用类中定义的 self.embeddings (1024维) 来生成向量
         # 从而避免 "expecting 384 got 1024" 的错误
-        
+
         docs = [
-            Document(
-                page_content=test_principle,
-                metadata={"source_task": TEST_TASK, "type": "principle", "verified": "true"}
-            ),
-            Document(
-                page_content=test_trajectory,
-                metadata={"source_task": TEST_TASK, "type": "trajectory"}
-            )
+            Document(page_content=test_principle, metadata={
+                "source_task": TEST_TASK,
+                "type": "principle",
+                "verified": "true"
+            }),
+            Document(page_content=test_trajectory, metadata={
+                "source_task": TEST_TASK,
+                "type": "trajectory"
+            })
         ]
-        
+
         # 写入
         kb.vector_store.add_documents(docs)
         print("   ✅ 写入操作完成")
-        
+
         # 稍等一下让索引生效
         time.sleep(1)
 
@@ -147,7 +146,7 @@ def test_write_and_read(kb):
 
 
 def test_shared_access(kb):
-    """测试 3: 模拟从另一台机器连接"""
+    """测试 3: 模拟从另一台机器连接."""
     print("\n" + "=" * 60)
     print("测试 3: 验证数据共享 (模拟第二台客户端)")
     print("=" * 60)
@@ -155,10 +154,7 @@ def test_shared_access(kb):
     print("\n🔄 建立第二个连接实例...")
     try:
         # 模拟第二个客户端
-        kb2 = LamarckianKnowledgeBase(
-            host=SERVER_HOST,
-            port=SERVER_PORT
-        )
+        kb2 = LamarckianKnowledgeBase(host=SERVER_HOST, port=SERVER_PORT)
 
         retrieved = kb2.retrieve_knowledge(TEST_TASK, k=3)
         print(f"   从新连接中检索到:")
@@ -176,7 +172,7 @@ def test_shared_access(kb):
 
 
 def cleanup(kb):
-    """最后清理"""
+    """最后清理."""
     print("\n" + "=" * 60)
     print("清理本次测试产生的数据")
     print("=" * 60)
@@ -185,19 +181,19 @@ def cleanup(kb):
         data = kb.list_all_memories()
         ids_to_del = []
         count = 0
-        
+
         # 简单的过滤逻辑
         all_items = data.get("principles", []) + data.get("trajectories", [])
         for item in all_items:
             if item.get("metadata", {}).get("source_task") == TEST_TASK:
                 ids_to_del.append(item["id"])
-        
+
         if ids_to_del:
             kb._chroma_collection.delete(ids=ids_to_del)
             print(f"   ✅ 成功删除了 {len(ids_to_del)} 条测试残留数据")
         else:
             print("   没有发现残留数据")
-            
+
     except Exception as e:
         print(f"   ⚠️ 清理出错: {e}")
 
@@ -207,7 +203,7 @@ def main():
     print("ChromaDB Client-Server 最终集成测试")
     print("=" * 60)
     print(f"Target Server: {SERVER_HOST}:{SERVER_PORT}")
-    
+
     # 1. 连接
     kb = test_connection()
     if kb is None:

@@ -7,21 +7,20 @@ from typing import Literal
 
 import cv2
 import numpy as np
+import scanpy as sc
+import torch
+import wandb
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import pairwise_distances
-import torch
 from tqdm import tqdm, trange
-import wandb
 
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.stlearn import StLouvain
 from dance.registry import register_preprocessor
-from dance.utils import set_seed, sub_data
-import scanpy as sc
-
 from dance.transforms import AnnDataTransform, BaseTransform, Compose, SetConfig
 from dance.typing import LogLevel, Optional, Sequence, Union
+from dance.utils import set_seed, sub_data
 from dance.utils.matrix import normalize
 from dance.utils.metrics import calculate_unified_scores, resolve_score_func
 from dance.utils.wrappers import add_mod_and_transform
@@ -29,7 +28,8 @@ from dance.utils.wrappers import add_mod_and_transform
 MODES = ["louvain", "kmeans"]
 # EVOLVE-BLOCK-START
 
-@register_preprocessor("feature", "spatial",overwrite=True)
+
+@register_preprocessor("feature", "spatial", overwrite=True)
 class MorphologyFeatureCNN(BaseTransform):
     """Cell morphological features extracted from CNN.
 
@@ -96,24 +96,24 @@ class MorphologyFeatureCNN(BaseTransform):
 
         # Process in batches for efficiency
         features = []
-        
+
         # Process all coordinates in batches
         for i in range(0, len(xy_pixel), self.batch_size):
-            batch_coords = xy_pixel[i:i+self.batch_size]
-            
+            batch_coords = xy_pixel[i:i + self.batch_size]
+
             # Process all images in the batch
             batch_imgs = []
             for x, y in batch_coords:
                 img = self._crop_and_process(image, x, y)
                 batch_imgs.append(img)
-            
+
             # Stack images and process in batch
             batch_tensor = torch.FloatTensor(np.stack(batch_imgs)).to(self.device)
             with torch.no_grad():
                 batch_features = self.model(batch_tensor).view(len(batch_imgs), -1).cpu().numpy()
-            
+
             features.extend(batch_features)
-        
+
         morth_feat = np.array(features)
         if self.n_components > 0:
             pca = PCA(n_components=self.n_components, random_state=self.random_state)
@@ -122,7 +122,7 @@ class MorphologyFeatureCNN(BaseTransform):
         data.data.obsm[self.out] = morth_feat
 
 
-@register_preprocessor("feature", "spatial",overwrite=True)
+@register_preprocessor("feature", "spatial", overwrite=True)
 class SMEFeature(BaseTransform):
     """Spatial Morphological gene Expression normalization feature from stLearn.
 
@@ -176,9 +176,9 @@ class SMEFeature(BaseTransform):
             sme_feat = pca.fit_transform(sme_feat)
 
         data.data.obsm[self.out] = sme_feat
-        
 
-@register_preprocessor("feature", "cell",overwrite=True)
+
+@register_preprocessor("feature", "cell", overwrite=True)
 @add_mod_and_transform
 class CellPCA(BaseTransform):
     """Reduce cell feature matrix with PCA.
@@ -228,9 +228,10 @@ class CellPCA(BaseTransform):
             data.data.uns["pca_explained_variance_ratio"] = pca.explained_variance_ratio_
             # data.data.uns["pca"] = pca
 
-        return data    
+        return data
 
-@register_preprocessor("graph", "spatial",overwrite=True)
+
+@register_preprocessor("graph", "spatial", overwrite=True)
 class SMEGraph(BaseTransform):
     """Spatial Morphological gene Expression graph."""
 
@@ -261,8 +262,9 @@ class SMEGraph(BaseTransform):
         adj = adj_p * adj_m * adj_g
 
         data.data.obsp[self.out] = adj
-        
-@register_preprocessor("graph", "cell",overwrite=True)
+
+
+@register_preprocessor("graph", "cell", overwrite=True)
 class NeighborGraph(BaseTransform):
     """Construct neighborhood graph of observations.
 
@@ -312,17 +314,16 @@ class NeighborGraph(BaseTransform):
         data.data.obsp[self.out] = adj
 
         return data
-     
-         
+
+
 def get_preprocessing_pipeline(morph_feat_dim: int = 50, sme_feat_dim: int = 50, pca_feat_dim: int = 10,
-                            nbrs_pcs: int = 10, n_neighbors: int = 10, device: str = "cpu",
-                            log_level: LogLevel = "INFO", crop_size=10, target_size=230):
+                               nbrs_pcs: int = 10, n_neighbors: int = 10, device: str = "cpu",
+                               log_level: LogLevel = "INFO", crop_size=10, target_size=230):
     return Compose(
         AnnDataTransform(sc.pp.filter_genes, min_cells=1),
         AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
         AnnDataTransform(sc.pp.log1p),
-        MorphologyFeatureCNN(n_components=morph_feat_dim, device=device, crop_size=crop_size,
-                                target_size=target_size),
+        MorphologyFeatureCNN(n_components=morph_feat_dim, device=device, crop_size=crop_size, target_size=target_size),
         CellPCA(n_components=pca_feat_dim),
         SMEGraph(),
         SMEFeature(n_components=sme_feat_dim),
@@ -335,6 +336,8 @@ def get_preprocessing_pipeline(morph_feat_dim: int = 50, sme_feat_dim: int = 50,
         }),
         log_level=log_level,
     )
+
+
 # EVOLVE-BLOCK-END
 
 if __name__ == "__main__":
@@ -351,7 +354,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_dir", type=str, default='./temp_data', help='test directory')
     parser.add_argument("--sample_file", type=str, default=None)
     parser.add_argument("--num_runs", type=int, default=3)
-    parser.add_argument("--obs_nums",type=int,default=10000)
+    parser.add_argument("--obs_nums", type=int, default=10000)
     args = parser.parse_args()
     scores = []
     inner_scores = []
@@ -359,14 +362,14 @@ if __name__ == "__main__":
 
     for seed in range(args.seed, args.seed + args.num_runs):
         start_time = time.time()  # 新增：记录单次循环的开始时间
-        
+
         set_seed(seed)  # 修正：之前是 args.seed，会导致每次跑出来的随机性相同，这里改成跟随循环变量 seed
 
         # Initialize model and get model specific preprocessing pipeline
         if args.mode == "kmeans":
             raise NotImplementedError("--------")
         elif args.mode == "louvain":
-            model = StLouvain(resolution=0.6,random_state=seed)
+            model = StLouvain(resolution=0.6, random_state=seed)
         else:
             raise ValueError(f"Unknown mode {args.mode!r}, available options are {MODES}")
         # preprocessing_pipeline = model.preprocessing_pipeline(device=args.device)
@@ -375,27 +378,28 @@ if __name__ == "__main__":
         dataloader = SpatialLIBDDataset(data_id=args.sample_number, data_dir=args.data_dir,
                                         sample_file=args.sample_file)
         preprocessing_pipeline = get_preprocessing_pipeline(device=args.device)
-        data = dataloader.load_data(transform=None,cache=args.cache)
-        sub_data(data.data,args.obs_nums)
+        data = dataloader.load_data(transform=None, cache=args.cache)
+        sub_data(data.data, args.obs_nums)
         preprocessing_pipeline(data)
         # Prepare preprocessing pipeline and apply it to data
         x, y = data.get_data(return_type="default")
         score = model.fit_score(x, y.values.ravel())
-        pred=model.predict()
+        pred = model.predict()
         silhouette_score = resolve_score_func("silhouette")
         calinski_harabasz_score = resolve_score_func("calinski_harabasz")
         davies_bouldin_score = resolve_score_func("davies_bouldin")
-        inner_scores.append(calculate_unified_scores({
-            "silhouette": silhouette_score(x.toarray(), pred),
-            "calinski_harabasz": calinski_harabasz_score(x.toarray(), pred),
-            "davies_bouldin": davies_bouldin_score(x.toarray(), pred)
-        }))
+        inner_scores.append(
+            calculate_unified_scores({
+                "silhouette": silhouette_score(x.toarray(), pred),
+                "calinski_harabasz": calinski_harabasz_score(x.toarray(), pred),
+                "davies_bouldin": davies_bouldin_score(x.toarray(), pred)
+            }))
         scores.append(score)
-        
+
         end_time = time.time()  # 新增：记录单次循环的结束时间
         run_time = end_time - start_time
         times.append(run_time)  # 新增：保存耗时
-        
+
         print(f"ARI: {score:.4f}, time: {run_time:.2f}s")  # 修改：同时输出得分与时间
 
     print(f"STAGATE {args.sample_number}:")
@@ -404,8 +408,6 @@ if __name__ == "__main__":
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
     print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
-        
-
 """ To reproduce stlearn on other samples, please refer to command lines belows:
 NOTE: since the stlearn method is unstable, you have to run multiple times to get
       best performance.

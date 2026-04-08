@@ -4,8 +4,8 @@ from typing import Optional, Union, get_args
 
 import dgl
 import numpy as np
-from sklearn.decomposition import TruncatedSVD
 import torch
+from sklearn.decomposition import TruncatedSVD
 
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
@@ -18,8 +18,9 @@ from dance.utils import set_seed
 from dance.utils.matrix import normalize
 from dance.utils.wrappers import add_mod_and_transform
 
+
 # EVOLVE-BLOCK-START
-@register_preprocessor("feature", "cell",overwrite=True)
+@register_preprocessor("feature", "cell", overwrite=True)
 @add_mod_and_transform
 class WeightedFeaturePCA(BaseTransform):
     """Compute the weighted gene PCA as cell features.
@@ -57,21 +58,20 @@ class WeightedFeaturePCA(BaseTransform):
             self.logger.info(f"Normalizing feature before decomposition with mode={self.feat_norm_mode} "
                              f"and axis={self.feat_norm_axis}")
             feat = normalize(feat, mode=self.feat_norm_mode, axis=self.feat_norm_axis)
-        
+
         # Use TruncatedSVD instead of PCA for sparse matrices
         if self.n_components > min(feat.shape):
             self.logger.warning(
-                f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)}"
-            )
+                f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)}")
             self.n_components = min(feat.shape) - 1  # TruncatedSVD requires n_components < min(shape)
-            
+
         # Apply log transformation to stabilize variance
         feat_log = np.log1p(feat)
-        
+
         gene_decomposer = TruncatedSVD(n_components=self.n_components)  # genes x components
 
         gene_feat = gene_decomposer.fit_transform(feat_log.T)  # decompose into gene features using log-transformed data
-        
+
         # Compute cell features independently using direct TruncatedSVD on cell-by-gene matrix
         cell_decomposer = TruncatedSVD(n_components=self.n_components)
         cell_feat_direct = cell_decomposer.fit_transform(feat_log)  # cells x components using log-transformed data
@@ -81,7 +81,7 @@ class WeightedFeaturePCA(BaseTransform):
         x_log = np.log1p(x)  # log(1+x) transformation
         x_norm = normalize(x_log, mode="normalize", axis=1)
         cell_feat_weighted = x_norm @ gene_feat  # cells x components
-        
+
         # Combine both representations with optimized weights
         cell_feat = 0.6 * cell_feat_weighted + 0.4 * cell_feat_direct
 
@@ -89,7 +89,8 @@ class WeightedFeaturePCA(BaseTransform):
         data.data.varm[self.out] = gene_feat.astype(np.float32)
         return data
 
-@register_preprocessor("graph", "cell",overwrite=True)
+
+@register_preprocessor("graph", "cell", overwrite=True)
 class CellFeatureGraph(BaseTransform):
 
     def __init__(self, cell_feature_channel: str, gene_feature_channel: Optional[str] = None, *,
@@ -108,42 +109,42 @@ class CellFeatureGraph(BaseTransform):
         # Apply enhanced TF-IDF transformation to highlight marker genes
         # First apply log transformation
         feat_log = np.log1p(feat)
-        
+
         # Calculate TF-IDF manually for more control
         tf_matrix = feat_log  # Term frequency after log transformation
-        
+
         # Calculate document frequency (how many cells express each gene)
         df = np.sum(feat > 0, axis=0)  # Count non-zero expressions per gene
         total_cells = feat.shape[0]
         idf = np.log(total_cells / (df + 1))  # Inverse document frequency with smoothing
-        
+
         # Calculate TF-IDF
         feat_tfidf = tf_matrix * idf  # Broadcasting multiplication
 
         # Find top-k connections per cell to sparsify the graph
         # This reduces noise and focuses on important gene-cell relationships
         k = min(50, num_genes // 2)  # Use top 50 or half the genes, whichever is smaller
-        
+
         # For each cell, find top k expressed genes
         top_k_indices = np.argpartition(feat_tfidf, -k, axis=1)[:, -k:]
         row_indices = np.repeat(np.arange(num_cells), k)
         col_indices = top_k_indices.flatten()
-        
+
         # Get corresponding weights
         weights = feat_tfidf[row_indices, col_indices]
-        
+
         # Filter out zero weights to ensure sparse representation
         mask = weights > 0
         row_indices = row_indices[mask]
         col_indices = col_indices[mask]
         weights = weights[mask]
-        
+
         self.logger.info(f"Number of nonzero entries after sparsification: {len(weights):,}")
         self.logger.info(f"Sparsity rate = {len(weights) / num_cells / num_genes:.1%}")
 
         # Offset gene indices to distinguish from cell nodes
         gene_node_indices = col_indices + num_cells  # gene nodes start after cell nodes
-        
+
         # Create bidirectional edges (cell->gene and gene->cell)
         row = np.concatenate([row_indices, gene_node_indices])
         col = np.concatenate([gene_node_indices, row_indices])
@@ -157,13 +158,13 @@ class CellFeatureGraph(BaseTransform):
         # Initialize bipartite cell-gene graph
         g = dgl.graph((row, col))
         g.edata["weight"] = edata
-        
+
         # Store node type information
         g.ndata["node_type"] = torch.cat([
-            torch.zeros(num_cells, dtype=torch.int32),      # 0 for cells
-            torch.ones(num_genes, dtype=torch.int32)        # 1 for genes
+            torch.zeros(num_cells, dtype=torch.int32),  # 0 for cells
+            torch.ones(num_genes, dtype=torch.int32)  # 1 for genes
         ])
-        
+
         # Apply efficient edge normalization using DGL's built-in function
         if self.normalize_edges:
             edge_norm = dgl.nn.EdgeWeightNorm(norm='both')
@@ -173,7 +174,7 @@ class CellFeatureGraph(BaseTransform):
                                         channel_type="varm")
         cell_feature = data.get_feature(return_type="torch", channel=self.cell_feature_channel, mod=self.mod,
                                         channel_type="obsm")
-        
+
         # Concatenate cell and gene features
         g.ndata["features"] = torch.vstack((cell_feature, gene_feature))
 
@@ -182,7 +183,7 @@ class CellFeatureGraph(BaseTransform):
         return data
 
 
-@register_preprocessor("graph", "cell",overwrite=True)
+@register_preprocessor("graph", "cell", overwrite=True)
 class PCACellFeatureGraph(BaseTransform):
 
     _DISPLAY_ATTRS = ("n_components", "split_name")
@@ -213,8 +214,10 @@ class PCACellFeatureGraph(BaseTransform):
         CellFeatureGraph(cell_feature_channel="WeightedFeaturePCA", mod=self.mod, normalize_edges=self.normalize_edges,
                          log_level=self.log_level)(data)
         return data
+
+
 # EVOLVE-BLOCK-END
-    
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=500)
@@ -256,7 +259,8 @@ if __name__ == "__main__":
 
         # Load data and perform necessary preprocessing
         dataloader = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
-                                               train_dataset=args.train_dataset, data_dir="../temp_data", val_size=args.val_size)
+                                               train_dataset=args.train_dataset, data_dir="../temp_data",
+                                               val_size=args.val_size)
         data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
         # Obtain training and testing data

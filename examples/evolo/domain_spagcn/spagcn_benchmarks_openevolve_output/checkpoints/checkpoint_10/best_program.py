@@ -1,8 +1,10 @@
 import argparse
 import time  # 新增：导入 time 模块
 
+import numba
 import numpy as np
 import scanpy as sc
+import torch
 
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.spagcn import SpaGCN, refine
@@ -12,12 +14,10 @@ from dance.transforms.cell_feature import CellPCA
 from dance.transforms.filter import FilterGenesMatch
 from dance.transforms.interface import AnnDataTransform
 from dance.transforms.misc import Compose, SetConfig
-from dance.typing import LogLevel
-from dance.utils import set_seed,sub_data
+from dance.typing import LogLevel, Optional, Sequence
+from dance.utils import set_seed, sub_data
 from dance.utils.metrics import calculate_unified_scores, resolve_score_func
-from dance.typing import Sequence,Optional
-import numba
-import torch
+
 
 # EVOLVE-BLOCK-START
 @numba.njit("f4(f4[:], f4[:])")
@@ -81,6 +81,8 @@ def spearman_distance(x, y):
 
 
 DIST_FUNC_ID = ["euclidean_distance", "pearson_distance", "spearman_distance"]
+
+
 # XXX: parallel produce segfalt on M-chip Mac
 @numba.njit("f4[:,:](f4[:,:], u4)", parallel=True, nogil=True)
 def pairwise_distance(x, dist_func_id=0):
@@ -99,6 +101,7 @@ def pairwise_distance(x, dist_func_id=0):
         for j in numba.prange(n):
             mat[i][j] = dist(x[i], x[j])
     return mat
+
 
 @register_preprocessor("graph", "spatial", overwrite=True)
 class SpaGCNGraph(BaseTransform):
@@ -166,7 +169,9 @@ class SpaGCNGraph2D(BaseTransform):
         data.data.obsp[self.out] = pairwise_distance(x.astype(np.float32), dist_func_id=0)
         return data
 
+
 # EVOLVE-BLOCK-END
+
 
 def get_preprocessing_pipeline(alpha: float = 1, beta: int = 49, dim: int = 50, log_level: LogLevel = "INFO"):
     return Compose(
@@ -184,7 +189,8 @@ def get_preprocessing_pipeline(alpha: float = 1, beta: int = 49, dim: int = 50, 
         }),
         log_level=log_level,
     )
-    
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
@@ -206,7 +212,7 @@ if __name__ == "__main__":
     parser.add_argument("--device", default="cpu", help="Computation device.")
     parser.add_argument("--seed", type=int, default=100, help="")
     parser.add_argument("--num_runs", type=int, default=1)
-    parser.add_argument("--obs_nums",type=int,default=10000)
+    parser.add_argument("--obs_nums", type=int, default=10000)
     args = parser.parse_args()
 
     scores = []
@@ -215,7 +221,7 @@ if __name__ == "__main__":
 
     for seed in range(args.seed, args.seed + args.num_runs):
         start_time = time.time()  # 新增：记录单次循环的开始时间
-        
+
         set_seed(seed)
 
         # Initialize model and get model specific preprocessing pipeline
@@ -225,7 +231,7 @@ if __name__ == "__main__":
         # Load data and perform necessary preprocessing
         dataloader = SpatialLIBDDataset(data_id=args.sample_number)
         data = dataloader.load_data(transform=None, cache=args.cache)
-        sub_data(data.data,args.obs_nums)
+        sub_data(data.data, args.obs_nums)
         preprocessing_pipeline(data)
         (x, adj, adj_2d), y = data.get_train_data()
 
@@ -235,29 +241,29 @@ if __name__ == "__main__":
         res = model.search_set_res((x, adj), l=l, target_num=args.n_clusters, start=0.4, step=args.step, tol=args.tol,
                                    lr=args.lr, epochs=args.epochs, max_run=args.max_run)
 
-        model.fit((x, adj), init_spa=True, init="louvain", tol=args.tol, lr=args.lr, epochs=args.epochs,
-                                   res=res)
+        model.fit((x, adj), init_spa=True, init="louvain", tol=args.tol, lr=args.lr, epochs=args.epochs, res=res)
         embed, pred = model.predict((x, adj), return_embed=True)
         score = model.default_score_func(y, pred)
-        
+
         refined_pred = refine(sample_id=data.data.obs_names.tolist(), pred=pred.tolist(), dis=adj_2d, shape="hexagon")
         score_refined = model.default_score_func(y, refined_pred)
-        
+
         silhouette_score = resolve_score_func("silhouette")
         calinski_harabasz_score = resolve_score_func("calinski_harabasz")
         davies_bouldin_score = resolve_score_func("davies_bouldin")
-        inner_scores.append(calculate_unified_scores({
-            "silhouette": silhouette_score(embed, refined_pred),
-            "calinski_harabasz": calinski_harabasz_score(embed, refined_pred),
-            "davies_bouldin": davies_bouldin_score(embed, refined_pred)
-        }))
-        
+        inner_scores.append(
+            calculate_unified_scores({
+                "silhouette": silhouette_score(embed, refined_pred),
+                "calinski_harabasz": calinski_harabasz_score(embed, refined_pred),
+                "davies_bouldin": davies_bouldin_score(embed, refined_pred)
+            }))
+
         scores.append(score_refined)
-        
+
         end_time = time.time()  # 新增：记录单次循环的结束时间
         run_time = end_time - start_time
         times.append(run_time)  # 新增：保存耗时
-        
+
         print(f"ARI: {score:.4f}")
         print(f"ARI (refined): {score_refined:.4f}, time: {run_time:.2f}s")  # 修改：打印细化得分的同时输出运行时间
         print(data)
@@ -268,7 +274,6 @@ if __name__ == "__main__":
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
     print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
-
 """ To reproduce SpaGCN on other samples, please refer to command lines belows:
 
 human dorsolateral prefrontal cortex sample 151673:

@@ -59,8 +59,8 @@ namespace cnpy {
         bool fortran_order;
         size_t num_vals;
     };
-   
-    using npz_t = std::map<std::string, NpyArray>; 
+
+    using npz_t = std::map<std::string, NpyArray>;
 
     char BigEndianTest();
     char map_type(const std::type_info& t);
@@ -75,7 +75,7 @@ namespace cnpy {
     template<typename T> std::vector<char>& operator+=(std::vector<char>& lhs, const T rhs) {
         //write in little endian
         for(size_t byte = 0; byte < sizeof(T); byte++) {
-            char val = *((char*)&rhs+byte); 
+            char val = *((char*)&rhs+byte);
             lhs.push_back(val);
         }
         return lhs;
@@ -232,7 +232,7 @@ namespace cnpy {
         npz_save(zipname, fname, &data[0], shape, mode);
     }
 
-    template<typename T> std::vector<char> create_npy_header(const std::vector<size_t>& shape) {  
+    template<typename T> std::vector<char> create_npy_header(const std::vector<size_t>& shape) {
 
         std::vector<char> dict;
         dict += "{'descr': '";

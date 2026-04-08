@@ -25,7 +25,7 @@ llm:
 # Prompt configuration
 prompt:
   system_message: "
-                                  
+
                   **System/Role:**
                   You are a Senior Python Optimization Specialist and Computational Biologist.
 
@@ -76,8 +76,8 @@ prompt:
                   **Prompt for the Model:**
 
                   ```text
-                  Please optimize the provided Python code block. 
-                  The user indicates that the single-batch path (batch_key=None) is the most frequent use case. 
+                  Please optimize the provided Python code block.
+                  The user indicates that the single-batch path (batch_key=None) is the most frequent use case.
                   Currently, the code suffers from severe performance issues due to Python-level loops when generating the 'row col' string list required by the C++ backend.
 
                   Requirements:

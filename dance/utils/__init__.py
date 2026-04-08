@@ -137,8 +137,9 @@ def spilt_web(url: str):
 
 
 import scanpy as sc
+
+
 def sub_data(adata, n_cells=10000, random_state=42):
     if adata.n_obs > n_cells:
         sc.pp.subsample(adata, n_obs=n_cells, random_state=random_state, copy=False)
         print(f"已随机抽取 {n_cells} 个细胞")
-        

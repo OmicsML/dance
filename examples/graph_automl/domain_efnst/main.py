@@ -2,16 +2,22 @@ import argparse
 import gc
 import math
 import os
+import random
 import time
 from pathlib import Path
-import random
 
-from PIL import Image
-from efficientnet_pytorch import EfficientNet
 import networkx as nx
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.nn.modules.loss
+import torchvision.transforms as transforms
+import wandb
+from efficientnet_pytorch import EfficientNet
+from PIL import Image
 from scipy.sparse import csr_matrix
 from scipy.spatial import distance
 from skimage import img_as_ubyte
@@ -20,29 +26,23 @@ from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import adjusted_rand_score, pairwise_distances
 from sklearn.neighbors import BallTree, KDTree, NearestNeighbors
-import torch
-import torch
 from torch.autograd import Variable
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.nn.modules.loss
 from torch.nn.parameter import Parameter
 from torch.utils.data import DataLoader, Dataset
 from torch_geometric.nn import BatchNorm, Sequential
+from torch_sparse import SparseTensor
 from torchvision import transforms
-import torchvision.transforms as transforms
 from tqdm import tqdm
 
-import wandb
 from dance import logger
 from dance.data.base import Data
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.EfNST import (
+    EfNsSTRunner,
     EfNSTAugmentTransform,
     EfNSTConcatgTransform,
     EfNSTGraphTransform,
     EfNSTImageTransform,
-    EfNsSTRunner,
 )
 from dance.pipeline import PipelinePlaner, save_summary_data
 from dance.registry import register_preprocessor
@@ -53,9 +53,8 @@ from dance.transforms.filter import (
     HighlyVariableGenesLogarithmizedByTopGenes,
 )
 from dance.transforms.misc import Compose, SetConfig
-from dance.utils import set_seed,sub_data
+from dance.utils import set_seed, sub_data
 from dance.utils.metrics import calculate_unified_scores, resolve_score_func
-from torch_sparse import SparseTensor
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -91,7 +90,8 @@ if __name__ == "__main__":
     start_time = time.time()
     file_root_path = Path(args.root_path, args.sample_number).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
-    pipeline_planer = PipelinePlaner.from_config_file(f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
+    pipeline_planer = PipelinePlaner.from_config_file(
+        f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
 
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
@@ -126,7 +126,7 @@ if __name__ == "__main__":
                     print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
                 data = dataloader.load_data(transform=None, cache=args.cache)
                 sub_data(data.data)
-                data.data.uns['data_name']=args.sample_number
+                data.data.uns['data_name'] = args.sample_number
                 preprocessing_pipeline(data)
                 (x, adj), y = data.get_data()
                 adata = data.data
@@ -171,7 +171,9 @@ if __name__ == "__main__":
         speed_score = 1.0 / (1.0 + total_time_seconds / 300.0)
         combined_score = 0.8 * avg_inner_score + 0.2 * speed_score
 
-        print(f"Averaged over {args.num_runs} runs - ARI: {avg_score:.4f}, Inner Score: {avg_inner_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}")
+        print(
+            f"Averaged over {args.num_runs} runs - ARI: {avg_score:.4f}, Inner Score: {avg_inner_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}"
+        )
 
         wandb.log({
             "ARI": avg_score,

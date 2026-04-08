@@ -48,7 +48,7 @@ public:
             LoadGraph();
             LoadFeatures();
         }
-        
+
     }
 
     void LoadGraph()
@@ -87,14 +87,14 @@ public:
         }
         random_shuffle(random_w.begin(),random_w.end());
         negativeFeature = vector<vector<double>>(ncols,vector<double>(nrows));
-        positiveFeature = vector<vector<double>>(ncols,vector<double>(nrows));        
+        positiveFeature = vector<vector<double>>(ncols,vector<double>(nrows));
         for(int row = 0; row <nrows; row ++){
             for(int col = 0; col <ncols; col ++){
                 auto val = mv1[row*ncols+col];
                 if(Degree[row]>0){
                     val = val/pow(Degree[row],rrr);
                 }
-                
+
                 if(val>0){
                     positiveFeature[col][row]=val;
                     positiveRowSum[col]+=val;
@@ -316,7 +316,7 @@ public:
 
 
     void LoadSplitAdjs(){
-  
+
         cnpy::NpyArray arr_mv1 = cnpy::npy_load("data/"+dataset+"1.npy");
         cnpy::NpyArray arr_mv2 = cnpy::npy_load("data/"+dataset+"2.npy");
         cnpy::NpyArray arr_mv3 = cnpy::npy_load("data/"+dataset+"3.npy");

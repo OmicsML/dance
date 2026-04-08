@@ -1,21 +1,20 @@
-"""
-Evaluator for HuggingFace dataset-based prompt optimization.
-"""
+"""Evaluator for HuggingFace dataset-based prompt optimization."""
 
-import re
-import traceback
-import yaml
 import os
+import re
 import time
-from openai import OpenAI
-from tqdm import tqdm
+import traceback
+
+import yaml
 from datasets import load_dataset
 from deepeval.metrics import GEval
 from deepeval.test_case import LLMTestCase, LLMTestCaseParams
+from openai import OpenAI
+from tqdm import tqdm
 
-method_name=os.environ['TASK_NAME']
+method_name = os.environ['TASK_NAME']
 # Read config.yaml to get model settings
-with open(os.path.join(os.path.dirname(__file__), "config_pseudocode.yaml"), "r") as f:
+with open(os.path.join(os.path.dirname(__file__), "config_pseudocode.yaml")) as f:
     config = yaml.safe_load(f)
 
 # Get model settings from config
@@ -54,17 +53,15 @@ if not prompt_file:
     print("Warning: OPENEVOLVE_PROMPT not set. Using default dataset_settings.yaml")
 else:
     basename = os.path.basename(prompt_file)
-    dataset_filename = basename.replace(f"_{method_name}_prompt.txt", "_prompt_dataset.yaml").replace(
-        ".txt", "_dataset.yaml"
-    )
+    dataset_filename = basename.replace(f"_{method_name}_prompt.txt",
+                                        "_prompt_dataset.yaml").replace(".txt", "_dataset.yaml")
     evaluator_dir = os.path.dirname(os.path.abspath(__file__))
     DATASET_CONFIG_PATH = os.path.join(evaluator_dir, dataset_filename)
     print(f"Dataset configuration: {dataset_filename}")
 
 
 def calculate_prompt_features(prompt):
-    """
-    Calculate custom features for MAP-Elites
+    """Calculate custom features for MAP-Elites.
 
     IMPORTANT: Returns raw continuous values, not bin indices.
     The database handles all scaling and binning automatically.
@@ -73,6 +70,7 @@ def calculate_prompt_features(prompt):
         tuple: (prompt_length, reasoning_sophistication_score)
         - prompt_length: Actual character count
         - reasoning_sophistication_score: Continuous score 0.0-1.0
+
     """
     # Feature 1: Prompt length (raw character count)
     prompt_length = len(prompt)
@@ -86,19 +84,13 @@ def calculate_prompt_features(prompt):
         sophistication_score += 0.1  # Has substantial content
 
     # Check for few-shot examples (high sophistication)
-    has_example = (
-        "example" in prompt_lower
-        or prompt.count("####") >= 4
-        or bool(re.search(r"problem:.*?solution:", prompt_lower, re.DOTALL))
-    )
+    has_example = ("example" in prompt_lower or prompt.count("####") >= 4
+                   or bool(re.search(r"problem:.*?solution:", prompt_lower, re.DOTALL)))
 
     # Check for Chain-of-Thought (CoT) indicators
-    has_cot = (
-        "step by step" in prompt_lower
-        or "step-by-step" in prompt_lower
-        or any(phrase in prompt_lower for phrase in ["think through", "reasoning", "explain your"])
-        or bool(re.search(r"(first|then|next|finally)", prompt_lower))
-    )
+    has_cot = ("step by step" in prompt_lower or "step-by-step" in prompt_lower
+               or any(phrase in prompt_lower for phrase in ["think through", "reasoning", "explain your"])
+               or bool(re.search(r"(first|then|next|finally)", prompt_lower)))
 
     # Check for directive language
     has_directive = "solve" in prompt_lower or "calculate" in prompt_lower
@@ -137,16 +129,17 @@ def calculate_prompt_features(prompt):
 
 
 def load_prompt_config(prompt_path):
-    """Load the prompt from text file and dataset config from matching _dataset.yaml file."""
+    """Load the prompt from text file and dataset config from matching _dataset.yaml
+    file."""
     # Load prompt from text file
-    with open(prompt_path, "r") as f:
+    with open(prompt_path) as f:
         prompt = f.read().strip()
-    
+
     # Load the configuration (already determined from environment variable)
     if not os.path.exists(DATASET_CONFIG_PATH):
         raise FileNotFoundError(f"Dataset configuration not found: {DATASET_CONFIG_PATH}")
 
-    with open(DATASET_CONFIG_PATH, "r") as f:
+    with open(DATASET_CONFIG_PATH) as f:
         config = yaml.safe_load(f)
 
     return config, prompt
@@ -160,7 +153,6 @@ def load_hf_dataset(config):
 
     print(f"Loading dataset: {dataset_name}")
 
-    
     streaming = config.get("streaming", False)
 
     # Try to load the specified split
@@ -172,9 +164,7 @@ def load_hf_dataset(config):
             streaming=streaming,
         )
     else:
-        dataset = load_dataset(
-            dataset_name, split=split, streaming=streaming
-        )
+        dataset = load_dataset(dataset_name, split=split, streaming=streaming)
     filtered_dataset = dataset.filter(lambda example: example['method'] == method_name)
     # Print dataset info
     if hasattr(filtered_dataset, "__len__"):
@@ -184,12 +174,16 @@ def load_hf_dataset(config):
 
     return filtered_dataset
 
+
 from deepeval.models import DeepEvalBaseLLM
-from openai import OpenAI, AsyncOpenAI
+from openai import AsyncOpenAI, OpenAI
+
+
 class CustomQwenPlus(DeepEvalBaseLLM):
+
     def __init__(self):
         self.api_key = os.getenv("DASHSCOPE_API_KEY")
-        self.api_key="sk-92265d8b2c044989b10ad59e3a27b56f"
+        self.api_key = "sk-92265d8b2c044989b10ad59e3a27b56f"
         self.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
         self.model_name = "qwen-flash"
 
@@ -198,7 +192,7 @@ class CustomQwenPlus(DeepEvalBaseLLM):
             api_key=self.api_key,
             base_url=self.base_url,
         )
-        
+
         # 初始化异步客户端 (用于 a_generate) - 这对 DeepEval 的性能至关重要
         self.async_client = AsyncOpenAI(
             api_key=self.api_key,
@@ -209,13 +203,14 @@ class CustomQwenPlus(DeepEvalBaseLLM):
         return self.client
 
     def generate(self, prompt: str) -> str:
-        """
-        同步生成方法
-        """
+        """同步生成方法."""
         chat_completion = self.client.chat.completions.create(
             model=self.model_name,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0, # 评估时建议将温度设为 0 以保证结果一致性
+            messages=[{
+                "role": "user",
+                "content": prompt
+            }],
+            temperature=0,  # 评估时建议将温度设为 0 以保证结果一致性
         )
         return chat_completion.choices[0].message.content
 
@@ -225,17 +220,23 @@ class CustomQwenPlus(DeepEvalBaseLLM):
         """
         chat_completion = await self.async_client.chat.completions.create(
             model=self.model_name,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{
+                "role": "user",
+                "content": prompt
+            }],
             temperature=0,
         )
         return chat_completion.choices[0].message.content
 
     def get_model_name(self):
         return self.model_name
+
+
 model = CustomQwenPlus()
+
+
 def evaluate_single_sample(model, code, prompt_template):
-    """
-    使用GEval指标评估单个伪代码样本的质量。
+    """使用GEval指标评估单个伪代码样本的质量。
 
     Args:
         model: DeepEval模型实例
@@ -244,66 +245,55 @@ def evaluate_single_sample(model, code, prompt_template):
 
     Returns:
         float: 评估指标的平均得分
+
     """
     # 1. Readability (可读性)
     readability_metric = GEval(
-         model=model,
+        model=model,
         name="Readability",
         criteria="Readability - Variable names should be clear and the logic should be easy to follow.",
-        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT], # 只需看生成的伪代码
+        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT],  # 只需看生成的伪代码
     )
 
     # 2. Correctness (正确性)
     correctness_metric = GEval(
-         model=model,
+        model=model,
         name="Correctness",
-        criteria="Correctness - The pseudo-code must remain faithful to the original code's logic. It should not alter the algorithm's intent.",
+        criteria=
+        "Correctness - The pseudo-code must remain faithful to the original code's logic. It should not alter the algorithm's intent.",
         # 需要对比"实际输出"和"预期输出/源代码"
-        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT, LLMTestCaseParams.EXPECTED_OUTPUT]
-    )
+        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT, LLMTestCaseParams.EXPECTED_OUTPUT])
 
     # 3. Completeness (完整性)
     completeness_metric = GEval(
-         model=model,
-        name="Completeness",
-        criteria="Completeness - The pseudo-code must cover all key boundary conditions and logical branches present in the original code.",
-        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT, LLMTestCaseParams.EXPECTED_OUTPUT]
-    )
+        model=model, name="Completeness", criteria=
+        "Completeness - The pseudo-code must cover all key boundary conditions and logical branches present in the original code.",
+        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT, LLMTestCaseParams.EXPECTED_OUTPUT])
 
     # 4. Conciseness (简洁性)
     conciseness_metric = GEval(
-         model=model,
-        name="Conciseness",
-        criteria="Conciseness - The pseudo-code should filter out unnecessary implementation details (like syntax-specific boilerplate) while keeping the core logic.",
-        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT]
-    )
+        model=model, name="Conciseness", criteria=
+        "Conciseness - The pseudo-code should filter out unnecessary implementation details (like syntax-specific boilerplate) while keeping the core logic.",
+        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT])
 
     # 5. Maintainability (可维护性)
     maintainability_metric = GEval(
-         model=model,
-        name="Maintainability",
-        criteria="Maintainability - The structure should be modular. Complex logic should be broken down into clear steps or blocks.",
-        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT]
-    )
+        model=model, name="Maintainability", criteria=
+        "Maintainability - The structure should be modular. Complex logic should be broken down into clear steps or blocks.",
+        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT])
 
     # 创建 DeepEval 测试用例
     test_case = LLMTestCase(
-        input=code,                # 输入是原代码
-        actual_output=prompt_template,# 模型生成的伪代码
-        expected_output=code      # 这里的预期输出也是原代码（用于作为对比基准）
+        input=code,  # 输入是原代码
+        actual_output=prompt_template,  # 模型生成的伪代码
+        expected_output=code  # 这里的预期输出也是原代码（用于作为对比基准）
     )
 
     # ==========================================
     # 运行评估
     # ==========================================
 
-    metrics = [
-        readability_metric,
-        correctness_metric,
-        completeness_metric,
-        conciseness_metric,
-        maintainability_metric
-    ]
+    metrics = [readability_metric, correctness_metric, completeness_metric, conciseness_metric, maintainability_metric]
 
     # 遍历运行每个指标
     print("开始评估...\n")
@@ -312,12 +302,13 @@ def evaluate_single_sample(model, code, prompt_template):
         metric.measure(test_case)
         print(f"指标: {metric.name}")
         print(f"得分: {metric.score}")
-        print(f"理由: {metric.reason}") # DeepEval 会生成打分理由，非常有价值
+        print(f"理由: {metric.reason}")  # DeepEval 会生成打分理由，非常有价值
         print("-" * 30)
         accuracy += metric.score
     accuracy /= len(metrics)
 
     return accuracy
+
 
 def evaluate_prompt(prompt, dataset, config, num_samples):
     """Evaluate a prompt on a subset of the dataset."""
@@ -423,7 +414,7 @@ def evaluate_stage1(prompt_path):
         # Always return feature dimensions, even on failure
         try:
             # Try to calculate features from the failed prompt
-            with open(prompt_path, "r") as f:
+            with open(prompt_path) as f:
                 failed_prompt = f.read().strip()
             prompt_length, reasoning_sophistication = calculate_prompt_features(failed_prompt)
         except:
@@ -494,7 +485,7 @@ def evaluate_stage2(prompt_path):
         # Always return feature dimensions, even on failure
         try:
             # Try to calculate features from the failed prompt
-            with open(prompt_path, "r") as f:
+            with open(prompt_path) as f:
                 failed_prompt = f.read().strip()
             prompt_length, reasoning_sophistication = calculate_prompt_features(failed_prompt)
         except:

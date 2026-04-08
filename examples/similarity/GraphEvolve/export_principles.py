@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-导出知识库中所有 principles 的 content 和 source_task 到 txt 文件
-"""
-import sys
+"""导出知识库中所有 principles 的 content 和 source_task 到 txt 文件."""
 import os
+import sys
 
 # 添加当前目录到 Python 路径，以便导入 lamarckian_knowledge_base
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -15,6 +13,7 @@ SERVER_HOST = "211.87.232.112"
 SERVER_PORT = 8000
 OUTPUT_FILE = "principles_export.txt"
 
+
 # ================= 主程序 =================
 def export_principles():
     print(f"\n{'='*80}")
@@ -25,10 +24,7 @@ def export_principles():
 
     # 1. 连接知识库
     try:
-        kb = LamarckianKnowledgeBase(
-            host=SERVER_HOST,
-            port=SERVER_PORT
-        )
+        kb = LamarckianKnowledgeBase(host=SERVER_HOST, port=SERVER_PORT)
         print("✅ 知识库连接成功")
     except Exception as e:
         print(f"❌ 知识库连接失败: {e}")

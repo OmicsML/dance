@@ -2,11 +2,10 @@ import argparse
 import random
 
 import numpy as np
-from sklearn.metrics import adjusted_rand_score
+from sklearn.metrics import adjusted_rand_score, pairwise_distances
 
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.EfNST import EfNsSTRunner
-from sklearn.metrics import adjusted_rand_score, pairwise_distances
 from dance.utils import set_seed
 
 if __name__ == "__main__":
@@ -45,11 +44,10 @@ if __name__ == "__main__":
                 random_state=seed)
             dataloader = SpatialLIBDDataset(data_id=args.sample_number)
             data = dataloader.load_data(transform=None, cache=args.cache)
-            data.data.uns['data_name']=args.sample_number
+            data.data.uns['data_name'] = args.sample_number
             preprocessing_pipeline = EfNsSTRunner.preprocessing_pipeline(
-                verbose=args.verbose, cnnType=args.cnnType, pca_n_comps=args.pca_n_comps,
-                distType=args.distType, k=args.k, dim_reduction=not args.no_dim_reduction, min_cells=args.min_cells,
-                platform=args.platform)
+                verbose=args.verbose, cnnType=args.cnnType, pca_n_comps=args.pca_n_comps, distType=args.distType,
+                k=args.k, dim_reduction=not args.no_dim_reduction, min_cells=args.min_cells, platform=args.platform)
             preprocessing_pipeline(data)
             (x, adj), y = data.get_data()
             adata = data.data

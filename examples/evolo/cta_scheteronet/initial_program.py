@@ -4,12 +4,13 @@ from typing import Optional
 
 import dgl
 import numpy as np
+import pandas as pd
 import scanpy as sc
-from sklearn.neighbors import NearestNeighbors
 import torch
 import torch.nn as nn
 from sklearn.model_selection import train_test_split
-import pandas as pd
+from sklearn.neighbors import NearestNeighbors
+
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scheteronet import (
     convert_dgl_to_original_format,
@@ -29,9 +30,8 @@ from dance.typing import LogLevel
 from dance.utils import set_seed, sub_data
 
 
-
 # EVOLVE-BLOCK-START
-@register_preprocessor("graph", "cell",overwrite=True)
+@register_preprocessor("graph", "cell", overwrite=True)
 class HeteronetGraph(BaseTransform):
 
     def __init__(self, knn_num: int = 5, distance_metrics: str = 'l2', random_state: int = 0,
@@ -44,6 +44,7 @@ class HeteronetGraph(BaseTransform):
         self.channel = channel
         self.ignore_first = ignore_first
         self.channel_type = channel_type
+
     def build_graph(self, features_np, radius=None, knears=None, distance_metrics='l2'):
         """
         based on https://github.com/hannshu/st_datasets/blob/master/utils/preprocess.py
@@ -112,21 +113,25 @@ class HeteronetGraph(BaseTransform):
         if batchs is not None:
             g.ndata['batch_id'] = torch.from_numpy(batchs.values.astype(int)).long()
         adata.uns[self.out] = g
+
+
 # EVOLVE-BLOCK-END
 
+
 def get_preprocessing_pipeline(log_level: LogLevel = "INFO"):
-        transforms = []
-        transforms.append(FilterCellsType())
-        transforms.append(AnnDataTransform(sc.pp.filter_genes, min_counts=3))
-        transforms.append(FilterCellsScanpy(min_counts=1))
-        transforms.append(HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=4000, flavor="cell_ranger"))
-        transforms.append(SaveRaw())
-        transforms.append(NormalizeTotal())
-        transforms.append(UpdateSizeFactors())
-        transforms.append(Log1P())
-        transforms.append(HeteronetGraph())
-        transforms.append(SetConfig({"label_channel": "cell_type"}))
-        return Compose(*transforms, log_level=log_level)
+    transforms = []
+    transforms.append(FilterCellsType())
+    transforms.append(AnnDataTransform(sc.pp.filter_genes, min_counts=3))
+    transforms.append(FilterCellsScanpy(min_counts=1))
+    transforms.append(HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=4000, flavor="cell_ranger"))
+    transforms.append(SaveRaw())
+    transforms.append(NormalizeTotal())
+    transforms.append(UpdateSizeFactors())
+    transforms.append(Log1P())
+    transforms.append(HeteronetGraph())
+    transforms.append(SetConfig({"label_channel": "cell_type"}))
+    return Compose(*transforms, log_level=log_level)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -175,22 +180,22 @@ if __name__ == "__main__":
     parser.add_argument('--mask_ratio', type=float, default=0.8)
     parser.add_argument('--spatial', action='store_false', help='read spatial')
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--obs_nums",type=int,default=None)
+    parser.add_argument("--obs_nums", type=int, default=None)
     args = parser.parse_args()
     runs = args.num_runs
     results = []
     inner_scores = []
     times = []  # 新增：用于记录每次运行的时间
-    
+
     if args.gpu == -1:
         device = torch.device("cpu")
     else:
         device = torch.device("cuda:" + str(args.gpu)) if torch.cuda.is_available() else torch.device("cpu")
     eval_func = eval_acc
-    
+
     for run in range(runs):
         start_time = time.time()  # 新增：记录单次循环的开始时间
-        
+
         set_seed(args.seed + run)
         dataloader = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
                                                train_dataset=args.train_dataset, data_dir=args.data_dir,
@@ -199,9 +204,9 @@ if __name__ == "__main__":
         preprocessing_pipeline = get_preprocessing_pipeline()
         data = dataloader.load_data(transform=None, cache=args.cache)
         if args.obs_nums is not None:
-            sub_data(data.data,args.obs_nums)
-            train_idx, test_idx = train_test_split(range(args.obs_nums),test_size=0.2,random_state=args.seed)
-            train_idx,val_idx = train_test_split(train_idx,test_size=args.val_size,random_state=args.seed)
+            sub_data(data.data, args.obs_nums)
+            train_idx, test_idx = train_test_split(range(args.obs_nums), test_size=0.2, random_state=args.seed)
+            train_idx, val_idx = train_test_split(train_idx, test_size=args.val_size, random_state=args.seed)
             data.set_split_idx("train", train_idx)
             data.set_split_idx("test", test_idx)
             data.set_split_idx("val", val_idx)
@@ -244,14 +249,14 @@ if __name__ == "__main__":
             # test_idx=dataset_ind.splits['test']
             test_score = model.score(dataset_ind, dataset_ind.y, data.test_idx)
             inner_score = model.score(dataset_ind, dataset_ind.y, data.train_idx)
-            
+
         results.append(test_score)
         inner_scores.append(inner_score)
-        
+
         end_time = time.time()  # 新增：记录单次循环的结束时间
         run_time = end_time - start_time
         times.append(run_time)  # 新增：保存耗时
-        
+
         print(f"Run {run+1} - test_score: {test_score:.4f}, time: {run_time:.2f}s")  # 新增：打印单次运行时间和得分
 
     print(f"scHeteroNet {args.species} {args.tissue} {args.test_dataset}:")

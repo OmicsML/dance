@@ -1,18 +1,17 @@
-"""
-Evaluator for HuggingFace dataset-based prompt optimization.
-"""
+"""Evaluator for HuggingFace dataset-based prompt optimization."""
 
-import re
-import traceback
-import yaml
 import os
+import re
 import time
+import traceback
+
+import yaml
+from datasets import load_dataset
 from openai import OpenAI
 from tqdm import tqdm
-from datasets import load_dataset
 
 # Read config.yaml to get model settings
-with open(os.path.join(os.path.dirname(__file__), "config.yaml"), "r") as f:
+with open(os.path.join(os.path.dirname(__file__), "config.yaml")) as f:
     config = yaml.safe_load(f)
 
 # Get model settings from config
@@ -51,17 +50,14 @@ if not prompt_file:
     print("Warning: OPENEVOLVE_PROMPT not set. Using default dataset_settings.yaml")
 else:
     basename = os.path.basename(prompt_file)
-    dataset_filename = basename.replace("_prompt.txt", "_prompt_dataset.yaml").replace(
-        ".txt", "_dataset.yaml"
-    )
+    dataset_filename = basename.replace("_prompt.txt", "_prompt_dataset.yaml").replace(".txt", "_dataset.yaml")
     evaluator_dir = os.path.dirname(os.path.abspath(__file__))
     DATASET_CONFIG_PATH = os.path.join(evaluator_dir, dataset_filename)
     print(f"Dataset configuration: {dataset_filename}")
 
 
 def calculate_prompt_features(prompt):
-    """
-    Calculate custom features for MAP-Elites
+    """Calculate custom features for MAP-Elites.
 
     IMPORTANT: Returns raw continuous values, not bin indices.
     The database handles all scaling and binning automatically.
@@ -70,6 +66,7 @@ def calculate_prompt_features(prompt):
         tuple: (prompt_length, reasoning_sophistication_score)
         - prompt_length: Actual character count
         - reasoning_sophistication_score: Continuous score 0.0-1.0
+
     """
     # Feature 1: Prompt length (raw character count)
     prompt_length = len(prompt)
@@ -83,19 +80,13 @@ def calculate_prompt_features(prompt):
         sophistication_score += 0.1  # Has substantial content
 
     # Check for few-shot examples (high sophistication)
-    has_example = (
-        "example" in prompt_lower
-        or prompt.count("####") >= 4
-        or bool(re.search(r"problem:.*?solution:", prompt_lower, re.DOTALL))
-    )
+    has_example = ("example" in prompt_lower or prompt.count("####") >= 4
+                   or bool(re.search(r"problem:.*?solution:", prompt_lower, re.DOTALL)))
 
     # Check for Chain-of-Thought (CoT) indicators
-    has_cot = (
-        "step by step" in prompt_lower
-        or "step-by-step" in prompt_lower
-        or any(phrase in prompt_lower for phrase in ["think through", "reasoning", "explain your"])
-        or bool(re.search(r"(first|then|next|finally)", prompt_lower))
-    )
+    has_cot = ("step by step" in prompt_lower or "step-by-step" in prompt_lower
+               or any(phrase in prompt_lower for phrase in ["think through", "reasoning", "explain your"])
+               or bool(re.search(r"(first|then|next|finally)", prompt_lower)))
 
     # Check for directive language
     has_directive = "solve" in prompt_lower or "calculate" in prompt_lower
@@ -134,16 +125,17 @@ def calculate_prompt_features(prompt):
 
 
 def load_prompt_config(prompt_path):
-    """Load the prompt from text file and dataset config from matching _dataset.yaml file."""
+    """Load the prompt from text file and dataset config from matching _dataset.yaml
+    file."""
     # Load prompt from text file
-    with open(prompt_path, "r") as f:
+    with open(prompt_path) as f:
         prompt = f.read().strip()
 
     # Load the configuration (already determined from environment variable)
     if not os.path.exists(DATASET_CONFIG_PATH):
         raise FileNotFoundError(f"Dataset configuration not found: {DATASET_CONFIG_PATH}")
 
-    with open(DATASET_CONFIG_PATH, "r") as f:
+    with open(DATASET_CONFIG_PATH) as f:
         config = yaml.safe_load(f)
 
     return config, prompt
@@ -177,9 +169,7 @@ def load_hf_dataset(config):
                 streaming=streaming,
             )
         else:
-            dataset = load_dataset(
-                dataset_name, split=split, trust_remote_code=trust_remote_code, streaming=streaming
-            )
+            dataset = load_dataset(dataset_name, split=split, trust_remote_code=trust_remote_code, streaming=streaming)
     except:
         # Fallback to train split if test is not available
         print(f"Split '{split}' not found, falling back to 'train'")
@@ -246,9 +236,7 @@ def evaluate_prompt(prompt, dataset, config, num_samples):
             context_text = ""
             if "title" in context_items and "sentences" in context_items:
                 # Handle the specific structure of HotpotQA
-                for i, (title, sentences) in enumerate(
-                    zip(context_items["title"], context_items["sentences"])
-                ):
+                for i, (title, sentences) in enumerate(zip(context_items["title"], context_items["sentences"])):
                     context_text += f"Paragraph {i+1} ({title}):\n"
                     context_text += " ".join(sentences) + "\n\n"
             formatted_prompt = prompt.format(context=context_text.strip(), question=input_text)
@@ -382,9 +370,7 @@ def evaluate_prompt(prompt, dataset, config, num_samples):
                 expected_upper = str(expected).upper()
 
                 # Look for the verdict in the output
-                if "SUPPORTED" in output_upper and "NOT" not in output_upper.replace(
-                    "NOT SUPPORTED", ""
-                ):
+                if "SUPPORTED" in output_upper and "NOT" not in output_upper.replace("NOT SUPPORTED", ""):
                     prediction = "SUPPORTED"
                 elif "NOT SUPPORTED" in output_upper or "NOT_SUPPORTED" in output_upper:
                     prediction = "NOT_SUPPORTED"
@@ -508,7 +494,7 @@ def evaluate_stage1(prompt_path):
         # Always return feature dimensions, even on failure
         try:
             # Try to calculate features from the failed prompt
-            with open(prompt_path, "r") as f:
+            with open(prompt_path) as f:
                 failed_prompt = f.read().strip()
             prompt_length, reasoning_sophistication = calculate_prompt_features(failed_prompt)
         except:
@@ -578,7 +564,7 @@ def evaluate_stage2(prompt_path):
         # Always return feature dimensions, even on failure
         try:
             # Try to calculate features from the failed prompt
-            with open(prompt_path, "r") as f:
+            with open(prompt_path) as f:
                 failed_prompt = f.read().strip()
             prompt_length, reasoning_sophistication = calculate_prompt_features(failed_prompt)
         except:

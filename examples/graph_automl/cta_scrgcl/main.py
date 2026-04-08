@@ -3,22 +3,22 @@ import gc
 import os
 import pprint
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import get_args
 
+import anndata
 import numpy as np
 import torch
 import wandb
-import tempfile
-import anndata
+
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scrgcl import scRGCLWrapper
 from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
 from dance.typing import LogLevel
 from dance.utils import set_seed
-    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -56,7 +56,8 @@ if __name__ == "__main__":
             if (dataset is not None and dataset != [])
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
-    pipeline_planer = PipelinePlaner.from_config_file(f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
+    pipeline_planer = PipelinePlaner.from_config_file(
+        f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
 
     # ================= MODIFIED FUNCTION STARTS HERE =================
@@ -85,7 +86,8 @@ if __name__ == "__main__":
 
                 # Load data and perform necessary preprocessing
                 dataloader = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
-                                                species=args.species, tissue=args.tissue, val_size=args.val_size,data_dir="../temp_data")
+                                                       species=args.species, tissue=args.tissue, val_size=args.val_size,
+                                                       data_dir="../temp_data")
                 data = dataloader.load_data(transform=None, cache=args.cache)
                 # Prepare preprocessing pipeline and apply it to data
                 kwargs = {tune_mode: dict(wandb.config)}
@@ -101,18 +103,17 @@ if __name__ == "__main__":
 
                 # Convert Labels (One-hot -> Index)
                 y_train_indices = y_train.argmax(1).cpu().numpy()
-                
+
                 train_adata = anndata.AnnData(X=x_train.cpu().numpy())
-                train_adata.uns=data.data.uns
+                train_adata.uns = data.data.uns
                 train_adata.obs['cell_type'] = y_train_indices
                 if hasattr(data.data, "var_names"):
                     train_adata.var_names = data.data.var_names
 
                 # Initialize model
-                
 
                 # Construct AnnData for Training
-                
+
                 # Train the model
                 logger.info("Training scRGCL model...")
                 model.fit(adata=train_adata, batch_size=args.batch_size)
@@ -129,9 +130,8 @@ if __name__ == "__main__":
                 valid_scores.append(run_valid_score)
                 test_scores.append(run_test_score)
 
-                logger.info(f"Run {run_idx + 1} finished. Valid Acc: {run_valid_score:.4f}, Test Acc: {run_test_score:.4f}")
-
-            
+                logger.info(
+                    f"Run {run_idx + 1} finished. Valid Acc: {run_valid_score:.4f}, Test Acc: {run_test_score:.4f}")
 
         # Stop Timer
         total_time_seconds = time.time() - start_time
@@ -144,7 +144,9 @@ if __name__ == "__main__":
         speed_score = 1.0 / (1.0 + total_time_seconds / 300.0)
         combined_score = 0.8 * avg_valid_score + 0.2 * speed_score
 
-        logger.info(f"Averaged over {args.num_runs} runs - Valid Acc: {avg_valid_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}")
+        logger.info(
+            f"Averaged over {args.num_runs} runs - Valid Acc: {avg_valid_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}"
+        )
 
         wandb.log({
             "train_acc": avg_train_score,
@@ -155,6 +157,7 @@ if __name__ == "__main__":
             "combined_score": combined_score
         })
         wandb.finish()
+
     # ================= MODIFIED FUNCTION ENDS HERE =================
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(

@@ -4,9 +4,9 @@ from algor import evaluate_function
 """Function minimization example for OpenEvolve"""
 import numpy as np
 
+
 def search_algorithm(iterations=1000, bounds=(-5, 5)):
-    """
-    A simple random search algorithm that often gets stuck in local minima.
+    """A simple random search algorithm that often gets stuck in local minima.
 
     Args:
         iterations: Number of iterations to run
@@ -14,6 +14,7 @@ def search_algorithm(iterations=1000, bounds=(-5, 5)):
 
     Returns:
         Tuple of (best_x, best_y, best_value)
+
     """
     # Initialize with a random point
     best_x = np.random.uniform(bounds[0], bounds[1])

@@ -33,8 +33,8 @@ from dance.transforms.filter import (
     HighlyVariableGenesLogarithmizedByMeanAndDisp,
     HighlyVariableGenesLogarithmizedByTopGenes,
     HighlyVariableGenesRawCount,
+    PrefilterGenes,
     ScrubletTransform,
-    PrefilterGenes
 )
 from dance.transforms.gene_holdout import GeneHoldout
 from dance.transforms.interface import AnnDataTransform

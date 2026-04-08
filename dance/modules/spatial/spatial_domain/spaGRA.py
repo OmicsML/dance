@@ -1,5 +1,3 @@
-
-# -*- coding: utf-8 -*-
 import os
 import random
 import sys
@@ -8,33 +6,33 @@ from collections import Counter
 
 import anndata as ad
 import dgl
-from dgl.nn.pytorch import GATConv
 import numba
 import numpy as np
 import ot
 import pandas as pd
 import scanpy as sc
 import scipy.sparse as sp
-from scipy.spatial import distance_matrix
 import sklearn.neighbors
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from dgl.nn.pytorch import GATConv
+from munkres import Munkres
+from scipy.spatial import distance_matrix
 from sklearn import metrics
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from torch.backends import cudnn
-from munkres import Munkres
-
-# from torch_geometric.data import Data
 
 from dance.modules.base import BaseClusteringMethod
-from dance.transforms import Compose, HighlyVariableGenesRawCount, NormalizeTotalLog1P, SetConfig
+from dance.transforms import Compose, HighlyVariableGenesRawCount, NormalizeTotalLog1P, PrefilterGenes, SetConfig
 from dance.transforms.base import BaseTransform
 from dance.transforms.graph import CalSpatialNet
 from dance.typing import LogLevel
-from dance.transforms import PrefilterGenes
+
+# from torch_geometric.data import Data
+
 """
 Graph Attention Networks in DGL using SPMV optimization.
 References
@@ -43,37 +41,46 @@ Paper: https://arxiv.org/abs/1710.10903
 Author's code: https://github.com/PetarV-/GAT
 Pytorch implementation: https://github.com/Diego999/pyGAT
 """
+
+
 @numba.njit("f4(f4[:], f4[:])")
-def euclid_dist(t1,t2):
-    sum=0
+def euclid_dist(t1, t2):
+    sum = 0
     for i in range(t1.shape[0]):
-        sum+=(t1[i]-t2[i])**2
+        sum += (t1[i] - t2[i])**2
     return np.sqrt(sum)
+
 
 @numba.njit("f4[:,:](f4[:,:])", parallel=True, nogil=True)
 def pairwise_distance(X):
-    n=X.shape[0]
-    adj=np.empty((n, n), dtype=np.float32)
+    n = X.shape[0]
+    adj = np.empty((n, n), dtype=np.float32)
     for i in numba.prange(n):
         for j in numba.prange(n):
-            adj[i][j]=euclid_dist(X[i], X[j])
+            adj[i][j] = euclid_dist(X[i], X[j])
     return adj
+
 
 def calculate_adj_matrix(adata):
     x = adata.obs["array_row"]
     y = adata.obs["array_col"]
-    X=np.array([x, y]).T.astype(np.float32)
+    X = np.array([x, y]).T.astype(np.float32)
     adj = pairwise_distance(X)
     return adj
+
 
 def _nan2zero(x):
     return torch.where(torch.isnan(x), torch.zeros_like(x), x)
 
+
 def _nan2inf(x):
     return torch.where(torch.isnan(x), torch.zeros_like(x) + np.inf, x)
-class NB(object):
+
+
+class NB:
+
     def __init__(self, theta=None, scale_factor=1.0):
-        super(NB, self).__init__()
+        super().__init__()
         self.eps = 1e-10
         self.scale_factor = scale_factor
         self.theta = theta
@@ -83,7 +90,7 @@ class NB(object):
         theta = torch.minimum(self.theta, torch.tensor(1e6))
         t1 = torch.lgamma(theta + self.eps) + torch.lgamma(y_true + 1.0) - torch.lgamma(y_true + theta + self.eps)
         t2 = (theta + y_true) * torch.log(1.0 + (y_pred / (theta + self.eps))) + (
-                y_true * (torch.log(theta + self.eps) - torch.log(y_pred + self.eps)))
+            y_true * (torch.log(theta + self.eps) - torch.log(y_pred + self.eps)))
         final = t1 + t2
         final = _nan2inf(final)
         if mean:
@@ -92,6 +99,7 @@ class NB(object):
 
 
 class ZINB(NB):
+
     def __init__(self, pi, ridge_lambda=0.0, **kwargs):
         super().__init__(**kwargs)
         self.pi = pi
@@ -113,8 +121,9 @@ class ZINB(NB):
         result = _nan2inf(result)
         return result
 
+
 def compute_joint(view1, view2):
-    """Compute the joint probability matrix P"""
+    """Compute the joint probability matrix P."""
 
     bn, k = view1.size()
     assert (view2.size(0) == bn and view2.size(1) == k)
@@ -126,6 +135,7 @@ def compute_joint(view1, view2):
 
     return p_i_j
 
+
 def consistency_loss(emb1, emb2):
     emb1 = emb1 - torch.mean(emb1, dim=0, keepdim=True)
     emb2 = emb2 - torch.mean(emb2, dim=0, keepdim=True)
@@ -133,10 +143,11 @@ def consistency_loss(emb1, emb2):
     emb2 = torch.nn.functional.normalize(emb2, p=2, dim=1)
     cov1 = torch.matmul(emb1, emb1.t())
     cov2 = torch.matmul(emb2, emb2.t())
-    return torch.mean((cov1 - cov2) ** 2)
+    return torch.mean((cov1 - cov2)**2)
+
 
 def crossview_contrastive_Loss(view1, view2, lamb=9.0, EPS=sys.float_info.epsilon):
-    """Contrastive loss for maximizng the consistency"""
+    """Contrastive loss for maximizng the consistency."""
     _, k = view1.size()
     p_i_j = compute_joint(view1, view2)
     assert (p_i_j.size() == (k, k))
@@ -160,7 +171,8 @@ def crossview_contrastive_Loss(view1, view2, lamb=9.0, EPS=sys.float_info.epsilo
 
     loss = loss.sum()
 
-    return loss*-1
+    return loss * -1
+
 
 def cosine_similarity(emb):
     mat = torch.matmul(emb, emb.T)
@@ -171,10 +183,12 @@ def cosine_similarity(emb):
     mat = mat - torch.diag_embed(torch.diag(mat))
     return mat
 
+
 def regularization_loss(emb, adj):
     mat = torch.sigmoid(cosine_similarity(emb))  # .cpu()
-    loss = torch.mean((mat - adj) ** 2)
+    loss = torch.mean((mat - adj)**2)
     return loss
+
 
 def refine_label(adata, radius=50, key='cluster'):
     n_neigh = radius
@@ -201,10 +215,9 @@ def refine_label(adata, radius=50, key='cluster'):
     return new_type
 
 
-
 def munkres_newlabel(y_true, y_pred):
-    """\
-     Kuhn-Munkres algorithm to achieve mapping from cluster labels to ground truth label
+    """\ Kuhn-Munkres algorithm to achieve mapping from cluster labels to ground truth
+    label.
 
     Parameters
     ----------
@@ -216,6 +229,7 @@ def munkres_newlabel(y_true, y_pred):
     Returns
     -------
     mapping label
+
     """
     y_true = y_true - np.min(y_true)
     l1 = list(set(y_true))
@@ -236,7 +250,7 @@ def munkres_newlabel(y_true, y_pred):
 
     if numclass1 != numclass2:
         print('error')
-        return 0,0,0
+        return 0, 0, 0
 
     cost = np.zeros((numclass1, numclass2), dtype=int)
     for i, c1 in enumerate(l1):
@@ -266,11 +280,8 @@ def munkres_newlabel(y_true, y_pred):
     return new_predict
 
 
-
-
 def Cal_Spatial_Net(adata, rad_cutoff=None, k_cutoff=None, model='Radius', Spatial_uns="Spatial_Net"):
-    """
-    Construct the spatial neighbor networks.
+    """Construct the spatial neighbor networks.
 
     Parameters
     ----------
@@ -286,6 +297,7 @@ def Cal_Spatial_Net(adata, rad_cutoff=None, k_cutoff=None, model='Radius', Spati
     Returns
     -------
     The spatial networks are saved in adata.uns['Spatial_Net']
+
     """
 
     print('------Calculating spatial graph...')
@@ -312,12 +324,18 @@ def Cal_Spatial_Net(adata, rad_cutoff=None, k_cutoff=None, model='Radius', Spati
     KNN_df.columns = ['Cell1', 'Cell2', 'Distance']
 
     Spatial_Net = KNN_df.copy()
-    Spatial_Net = Spatial_Net.loc[Spatial_Net['Distance'] > 0,]
-    id_cell_trans = dict(zip(range(coor.shape[0]), np.array(coor.index), ))
+    Spatial_Net = Spatial_Net.loc[
+        Spatial_Net['Distance'] > 0,
+    ]
+    id_cell_trans = dict(zip(
+        range(coor.shape[0]),
+        np.array(coor.index),
+    ))
     Spatial_Net['Cell1'] = Spatial_Net['Cell1'].map(id_cell_trans)
     Spatial_Net['Cell2'] = Spatial_Net['Cell2'].map(id_cell_trans)
 
     adata.uns[Spatial_uns] = Spatial_Net
+
 
 class TransferData(BaseTransform):
     """Transfer spatial network data to graph format.
@@ -326,9 +344,10 @@ class TransferData(BaseTransform):
     ----------
     spatial_uns
         Key for spatial networks in adata.uns. Default is "Spatial_Net".
+
     """
 
-    _DISPLAY_ATTRS = ("spatial_uns",)
+    _DISPLAY_ATTRS = ("spatial_uns", )
 
     def __init__(self, spatial_uns="Spatial_Net", out=None, log_level="WARNING"):
         super().__init__(out=out, log_level=log_level)
@@ -367,11 +386,10 @@ def Transfer_Data(adata):
     return G, adata.X.todense()
 
 
+class NB:
 
-
-class NB(object):
     def __init__(self, theta=None, scale_factor=1.0):
-        super(NB, self).__init__()
+        super().__init__()
         self.eps = 1e-10
         self.scale_factor = scale_factor
         self.theta = theta
@@ -381,14 +399,16 @@ class NB(object):
         theta = torch.minimum(self.theta, torch.tensor(1e6))
         t1 = torch.lgamma(theta + self.eps) + torch.lgamma(y_true + 1.0) - torch.lgamma(y_true + theta + self.eps)
         t2 = (theta + y_true) * torch.log(1.0 + (y_pred / (theta + self.eps))) + (
-                y_true * (torch.log(theta + self.eps) - torch.log(y_pred + self.eps)))
+            y_true * (torch.log(theta + self.eps) - torch.log(y_pred + self.eps)))
         final = t1 + t2
         final = _nan2inf(final)
         if mean:
             final = torch.mean(final)
         return final
 
+
 class ZINB(NB):
+
     def __init__(self, pi, ridge_lambda=0.0, **kwargs):
         super().__init__(**kwargs)
         self.pi = pi
@@ -410,17 +430,15 @@ class ZINB(NB):
         result = _nan2inf(result)
         return result
 
+
 class decoder(torch.nn.Module):
+
     def __init__(self, nfeat, nhid1, nhid2):
-        super(decoder, self).__init__()
-        self.decoder = torch.nn.Sequential(
-            torch.nn.Linear(nfeat,  nhid1),
-            torch.nn.BatchNorm1d(nhid1),
-            torch.nn.ReLU()
-        )
+        super().__init__()
+        self.decoder = torch.nn.Sequential(torch.nn.Linear(nfeat, nhid1), torch.nn.BatchNorm1d(nhid1), torch.nn.ReLU())
         self.pi = torch.nn.Linear(nhid1, nhid2)
         self.disp = torch.nn.Linear(nhid1, nhid2)
-        self.mean = torch.nn.Linear(nhid1,  nhid2)
+        self.mean = torch.nn.Linear(nhid1, nhid2)
         self.DispAct = lambda x: torch.clamp(F.softplus(x), 1e-4, 1e4)
         self.MeanAct = lambda x: torch.clamp(torch.exp(x), 1e-5, 1e6)
 
@@ -454,35 +472,27 @@ class decoder(torch.nn.Module):
         # adata.obs['label_refined'] = np.array(new_type)
 
         return new_type
+
+
 class GAT(nn.Module):
-    def __init__(self,
-                 g,
-                 H,
-                 num_layers,
-                 in_dim,
-                 num_hidden,
-                 heads,
-                 activation,
-                 feat_drop,
-                 attn_drop,
-                 negative_slope):
-        super(GAT, self).__init__()
+
+    def __init__(self, g, H, num_layers, in_dim, num_hidden, heads, activation, feat_drop, attn_drop, negative_slope):
+        super().__init__()
         self.g = g
         self.num_layers = num_layers
         self.num_hidden = num_hidden
         self.gat_layers = nn.ModuleList()
         self.activation = activation
-        self.ZINB = decoder(num_hidden*heads[0],  H,  in_dim)
+        self.ZINB = decoder(num_hidden * heads[0], H, in_dim)
 
-        self.gat_layers.append(GATConv(
-            in_dim, num_hidden, heads[0],
-            feat_drop, attn_drop, negative_slope, False, self.activation))
+        self.gat_layers.append(
+            GATConv(in_dim, num_hidden, heads[0], feat_drop, attn_drop, negative_slope, False, self.activation))
         # hidden layers
         for l in range(1, num_layers):
             # due to multi-head, the in_dim = num_hidden * num_heads
-            self.gat_layers.append(GATConv(
-                num_hidden * heads[l - 1], num_hidden, heads[l],
-                feat_drop, attn_drop, negative_slope, False, self.activation))
+            self.gat_layers.append(
+                GATConv(num_hidden * heads[l - 1], num_hidden, heads[l], feat_drop, attn_drop, negative_slope, False,
+                        self.activation))
 
     def forward(self, inputs):
         heads = []
@@ -490,19 +500,18 @@ class GAT(nn.Module):
         # get hidden_representation
         for l in range(self.num_layers):
             temp = h.flatten(1)
-            h =self.gat_layers[l](self.g, temp)
+            h = self.gat_layers[l](self.g, temp)
         # get heads
         for i in range(h.shape[1]):
             heads.append(h[:, i])
-
 
         heads_tensor = torch.cat(heads, axis=1)
         [pi, disp, mean] = self.ZINB(heads_tensor)
         return heads, pi, disp, mean
 
 
-def contrastive_loss(z1: torch.Tensor, z2: torch.Tensor, adj,
-                     mean: bool = True, tau: float = 1.0, hidden_norm: bool = True):
+def contrastive_loss(z1: torch.Tensor, z2: torch.Tensor, adj, mean: bool = True, tau: float = 1.0,
+                     hidden_norm: bool = True):
     l1 = nei_con_loss(z1, z2, tau, adj, hidden_norm)
     l2 = nei_con_loss(z2, z1, tau, adj, hidden_norm)
     ret = (l1 + l2) * 0.5
@@ -527,6 +536,7 @@ def sim(z1: torch.Tensor, z2: torch.Tensor, hidden_norm: bool = True):
 
 # --- 修改 1: 支持 Batch 的对比损失函数 ---
 
+
 def multihead_contrastive_loss(heads, adj, nei_count, tau: float = 1.0):
     """
     heads: List of tensors, 每个 tensor 是 (Batch_Size, Hidden_Dim)
@@ -548,8 +558,8 @@ def nei_con_loss(z1: torch.Tensor, z2: torch.Tensor, tau, adj, nei_count, hidden
     '''
     # 移除自环 (Batch 内部的对角线)
     adj = adj - torch.diag_embed(torch.diag(adj))
-    adj[adj > 0] = 1 # 确保是二值的
-    
+    adj[adj > 0] = 1  # 确保是二值的
+
     # 这里我们只计算 Batch 内的相似度，因此显存占用极小 (2048^2)
     f = lambda x: torch.exp(x / tau)
     intra_view_sim = f(sim(z1, z1, hidden_norm))
@@ -558,20 +568,18 @@ def nei_con_loss(z1: torch.Tensor, z2: torch.Tensor, tau, adj, nei_count, hidden
     # 计算 Loss
     # 注意：这里的 sum(1) 仅是 Batch 内的求和，作为全图的近似
     denom = intra_view_sim.sum(1) + inter_view_sim.sum(1) - intra_view_sim.diag()
-    
+
     # 避免分母为0
     denom = torch.clamp(denom, min=1e-6)
 
     loss = (inter_view_sim.diag() + (intra_view_sim * adj).sum(1) + (inter_view_sim * adj).sum(1)) / denom
-    
+
     # 使用预先计算好的真实邻居数量进行归一化
     # 注意避免除以0
     nei_count = torch.clamp(nei_count, min=1.0)
-    loss = loss / nei_count 
+    loss = loss / nei_count
 
     return -torch.log(torch.clamp(loss, min=1e-8)).mean()
-
-
 
 
 def set_seed(seed=0):
@@ -587,25 +595,27 @@ def set_seed(seed=0):
     os.environ['PYTHONHASHSEED'] = str(seed)
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
 
-def prefilter_specialgenes(adata,Gene1Pattern="ERCC",Gene2Pattern="MT-",Gene3Pattern="mt-"):
-    id_tmp1=np.asarray([not str(name).startswith(Gene1Pattern) for name in adata.var_names],dtype=bool)
-    id_tmp2=np.asarray([not str(name).startswith(Gene2Pattern) for name in adata.var_names],dtype=bool)
+
+def prefilter_specialgenes(adata, Gene1Pattern="ERCC", Gene2Pattern="MT-", Gene3Pattern="mt-"):
+    id_tmp1 = np.asarray([not str(name).startswith(Gene1Pattern) for name in adata.var_names], dtype=bool)
+    id_tmp2 = np.asarray([not str(name).startswith(Gene2Pattern) for name in adata.var_names], dtype=bool)
     id_tmp3 = np.asarray([not str(name).startswith(Gene3Pattern) for name in adata.var_names], dtype=bool)
-    id_tmp=np.logical_and(id_tmp1,id_tmp2,id_tmp3)
+    id_tmp = np.logical_and(id_tmp1, id_tmp2, id_tmp3)
     adata._inplace_subset_var(id_tmp)
-    
 
 
-
-
-def prefilter_genes(adata,min_counts=None,max_counts=None,min_cells=10,max_cells=None):
+def prefilter_genes(adata, min_counts=None, max_counts=None, min_cells=10, max_cells=None):
     if min_cells is None and min_counts is None and max_cells is None and max_counts is None:
         raise ValueError('Provide one of min_counts, min_genes, max_counts or max_genes.')
-    id_tmp=np.asarray([True]*adata.shape[1],dtype=bool)
-    id_tmp=np.logical_and(id_tmp,sc.pp.filter_genes(adata.X,min_cells=min_cells)[0]) if min_cells is not None  else id_tmp
-    id_tmp=np.logical_and(id_tmp,sc.pp.filter_genes(adata.X,max_cells=max_cells)[0]) if max_cells is not None  else id_tmp
-    id_tmp=np.logical_and(id_tmp,sc.pp.filter_genes(adata.X,min_counts=min_counts)[0]) if min_counts is not None  else id_tmp
-    id_tmp=np.logical_and(id_tmp,sc.pp.filter_genes(adata.X,max_counts=max_counts)[0]) if max_counts is not None  else id_tmp
+    id_tmp = np.asarray([True] * adata.shape[1], dtype=bool)
+    id_tmp = np.logical_and(id_tmp,
+                            sc.pp.filter_genes(adata.X, min_cells=min_cells)[0]) if min_cells is not None else id_tmp
+    id_tmp = np.logical_and(id_tmp,
+                            sc.pp.filter_genes(adata.X, max_cells=max_cells)[0]) if max_cells is not None else id_tmp
+    id_tmp = np.logical_and(id_tmp,
+                            sc.pp.filter_genes(adata.X, min_counts=min_counts)[0]) if min_counts is not None else id_tmp
+    id_tmp = np.logical_and(id_tmp,
+                            sc.pp.filter_genes(adata.X, max_counts=max_counts)[0]) if max_counts is not None else id_tmp
     adata._inplace_subset_var(id_tmp)
 
 
@@ -613,7 +623,7 @@ def refine_nearest_labels(adata, radius=50, key='label'):
     new_type = []
     df = adata.obsm['spatial']
     old_type = adata.obs[key].values
-    df = pd.DataFrame(df,index=old_type)
+    df = pd.DataFrame(df, index=old_type)
     distances = distance_matrix(df, df)
     distances_df = pd.DataFrame(distances, index=old_type, columns=old_type)
 
@@ -629,8 +639,9 @@ def refine_nearest_labels(adata, radius=50, key='label'):
 
     return [str(i) for i in list(new_type)]
 
+
 def normalize(mx):
-    """Row-normalize sparse matrix"""
+    """Row-normalize sparse matrix."""
     rowsum = np.array(mx.sum(1))
     r_inv = np.power(rowsum, -1).flatten()
     r_inv[np.isinf(r_inv)] = 0.
@@ -638,15 +649,20 @@ def normalize(mx):
     mx = r_mat_inv.dot(mx)
     return mx
 
+
 def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     """Convert a scipy sparse matrix to a torch sparse tensor."""
-    sparse_mx = sparse_mx.tocoo().astype(np.float32)  #其思想是 按照(row_index, column_index, value)的方式存储每一个非0元素，所以存储的数据结构就应该是一个以三元组为元素的列表List[Tuple[int, int, int]]
-    indices = torch.from_numpy(np.vstack((sparse_mx.row, sparse_mx.col)).astype(np.int64)) #from_numpy()用来将数组array转换为张量Tensor vstack（）：按行在下边拼接
+    sparse_mx = sparse_mx.tocoo().astype(
+        np.float32
+    )  #其思想是 按照(row_index, column_index, value)的方式存储每一个非0元素，所以存储的数据结构就应该是一个以三元组为元素的列表List[Tuple[int, int, int]]
+    indices = torch.from_numpy(np.vstack(
+        (sparse_mx.row, sparse_mx.col)).astype(np.int64))  #from_numpy()用来将数组array转换为张量Tensor vstack（）：按行在下边拼接
     values = torch.from_numpy(sparse_mx.data)
     shape = torch.Size(sparse_mx.shape)
     return torch.sparse.FloatTensor(indices, values, shape)
 
-def merge_anndatas(adata_list,batch_key="slide"):
+
+def merge_anndatas(adata_list, batch_key="slide"):
     combined_adata = adata_list[0].concatenate(adata_list[1:], join='outer', batch_key=batch_key)
     spatial_nets = []
     for i, adata in enumerate(adata_list):
@@ -664,63 +680,49 @@ def merge_anndatas(adata_list,batch_key="slide"):
 def get_adata(file_name="151507.h5ad"):
     adata = sc.read(file_name)
     adata.var_names_make_unique()
-    prefilter_genes(adata, min_cells=3) 
+    prefilter_genes(adata, min_cells=3)
     sc.pp.highly_variable_genes(adata, flavor="seurat_v3", n_top_genes=1000)
     sc.pp.normalize_per_cell(adata)
     sc.pp.log1p(adata)
     Cal_Spatial_Net(adata, rad_cutoff=150)
 
 
-def train(adata,k=0,hidden_dims=3000, n_epochs=100,num_hidden=100,lr=0.00008, key_added='SpaGRA',a=0.1,b=1,c=0.5,
-                radius=50,  weight_decay=0.0001,  random_seed=0,feat_drop=0.01,attn_drop=0.1,
-                negative_slope=0.01,heads=4,method="kmeans",reso=1,
-                device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')):
+def train(adata, k=0, hidden_dims=3000, n_epochs=100, num_hidden=100, lr=0.00008, key_added='SpaGRA', a=0.1, b=1, c=0.5,
+          radius=50, weight_decay=0.0001, random_seed=0, feat_drop=0.01, attn_drop=0.1, negative_slope=0.01, heads=4,
+          method="kmeans", reso=1, device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')):
     set_seed(random_seed)
     adata.X = sp.csr_matrix(adata.X)
 
     if 'highly_variable' in adata.var.columns:
-        adata_Vars =  adata[:, adata.var['highly_variable']]
+        adata_Vars = adata[:, adata.var['highly_variable']]
     else:
         adata_Vars = adata
 
     if 'Spatial_Net' not in adata.uns.keys():
         raise ValueError("Spatial_Net is not existed! Run Cal_Spatial_Net first!")
 
-
-    adj,features = Transfer_Data(adata_Vars)
+    adj, features = Transfer_Data(adata_Vars)
     g = dgl.from_scipy(adj)
     all_time = time.time()
     g = g.int().to(device)
     num_feats = features.shape[1]
     n_edges = g.number_of_edges()
-    model = GAT(g,
-                hidden_dims,
-                1,
-                num_feats,
-                num_hidden,
-                [heads],
-                F.elu,
-                feat_drop,
-                attn_drop,
-                negative_slope)
+    model = GAT(g, hidden_dims, 1, num_feats, num_hidden, [heads], F.elu, feat_drop, attn_drop, negative_slope)
     adj = torch.tensor(adj.todense()).to(device)
     features = torch.FloatTensor(features).to(device)
     model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(),
-                           lr=lr,
-                           weight_decay=weight_decay)
-
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     coords = torch.tensor(adata.obsm['spatial']).float().to(device)
     sp_dists = torch.cdist(coords, coords, p=2)
     sp_dists = torch.div(sp_dists, torch.max(sp_dists)).to(device)
-    ari_max=0
+    ari_max = 0
     model.train()
     for epoch in range(n_epochs):
 
         # model.train()
         optimizer.zero_grad()
-        heads, pi, disp, mean  = model(features)
+        heads, pi, disp, mean = model(features)
         heads0 = torch.cat(heads, axis=1)
         # heads0 = heads[0]
 
@@ -731,14 +733,13 @@ def train(adata,k=0,hidden_dims=3000, n_epochs=100,num_hidden=100,lr=0.00008, ke
         # reg_loss=0
         zinb_loss = ZINB(pi, theta=disp, ridge_lambda=1).loss(features, mean, mean=True)
         loss = multihead_contrastive_loss(heads, adj, tau=10)
-        total_loss =  a * loss + b * reg_loss  + c* zinb_loss
-
+        total_loss = a * loss + b * reg_loss + c * zinb_loss
 
         total_loss.backward()
         optimizer.step()
-        print("loss ",epoch,loss.item(),reg_loss.item(),zinb_loss.item())
+        print("loss ", epoch, loss.item(), reg_loss.item(), zinb_loss.item())
         # kmeans = KMeans(n_clusters=k).fit(np.nan_to_num(heads0.cpu().detach()))
-        if method=="kmeans":
+        if method == "kmeans":
             kmeans = KMeans(n_clusters=k, random_state=random_seed).fit(np.nan_to_num(heads0.cpu().detach()))
             idx = kmeans.labels_
             adata_Vars.obs['temp'] = idx
@@ -753,14 +754,13 @@ def train(adata,k=0,hidden_dims=3000, n_epochs=100,num_hidden=100,lr=0.00008, ke
                     mean_max = mean.to('cpu').detach().numpy()
                     emb_max = heads0.to('cpu').detach().numpy()
             else:
-                    idx_max = idx
-                    mean_max = mean.to('cpu').detach().numpy()
-                    emb_max = heads0.to('cpu').detach().numpy()
-
+                idx_max = idx
+                mean_max = mean.to('cpu').detach().numpy()
+                emb_max = heads0.to('cpu').detach().numpy()
 
         if method == "louvain":
             adata_tmp = sc.AnnData(np.nan_to_num(heads0.cpu().detach()))
-            sc.pp.neighbors(adata_tmp, n_neighbors=20,use_rep='X')
+            sc.pp.neighbors(adata_tmp, n_neighbors=20, use_rep='X')
             sc.tl.louvain(adata_tmp, resolution=reso, random_state=0)
             idx = adata_tmp.obs['louvain'].astype(int).to_numpy()
 
@@ -774,7 +774,7 @@ def train(adata,k=0,hidden_dims=3000, n_epochs=100,num_hidden=100,lr=0.00008, ke
         emb = heads0.to('cpu').detach().numpy()
         adata.obsm["emb"] = emb  ######
 
-    if radius !=0 :
+    if radius != 0:
         nearest_new_type = refine_label(adata, radius=radius)
         adata.obs[key_added] = nearest_new_type
     else:
@@ -789,9 +789,6 @@ def train(adata,k=0,hidden_dims=3000, n_epochs=100,num_hidden=100,lr=0.00008, ke
     adata.obsm['emb_pca'] = pca.fit_transform(adata.obsm['emb'].copy())
 
     return adata
-
-
-
 
 
 class SpaGRA(BaseClusteringMethod):
@@ -840,10 +837,9 @@ class SpaGRA(BaseClusteringMethod):
 
     """
 
-    def __init__(self, k=0, hidden_dims=1000, n_epochs=200, num_hidden=600, lr=0.00008,
-                 key_added='SpaGRA', a=2, b=1, c=1, radius=0, weight_decay=0.00001,
-                 random_seed=0, feat_drop=0.02, attn_drop=0.01, negative_slope=0.02,
-                 heads=4, method="louvain", reso=0.8,
+    def __init__(self, k=0, hidden_dims=1000, n_epochs=200, num_hidden=600, lr=0.00008, key_added='SpaGRA', a=2, b=1,
+                 c=1, radius=0, weight_decay=0.00001, random_seed=0, feat_drop=0.02, attn_drop=0.01,
+                 negative_slope=0.02, heads=4, method="louvain", reso=0.8,
                  device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')):
         self.k = k
         self.hidden_dims = hidden_dims
@@ -875,8 +871,7 @@ class SpaGRA(BaseClusteringMethod):
         transforms.append(HighlyVariableGenesRawCount(n_top_genes=1000))
         transforms.append(NormalizeTotalLog1P())
         transforms.append(CalSpatialNet(rad_cutoff=150))
-        transforms.append(SetConfig({"label_channel": "label",
-                "label_channel_type": "obs"}))
+        transforms.append(SetConfig({"label_channel": "label", "label_channel_type": "obs"}))
         return Compose(*transforms, log_level=log_level)
 
     # @classmethod
@@ -912,13 +907,13 @@ class SpaGRA(BaseClusteringMethod):
         from dance.data import Data
         data = Data(adata_Vars)
         transfer_data = TransferData()
-        adj, features = transfer_data(data) # adj here contains self-loops (eye)
+        adj, features = transfer_data(data)  # adj here contains self-loops (eye)
 
         # 1. 构建 DGL 图用于 GAT (保持不变)
         g = dgl.from_scipy(adj)
         g = g.int().to(self.device)
         num_feats = features.shape[1]
-        
+
         # 2. 预先计算所有节点的邻居数量 (在 CPU 上进行，避免 GPU OOM)
         # adj 已经包含了自环，所以 sum 结果至少是 1
         # nei_con_loss 逻辑中：nei_count = intra_nei + inter_nei + self_inter
@@ -928,23 +923,13 @@ class SpaGRA(BaseClusteringMethod):
         # 根据原代码逻辑: nei_count = degree * 2 + 1
         all_nei_counts = torch.tensor(raw_degree * 2 + 1).float().to(self.device)
 
-        self.model = GAT(g,
-                         self.hidden_dims,
-                         1,
-                         num_feats,
-                         self.num_hidden,
-                         [self.heads],
-                         F.elu,
-                         self.feat_drop,
-                         self.attn_drop,
-                         self.negative_slope)
+        self.model = GAT(g, self.hidden_dims, 1, num_feats, self.num_hidden, [self.heads], F.elu, self.feat_drop,
+                         self.attn_drop, self.negative_slope)
 
         features = torch.FloatTensor(features).to(self.device)
         self.model.to(self.device)
 
-        optimizer = torch.optim.Adam(self.model.parameters(),
-                                     lr=self.lr,
-                                     weight_decay=self.weight_decay)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
         # 3. 准备坐标数据
         coords = torch.tensor(adata.obsm['spatial'].values).float().to(self.device)
@@ -952,7 +937,7 @@ class SpaGRA(BaseClusteringMethod):
 
         print(f"Start Training: N={adata.n_obs}, Batch_Size=2048")
         self.model.train()
-        
+
         for epoch in range(self.n_epochs):
             optimizer.zero_grad()
             heads, pi, disp, mean = self.model(features)
@@ -965,12 +950,12 @@ class SpaGRA(BaseClusteringMethod):
                 idx = torch.randperm(heads0.shape[0])[:batch_size]
             else:
                 idx = torch.arange(heads0.shape[0])
-            
+
             idx = idx.to(self.device)
-            idx_cpu = idx.cpu().numpy() # 用于切片 scipy 矩阵
+            idx_cpu = idx.cpu().numpy()  # 用于切片 scipy 矩阵
 
             # 1. Batch Data 准备
-            heads_batch = [h[idx] for h in heads] # List slicing
+            heads_batch = [h[idx] for h in heads]  # List slicing
             heads0_batch = heads0[idx]
             coords_batch = coords[idx]
             nei_count_batch = all_nei_counts[idx]
@@ -983,10 +968,10 @@ class SpaGRA(BaseClusteringMethod):
             # 3. 计算正则化 Loss (Batch)
             z_dists_batch = torch.cdist(heads0_batch, heads0_batch, p=2)
             z_dists_batch = torch.div(z_dists_batch, torch.max(z_dists_batch) + 1e-6)
-            
+
             sp_dists_batch = torch.cdist(coords_batch, coords_batch, p=2)
             sp_dists_batch = torch.div(sp_dists_batch, torch.max(sp_dists_batch) + 1e-6)
-            
+
             reg_loss = torch.mean(torch.mul(1.0 - z_dists_batch, sp_dists_batch))
 
             # 4. 计算 Contrastive Loss (Batch)
@@ -994,12 +979,12 @@ class SpaGRA(BaseClusteringMethod):
 
             # 5. ZINB Loss (Global，因为这个计算不涉及 N*N 矩阵，通常不会 OOM)
             zinb_loss = ZINB(pi, theta=disp, ridge_lambda=1).loss(features, mean, mean=True)
-            
+
             total_loss = self.a * loss + self.b * reg_loss + self.c * zinb_loss
 
             total_loss.backward()
             optimizer.step()
-            
+
             if epoch % 10 == 0:
                 print(f"Epoch {epoch}: Loss={loss.item():.4f}, Reg={reg_loss.item():.4f}, ZINB={zinb_loss.item():.4f}")
 

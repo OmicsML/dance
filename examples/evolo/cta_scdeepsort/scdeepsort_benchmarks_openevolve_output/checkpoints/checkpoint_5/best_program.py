@@ -1,12 +1,13 @@
 import argparse
 import pprint
+import time
 from typing import Optional, Union, get_args
 
 import dgl
 import numpy as np
+import torch
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
-import torch
 
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
@@ -18,10 +19,10 @@ from dance.typing import LogLevel
 from dance.utils import set_seed, sub_data
 from dance.utils.matrix import normalize
 from dance.utils.wrappers import add_mod_and_transform
-import time
+
 
 # EVOLVE-BLOCK-START
-@register_preprocessor("feature", "cell",overwrite=True)
+@register_preprocessor("feature", "cell", overwrite=True)
 @add_mod_and_transform
 class WeightedFeaturePCA(BaseTransform):
     """Compute the weighted gene PCA as cell features.
@@ -64,7 +65,7 @@ class WeightedFeaturePCA(BaseTransform):
                 f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)} with svd_solver='full'"
             )
             self.n_components = min(feat.shape)
-        
+
         # Use Truncated SVD instead of PCA for sparse gene expression matrices
         from sklearn.decomposition import TruncatedSVD
         gene_svd = TruncatedSVD(n_components=self.n_components)  # genes x components
@@ -84,7 +85,8 @@ class WeightedFeaturePCA(BaseTransform):
         #     data.data.uns["pca_explained_variance_ratio"] = gene_svd.explained_variance_ratio_
         return data
 
-@register_preprocessor("graph", "cell",overwrite=True)
+
+@register_preprocessor("graph", "cell", overwrite=True)
 class CellFeatureGraph(BaseTransform):
 
     def __init__(self, cell_feature_channel: str, gene_feature_channel: Optional[str] = None, *,
@@ -114,16 +116,16 @@ class CellFeatureGraph(BaseTransform):
 
         # Apply TF-IDF transformation if specified
         if self.use_tfidf:
-            from sklearn.feature_extraction.text import TfidfTransformer
             from scipy.sparse import issparse
-            
+            from sklearn.feature_extraction.text import TfidfTransformer
+
             # Apply log transformation first to dampen high expression values
             if not issparse(feat):
                 feat = np.log1p(feat)  # log(1 + x) transformation
             else:
                 feat = feat.copy()
                 feat.data = np.log1p(feat.data)
-            
+
             # Treat cells as documents and genes as words
             tfidf = TfidfTransformer()
             feat = tfidf.fit_transform(feat).toarray()
@@ -159,7 +161,7 @@ class CellFeatureGraph(BaseTransform):
             norm = dgl.nn.EdgeWeightNorm(norm='both')
             normalized_weights = norm(g, edge_weights_1d)
             g.edata['weight'] = normalized_weights.unsqueeze(-1)  # Convert back to [N, 1]
-        
+
         # Remove explicit self-loops since AdaptiveSAGE has its own learnable self-loop mechanism
         # g.add_edges(g.nodes(), g.nodes(), {"weight": torch.ones(g.number_of_nodes())[:, None]})
 
@@ -174,7 +176,7 @@ class CellFeatureGraph(BaseTransform):
         return data
 
 
-@register_preprocessor("graph", "cell",overwrite=True)
+@register_preprocessor("graph", "cell", overwrite=True)
 class PCACellFeatureGraph(BaseTransform):
 
     _DISPLAY_ATTRS = ("n_components", "split_name")
@@ -207,8 +209,10 @@ class PCACellFeatureGraph(BaseTransform):
         CellFeatureGraph(cell_feature_channel="WeightedFeaturePCA", mod=self.mod, normalize_edges=self.normalize_edges,
                          use_tfidf=self.use_tfidf, log_level=self.log_level)(data)
         return data
+
+
 # EVOLVE-BLOCK-END
-    
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=500)
@@ -230,7 +234,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=202)
     parser.add_argument("--num_runs", type=int, default=1)
     parser.add_argument("--val_size", type=float, default=0.0, help="val size")
-    parser.add_argument("--obs_nums",type=int,default=None)
+    parser.add_argument("--obs_nums", type=int, default=None)
     args = parser.parse_args()
     logger.setLevel(args.log_level)
     logger.info(f"Running SVM with the following parameters:\n{pprint.pformat(vars(args))}")
@@ -241,7 +245,7 @@ if __name__ == "__main__":
 
     for seed in range(args.seed, args.seed + args.num_runs):
         start_time = time.time()  # 新增：记录单次循环的开始时间
-        
+
         set_seed(seed)
 
         # Initialize model and get model specific preprocessing pipeline
@@ -255,15 +259,16 @@ if __name__ == "__main__":
 
         # Load data and perform necessary preprocessing
         dataloader = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
-                                               train_dataset=args.train_dataset, data_dir="../temp_data", val_size=args.val_size)
+                                               train_dataset=args.train_dataset, data_dir="../temp_data",
+                                               val_size=args.val_size)
         data = dataloader.load_data(transform=None, cache=args.cache)
         if args.obs_nums is not None:
-            sub_data(data.data,args.obs_nums)
-            train_idx, test_idx = train_test_split(range(args.obs_nums),test_size=0.2,random_state=seed)
+            sub_data(data.data, args.obs_nums)
+            train_idx, test_idx = train_test_split(range(args.obs_nums), test_size=0.2, random_state=seed)
             data.set_split_idx("train", train_idx)
             data.set_split_idx("test", test_idx)
         preprocessing_pipeline(data)
-        
+
         # Obtain training and testing data
         y_train = data.get_y(split_name="train", return_type="torch")
         y_test = data.get_y(split_name="test", return_type="torch")
@@ -283,26 +288,26 @@ if __name__ == "__main__":
                   val_ratio=args.test_rate)
         score = model.score(g_test, y_test)
         inner_score = model.score(g_train, y_train)
-        
+
         end_time = time.time()  # 新增：记录单次循环的结束时间
         run_time = end_time - start_time
-        
+
         scores.append(score.item())
         inner_scores.append(inner_score.item())
         times.append(run_time)  # 新增：保存耗时
-        
+
         print(f"{score=:.4f}, time={run_time:.2f}s")
-        
+
     print(f"scDeepSort {args.species} {args.tissue} {args.test_dataset}:")
     # 修改：在打印输出中加入 times 列表，以供 evaluator 捕获
     print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
-    
+
     mean_score = np.mean(scores)
     std_score = np.std(scores)
     mean_inner_score = np.mean(inner_scores)
     std_inner_score = np.std(inner_scores)
     mean_time = np.mean(times)
-    
+
     print(f"mean_score: {mean_score:.5f} +/- {std_score:.5f}")
     print(f"mean_inner_score: {mean_inner_score:.5f} +/- {std_inner_score:.5f}")
     print(f"mean_time: {mean_time:.2f}s")

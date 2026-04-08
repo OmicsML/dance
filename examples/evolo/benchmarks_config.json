@@ -83,7 +83,7 @@
             "--use_prop",
             "--use_2hop"
         ],
-       
+
         "Human_CD4": [
             "--species",
             "human",
@@ -294,7 +294,7 @@
             "--num_runs",
             "5",
             "--device",
-            "cuda:0" 
+            "cuda:0"
         ],
         "Human_CD8": [
             "--species",
@@ -383,7 +383,7 @@
             "--num_runs",
             "5",
             "--device",
-            "cuda:1" 
+            "cuda:1"
         ]
     },
     "scgat_benchmarks": {
@@ -407,7 +407,7 @@
             "7572",
             "--num_runs",
             "5",
-            "--gpu","0" 
+            "--gpu","0"
         ],
         "Human_Spleen": [
             "--species",
@@ -429,7 +429,7 @@
             "2743",
             "--num_runs",
             "5",
-            "--gpu","0" 
+            "--gpu","0"
         ],
         "Human_CD8": [
             "--species",
@@ -442,7 +442,7 @@
             "1641",
             "517",
             "706",
-            "777",  
+            "777",
             "850",
             "972",
             "--test_dataset",
@@ -456,9 +456,9 @@
             "492",
             "--num_runs",
             "5",
-            "--gpu","0" 
+            "--gpu","0"
         ],
-      
+
         "Human_CD4": [
             "--species",
             "human",
@@ -488,7 +488,7 @@
             "559",
             "--num_runs",
             "5",
-            "--gpu","0" 
+            "--gpu","0"
         ]
     },
     "scrgcl_benchmarks": {
@@ -512,7 +512,7 @@
             "7572",
             "--num_runs",
             "2",
-            "--gpu","5" 
+            "--gpu","5"
         ],
         "Human_Spleen": [
             "--species",
@@ -534,7 +534,7 @@
             "2743",
             "--num_runs",
             "3",
-            "--gpu","4" 
+            "--gpu","4"
         ],
         "Human_CD8": [
             "--species",
@@ -561,7 +561,7 @@
             "492",
             "--num_runs",
             "2",
-            "--gpu","0" 
+            "--gpu","0"
         ],
         "Human_CD4": [
             "--species",
@@ -592,7 +592,7 @@
             "559",
             "--num_runs",
             "1",
-            "--gpu","0" 
+            "--gpu","0"
         ]
     },
     "graphcs_benchmarks": {
@@ -616,7 +616,7 @@
             "7572",
             "--num_runs",
             "5",
-            "--gpu","0" 
+            "--gpu","0"
         ],
         "Human_Spleen": [
             "--species",
@@ -638,7 +638,7 @@
             "2743",
             "--num_runs",
             "5",
-            "--gpu","0" 
+            "--gpu","0"
         ],
         "Human_CD8": [
             "--species",
@@ -665,7 +665,7 @@
             "492",
             "--num_runs",
             "5",
-            "--gpu","0" 
+            "--gpu","0"
         ],
         "Human_CD4": [
             "--species",
@@ -696,7 +696,7 @@
             "559",
             "--num_runs",
             "5",
-            "--gpu","0" 
+            "--gpu","0"
         ]
     },
     "spagcn_benchmarks": {
@@ -938,7 +938,7 @@
         "--num_runs",
         "1"
     ],
-    
+
     "efnst_stage1_args":[
         "--sample_number",
         "151507",
@@ -1043,7 +1043,7 @@
             "--obs_nums",
             "800"
         ],
-       
+
         "Human_CD4": [
             "--species",
             "human",
@@ -1454,7 +1454,7 @@
             "1641",
             "517",
             "706",
-            "777",  
+            "777",
             "850",
             "972",
             "--test_dataset",
@@ -1472,7 +1472,7 @@
             "--obs_nums",
             "800"
         ],
-      
+
         "Human_CD4": [
             "--species",
             "human",
@@ -1523,7 +1523,7 @@
             "--test_dataset",
             "1925",
             "205",
-            "3323", 
+            "3323",
             "6509",
             "7572",
             "--num_runs",
@@ -2018,7 +2018,7 @@
         "--obs_nums",
         "800"
     ],
-    
+
     "efnst_stage1_args_sub":[
         "--sample_number",
         "151507",

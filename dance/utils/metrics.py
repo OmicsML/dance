@@ -1,4 +1,5 @@
 from typing import Dict
+
 import anndata as ad
 import numpy as np
 import pandas as pd
@@ -6,9 +7,15 @@ import torch
 from networkx.algorithms import bipartite
 from scipy import sparse
 from sklearn.cluster import KMeans
-from sklearn.metrics import adjusted_rand_score, mean_absolute_percentage_error, mean_squared_error
+from sklearn.metrics import (
+    adjusted_rand_score,
+    calinski_harabasz_score,
+    davies_bouldin_score,
+    mean_absolute_percentage_error,
+    mean_squared_error,
+    silhouette_score,
+)
 from sklearn.metrics.cluster import normalized_mutual_info_score
-from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
 
 from dance import logger
 from dance.registry import REGISTERED_METRIC_FUNCS, register_metric_func
@@ -192,16 +199,18 @@ def integration_openproblems_evaluate(adata: ad.AnnData):
     score['final_scores'] = sum(score.values()) / len(score)
     return score
 
+
 @register_metric_func()
 @torch_to_numpy
 def silhouette(X: Union[torch.Tensor, np.ndarray], labels: Union[torch.Tensor, np.ndarray]) -> float:
     """Silhouette Coefficient.
-    
+
     A higher Silhouette Coefficient score relates to a model with better defined clusters.
     The score is higher when clusters are dense and well separated.
 
     See
     :func: `sklearn.metrics.silhouette_score`.
+
     """
     # 轮廓系数要求簇的数量至少为2，最多为 n_samples - 1
     n_labels = len(np.unique(labels))
@@ -211,8 +220,9 @@ def silhouette(X: Union[torch.Tensor, np.ndarray], labels: Union[torch.Tensor, n
         # 返回0或-1都是常见做法，这里返回0表示中性
         print(f"Warning: Silhouette score is not defined for n_labels={n_labels}. Returning 0.")
         return 0.0
-    
+
     return silhouette_score(X, labels)
+
 
 @register_metric_func()
 @torch_to_numpy
@@ -224,6 +234,7 @@ def calinski_harabasz(X: Union[torch.Tensor, np.ndarray], labels: Union[torch.Te
 
     See
     :func: `sklearn.metrics.calinski_harabasz_score`.
+
     """
     # 与轮廓系数类似，CH指数也要求簇的数量在[2, n_samples-1]之间
     n_labels = len(np.unique(labels))
@@ -233,6 +244,7 @@ def calinski_harabasz(X: Union[torch.Tensor, np.ndarray], labels: Union[torch.Te
         return 0.0
 
     return calinski_harabasz_score(X, labels)
+
 
 @register_metric_func()
 @torch_to_numpy
@@ -246,6 +258,7 @@ def davies_bouldin(X: Union[torch.Tensor, np.ndarray], labels: Union[torch.Tenso
 
     See
     :func: `sklearn.metrics.davies_bouldin_score`.
+
     """
     # DB指数同样要求簇的数量在[2, n_samples-1]之间
     n_labels = len(np.unique(labels))
@@ -257,26 +270,30 @@ def davies_bouldin(X: Union[torch.Tensor, np.ndarray], labels: Union[torch.Tenso
     return davies_bouldin_score(X, labels)
 
 
-
 METRIC_BOUNDS = {
-    'silhouette': {'min': -1.0, 'max': 1.0},
-    'calinski_harabasz': {'min': 0.0, 'max': 20000.0}, 
-    'davies_bouldin': {'min': 0.0, 'max': 10.0}       
+    'silhouette': {
+        'min': -1.0,
+        'max': 1.0
+    },
+    'calinski_harabasz': {
+        'min': 0.0,
+        'max': 20000.0
+    },
+    'davies_bouldin': {
+        'min': 0.0,
+        'max': 10.0
+    }
 }
 
 
 def calculate_unified_scores(score_dict: Dict[str, float]) -> float:
-    """
-    Evaluates performance with logging for out-of-bounds values before clipping.
-    """
+    """Evaluates performance with logging for out-of-bounds values before clipping."""
     # --- 1. Silhouette Score ---
     s_val = score_dict['silhouette']
     s_bounds = METRIC_BOUNDS['silhouette']
     if not (s_bounds['min'] <= s_val <= s_bounds['max']):
-        logger.info(
-            f"Silhouette score {s_val:.4f} is outside the defined bounds "
-            f"[{s_bounds['min']}, {s_bounds['max']}]. Clipping."
-        )
+        logger.info(f"Silhouette score {s_val:.4f} is outside the defined bounds "
+                    f"[{s_bounds['min']}, {s_bounds['max']}]. Clipping.")
     s_val_clipped = np.clip(s_val, s_bounds['min'], s_bounds['max'])
     norm_s = (s_val_clipped - s_bounds['min']) / (s_bounds['max'] - s_bounds['min'])
 
@@ -284,21 +301,17 @@ def calculate_unified_scores(score_dict: Dict[str, float]) -> float:
     ch_val = score_dict['calinski_harabasz']
     ch_bounds = METRIC_BOUNDS['calinski_harabasz']
     if not (ch_bounds['min'] <= ch_val <= ch_bounds['max']):
-        logger.info(
-            f"Calinski-Harabasz score {ch_val:.2f} is outside the defined bounds "
-            f"[{ch_bounds['min']}, {ch_bounds['max']}]. Clipping."
-        )
+        logger.info(f"Calinski-Harabasz score {ch_val:.2f} is outside the defined bounds "
+                    f"[{ch_bounds['min']}, {ch_bounds['max']}]. Clipping.")
     ch_val_clipped = np.clip(ch_val, ch_bounds['min'], ch_bounds['max'])
     norm_ch = (ch_val_clipped - ch_bounds['min']) / (ch_bounds['max'] - ch_bounds['min'])
-    
+
     # --- 3. Davies-Bouldin Score ---
     db_val = score_dict['davies_bouldin']
     db_bounds = METRIC_BOUNDS['davies_bouldin']
     if not (db_bounds['min'] <= db_val <= db_bounds['max']):
-        logger.info(
-            f"Davies-Bouldin score {db_val:.4f} is outside the defined bounds "
-            f"[{db_bounds['min']}, {db_bounds['max']}]. Clipping."
-        )
+        logger.info(f"Davies-Bouldin score {db_val:.4f} is outside the defined bounds "
+                    f"[{db_bounds['min']}, {db_bounds['max']}]. Clipping.")
     db_val_clipped = np.clip(db_val, db_bounds['min'], db_bounds['max'])
     norm_db = (db_bounds['max'] - db_val_clipped) / (db_bounds['max'] - db_bounds['min'])
 

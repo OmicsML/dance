@@ -2,18 +2,17 @@ import argparse
 import gc
 import os
 import time
-
-import numpy as np
 from pathlib import Path
 
+import numpy as np
 import wandb
+
 from dance import logger
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.spagcn import SpaGCN, refine
 from dance.pipeline import PipelinePlaner, save_summary_data
 from dance.utils import set_seed, sub_data
 from dance.utils.metrics import calculate_unified_scores, resolve_score_func
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -47,7 +46,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     file_root_path = Path(args.root_path, args.sample_number).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
-    pipeline_planer = PipelinePlaner.from_config_file(f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
+    pipeline_planer = PipelinePlaner.from_config_file(
+        f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
 
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
@@ -82,15 +82,15 @@ if __name__ == "__main__":
             # Train and evaluate model
             l = model.search_l(args.p, adj, start=args.start, end=args.end, tol=args.tol, max_run=args.max_run)
             model.set_l(l)
-            res = model.search_set_res((x, adj), l=l, target_num=args.n_clusters, start=0.4, step=args.step, tol=args.tol,
-                                       lr=args.lr, epochs=args.epochs, max_run=args.max_run)
+            res = model.search_set_res((x, adj), l=l, target_num=args.n_clusters, start=0.4, step=args.step,
+                                       tol=args.tol, lr=args.lr, epochs=args.epochs, max_run=args.max_run)
 
-            model.fit((x, adj), init_spa=True, init="louvain", tol=args.tol, lr=args.lr, epochs=args.epochs,
-                                     res=res)
+            model.fit((x, adj), init_spa=True, init="louvain", tol=args.tol, lr=args.lr, epochs=args.epochs, res=res)
             embed, pred = model.predict((x, adj), return_embed=True)
             score = model.default_score_func(y, pred)
 
-            refined_pred = refine(sample_id=data.data.obs_names.tolist(), pred=pred.tolist(), dis=adj_2d, shape="hexagon")
+            refined_pred = refine(sample_id=data.data.obs_names.tolist(), pred=pred.tolist(), dis=adj_2d,
+                                  shape="hexagon")
             score_refined = model.default_score_func(y, refined_pred)
 
             # Calculate internal evaluation metrics
@@ -121,7 +121,9 @@ if __name__ == "__main__":
         speed_score = 1.0 / (1.0 + total_time_seconds / 300.0)
         combined_score = 0.8 * avg_inner_score + 0.2 * speed_score
 
-        print(f"Averaged over {args.num_runs} runs - ARI: {avg_score:.4f}, Inner Score: {avg_inner_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}")
+        print(
+            f"Averaged over {args.num_runs} runs - ARI: {avg_score:.4f}, Inner Score: {avg_inner_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}"
+        )
 
         wandb.log({
             "ARI": avg_score,
@@ -131,8 +133,8 @@ if __name__ == "__main__":
             "combined_score": combined_score
         })
 
-    entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
-        evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)
+    entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(evaluate_pipeline, sweep_id=args.sweep_id,
+                                                                  count=args.count)
     save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path,
                       additional_sweep_ids=args.additional_sweep_ids)
 """ To reproduce SpaGCN on other samples, please refer to command lines belows:

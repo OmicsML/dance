@@ -1,41 +1,39 @@
 import argparse
 import copy
+import hashlib
+import json  # 新增：导入 json 模块用于保存结果
+import logging
 import pprint
+import time
+from abc import ABC, abstractmethod
+from typing import Any, Optional, Tuple
+
 import numpy as np
+import pandas as pd
+import scanpy as sc
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import scanpy as sc
-import json  # 新增：导入 json 模块用于保存结果
+from scipy import sparse
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import NearestNeighbors
+from sklearn.preprocessing import LabelEncoder
+from torch_geometric.data import Data as PyGData
 
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
-from dance.modules.single_modality.cell_type_annotation.scgat import scGATAnnotator, GAT, masked_nll_loss
-from dance.transforms import Compose, SetConfig
-from dance.utils import set_seed, sub_data
-
-import hashlib
-import time
-import pandas as pd
-from scipy import sparse
-from sklearn.neighbors import NearestNeighbors
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
-from torch_geometric.data import Data as PyGData
-from typing import Optional, Tuple, Any
-from abc import ABC, abstractmethod
-
-import logging
+from dance.modules.single_modality.cell_type_annotation.scgat import GAT, masked_nll_loss, scGATAnnotator
 from dance.registry import register_preprocessor
-from dance.typing import LogLevel
+from dance.transforms import Compose, SetConfig
 from dance.transforms.base import BaseTransform
+from dance.typing import LogLevel
+from dance.utils import set_seed, sub_data
 
 
 class ChunkedGraphLearner(nn.Module):
     """Memory-efficient graph learner using chunked cosine similarity + KNN."""
 
-    def __init__(self, n_feats: int, K: int = 20, lamb1: float = 0.5, lamb2: float = 0.5,
-                 chunk_size: int = 2000):
+    def __init__(self, n_feats: int, K: int = 20, lamb1: float = 0.5, lamb2: float = 0.5, chunk_size: int = 2000):
         super().__init__()
         self.transform = nn.Linear(n_feats, n_feats)
         self.K = K
@@ -88,13 +86,12 @@ def smooth_cell_features(cell_feat: torch.Tensor, adj_sparse) -> torch.Tensor:
     """Smooth cell features using the learned adjacency (no gene nodes)."""
     if adj_sparse is None:
         return cell_feat
-    
+
     knn_src, knn_dst, knn_val = adj_sparse
     N = cell_feat.shape[0]
-    
+
     # Calculate row sums for normalization
-    row_sums = torch.zeros(N, device=cell_feat.device).scatter_add(
-        0, knn_src, knn_val).clamp(min=1e-8)
+    row_sums = torch.zeros(N, device=cell_feat.device).scatter_add(0, knn_src, knn_val).clamp(min=1e-8)
     row_sums_safe = row_sums.clone()
     row_sums_safe[row_sums_safe < 1e-8] = 1.0
     norm_val = knn_val / row_sums_safe[knn_src]
@@ -105,46 +102,47 @@ def smooth_cell_features(cell_feat: torch.Tensor, adj_sparse) -> torch.Tensor:
     h_agg = torch.sparse.mm(sparse_adj, cell_feat)
 
     alpha = 0.5
-    
+
     # 使用 In-place 操作替代 alpha * cell_feat + (1 - alpha) * h_agg
     # 这样可以避免分配额外的 4.5GB 显存
     h_agg.mul_(1.0 - alpha)
     h_agg.add_(cell_feat, alpha=alpha)
-    
+
     return h_agg
 
 
-def compute_graph_reg(knn_src: torch.Tensor, knn_dst: torch.Tensor, knn_val: torch.Tensor, 
-                      cell_embeds: torch.Tensor, N: int, 
-                      lambda_smooth: float, lambda_conn: float, lambda_sparse: float,
+def compute_graph_reg(knn_src: torch.Tensor, knn_dst: torch.Tensor, knn_val: torch.Tensor, cell_embeds: torch.Tensor,
+                      N: int, lambda_smooth: float, lambda_conn: float, lambda_sparse: float,
                       chunk_size: int = 50000) -> torch.Tensor:
-    """
-    Compute full IDGL graph regularization loss (Smoothness + Connectivity + Sparsity).
+    """Compute full IDGL graph regularization loss (Smoothness + Connectivity +
+    Sparsity).
+
     Smoothness is computed in chunks to save memory.
+
     """
     num_edges = knn_src.size(0)
     smoothness_loss = 0.0
-    
+
     # 1. 平滑度损失 (Smoothness Loss) - 分块处理防止 OOM
     for i in range(0, num_edges, chunk_size):
-        src_chunk = knn_src[i : i + chunk_size]
-        dst_chunk = knn_dst[i : i + chunk_size]
-        val_chunk = knn_val[i : i + chunk_size]
-        
+        src_chunk = knn_src[i:i + chunk_size]
+        dst_chunk = knn_dst[i:i + chunk_size]
+        val_chunk = knn_val[i:i + chunk_size]
+
         diff = cell_embeds[src_chunk] - cell_embeds[dst_chunk]
-        dist_sq = torch.sum(diff.pow_(2), dim=-1) 
+        dist_sq = torch.sum(diff.pow_(2), dim=-1)
         smoothness_loss = smoothness_loss + torch.sum(val_chunk * dist_sq)
-        
+
     # 2. 连通性损失 (Connectivity Loss) - 防止产生孤立节点
     row_sums = torch.zeros(N, device=knn_val.device).scatter_add(0, knn_src, knn_val)
     conn_loss = -torch.sum(torch.log(row_sums + 1e-8))
-    
+
     # 3. 稀疏性损失 (Sparsity Loss) - 防止图过于密集
     sparse_loss = torch.sum(knn_val.pow(2))
-    
+
     # 组合所有正则化项并取平均
     total_reg_loss = (lambda_smooth * smoothness_loss) + (lambda_conn * conn_loss) + (lambda_sparse * sparse_loss)
-    
+
     return total_reg_loss / N
 
 
@@ -153,28 +151,23 @@ def scipysparse2torchsparse(x):
     values = x.data
     coo_data = x.tocoo()
     indices = torch.LongTensor([coo_data.row, coo_data.col])
-    t = torch.sparse.FloatTensor(indices, torch.from_numpy(values).float(),
-                                 [x.shape[0], x.shape[1]])
+    t = torch.sparse.FloatTensor(indices, torch.from_numpy(values).float(), [x.shape[0], x.shape[1]])
     return indices, t
 
 
 # EVOLVE-BLOCK-START
 @register_preprocessor("graph", "cell", overwrite=True)
 class scGATGraphTransform(BaseTransform):
-    """
-    Constructs a PyTorch Geometric Graph from AnnData for GAT training.
+    """Constructs a PyTorch Geometric Graph from AnnData for GAT training.
+
     Supports labels in adata.obs (categorical) or adata.obsm (one-hot).
+
     """
 
     _DISPLAY_ATTRS: Tuple[str] = ("label_column", "n_neighbors")
 
-    def __init__(
-        self,
-        label_column: str = 'cell_type',
-        n_neighbors: int = 15,
-        out: Optional[str] = None,
-        log_level: LogLevel = "INFO"
-    ):
+    def __init__(self, label_column: str = 'cell_type', n_neighbors: int = 15, out: Optional[str] = None,
+                 log_level: LogLevel = "INFO"):
         super().__init__(out=out, log_level=log_level)
         self.label_column = label_column
         self.n_neighbors = n_neighbors
@@ -276,24 +269,22 @@ class scGATGraphTransform(BaseTransform):
             if not val_indices.any():
                 self.logger.info("Splitting test set to create validation set...")
                 test_idx_loc = np.where(test_indices)[0]
-                val_idx_loc, test_idx_loc = train_test_split(
-                    test_idx_loc, test_size=0.5, random_state=42,
-                    stratify=labels[test_idx_loc])
+                val_idx_loc, test_idx_loc = train_test_split(test_idx_loc, test_size=0.5, random_state=42,
+                                                             stratify=labels[test_idx_loc])
                 val_indices = np.zeros(len(adata), dtype=bool)
                 val_indices[val_idx_loc] = True
                 test_indices = np.zeros(len(adata), dtype=bool)
                 test_indices[test_idx_loc] = True
         else:
             idx_all = np.arange(adata.shape[0])
-            idx_train, idx_test = train_test_split(
-                idx_all, test_size=1 - self.train_ratio, random_state=42, stratify=labels)
+            idx_train, idx_test = train_test_split(idx_all, test_size=1 - self.train_ratio, random_state=42,
+                                                   stratify=labels)
 
             remaining_ratio = 1 - self.train_ratio
             if remaining_ratio > 0:
                 val_relative_size = self.val_ratio / remaining_ratio
-                idx_test, idx_val = train_test_split(
-                    idx_test, test_size=val_relative_size, random_state=42,
-                    stratify=labels[idx_test])
+                idx_test, idx_val = train_test_split(idx_test, test_size=val_relative_size, random_state=42,
+                                                     stratify=labels[idx_test])
             else:
                 idx_val = []
 
@@ -307,17 +298,15 @@ class scGATGraphTransform(BaseTransform):
         self.logger.info("Converting to PyG Data object...")
         edge_index, _ = scipysparse2torchsparse(adj)
 
-        pyg_data = PyGData(
-            x=torch.from_numpy(features).float(),
-            edge_index=edge_index,
-            y=torch.LongTensor(labels),
-            train_mask=torch.tensor(train_indices, dtype=torch.bool),
-            val_mask=torch.tensor(val_indices, dtype=torch.bool),
-            test_mask=torch.tensor(test_indices, dtype=torch.bool)
-        )
+        pyg_data = PyGData(x=torch.from_numpy(features).float(), edge_index=edge_index, y=torch.LongTensor(labels),
+                           train_mask=torch.tensor(train_indices, dtype=torch.bool),
+                           val_mask=torch.tensor(val_indices, dtype=torch.bool),
+                           test_mask=torch.tensor(test_indices, dtype=torch.bool))
 
         self.logger.info(f"GAT Graph ready. Nodes: {pyg_data.num_nodes}, Edges: {pyg_data.num_edges}")
-        self.logger.info(f"Split - Train: {pyg_data.train_mask.sum()}, Val: {pyg_data.val_mask.sum()}, Test: {pyg_data.test_mask.sum()}")
+        self.logger.info(
+            f"Split - Train: {pyg_data.train_mask.sum()}, Val: {pyg_data.val_mask.sum()}, Test: {pyg_data.test_mask.sum()}"
+        )
 
         adata.uns['pyg_data'] = pyg_data
         adata.uns['label_encoder'] = le
@@ -329,11 +318,13 @@ class scGATGraphTransform(BaseTransform):
         self.logger.info(f"Transformation finished in {time.time() - start_time:.2f}s")
 
         return data
+
+
 # EVOLVE-BLOCK-END
 
 
-def get_preprocessing_pipeline(label_column: str = 'cell_type',
-                                n_neighbors: int = 15, log_level="INFO") -> BaseTransform:
+def get_preprocessing_pipeline(label_column: str = 'cell_type', n_neighbors: int = 15,
+                               log_level="INFO") -> BaseTransform:
     transforms = []
     transforms.append(scGATGraphTransform(label_column=label_column, n_neighbors=n_neighbors))
     transforms.append(SetConfig({"label_channel": "cell_type"}))
@@ -379,20 +370,16 @@ if __name__ == "__main__":
 
         device = f"cuda:{args.gpu}" if args.gpu >= 0 and torch.cuda.is_available() else "cpu"
 
-        dataloader = CellTypeAnnotationDataset(
-            train_dataset=args.train_dataset, test_dataset=args.test_dataset,
-            species=args.species, tissue=args.tissue, val_size=args.val_size)
+        dataloader = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
+                                               species=args.species, tissue=args.tissue, val_size=args.val_size)
         data = dataloader.load_data(transform=None, cache=args.cache)
 
-        preprocessing_pipeline = get_preprocessing_pipeline(
-            label_column="cell_type", n_neighbors=15, log_level="INFO")
+        preprocessing_pipeline = get_preprocessing_pipeline(label_column="cell_type", n_neighbors=15, log_level="INFO")
 
         if args.obs_nums is not None:
             sub_data(data.data, args.obs_nums)
-            train_idx, test_idx = train_test_split(
-                range(args.obs_nums), test_size=0.2, random_state=args.seed)
-            train_idx, val_idx = train_test_split(
-                train_idx, test_size=args.val_size, random_state=args.seed)
+            train_idx, test_idx = train_test_split(range(args.obs_nums), test_size=0.2, random_state=args.seed)
+            train_idx, val_idx = train_test_split(train_idx, test_size=args.val_size, random_state=args.seed)
             data.set_split_idx("train", train_idx)
             data.set_split_idx("test", test_idx)
             data.set_split_idx("val", val_idx)
@@ -402,8 +389,8 @@ if __name__ == "__main__":
         pyg_data = data.data.uns['pyg_data']
 
         # Extract features and masks
-        x_all = pyg_data.x.to(device)           # [N, F]
-        y_all = pyg_data.y.to(device)            # [N]
+        x_all = pyg_data.x.to(device)  # [N, F]
+        y_all = pyg_data.y.to(device)  # [N]
         train_mask = pyg_data.train_mask.to(device)
         val_mask = pyg_data.val_mask.to(device)
         test_mask = pyg_data.test_mask.to(device)
@@ -428,13 +415,16 @@ if __name__ == "__main__":
             dropout=args.dropout,
         ).to(device)
 
-        graphlearner = ChunkedGraphLearner(
-            n_feats, K=20, lamb1=0.5, lamb2=0.5, chunk_size=args.chunk_size
-        ).to(device)
+        graphlearner = ChunkedGraphLearner(n_feats, K=20, lamb1=0.5, lamb2=0.5, chunk_size=args.chunk_size).to(device)
 
         optimizer = torch.optim.Adagrad([
-            {'params': gat_model.parameters()},
-            {'params': graphlearner.parameters(), 'lr': args.lr * 10},
+            {
+                'params': gat_model.parameters()
+            },
+            {
+                'params': graphlearner.parameters(),
+                'lr': args.lr * 10
+            },
         ], lr=args.lr, weight_decay=args.weight_decay)
 
         best_val_loss = float('inf')
@@ -462,9 +452,8 @@ if __name__ == "__main__":
             knn_src, knn_dst, knn_val = adj_cells_sparse
 
             # Regularization
-            reg_loss = compute_graph_reg(
-                knn_src, knn_dst, knn_val, cell_embeds.detach(), N,
-                args.lambda_smooth, args.lambda_conn, args.lambda_sparse,chunk_size=args.chunk_size)
+            reg_loss = compute_graph_reg(knn_src, knn_dst, knn_val, cell_embeds.detach(), N, args.lambda_smooth,
+                                         args.lambda_conn, args.lambda_sparse, chunk_size=args.chunk_size)
 
             # Build edge_index for GAT from learned adjacency
             learned_edge_index = torch.stack([knn_src, knn_dst], dim=0)
@@ -476,8 +465,7 @@ if __name__ == "__main__":
             total_loss = cls_loss + 1e-1 * reg_loss
             total_loss.backward()
 
-            torch.nn.utils.clip_grad_norm_(
-                list(gat_model.parameters()) + list(graphlearner.parameters()), max_norm=2.0)
+            torch.nn.utils.clip_grad_norm_(list(gat_model.parameters()) + list(graphlearner.parameters()), max_norm=2.0)
             optimizer.step()
 
             # Update cell_embeds
@@ -582,5 +570,5 @@ if __name__ == "__main__":
 
     with open(json_filename, "w", encoding="utf-8") as f:
         json.dump(results_dict, f, indent=4, ensure_ascii=False)
-    
+
     print(f"Results successfully saved to {json_filename}")

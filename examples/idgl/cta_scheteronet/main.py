@@ -1,18 +1,19 @@
 import argparse
-import time
-from typing import Optional
 import json
 import os  # 新增：导入 os 模块用于文件路径检查
+import time
+from typing import Optional
 
 import dgl
 import numpy as np
+import pandas as pd
 import scanpy as sc
-from sklearn.neighbors import NearestNeighbors
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from sklearn.model_selection import train_test_split
-import pandas as pd
+from sklearn.neighbors import NearestNeighbors
+
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scheteronet import (
     convert_dgl_to_original_format,
@@ -35,8 +36,7 @@ from dance.utils import set_seed, sub_data
 class ChunkedGraphLearner(nn.Module):
     """Memory-efficient graph learner using chunked cosine similarity + KNN."""
 
-    def __init__(self, n_feats: int, K: int = 20, lamb1: float = 0.5, lamb2: float = 0.5,
-                 chunk_size: int = 2000):
+    def __init__(self, n_feats: int, K: int = 20, lamb1: float = 0.5, lamb2: float = 0.5, chunk_size: int = 2000):
         super().__init__()
         self.transform = nn.Linear(n_feats, n_feats)
         self.K = K
@@ -140,6 +140,8 @@ class HeteronetGraph(BaseTransform):
         if batchs is not None:
             g.ndata['batch_id'] = torch.from_numpy(batchs.values.astype(int)).long()
         adata.uns[self.out] = g
+
+
 # EVOLVE-BLOCK-END
 
 
@@ -149,10 +151,9 @@ def smooth_cell_features(cell_feat, adj_sparse):
         return cell_feat
     knn_src, knn_dst, knn_val = adj_sparse
     N = cell_feat.shape[0]
-    
+
     # 计算行归一化系数
-    row_sums = torch.zeros(N, device=cell_feat.device).scatter_add(
-        0, knn_src, knn_val).clamp(min=1e-8)
+    row_sums = torch.zeros(N, device=cell_feat.device).scatter_add(0, knn_src, knn_val).clamp(min=1e-8)
     row_sums_safe = row_sums.clone()
     row_sums_safe[row_sums_safe < 1e-8] = 1.0
     norm_val = knn_val / row_sums_safe[knn_src]
@@ -161,10 +162,8 @@ def smooth_cell_features(cell_feat, adj_sparse):
     # 构建稀疏张量 (Sparse Tensor)
     indices = torch.stack([knn_src, knn_dst], dim=0)
     # 注意：如果存在重复的边，sparse_coo_tensor 会自动将它们的值相加（coalesce）
-    adj_sparse_tensor = torch.sparse_coo_tensor(
-        indices, norm_val, size=(N, N), device=cell_feat.device
-    )
-    
+    adj_sparse_tensor = torch.sparse_coo_tensor(indices, norm_val, size=(N, N), device=cell_feat.device)
+
     # 使用稀疏矩阵乘法进行特征聚合，避免实例化 [E, D] 的巨大张量
     h_agg = torch.sparse.mm(adj_sparse_tensor, cell_feat)
     # ========================================================
@@ -173,8 +172,7 @@ def smooth_cell_features(cell_feat, adj_sparse):
     return alpha * cell_feat + (1 - alpha) * h_agg
 
 
-def compute_graph_reg(knn_src, knn_dst, knn_val, cell_embeds, N,
-                      lambda_smooth, lambda_conn, lambda_sparse):
+def compute_graph_reg(knn_src, knn_dst, knn_val, cell_embeds, N, lambda_smooth, lambda_conn, lambda_sparse):
     reg = torch.tensor(0.0, device=knn_val.device)
 
     if lambda_smooth > 0:
@@ -185,7 +183,7 @@ def compute_graph_reg(knn_src, knn_dst, knn_val, cell_embeds, N,
     if lambda_conn > 0:
         row_sums = torch.zeros(N, device=knn_val.device).scatter_add(0, knn_src, knn_val)
         target_degree = row_sums.mean().detach()
-        conn_loss = ((row_sums - target_degree) ** 2).mean()
+        conn_loss = ((row_sums - target_degree)**2).mean()
         reg = reg + lambda_conn * conn_loss
 
     if lambda_sparse > 0:
@@ -329,11 +327,9 @@ if __name__ == "__main__":
 
         # Extract initial adj from the KNN edge_index built by HeteronetGraph
         edge_index = dataset_ind.edge_index.to(device)
-        adj_init_sparse = (edge_index[0], edge_index[1],
-                           torch.ones(edge_index.shape[1], device=device))
+        adj_init_sparse = (edge_index[0], edge_index[1], torch.ones(edge_index.shape[1], device=device))
 
-        graphlearner = ChunkedGraphLearner(d, K=20, lamb1=0.5, lamb2=0.5,
-                                           chunk_size=args.chunk_size).to(device)
+        graphlearner = ChunkedGraphLearner(d, K=20, lamb1=0.5, lamb2=0.5, chunk_size=args.chunk_size).to(device)
         gl_optimizer = torch.optim.Adam(graphlearner.parameters(), lr=args.lr * 10)
 
         cell_embeds = cell_feat_orig.clone().detach()
@@ -359,8 +355,14 @@ if __name__ == "__main__":
             # --- 2. Compute graph regularization and update GraphLearner ---
             knn_src, knn_dst, knn_val = adj_cells_sparse
             reg_loss = compute_graph_reg(
-                knn_src, knn_dst, knn_val, cell_embeds.detach(),
-                N, args.lambda_smooth, args.lambda_conn, args.lambda_sparse,
+                knn_src,
+                knn_dst,
+                knn_val,
+                cell_embeds.detach(),
+                N,
+                args.lambda_smooth,
+                args.lambda_conn,
+                args.lambda_sparse,
             )
             gl_optimizer.zero_grad()
             reg_loss.backward()
@@ -402,7 +404,7 @@ if __name__ == "__main__":
 
     print(f"scHeteroNet {args.species} {args.tissue} {args.test_dataset}:")
     print(f"scores:{results},inner_scores:{inner_scores},times:{times}")
-    
+
     mean_score = np.mean(results)
     std_score = np.std(results)
     mean_inner_score = np.mean(inner_scores)
@@ -434,10 +436,10 @@ if __name__ == "__main__":
     }
 
     json_filename = "results_scheteronet.json"
-    
+
     # 读取已有的数据
     if os.path.exists(json_filename):
-        with open(json_filename, "r", encoding="utf-8") as f:
+        with open(json_filename, encoding="utf-8") as f:
             try:
                 all_results = json.load(f)
                 if not isinstance(all_results, list):
@@ -453,5 +455,5 @@ if __name__ == "__main__":
     # 写回文件
     with open(json_filename, "w", encoding="utf-8") as f:
         json.dump(all_results, f, indent=4, ensure_ascii=False)
-    
+
     print(f"Results successfully appended to {json_filename}")

@@ -1,26 +1,27 @@
-import os
-import sys
-import pickle
-import time
-import random
 import copy
-from typing import Optional, Tuple, Mapping, Any, Union
+import os
+import pickle
+import random
+import sys
+import time
 from abc import ABC, abstractmethod, abstractstaticmethod
+from typing import Any, Mapping, Optional, Tuple, Union
 
-import torch
-import torch.nn.functional as F
-from torch_geometric.data import Data, ClusterData, ClusterLoader
-from torch_geometric.nn import GATConv
 import numpy as np
 import scanpy as sc
+import torch
+import torch.nn.functional as F
 from scipy import sparse
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
+from torch_geometric.data import ClusterData, ClusterLoader, Data
+from torch_geometric.nn import GATConv
 
 from dance.modules.base import BaseMethod
 from dance.transforms.base import BaseTransform
 from dance.transforms.graph.scgat_graph import scGATGraphTransform
 from dance.transforms.misc import Compose, SetConfig
+
 
 def scipysparse2torchsparse(x):
     samples = x.shape[0]
@@ -31,6 +32,7 @@ def scipysparse2torchsparse(x):
     t = torch.sparse.FloatTensor(indices, torch.from_numpy(values).float(), [samples, features])
     return indices, t
 
+
 def masked_nll_loss(logits, labels, mask):
     loss = F.nll_loss(logits, labels, reduction='none')
     mask = mask.type(torch.float)
@@ -38,13 +40,15 @@ def masked_nll_loss(logits, labels, mask):
     loss *= mask
     return torch.sum(loss) / loss.size()[0]
 
+
 class GAT(torch.nn.Module):
+
     def __init__(self, in_channels, hidden_channels, out_channels, heads=8, dropout=0.4, alpha=0.2):
-        super(GAT, self).__init__()
-        self.gat1 = GATConv(in_channels, hidden_channels, heads=heads, concat=True,
-                            negative_slope=alpha, dropout=dropout)
-        self.gat2 = GATConv(hidden_channels * heads, out_channels, heads=heads, concat=False,
-                            negative_slope=alpha, dropout=dropout)
+        super().__init__()
+        self.gat1 = GATConv(in_channels, hidden_channels, heads=heads, concat=True, negative_slope=alpha,
+                            dropout=dropout)
+        self.gat2 = GATConv(hidden_channels * heads, out_channels, heads=heads, concat=False, negative_slope=alpha,
+                            dropout=dropout)
 
     def forward(self, x, edge_index):
         x = self.gat1(x, edge_index)
@@ -59,40 +63,34 @@ class GAT(torch.nn.Module):
 
 import copy
 import random
-import torch
-import torch.nn.functional as F
+from typing import Any, Optional, Union
+
 import numpy as np
 import scanpy as sc
-from torch_geometric.data import Data, ClusterData, ClusterLoader
-from typing import Optional, Any, Union
+import torch
+import torch.nn.functional as F
+from torch_geometric.data import ClusterData, ClusterLoader, Data
+
 from dance.transforms import BaseTransform
 
 # 假设 GAT 和 scGATGraphTransform 已经在上下文中定义
-# from .model import GAT 
+# from .model import GAT
 # from .transforms import scGATGraphTransform
 
+
 class scGATAnnotator(BaseMethod):
-    """
-    Graph Attention Network (GAT) for cell type annotation.
+    """Graph Attention Network (GAT) for cell type annotation.
+
     Strictly expects input data to be scanpy.AnnData transformed by scGATGraphTransform.
+
     """
     _DEFAULT_METRIC = 'accuracy'
     _DISPLAY_ATTRS = ('hidden_channels', 'heads', 'lr', 'dropout')
 
-    def __init__(self, 
-                 hidden_channels: int = 8, 
-                 heads: int = 8, 
-                 dropout: float = 0.4, 
-                 alpha: float = 0.2,
-                 lr: float = 0.001,
-                 weight_decay: float = 5e-4,
-                 n_epochs: int = 2000,
-                 patience: int = 100,
-                 batch_size: int = 256,
-                 num_parts: int = 1,
-                 device: str = 'cuda',
-                 random_seed: int = 42):
-        
+    def __init__(self, hidden_channels: int = 8, heads: int = 8, dropout: float = 0.4, alpha: float = 0.2,
+                 lr: float = 0.001, weight_decay: float = 5e-4, n_epochs: int = 2000, patience: int = 100,
+                 batch_size: int = 256, num_parts: int = 1, device: str = 'cuda', random_seed: int = 42):
+
         self.hidden_channels = hidden_channels
         self.heads = heads
         self.dropout = dropout
@@ -105,19 +103,16 @@ class scGATAnnotator(BaseMethod):
         self.num_parts = num_parts
         self.device = device
         self.random_seed = random_seed
-        
+
         self.model = None
         self.label_encoder = None
 
     @staticmethod
-    def preprocessing_pipeline(label_column: str = 'cell_type',
-                               n_neighbors: int = 15,log_level="INFO") -> BaseTransform:
-        transforms=[]
-        transforms.append(scGATGraphTransform(label_column=label_column,
-                                    n_neighbors=n_neighbors))
-        transforms.append(SetConfig({
-                "label_channel": "cell_type"
-            }),)
+    def preprocessing_pipeline(label_column: str = 'cell_type', n_neighbors: int = 15,
+                               log_level="INFO") -> BaseTransform:
+        transforms = []
+        transforms.append(scGATGraphTransform(label_column=label_column, n_neighbors=n_neighbors))
+        transforms.append(SetConfig({"label_channel": "cell_type"}), )
         return Compose(*transforms, log_level=log_level)
 
     def _set_seed(self):
@@ -128,9 +123,10 @@ class scGATAnnotator(BaseMethod):
             torch.cuda.manual_seed(self.random_seed)
 
     def _get_pyg_data(self, x: Any) -> Data:
-        """
-        Helper to extract PyG Data object from AnnData.
+        """Helper to extract PyG Data object from AnnData.
+
         Strictly assumes x is AnnData and has 'pyg_data' in uns.
+
         """
         if not isinstance(x, sc.AnnData):
             raise TypeError(f"Input must be a scanpy.AnnData object, got {type(x)}.")
@@ -147,41 +143,30 @@ class scGATAnnotator(BaseMethod):
         return x.uns['pyg_data']
 
     def fit(self, x: sc.AnnData, y: Optional[Any] = None, **kwargs):
-        """
-        Train the GAT model.
-        
+        """Train the GAT model.
+
         Args:
             x: AnnData object containing 'pyg_data' in .uns.
             y: Ignored (labels are expected inside the graph object).
+
         """
         self._set_seed()
-        
+
         # 1. Data Preparation: Extract prepared PyG object
-        print(">>> 正在获取 PyG 数据 (如果这里卡住，说明是在 transform 阶段没跑完)") # DEBUG
+        print(">>> 正在获取 PyG 数据 (如果这里卡住，说明是在 transform 阶段没跑完)")  # DEBUG
         data = self._get_pyg_data(x)
-        print(">>> 成功获取 PyG 数据") # DEBUG
-        
-        
+        print(">>> 成功获取 PyG 数据")  # DEBUG
+
         # 2. Model Initialization
         n_classes = int(data.y.max().item() + 1)
         num_features = data.x.shape[1]
-        
-        self.model = GAT(
-            in_channels=num_features,
-            hidden_channels=self.hidden_channels,
-            out_channels=n_classes,
-            heads=self.heads,
-            dropout=self.dropout,
-            alpha=self.alpha
-        ).to(self.device)
-        print(">>> 模型初始化完成") # DEBUG
-        optimizer = torch.optim.Adagrad(
-            self.model.parameters(), 
-            lr=self.lr, 
-            weight_decay=self.weight_decay
-        )
 
-         # 3. Data Loading Strategy (Full Batch vs Cluster Batch)
+        self.model = GAT(in_channels=num_features, hidden_channels=self.hidden_channels, out_channels=n_classes,
+                         heads=self.heads, dropout=self.dropout, alpha=self.alpha).to(self.device)
+        print(">>> 模型初始化完成")  # DEBUG
+        optimizer = torch.optim.Adagrad(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+
+        # 3. Data Loading Strategy (Full Batch vs Cluster Batch)
         # Modified logic to support skipping ClusterData for CPU optimization
         if self.num_parts <= 1:
             print(f"Full batch training enabled (num_parts={self.num_parts}). Skipping graph clustering.")
@@ -193,9 +178,9 @@ class scGATAnnotator(BaseMethod):
             print(f"Graph clustering enabled (target num_parts={self.num_parts}).")
             # Ensure valid number of parts
             num_parts = min(self.num_parts, data.num_nodes)
-            if num_parts < 2: 
+            if num_parts < 2:
                 num_parts = 2
-            
+
             # This is the CPU-intensive part
             cd = ClusterData(data, num_parts=num_parts, recursive=False)
             loader = ClusterLoader(cd, batch_size=self.batch_size, shuffle=True)
@@ -206,7 +191,7 @@ class scGATAnnotator(BaseMethod):
         best_state_dict = None
 
         print(f"Starting training on device: {self.device}")
-        
+
         for epoch in range(self.n_epochs):
             self.model.train()
             epoch_loss = []
@@ -215,7 +200,7 @@ class scGATAnnotator(BaseMethod):
                 batch = batch.to(self.device)
                 optimizer.zero_grad()
                 output = self.model(batch.x, batch.edge_index)
-                
+
                 # Check if batch has training nodes
                 if batch.train_mask.sum() > 0:
                     loss = masked_nll_loss(output, batch.y, batch.train_mask)
@@ -225,7 +210,7 @@ class scGATAnnotator(BaseMethod):
 
             # Validation
             val_loss = self._evaluate_loss(data, 'val')
-            
+
             if val_loss < best_loss:
                 best_loss = val_loss
                 bad_counter = 0
@@ -236,7 +221,7 @@ class scGATAnnotator(BaseMethod):
             if bad_counter >= self.patience:
                 print(f"Early stopping at epoch {epoch}")
                 break
-                
+
             if epoch % 10 == 0:
                 train_loss_val = np.mean(epoch_loss) if epoch_loss else 0.0
                 print(f"Epoch {epoch}: Train Loss {train_loss_val:.4f}, Val Loss {val_loss:.4f}")
@@ -244,7 +229,7 @@ class scGATAnnotator(BaseMethod):
         # Restore best model
         if best_state_dict is not None:
             self.model.load_state_dict(best_state_dict)
-            
+
         return self
 
     def _evaluate_loss(self, data, split='val'):
@@ -255,33 +240,29 @@ class scGATAnnotator(BaseMethod):
             # NOTE: If OOM, this part needs to be batched (subgraph inference)
             data_dev = data.to(self.device)
             output = self.model(data_dev.x, data_dev.edge_index)
-            
+
             mask = getattr(data_dev, f'{split}_mask')
             if mask.sum() == 0:
                 return float('inf')
-                
+
             loss = masked_nll_loss(output, data_dev.y, mask)
             return loss.item()
 
     def predict(self, x: sc.AnnData):
-        """
-        Returns predicted class indices.
-        """
+        """Returns predicted class indices."""
         logits = self.predict_proba(x)
         preds = logits.argmax(dim=1).cpu().numpy()
         return preds
 
     def predict_proba(self, x: sc.AnnData):
-        """
-        Returns log_softmax probabilities.
-        """
+        """Returns log_softmax probabilities."""
         if self.model is None:
             raise RuntimeError("Model is not trained yet.")
-        
+
         data = self._get_pyg_data(x)
 
         self.model.eval()
         with torch.no_grad():
             output = self.model(data.x.to(self.device), data.edge_index.to(self.device))
-        
+
         return output

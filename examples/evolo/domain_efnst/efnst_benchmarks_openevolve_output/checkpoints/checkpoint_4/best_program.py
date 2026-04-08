@@ -1,16 +1,21 @@
 import argparse
 import math
 import os
+import random
 import time  # 新增：导入 time 模块
 from pathlib import Path
-import random
 
-from PIL import Image
-from efficientnet_pytorch import EfficientNet
 import networkx as nx
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.nn.modules.loss
+import torchvision.transforms as transforms
+from efficientnet_pytorch import EfficientNet
+from PIL import Image
 from scipy.sparse import csr_matrix
 from scipy.spatial import distance
 from skimage import img_as_ubyte
@@ -19,27 +24,23 @@ from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import adjusted_rand_score, pairwise_distances
 from sklearn.neighbors import BallTree, KDTree, NearestNeighbors
-import torch
 from torch.autograd import Variable
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.nn.modules.loss
 from torch.nn.parameter import Parameter
 from torch.utils.data import DataLoader, Dataset
 from torch_geometric.nn import BatchNorm, Sequential
+from torch_sparse import SparseTensor
 from torchvision import transforms
-import torchvision.transforms as transforms
 from tqdm import tqdm
-from dance.typing import Optional
+
 from dance import logger
 from dance.data.base import Data
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.EfNST import (
+    EfNsSTRunner,
     EfNSTAugmentTransform,
     EfNSTConcatgTransform,
     EfNSTGraphTransform,
     EfNSTImageTransform,
-    EfNsSTRunner,
 )
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
@@ -49,9 +50,10 @@ from dance.transforms.filter import (
     HighlyVariableGenesLogarithmizedByTopGenes,
 )
 from dance.transforms.misc import Compose, SetConfig
-from dance.utils import set_seed,sub_data
+from dance.typing import Optional
+from dance.utils import set_seed, sub_data
 from dance.utils.metrics import calculate_unified_scores, resolve_score_func
-from torch_sparse import SparseTensor
+
 """Created on Tue Jan 23 18:54:08 2024.
 
 @author: lenovo
@@ -60,7 +62,6 @@ from torch_sparse import SparseTensor
 # -*- coding: utf-8 -*-
 
 # Standard library imports
-
 
 # typing.Literal for compatibility
 try:
@@ -79,8 +80,6 @@ except ImportError:
 
         class Literal(metaclass=LiteralMeta):
             pass
-
-
 
 
 class SpatialImageDataset(Dataset):
@@ -104,6 +103,8 @@ class SpatialImageDataset(Dataset):
             image = self.transform(image)
 
         return image, spot_name
+
+
 def extract_features_batch(adata, model, device, batch_size=64, num_workers=4):
     """Extracts features from image slices in an efficient, batched manner.
 
@@ -167,6 +168,7 @@ def extract_features_batch(adata, model, device, batch_size=64, num_workers=4):
     feat_df = pd.DataFrame(final_features, index=all_spot_names)
 
     return adata, feat_df
+
 
 class Image_Feature:
 
@@ -373,11 +375,11 @@ class graph:
         return graph_dict
 
 
-@register_preprocessor("misc",overwrite=True)
+@register_preprocessor("misc", overwrite=True)
 class EfNSTImageTransform(BaseTransform):
 
-    def __init__(self, cnnType='efficientnet-b0', pca_n_comps=200, save_path="./", verbose=False,
-                 crop_size=50, target_size=224, device=None, **kwargs):
+    def __init__(self, cnnType='efficientnet-b0', pca_n_comps=200, save_path="./", verbose=False, crop_size=50,
+                 target_size=224, device=None, **kwargs):
         self.verbose = verbose
         self.save_path = save_path
         self.pca_n_comps = pca_n_comps
@@ -389,17 +391,19 @@ class EfNSTImageTransform(BaseTransform):
 
     def __call__(self, data: Data) -> Data:
         adata = data.data
-        self.data_name=adata.uns['data_name']
+        self.data_name = adata.uns['data_name']
         save_path_image_crop = Path(os.path.join(self.save_path, 'Image_crop', f'{self.data_name}'))
         save_path_image_crop.mkdir(parents=True, exist_ok=True)
         adata = image_crop(adata, save_path=save_path_image_crop, quality='fulres', crop_size=self.crop_size,
                            target_size=self.target_size)
-        adata = Image_Feature(adata, pca_components=self.pca_n_comps, cnnType=self.cnnType, device=self.device).Extract_Image_Feature()
+        adata = Image_Feature(adata, pca_components=self.pca_n_comps, cnnType=self.cnnType,
+                              device=self.device).Extract_Image_Feature()
         if self.verbose:
             save_data_path = Path(os.path.join(self.save_path, f'{self.data_name}'))
             save_data_path.mkdir(parents=True, exist_ok=True)
             adata.write(os.path.join(save_data_path, f'{self.data_name}.h5ad'), compression="gzip")
         return data
+
 
 # EVOLVE-BLOCK-START
 def cal_spatial_weight(
@@ -407,67 +411,71 @@ def cal_spatial_weight(
     spatial_k=50,
     spatial_type="KDTree",
 ):
-    from sklearn.neighbors import BallTree, KDTree, NearestNeighbors
     from scipy.spatial.distance import pdist, squareform
-    
+    from sklearn.neighbors import BallTree, KDTree, NearestNeighbors
+
     # Calculate k-th neighbor distance for each point to determine local density
     nbrs = NearestNeighbors(n_neighbors=min(spatial_k + 1, data.shape[0]), algorithm='ball_tree').fit(data)
     distances, indices = nbrs.kneighbors(data)
-    
+
     # Use the distance to the k-th neighbor as an estimate of local density
     # This creates spot-specific bandwidths
     kth_distances = distances[:, -1]  # Distance to k-th nearest neighbor
-    
+
     # Adaptive Gaussian kernel: weight decreases with distance, scaled by local density
     n_spots = data.shape[0]
     spatial_weight = np.zeros((n_spots, n_spots))
-    
+
     for i in range(n_spots):
         # Use local density (kth neighbor distance) as bandwidth for this spot
         local_bandwidth = max(kth_distances[i], 1e-6)  # Avoid division by zero
-        
+
         # Calculate distances to neighbors
         neighbor_indices = indices[i, 1:]  # Exclude self
         neighbor_distances = distances[i, 1:]  # Exclude self
-        
+
         # Apply adaptive Gaussian kernel
-        weights = np.exp(- (neighbor_distances ** 2) / (2 * local_bandwidth ** 2))
+        weights = np.exp(-(neighbor_distances**2) / (2 * local_bandwidth**2))
         spatial_weight[i, neighbor_indices] = weights
-    
+
     return spatial_weight
+
+
 def cal_gene_weight(data, n_components=50, gene_dist_type="cosine"):
+    from scipy.special import softmax
     from sklearn.decomposition import TruncatedSVD
     from sklearn.preprocessing import minmax_scale
-    from scipy.special import softmax
-    
+
     # Use TruncatedSVD for sparse inputs to maintain efficiency
     if isinstance(data, csr_matrix):
         # For sparse matrices, use TruncatedSVD instead of PCA
-        svd = TruncatedSVD(n_components=min(n_components, min(data.shape)-1))
+        svd = TruncatedSVD(n_components=min(n_components, min(data.shape) - 1))
         data_reduced = svd.fit_transform(data)
     else:
         # For dense matrices, we can use PCA
         from sklearn.decomposition import PCA
         pca = PCA(n_components=n_components)
         data_reduced = pca.fit_transform(data)
-    
+
     # Compute correlation matrix
     if gene_dist_type == "cosine":
         from sklearn.metrics.pairwise import cosine_similarity
         gene_similarity = cosine_similarity(data_reduced)
     else:
         gene_similarity = 1 - pairwise_distances(data_reduced, metric=gene_dist_type)
-    
+
     # Apply soft-thresholding to filter noise and sharpen biological signals
     # Replace small correlations with exponentially weighted values
     threshold = np.percentile(np.abs(gene_similarity), 80)  # Dynamic threshold
     gene_similarity = np.where(np.abs(gene_similarity) < threshold, 0, gene_similarity)
-    
+
     # Apply exponential transformation to sharpen strong signals
     gene_similarity = np.exp(gene_similarity) - 1  # Exponential transformation
     gene_similarity = minmax_scale(gene_similarity.ravel()).reshape(gene_similarity.shape)  # Normalize
-    
+
     return gene_similarity
+
+
 def cal_weight_matrix(adata, platform="Visium", pd_dist_type="euclidean", md_dist_type="cosine",
                       gb_dist_type="correlation", n_components=50, no_morphological=True, spatial_k=30,
                       spatial_type="KDTree", verbose=False):
@@ -494,7 +502,7 @@ def cal_weight_matrix(adata, platform="Visium", pd_dist_type="euclidean", md_dis
             col_ind.extend(indices[i])
         data = np.ones(len(row_ind), dtype=np.int8)
         physical_distance = csr_matrix((data, (row_ind, col_ind)), shape=(n_spots, n_spots))
-        
+
         # Convert to dense for compatibility with new spatial weight calculation
         physical_distance_dense = physical_distance.toarray()
         # Recalculate with adaptive spatial weights
@@ -504,35 +512,36 @@ def cal_weight_matrix(adata, platform="Visium", pd_dist_type="euclidean", md_dis
         physical_distance_dense = np.multiply(physical_distance_dense, spatial_weight_dense)
         physical_distance = csr_matrix(physical_distance_dense)
     else:
-        physical_distance_dense = cal_spatial_weight(adata.obsm['spatial'], spatial_k=spatial_k, spatial_type=spatial_type)
+        physical_distance_dense = cal_spatial_weight(adata.obsm['spatial'], spatial_k=spatial_k,
+                                                     spatial_type=spatial_type)
         physical_distance = csr_matrix(physical_distance_dense)
 
     gene_counts = adata.X.copy()
     gene_correlation = cal_gene_weight(data=gene_counts, gene_dist_type=gb_dist_type, n_components=n_components)
     del gene_counts
-    
+
     # Apply topological pruning: keep mutual nearest neighbors
     # Find top-k connections for both spatial and gene similarities
     top_k_spatial = min(15, physical_distance.shape[0] - 1)  # Reasonable number for spatial
-    top_k_gene = min(15, gene_correlation.shape[0] - 1)      # Reasonable number for gene
-    
+    top_k_gene = min(15, gene_correlation.shape[0] - 1)  # Reasonable number for gene
+
     # Create masks for top-k connections
     spatial_mask = np.zeros_like(physical_distance_dense)
     gene_mask = np.zeros_like(gene_correlation)
-    
+
     for i in range(physical_distance_dense.shape[0]):
         # Get top-k spatial neighbors
         top_spatial_idx = np.argsort(physical_distance_dense[i])[::-1][:top_k_spatial]
         spatial_mask[i, top_spatial_idx] = 1
-        
+
         # Get top-k gene neighbors
         top_gene_idx = np.argsort(gene_correlation[i])[::-1][:top_k_gene]
         gene_mask[i, top_gene_idx] = 1
-    
+
     # Apply masks
     physical_distance_dense = physical_distance_dense * spatial_mask
     gene_correlation = gene_correlation * gene_mask
-    
+
     if verbose:
         adata.obsm["gene_correlation"] = gene_correlation
         adata.obsm["physical_distance"] = csr_matrix(physical_distance_dense)
@@ -542,20 +551,17 @@ def cal_weight_matrix(adata, platform="Visium", pd_dist_type="euclidean", md_dis
     if platform == 'Visium':
         morphological_similarity = 1 - pairwise_distances(np.array(adata.obsm["image_feat_pca"]), metric=md_dist_type)
         morphological_similarity = np.clip(morphological_similarity, 0, None)  # Ensure non-negative
-        
+
         # Log-domain fusion to avoid vanishing weights
         # Add small epsilon to avoid log(0)
         eps = 1e-8
-        log_fusion = (
-            0.4 * np.log(physical_distance_dense + eps) + 
-            0.4 * np.log(gene_correlation + eps) + 
-            0.2 * np.log(morphological_similarity + eps)
-        )
+        log_fusion = (0.4 * np.log(physical_distance_dense + eps) + 0.4 * np.log(gene_correlation + eps) +
+                      0.2 * np.log(morphological_similarity + eps))
         weights_matrix_all = np.exp(log_fusion)  # Back to original domain
-        
+
         # Apply topological consistency: mutual nearest neighbors
         weights_matrix_all = weights_matrix_all * spatial_mask * gene_mask
-        
+
         adata.obsm["weights_matrix_all"] = weights_matrix_all
         if no_morphological:
             # For nomd version, use same fusion principle
@@ -571,8 +577,10 @@ def cal_weight_matrix(adata, platform="Visium", pd_dist_type="euclidean", md_dis
         # Apply topological consistency
         weights_matrix_nomd = weights_matrix_nomd * spatial_mask * gene_mask
         adata.obsm["weights_matrix_nomd"] = weights_matrix_nomd
-    
+
     return adata
+
+
 # EVOLVE-BLOCK-END
 
 
@@ -611,6 +619,8 @@ def find_adjacent_spot(adata, use_data="raw", neighbour_k=4, weights='weights_ma
     if verbose:
         adata.obsm['adjacent_weight'] = np.array(weights_list)
     return adata
+
+
 def augment_gene_data(adata, Adj_WT=0.2):
     adjacent_gene_matrix = adata.obsm["adjacent_data"].astype(float)
     if isinstance(adata.X, np.ndarray):
@@ -620,6 +630,8 @@ def augment_gene_data(adata, Adj_WT=0.2):
     adata.obsm["augment_gene_data"] = augment_gene_matrix
     del adjacent_gene_matrix
     return adata
+
+
 def augment_adata(adata, platform="Visium", pd_dist_type="euclidean", md_dist_type="cosine", gb_dist_type="correlation",
                   n_components=50, no_morphological=False, use_data="raw", neighbour_k=4, weights="weights_matrix_all",
                   Adj_WT=0.2, spatial_k=30, spatial_type="KDTree"):
@@ -641,7 +653,8 @@ def augment_adata(adata, platform="Visium", pd_dist_type="euclidean", md_dist_ty
     )
     return adata
 
-@register_preprocessor("misc",overwrite=True)
+
+@register_preprocessor("misc", overwrite=True)
 class EfNSTAugmentTransform(BaseTransform):
 
     def __init__(self, Adj_WT=0.2, neighbour_k=4, weights="weights_matrix_all", spatial_k=30, platform="Visium",
@@ -667,7 +680,7 @@ class EfNSTAugmentTransform(BaseTransform):
         return adata_augment
 
 
-@register_preprocessor("graph", "cell",overwrite=True)
+@register_preprocessor("graph", "cell", overwrite=True)
 class EfNSTGraphTransform(BaseTransform):
 
     def __init__(self, distType="Radius", k=12, rad_cutoff=150, **kwargs):
@@ -681,21 +694,23 @@ class EfNSTGraphTransform(BaseTransform):
         graph_dict = graph(adata.obsm['spatial'], distType=self.distType, k=self.k, rad_cutoff=self.rad_cutoff).main()
         adata.uns['EfNSTGraph'] = graph_dict
 
-def get_preprocessing_pipeline(verbose=False, cnnType='efficientnet-b0', pca_n_comps=200, distType="KDTree",
-                               k=12, dim_reduction=True, min_cells=3, platform="Visium", device=None):
-        return Compose(
-            EfNSTImageTransform(verbose=verbose, cnnType=cnnType, device=device),
-            EfNSTAugmentTransform(),
-            EfNSTGraphTransform(distType=distType, k=k),
-            EfNSTConcatgTransform(dim_reduction=dim_reduction, min_cells=min_cells, platform=platform,
-                                  pca_n_comps=pca_n_comps),  #xenium can also be processed using Visium method
-            SetConfig({
-                "feature_channel": ["feature.cell", "EfNSTGraph"],
-                "feature_channel_type": ["obsm", "uns"],
-                "label_channel": "label",
-                "label_channel_type": "obs"
-            }))
-            
+
+def get_preprocessing_pipeline(verbose=False, cnnType='efficientnet-b0', pca_n_comps=200, distType="KDTree", k=12,
+                               dim_reduction=True, min_cells=3, platform="Visium", device=None):
+    return Compose(
+        EfNSTImageTransform(verbose=verbose, cnnType=cnnType, device=device),
+        EfNSTAugmentTransform(),
+        EfNSTGraphTransform(distType=distType, k=k),
+        EfNSTConcatgTransform(dim_reduction=dim_reduction, min_cells=min_cells, platform=platform,
+                              pca_n_comps=pca_n_comps),  #xenium can also be processed using Visium method
+        SetConfig({
+            "feature_channel": ["feature.cell", "EfNSTGraph"],
+            "feature_channel_type": ["obsm", "uns"],
+            "label_channel": "label",
+            "label_channel_type": "obs"
+        }))
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
@@ -718,7 +733,7 @@ if __name__ == "__main__":
     parser.add_argument("--min_cells", type=int, default=3, help="Minimum number of cells.")
     parser.add_argument("--platform", type=str, default="Visium", help="Platform type.")
     parser.add_argument("--device", type=str, default=None, help="Device to use (e.g., 'cuda', 'cpu', 'cuda:0').")
-    parser.add_argument("--obs_nums",type=int,default=10000)
+    parser.add_argument("--obs_nums", type=int, default=10000)
     args = parser.parse_args()
 
     scores = []
@@ -727,7 +742,7 @@ if __name__ == "__main__":
 
     for seed in range(args.seed, args.seed + args.num_runs):
         start_time = time.time()  # 新增：记录单次循环的开始时间
-        
+
         # 修正：将 args.seed 修改为跟随循环的 seed
         set_seed(seed, extreme_mode=True)
         try:
@@ -740,12 +755,13 @@ if __name__ == "__main__":
                 random_state=seed)
             dataloader = SpatialLIBDDataset(data_id=args.sample_number)
             data = dataloader.load_data(transform=None, cache=args.cache)
-            sub_data(data.data,n_cells=args.obs_nums)
-            data.data.uns['data_name']=args.sample_number
-            preprocessing_pipeline = get_preprocessing_pipeline(
-                verbose=args.verbose, cnnType=args.cnnType, pca_n_comps=args.pca_n_comps,
-                distType=args.distType, k=args.k, dim_reduction=not args.no_dim_reduction, min_cells=args.min_cells,
-                platform=args.platform, device=args.device)
+            sub_data(data.data, n_cells=args.obs_nums)
+            data.data.uns['data_name'] = args.sample_number
+            preprocessing_pipeline = get_preprocessing_pipeline(verbose=args.verbose, cnnType=args.cnnType,
+                                                                pca_n_comps=args.pca_n_comps, distType=args.distType,
+                                                                k=args.k, dim_reduction=not args.no_dim_reduction,
+                                                                min_cells=args.min_cells, platform=args.platform,
+                                                                device=args.device)
             preprocessing_pipeline(data)
             (x, adj), y = data.get_data()
             adata = data.data
@@ -756,23 +772,24 @@ if __name__ == "__main__":
             silhouette_score = resolve_score_func("silhouette")
             calinski_harabasz_score = resolve_score_func("calinski_harabasz")
             davies_bouldin_score = resolve_score_func("davies_bouldin")
-            inner_scores.append(calculate_unified_scores({
-                "silhouette": silhouette_score(x, y_pred),
-                "calinski_harabasz": calinski_harabasz_score(x, y_pred),
-                "davies_bouldin": davies_bouldin_score(x, y_pred)
-            }))
+            inner_scores.append(
+                calculate_unified_scores({
+                    "silhouette": silhouette_score(x, y_pred),
+                    "calinski_harabasz": calinski_harabasz_score(x, y_pred),
+                    "davies_bouldin": davies_bouldin_score(x, y_pred)
+                }))
         finally:
-            
+
             if "adata" in locals():
                 EfNST.delete_imgs(adata)
-        
+
         score = adjusted_rand_score(y, y_pred)
         scores.append(score)
-        
+
         end_time = time.time()  # 新增：记录单次循环的结束时间
         run_time = end_time - start_time
         times.append(run_time)  # 新增：保存耗时
-        
+
         print(f"ARI: {score:.4f}, time: {run_time:.2f}s")  # 修改：同时输出得分和运行时间
 
     print(f"EfNST {args.sample_number}:")
@@ -781,7 +798,6 @@ if __name__ == "__main__":
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
     print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
-
 """
 python EfNST.py --sample_number 151507
 python EfNST.py --sample_number 151673

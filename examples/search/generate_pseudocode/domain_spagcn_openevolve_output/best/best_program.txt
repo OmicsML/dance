@@ -190,10 +190,10 @@ begin
     x_array := adata.obsm["spatial"]["x"];
     y_array := adata.obsm["spatial"]["y"];
     adj_2d := CalculateAdjMatrix(x_array, y_array, histology = false);
-    r := SearchRadius(target, adata.obs.index, x_array, y_array, adata.obs["pred"], 
+    r := SearchRadius(target, adata.obs.index, x_array, y_array, adata.obs["pred"],
                       start = quantile(adj_2d[≠0], 0.001), end = quantile(adj_2d[≠0], 0.1),
                       num_min = 10, num_max = 14);
-    nbr_domains := FindNeighborClusters(target, adata.obs.index, x_array, y_array, 
+    nbr_domains := FindNeighborClusters(target, adata.obs.index, x_array, y_array,
                                         adata.obs["pred"], radius = r, ratio = 0.5)[0:3];
     de_genes := RankGenesGroups(adata, target, nbr_domains, label_col = "pred", log = true);
     filtered := de_genes[

@@ -35,14 +35,13 @@ if __name__ == "__main__":
 
         # Fit the model and evaluate
         model.fit(data.data)
-        _,y = data.get_data(return_type="default")
+        _, y = data.get_data(return_type="default")
         score = model.score(None, y.values)
         scores.append(score)
         print(f"ARI: {score:.4f}")
 
     print(f"SpaGRA {args.sample_number}:")
     print(f"{scores}\n{np.mean(scores):.5f} +/- {np.std(scores):.5f}")
-
 """ To reproduce SpaGRA on other samples, please refer to command lines belows:
 
 human dorsolateral prefrontal cortex sample 151673:

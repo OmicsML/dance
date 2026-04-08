@@ -13,7 +13,7 @@ pipeline:
   - type: graph.spatial
     target: SpaGCNGraph
     params_to_tune:
-      alpha: 
+      alpha:
         values: [1,2,2.5]
       beta:
         values: [40,49,60]

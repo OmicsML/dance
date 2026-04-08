@@ -59,7 +59,8 @@ if __name__ == "__main__":
             if (dataset is not None and dataset != [])
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
-    pipeline_planer = PipelinePlaner.from_config_file(f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
+    pipeline_planer = PipelinePlaner.from_config_file(
+        f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
 
     # ================= MODIFIED FUNCTION STARTS HERE =================
@@ -100,8 +101,8 @@ if __name__ == "__main__":
             num_genes = data.shape[1]
             # Initialize model and get model specific preprocessing pipeline
             dense_dim = g.ndata["features"].shape[1]
-            model = ScDeepSort(dense_dim, args.hidden_dim, args.n_layers, args.species, args.tissue, dropout=args.dropout,
-                               batch_size=args.batch_size, device=args.device)
+            model = ScDeepSort(dense_dim, args.hidden_dim, args.n_layers, args.species, args.tissue,
+                               dropout=args.dropout, batch_size=args.batch_size, device=args.device)
 
             gene_ids = torch.arange(num_genes)
             train_cell_ids = torch.LongTensor(data.train_idx) + num_genes
@@ -139,7 +140,9 @@ if __name__ == "__main__":
         speed_score = 1.0 / (1.0 + total_time_seconds / 300.0)
         combined_score = 0.8 * avg_valid_score + 0.2 * speed_score
 
-        logger.info(f"Averaged over {args.num_runs} runs - Valid Acc: {avg_valid_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}")
+        logger.info(
+            f"Averaged over {args.num_runs} runs - Valid Acc: {avg_valid_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}"
+        )
 
         wandb.log({
             "train_acc": avg_train_score,
@@ -150,6 +153,7 @@ if __name__ == "__main__":
             "combined_score": combined_score
         })
         wandb.finish()
+
     # ================= MODIFIED FUNCTION ENDS HERE =================
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(

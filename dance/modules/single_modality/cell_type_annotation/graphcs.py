@@ -27,6 +27,7 @@ from dance.typing import LogLevel, Optional
 
 @contextlib.contextmanager
 def _disable_tracking_bn_stats(model):
+
     def switch_attr(m):
         if hasattr(m, 'track_running_stats'):
             m.track_running_stats ^= True
@@ -45,12 +46,10 @@ def _l2_normalize(d):
 class VATLoss(nn.Module):
 
     def __init__(self, xi=10.0, eps=1.0, ip=1):
-        """VAT loss
-        :param xi: hyperparameter of VAT (default: 10.0)
-        :param eps: hyperparameter of VAT (default: 1.0)
-        :param ip: iteration times of computing adv noise (default: 1)
-        """
-        super(VATLoss, self).__init__()
+        """VAT loss :param xi: hyperparameter of VAT (default: 10.0) :param eps:
+        hyperparameter of VAT (default: 1.0) :param ip: iteration times of computing adv
+        noise (default: 1)"""
+        super().__init__()
         self.xi = xi
         self.eps = eps
         self.ip = ip
@@ -81,10 +80,12 @@ class VATLoss(nn.Module):
             lds = F.kl_div(logp_hat, pred, reduction='batchmean')
 
         return lds
+
+
 class Dense(nn.Module):
 
     def __init__(self, in_features, out_features, bias='none'):
-        super(Dense, self).__init__()
+        super().__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.weight = nn.Parameter(torch.FloatTensor(in_features, out_features))
@@ -92,7 +93,7 @@ class Dense(nn.Module):
             self.bias = nn.BatchNorm1d(out_features)
         else:
             self.bias = lambda x: x
-            
+
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -106,12 +107,14 @@ class Dense(nn.Module):
             output = output + input
         return output
 
+
 class GnnBP(nn.Module):
-    def __init__(self, nfeat, nlayers,nhidden, nclass, dropout, bias):
-        super(GnnBP, self).__init__()
+
+    def __init__(self, nfeat, nlayers, nhidden, nclass, dropout, bias):
+        super().__init__()
         self.fcs = nn.ModuleList()
         self.fcs.append(Dense(nfeat, nhidden, bias))
-        for _ in range(nlayers-2):
+        for _ in range(nlayers - 2):
             self.fcs.append(Dense(nhidden, nhidden, bias))
         self.fcs.append(Dense(nhidden, nclass))
         self.act_fn = nn.ReLU()
@@ -129,8 +132,9 @@ class GnnBP(nn.Module):
 
 
 class Gnn(nn.Module):
+
     def __init__(self, nfeat, nlayers, nhidden, nclass, dropout, bias):
-        super(Gnn, self).__init__()
+        super().__init__()
 
         self.feature_layers = nn.Sequential(
             nn.Linear(nfeat, 128),
@@ -139,9 +143,10 @@ class Gnn(nn.Module):
             # nn.ReLU(),
             nn.Linear(128, nclass))
 
-    def forward(self, x, is_dec = False):
+    def forward(self, x, is_dec=False):
         enc = self.feature_layers(x)
         return enc
+
 
 def muticlass_f1(output, labels):
     preds = output.max(1)[1]
@@ -150,8 +155,10 @@ def muticlass_f1(output, labels):
     micro = f1_score(labels, preds, average='micro')
     return micro
 
+
 # Helper class for Data Loading
 class SimpleSet(Data.Dataset):
+
     def __init__(self, features, labels, names=None):
         self.features = features
         self.labels = labels
@@ -177,12 +184,13 @@ class GraphCSClassifier(BaseClassificationMethod):
         project path for saving temporary checkpoints.
     random_state: int
         Random seed.
+
     """
 
     def __init__(self, args, prj_path="./", random_state: Optional[int] = 20159):
         self.prj_path = prj_path
         self.random_state = random_state if random_state is not None else args.seed
-        
+
         # 1. Unpack hyperparameters from args during initialization
         self.batch_size = args.batch_size
         self.epochs = args.epochs
@@ -190,7 +198,7 @@ class GraphCSClassifier(BaseClassificationMethod):
         self.vat_lr = args.vat_lr
         self.patience = args.patience
         self.gpus = args.gpus
-        
+
         # Model architecture params
         self.layer = args.layer
         self.hidden = args.hidden
@@ -198,10 +206,8 @@ class GraphCSClassifier(BaseClassificationMethod):
         self.bias = args.bias
 
         # Setup device
-        self.device = torch.device(
-            f"cuda:{self.gpus[0]}" if torch.cuda.is_available() and self.gpus else "cpu"
-        )
-        
+        self.device = torch.device(f"cuda:{self.gpus[0]}" if torch.cuda.is_available() and self.gpus else "cpu")
+
         self._set_seed(self.random_state)
         self.model = None
 
@@ -215,43 +221,28 @@ class GraphCSClassifier(BaseClassificationMethod):
     @staticmethod
     def preprocessing_pipeline(edge_ratio: float = 2, log_level: LogLevel = "INFO"):
         transforms = []
-        transforms.append(SupervisedFeatureSelection(label_col="cell_type", n_features=2000,split_name="train"))
+        transforms.append(SupervisedFeatureSelection(label_col="cell_type", n_features=2000, split_name="train"))
         transforms.append(NormalizeTotalLog1P())
         transforms.append(HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=2000))
         transforms.append(BBKNNConstruction(edge_ratio=edge_ratio, key_added="temp_graph"))
-        transforms.append(SetConfig({
-            "label_channel": "cell_type"
-        }))
+        transforms.append(SetConfig({"label_channel": "cell_type"}))
         return Compose(*transforms, log_level=log_level)
-       
 
-    def fit(self, x_train,y_train,x_val,y_val,nfeat,nclass):
+    def fit(self, x_train, y_train, x_val, y_val, nfeat, nclass):
         """Train the GraphCS model."""
 
         train_dataset = SimpleSet(x_train, y_train)
-        
+
         # Use self.batch_size instead of args.batch
-        train_loader = Data.DataLoader(
-            dataset=train_dataset,
-            batch_size=self.batch_size, 
-            shuffle=True,
-            num_workers=2
-        )
-        
+        train_loader = Data.DataLoader(dataset=train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=2)
+
         # 2. Initialize Model
         # Import GnnBP and VATLoss here to avoid circular imports if they are in utils
-        # from model import GnnBP 
+        # from model import GnnBP
         # from vat import VATLoss
-        
-        
-        self.model = GnnBP(
-            nfeat=nfeat,
-            nlayers=self.layer,
-            nhidden=self.hidden,
-            nclass=nclass,
-            dropout=self.dropout,
-            bias=self.bias
-        ).to(self.device)
+
+        self.model = GnnBP(nfeat=nfeat, nlayers=self.layer, nhidden=self.hidden, nclass=nclass, dropout=self.dropout,
+                           bias=self.bias).to(self.device)
 
         if len(self.gpus) > 1:
             self.model = nn.DataParallel(self.model, device_ids=self.gpus)
@@ -262,9 +253,9 @@ class GraphCSClassifier(BaseClassificationMethod):
         # 3. Training Loop
         bad_counter = 0
         best_f1 = 0
-        
+
         if not os.path.exists(os.path.join(self.prj_path, 'pretrained')):
-             os.makedirs(os.path.join(self.prj_path, 'pretrained'), exist_ok=True)
+            os.makedirs(os.path.join(self.prj_path, 'pretrained'), exist_ok=True)
         checkpt_file = os.path.join(self.prj_path, 'pretrained', uuid.uuid4().hex + '.pt')
 
         start_time = time.time()
@@ -272,7 +263,7 @@ class GraphCSClassifier(BaseClassificationMethod):
         for epoch in range(self.epochs):
             self.model.train()
             loss_list = []
-            
+
             for batch_x, (batch_y, _) in train_loader:
                 batch_x = batch_x.to(self.device)
                 batch_y = batch_y.to(self.device)
@@ -301,7 +292,7 @@ class GraphCSClassifier(BaseClassificationMethod):
                 micro_val = muticlass_f1(output_val, val_y_gpu).item()
 
             avg_loss = np.mean(loss_list)
-            
+
             if (epoch + 1) % 10 == 0:
                 print(f'Epoch:{epoch+1:04d} | loss:{avg_loss:.3f} | val_f1:{micro_val:.6f}')
 
@@ -327,11 +318,11 @@ class GraphCSClassifier(BaseClassificationMethod):
         """Predict cell labels."""
         self.model.eval()
         x_tensor = torch.FloatTensor(x)
-        
+
         # Use self.batch_size
-        pred_dataset = SimpleSet(x_tensor, torch.zeros(len(x_tensor))) 
+        pred_dataset = SimpleSet(x_tensor, torch.zeros(len(x_tensor)))
         pred_loader = Data.DataLoader(pred_dataset, batch_size=self.batch_size, shuffle=False)
-        
+
         preds = []
         with torch.no_grad():
             for batch_x, _ in pred_loader:
@@ -339,7 +330,7 @@ class GraphCSClassifier(BaseClassificationMethod):
                 output = self.model(batch_x)
                 pred_batch = output.max(1)[1].cpu().numpy()
                 preds.append(pred_batch)
-        
+
         return np.concatenate(preds)
 
     def predict_proba(self, x: np.ndarray) -> np.ndarray:
@@ -348,7 +339,7 @@ class GraphCSClassifier(BaseClassificationMethod):
         x_tensor = torch.FloatTensor(x)
         pred_dataset = SimpleSet(x_tensor, torch.zeros(len(x_tensor)))
         pred_loader = Data.DataLoader(pred_dataset, batch_size=self.batch_size, shuffle=False)
-        
+
         probs = []
         with torch.no_grad():
             for batch_x, _ in pred_loader:
@@ -356,16 +347,16 @@ class GraphCSClassifier(BaseClassificationMethod):
                 output = self.model(batch_x)
                 prob_batch = torch.softmax(output, dim=1).cpu().numpy()
                 probs.append(prob_batch)
-                
-        return np.concatenate(probs, axis=0)
-    
-    
 
-def load_GBP_data(datastr, alpha, rmax, rrz,temp_data, temp_graph):
+        return np.concatenate(probs, axis=0)
+
+
+def load_GBP_data(datastr, alpha, rmax, rrz, temp_data, temp_graph):
     from dance.settings import EXAMPLESDIR
+
     # 如果提供了临时数据，使用临时文件
     if temp_data is not None and temp_graph is not None:
-        os.makedirs("data",exist_ok=True)
+        os.makedirs("data", exist_ok=True)
         # 保存临时特征文件
         feat_path = os.path.join("data", datastr + "_feat.npy")
         np.save(feat_path, temp_data)
@@ -386,4 +377,3 @@ def load_GBP_data(datastr, alpha, rmax, rrz,temp_data, temp_graph):
             if os.path.exists(graph_path):
                 os.remove(graph_path)
         return features
-  

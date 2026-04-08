@@ -114,9 +114,9 @@ class StLouvain(BaseClusteringMethod):
 
     """
 
-    def __init__(self, resolution: float = 1,random_state=None):
+    def __init__(self, resolution: float = 1, random_state=None):
         self.model = Louvain(resolution)
-        self.random_state=random_state
+        self.random_state = random_state
 
     @staticmethod
     def preprocessing_pipeline(morph_feat_dim: int = 50, sme_feat_dim: int = 50, pca_feat_dim: int = 10,

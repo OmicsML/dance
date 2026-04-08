@@ -1,13 +1,15 @@
 import numpy as np
+import pandas as pd
+import sklearn
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import pairwise_distances
 from sklearn.neighbors import NearestNeighbors
-import pandas as pd
-import sklearn
+
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.typing import Sequence
 from dance.utils.matrix import pairwise_distance
+
 
 @register_preprocessor("graph", "spatial")
 class CalSpatialNet(BaseTransform):
@@ -23,12 +25,13 @@ class CalSpatialNet(BaseTransform):
         The network construction model. When model=='Radius', the spot is connected to spots whose distance is less than rad_cutoff. When model=='KNN', the spot is connected to its first k_cutoff nearest neighbors.
     spatial_uns
         Key for storing spatial networks in adata.uns. Default is "Spatial_Net".
+
     """
 
     _DISPLAY_ATTRS = ("rad_cutoff", "k_cutoff", "model", "spatial_uns")
 
-    def __init__(self, rad_cutoff=None, k_cutoff=None, model='Radius', spatial_uns="Spatial_Net",
-                 out=None, log_level="WARNING"):
+    def __init__(self, rad_cutoff=None, k_cutoff=None, model='Radius', spatial_uns="Spatial_Net", out=None,
+                 log_level="WARNING"):
         super().__init__(out=out, log_level=log_level)
         self.rad_cutoff = rad_cutoff
         self.k_cutoff = k_cutoff
@@ -63,13 +66,19 @@ class CalSpatialNet(BaseTransform):
         KNN_df.columns = ['Cell1', 'Cell2', 'Distance']
 
         Spatial_Net = KNN_df.copy()
-        Spatial_Net = Spatial_Net.loc[Spatial_Net['Distance'] > 0,]
-        id_cell_trans = dict(zip(range(coor.shape[0]), np.array(coor.index), ))
+        Spatial_Net = Spatial_Net.loc[
+            Spatial_Net['Distance'] > 0,
+        ]
+        id_cell_trans = dict(zip(
+            range(coor.shape[0]),
+            np.array(coor.index),
+        ))
         Spatial_Net['Cell1'] = Spatial_Net['Cell1'].map(id_cell_trans)
         Spatial_Net['Cell2'] = Spatial_Net['Cell2'].map(id_cell_trans)
 
         adata.uns[self.spatial_uns] = Spatial_Net
         return data
+
 
 @register_preprocessor("graph", "spatial")
 class SpaGCNGraph(BaseTransform):

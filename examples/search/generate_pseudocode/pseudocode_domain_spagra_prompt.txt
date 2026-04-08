@@ -549,7 +549,7 @@ def nei_con_loss(z1: torch.Tensor, z2: torch.Tensor, tau, adj, nei_count, hidden
     # 移除自环 (Batch 内部的对角线)
     adj = adj - torch.diag_embed(torch.diag(adj))
     adj[adj > 0] = 1 # 确保是二值的
-    
+
     # 这里我们只计算 Batch 内的相似度，因此显存占用极小 (2048^2)
     f = lambda x: torch.exp(x / tau)
     intra_view_sim = f(sim(z1, z1, hidden_norm))
@@ -558,16 +558,16 @@ def nei_con_loss(z1: torch.Tensor, z2: torch.Tensor, tau, adj, nei_count, hidden
     # 计算 Loss
     # 注意：这里的 sum(1) 仅是 Batch 内的求和，作为全图的近似
     denom = intra_view_sim.sum(1) + inter_view_sim.sum(1) - intra_view_sim.diag()
-    
+
     # 避免分母为0
     denom = torch.clamp(denom, min=1e-6)
 
     loss = (inter_view_sim.diag() + (intra_view_sim * adj).sum(1) + (inter_view_sim * adj).sum(1)) / denom
-    
+
     # 使用预先计算好的真实邻居数量进行归一化
     # 注意避免除以0
     nei_count = torch.clamp(nei_count, min=1.0)
-    loss = loss / nei_count 
+    loss = loss / nei_count
 
     return -torch.log(torch.clamp(loss, min=1e-8)).mean()
 
@@ -593,7 +593,7 @@ def prefilter_specialgenes(adata,Gene1Pattern="ERCC",Gene2Pattern="MT-",Gene3Pat
     id_tmp3 = np.asarray([not str(name).startswith(Gene3Pattern) for name in adata.var_names], dtype=bool)
     id_tmp=np.logical_and(id_tmp1,id_tmp2,id_tmp3)
     adata._inplace_subset_var(id_tmp)
-    
+
 
 
 
@@ -664,7 +664,7 @@ def merge_anndatas(adata_list,batch_key="slide"):
 def get_adata(file_name="151507.h5ad"):
     adata = sc.read(file_name)
     adata.var_names_make_unique()
-    prefilter_genes(adata, min_cells=3) 
+    prefilter_genes(adata, min_cells=3)
     sc.pp.highly_variable_genes(adata, flavor="seurat_v3", n_top_genes=1000)
     sc.pp.normalize_per_cell(adata)
     sc.pp.log1p(adata)
@@ -918,7 +918,7 @@ class SpaGRA(BaseClusteringMethod):
         g = dgl.from_scipy(adj)
         g = g.int().to(self.device)
         num_feats = features.shape[1]
-        
+
         # 2. 预先计算所有节点的邻居数量 (在 CPU 上进行，避免 GPU OOM)
         # adj 已经包含了自环，所以 sum 结果至少是 1
         # nei_con_loss 逻辑中：nei_count = intra_nei + inter_nei + self_inter
@@ -952,7 +952,7 @@ class SpaGRA(BaseClusteringMethod):
 
         print(f"Start Training: N={adata.n_obs}, Batch_Size=2048")
         self.model.train()
-        
+
         for epoch in range(self.n_epochs):
             optimizer.zero_grad()
             heads, pi, disp, mean = self.model(features)
@@ -965,7 +965,7 @@ class SpaGRA(BaseClusteringMethod):
                 idx = torch.randperm(heads0.shape[0])[:batch_size]
             else:
                 idx = torch.arange(heads0.shape[0])
-            
+
             idx = idx.to(self.device)
             idx_cpu = idx.cpu().numpy() # 用于切片 scipy 矩阵
 
@@ -983,10 +983,10 @@ class SpaGRA(BaseClusteringMethod):
             # 3. 计算正则化 Loss (Batch)
             z_dists_batch = torch.cdist(heads0_batch, heads0_batch, p=2)
             z_dists_batch = torch.div(z_dists_batch, torch.max(z_dists_batch) + 1e-6)
-            
+
             sp_dists_batch = torch.cdist(coords_batch, coords_batch, p=2)
             sp_dists_batch = torch.div(sp_dists_batch, torch.max(sp_dists_batch) + 1e-6)
-            
+
             reg_loss = torch.mean(torch.mul(1.0 - z_dists_batch, sp_dists_batch))
 
             # 4. 计算 Contrastive Loss (Batch)
@@ -994,12 +994,12 @@ class SpaGRA(BaseClusteringMethod):
 
             # 5. ZINB Loss (Global，因为这个计算不涉及 N*N 矩阵，通常不会 OOM)
             zinb_loss = ZINB(pi, theta=disp, ridge_lambda=1).loss(features, mean, mean=True)
-            
+
             total_loss = self.a * loss + self.b * reg_loss + self.c * zinb_loss
 
             total_loss.backward()
             optimizer.step()
-            
+
             if epoch % 10 == 0:
                 print(f"Epoch {epoch}: Loss={loss.item():.4f}, Reg={reg_loss.item():.4f}, ZINB={zinb_loss.item():.4f}")
 

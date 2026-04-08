@@ -9,8 +9,8 @@
 import math
 import os
 import random
-from pathlib import Path
 import shutil
+from pathlib import Path
 
 from skimage import img_as_ubyte
 from sklearn import preprocessing
@@ -449,8 +449,7 @@ class graph:
             from sklearn.neighbors import kneighbors_graph
             A = kneighbors_graph(self.data, n_neighbors=self.k, mode='connectivity', include_self=False)
             A = A.toarray()
-            graphList = [(node_idx, j) for node_idx in range(self.data.shape[0])
-                         for j in np.where(A[node_idx] == 1)[0]]
+            graphList = [(node_idx, j) for node_idx in range(self.data.shape[0]) for j in np.where(A[node_idx] == 1)[0]]
         elif self.distType == "Radius":
             from sklearn.neighbors import NearestNeighbors
             nbrs = NearestNeighbors(radius=self.rad_cutoff).fit(self.data)
@@ -907,8 +906,8 @@ class TrainingConfig:
 @register_preprocessor("misc")
 class EfNSTImageTransform(BaseTransform):
 
-    def __init__(self, cnnType='efficientnet-b0', pca_n_comps=200, save_path="./", verbose=False,
-                 crop_size=50, target_size=224, **kwargs):
+    def __init__(self, cnnType='efficientnet-b0', pca_n_comps=200, save_path="./", verbose=False, crop_size=50,
+                 target_size=224, **kwargs):
         self.verbose = verbose
         self.save_path = save_path
         self.pca_n_comps = pca_n_comps
@@ -919,7 +918,7 @@ class EfNSTImageTransform(BaseTransform):
 
     def __call__(self, data: Data) -> Data:
         adata = data.data
-        self.data_name=adata.uns['data_name']
+        self.data_name = adata.uns['data_name']
         save_path_image_crop = Path(os.path.join(self.save_path, 'Image_crop', f'{self.data_name}'))
         save_path_image_crop.mkdir(parents=True, exist_ok=True)
         adata = image_crop(adata, save_path=save_path_image_crop, quality='fulres', crop_size=self.crop_size,
@@ -971,6 +970,7 @@ class EfNSTGraphTransform(BaseTransform):
         adata = data.data
         graph_dict = graph(adata.obsm['spatial'], distType=self.distType, k=self.k, rad_cutoff=self.rad_cutoff).main()
         adata.uns['EfNSTGraph'] = graph_dict
+
 
 @register_preprocessor('misc')
 class EfNSTConcatgTransform(BaseTransform):
@@ -1054,10 +1054,10 @@ class EfNsSTRunner(BaseClusteringMethod):
     #     )
 
     @staticmethod
-    def preprocessing_pipeline(verbose=False, cnnType='efficientnet-b0', pca_n_comps=200, distType="KDTree",
-                               k=12, dim_reduction=True, min_cells=3, platform="Visium"):
+    def preprocessing_pipeline(verbose=False, cnnType='efficientnet-b0', pca_n_comps=200, distType="KDTree", k=12,
+                               dim_reduction=True, min_cells=3, platform="Visium"):
         return Compose(
-            EfNSTImageTransform( verbose=verbose, cnnType=cnnType),
+            EfNSTImageTransform(verbose=verbose, cnnType=cnnType),
             EfNSTAugmentTransform(),
             EfNSTGraphTransform(distType=distType, k=k),
             EfNSTConcatgTransform(dim_reduction=dim_reduction, min_cells=min_cells, platform=platform,
@@ -1161,9 +1161,9 @@ class EfNsSTRunner(BaseClusteringMethod):
             # 获取第一张图片的路径，找到其父目录
             first_path = adata.obs['slices_path'].iloc[0]
             folder_path = Path(first_path).parent
-            
+
             print(f"Deleting temporary folder: {folder_path} ...")
-            
+
             # 直接删除整个目录树
             if folder_path.exists() and folder_path.is_dir():
                 shutil.rmtree(folder_path)

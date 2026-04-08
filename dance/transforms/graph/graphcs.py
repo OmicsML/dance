@@ -1,22 +1,25 @@
-import scanpy as sc
-import bbknn
-import numpy as np
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Union, Any
+from typing import Any, Optional, Tuple, Union
 
-from dance.transforms.base import BaseTransform
+import bbknn
+import numpy as np
+import scanpy as sc
+
 from dance.registry import register_preprocessor
+from dance.transforms.base import BaseTransform
 
 # 假设 BaseTransform 已定义
 # logger = logging.getLogger(__name__)
 LogLevel = Union[int, str]
-Data = Any 
+Data = Any
+
+
 @register_preprocessor("graph", "cell")
 class BBKNNConstruction(BaseTransform):
-    """
-    Constructs a graph using BBKNN (for multi-batch data) or KNN (for single-batch data),
-    trims edges based on ratio, and saves the graph structure as a list of strings in `adata.uns`.
+    """Constructs a graph using BBKNN (for multi-batch data) or KNN (for single-batch
+    data), trims edges based on ratio, and saves the graph structure as a list of
+    strings in `adata.uns`.
 
     For multi-batch data, uses BBKNN to handle batch effects. For single-batch data,
     uses standard KNN neighbor graph construction.
@@ -40,19 +43,13 @@ class BBKNNConstruction(BaseTransform):
         The key in `adata.uns` where the graph list will be stored. Default: 'temp_graph'.
     n_neighbors
         Number of neighbors for KNN (used for single-batch data). Default: 15.
+
     """
 
     _DISPLAY_ATTRS: Tuple[str] = ("batch_key", "edge_ratio", "key_added", "n_neighbors")
 
-    def __init__(
-        self,
-        batch_key: Optional[str] = None,
-        edge_ratio: float = 2.0,
-        key_added: str = 'temp_graph',
-        n_neighbors: int = 15,
-        out: Optional[str] = None,
-        log_level: LogLevel = "WARNING"
-    ):
+    def __init__(self, batch_key: Optional[str] = None, edge_ratio: float = 2.0, key_added: str = 'temp_graph',
+                 n_neighbors: int = 15, out: Optional[str] = None, log_level: LogLevel = "WARNING"):
         super().__init__(out=out, log_level=log_level)
         self.batch_key = batch_key
         self.edge_ratio = edge_ratio
@@ -125,7 +122,7 @@ class BBKNNConstruction(BaseTransform):
 
             # 4. 提取原始连接信息
             if 'connectivities' not in adata.obsp:
-                 raise ValueError("BBKNN did not generate 'connectivities' in adata.obsp")
+                raise ValueError("BBKNN did not generate 'connectivities' in adata.obsp")
 
             cell_count = adata.shape[0]
             # 获取 COO 格式以便遍历

@@ -1,26 +1,28 @@
 #!/usr/bin/env python3
-"""
-Unified evaluation script for GEPA benchmark datasets.
+"""Unified evaluation script for GEPA benchmark datasets.
+
 Can evaluate baseline or evolved prompts on IFEval, HoVer, and HotpotQA.
+
 """
 
-import os
-import json
-import yaml
-import time
 import argparse
+import json
+import os
+import time
 from datetime import datetime
+
+import yaml
 from datasets import load_dataset
-from openai import OpenAI
-from tqdm import tqdm
 from deepeval.metrics import GEval
 from deepeval.test_case import LLMTestCase, LLMTestCaseParams
+from openai import OpenAI
+from tqdm import tqdm
 
 
 # Initialize OpenAI client
 def get_client():
     api_key = os.environ.get("OPENAI_API_KEY")
-    api_key="sk-92265d8b2c044989b10ad59e3a27b56f"
+    api_key = "sk-92265d8b2c044989b10ad59e3a27b56f"
     return OpenAI(base_url="https://dashscope.aliyuncs.com/compatible-mode/v1", api_key=api_key)
 
 
@@ -34,7 +36,7 @@ def load_prompt(dataset_name, prompt_type="baseline"):
     if not os.path.exists(prompt_path):
         raise FileNotFoundError(f"Prompt file not found: {prompt_path}")
 
-    with open(prompt_path, "r") as f:
+    with open(prompt_path) as f:
         return f.read().strip()
 
 
@@ -42,7 +44,7 @@ def load_dataset_config(dataset_name):
     """Load dataset configuration."""
     config_path = f"{dataset_name}_prompt_dataset.yaml"
 
-    with open(config_path, "r") as f:
+    with open(config_path) as f:
         return yaml.safe_load(f)
 
 
@@ -67,9 +69,7 @@ def evaluate_ifeval(client, prompt_template, num_samples, model):
         samples_to_process = min(num_samples, len(dataset))
         print(f"Using {samples_to_process} samples from {split_used} split")
         dataset = load_dataset("google/IFEval", split=split_used, streaming=True)
-        dataset_iter = tqdm(
-            dataset.take(samples_to_process), total=samples_to_process, desc="Evaluating"
-        )
+        dataset_iter = tqdm(dataset.take(samples_to_process), total=samples_to_process, desc="Evaluating")
 
     correct = 0
     total = 0
@@ -92,7 +92,10 @@ def evaluate_ifeval(client, prompt_template, num_samples, model):
             try:
                 response = client.chat.completions.create(
                     model=model,
-                    messages=[{"role": "user", "content": formatted_prompt}],
+                    messages=[{
+                        "role": "user",
+                        "content": formatted_prompt
+                    }],
                     temperature=0.1,
                     max_tokens=4096,
                 )
@@ -147,9 +150,7 @@ def evaluate_hover(client, prompt_template, num_samples, model):
         samples_to_process = min(num_samples, len(dataset))
         print(f"Using {samples_to_process} samples from {split_used} split")
         dataset = load_dataset("hover", split=split_used, streaming=True, trust_remote_code=True)
-        dataset_iter = tqdm(
-            dataset.take(samples_to_process), total=samples_to_process, desc="Evaluating"
-        )
+        dataset_iter = tqdm(dataset.take(samples_to_process), total=samples_to_process, desc="Evaluating")
 
     correct = 0
     total = 0
@@ -173,7 +174,10 @@ def evaluate_hover(client, prompt_template, num_samples, model):
             try:
                 response = client.chat.completions.create(
                     model=model,
-                    messages=[{"role": "user", "content": formatted_prompt}],
+                    messages=[{
+                        "role": "user",
+                        "content": formatted_prompt
+                    }],
                     temperature=0.1,
                     max_tokens=4096,
                 )
@@ -216,14 +220,10 @@ def evaluate_hotpotqa(client, prompt_template, num_samples, model):
 
     # Try test split first, then validation
     try:
-        dataset = load_dataset(
-            "hotpotqa/hotpot_qa", "distractor", split="test", trust_remote_code=True
-        )
+        dataset = load_dataset("hotpotqa/hotpot_qa", "distractor", split="test", trust_remote_code=True)
         split_used = "test"
     except:
-        dataset = load_dataset(
-            "hotpotqa/hotpot_qa", "distractor", split="validation", trust_remote_code=True
-        )
+        dataset = load_dataset("hotpotqa/hotpot_qa", "distractor", split="validation", trust_remote_code=True)
         split_used = "validation"
 
     print(f"Dataset loaded. Using {split_used} split with {len(dataset)} samples")
@@ -256,9 +256,7 @@ def evaluate_hotpotqa(client, prompt_template, num_samples, model):
             context_str += f"{title}: {' '.join(sents)}\n"
 
         try:
-            formatted_prompt = prompt_template.format(
-                context=context_str.strip(), question=question
-            )
+            formatted_prompt = prompt_template.format(context=context_str.strip(), question=question)
         except KeyError as e:
             print(f"Error: Prompt template missing placeholders: {e}")
             return 0.0, 0, total, total
@@ -269,7 +267,10 @@ def evaluate_hotpotqa(client, prompt_template, num_samples, model):
             try:
                 response = client.chat.completions.create(
                     model=model,
-                    messages=[{"role": "user", "content": formatted_prompt}],
+                    messages=[{
+                        "role": "user",
+                        "content": formatted_prompt
+                    }],
                     temperature=0.1,
                     max_tokens=4096,
                 )
@@ -297,16 +298,20 @@ def evaluate_hotpotqa(client, prompt_template, num_samples, model):
     accuracy = correct / total if total > 0 else 0.0
     return accuracy, correct, total, empty_responses
 
-method_name="cta_scdeepsort"
+
+method_name = "cta_scdeepsort"
 
 import os
-from openai import OpenAI, AsyncOpenAI
+
 from deepeval.models import DeepEvalBaseLLM
+from openai import AsyncOpenAI, OpenAI
+
 
 class CustomQwenPlus(DeepEvalBaseLLM):
+
     def __init__(self):
         self.api_key = os.getenv("DASHSCOPE_API_KEY")
-        self.api_key="sk-92265d8b2c044989b10ad59e3a27b56f"
+        self.api_key = "sk-92265d8b2c044989b10ad59e3a27b56f"
         self.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
         self.model_name = "qwen-flash"
 
@@ -315,7 +320,7 @@ class CustomQwenPlus(DeepEvalBaseLLM):
             api_key=self.api_key,
             base_url=self.base_url,
         )
-        
+
         # 初始化异步客户端 (用于 a_generate) - 这对 DeepEval 的性能至关重要
         self.async_client = AsyncOpenAI(
             api_key=self.api_key,
@@ -326,13 +331,14 @@ class CustomQwenPlus(DeepEvalBaseLLM):
         return self.client
 
     def generate(self, prompt: str) -> str:
-        """
-        同步生成方法
-        """
+        """同步生成方法."""
         chat_completion = self.client.chat.completions.create(
             model=self.model_name,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0, # 评估时建议将温度设为 0 以保证结果一致性
+            messages=[{
+                "role": "user",
+                "content": prompt
+            }],
+            temperature=0,  # 评估时建议将温度设为 0 以保证结果一致性
         )
         return chat_completion.choices[0].message.content
 
@@ -342,19 +348,20 @@ class CustomQwenPlus(DeepEvalBaseLLM):
         """
         chat_completion = await self.async_client.chat.completions.create(
             model=self.model_name,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{
+                "role": "user",
+                "content": prompt
+            }],
             temperature=0,
         )
         return chat_completion.choices[0].message.content
 
     def get_model_name(self):
         return self.model_name
-    
-    
-    
-def evaluate_pseudocode(client, prompt_template,num_samples,model):
+
+
+def evaluate_pseudocode(client, prompt_template, num_samples, model):
     from string import Template
-   
     """Evaluate pseudocode dataset."""
     print("\nLoading pseudocode dataset...")
 
@@ -366,9 +373,9 @@ def evaluate_pseudocode(client, prompt_template,num_samples,model):
     samples_to_process = min(num_samples, len(dataset))
     print(f"Using full {split_used} split: {samples_to_process} samples")
     dataset_iter = tqdm(dataset, desc="Evaluating")
-    
+
     accuracy = 0
-    
+
     correct = 0
     total = 1
     empty_responses = 0
@@ -382,49 +389,43 @@ def evaluate_pseudocode(client, prompt_template,num_samples,model):
         for attempt in range(3):
             try:
                 readability_metric = GEval(
-                     model=model,
+                    model=model,
                     name="Readability",
                     criteria="Readability - Variable names should be clear and the logic should be easy to follow.",
-                    evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT], # 只需看生成的伪代码
+                    evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT],  # 只需看生成的伪代码
                 )
 
                 # 2. Correctness (正确性)
                 correctness_metric = GEval(
-                     model=model,
+                    model=model,
                     name="Correctness",
-                    criteria="Correctness - The pseudo-code must remain faithful to the original code's logic. It should not alter the algorithm's intent.",
+                    criteria=
+                    "Correctness - The pseudo-code must remain faithful to the original code's logic. It should not alter the algorithm's intent.",
                     # 需要对比“实际输出”和“预期输出/源代码”
-                    evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT, LLMTestCaseParams.EXPECTED_OUTPUT] 
-                )
+                    evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT, LLMTestCaseParams.EXPECTED_OUTPUT])
 
                 # 3. Completeness (完整性)
                 completeness_metric = GEval(
-                     model=model,
-                    name="Completeness",
-                    criteria="Completeness - The pseudo-code must cover all key boundary conditions and logical branches present in the original code.",
-                    evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT, LLMTestCaseParams.EXPECTED_OUTPUT]
-                )
+                    model=model, name="Completeness", criteria=
+                    "Completeness - The pseudo-code must cover all key boundary conditions and logical branches present in the original code.",
+                    evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT, LLMTestCaseParams.EXPECTED_OUTPUT])
 
                 # 4. Conciseness (简洁性)
                 conciseness_metric = GEval(
-                     model=model,
-                    name="Conciseness",
-                    criteria="Conciseness - The pseudo-code should filter out unnecessary implementation details (like syntax-specific boilerplate) while keeping the core logic.",
-                    evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT]
-                )
+                    model=model, name="Conciseness", criteria=
+                    "Conciseness - The pseudo-code should filter out unnecessary implementation details (like syntax-specific boilerplate) while keeping the core logic.",
+                    evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT])
 
                 # 5. Maintainability (可维护性)
                 maintainability_metric = GEval(
-                     model=model,
-                    name="Maintainability",
-                    criteria="Maintainability - The structure should be modular. Complex logic should be broken down into clear steps or blocks.",
-                    evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT]
-                )
+                    model=model, name="Maintainability", criteria=
+                    "Maintainability - The structure should be modular. Complex logic should be broken down into clear steps or blocks.",
+                    evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT])
                 # 创建 DeepEval 测试用例
                 test_case = LLMTestCase(
-                    input=code,                # 输入是原代码
-                    actual_output=prompt_template,# 模型生成的伪代码
-                    expected_output=code      # 这里的预期输出也是原代码（用于作为对比基准）
+                    input=code,  # 输入是原代码
+                    actual_output=prompt_template,  # 模型生成的伪代码
+                    expected_output=code  # 这里的预期输出也是原代码（用于作为对比基准）
                 )
 
                 # ==========================================
@@ -432,24 +433,21 @@ def evaluate_pseudocode(client, prompt_template,num_samples,model):
                 # ==========================================
 
                 metrics = [
-                    readability_metric,
-                    correctness_metric,
-                    completeness_metric,
-                    conciseness_metric,
+                    readability_metric, correctness_metric, completeness_metric, conciseness_metric,
                     maintainability_metric
                 ]
-                
+
                 # 遍历运行每个指标
                 print("开始评估...\n")
                 for metric in metrics:
                     metric.measure(test_case)
                     print(f"指标: {metric.name}")
                     print(f"得分: {metric.score}")
-                    print(f"理由: {metric.reason}") # DeepEval 会生成打分理由，非常有价值
+                    print(f"理由: {metric.reason}")  # DeepEval 会生成打分理由，非常有价值
                     print("-" * 30)
                     accuracy += metric.score
                 accuracy /= len(metrics)
-                
+
             except Exception as e:
                 if attempt == 2:
                     print(f"\nError after 3 attempts: {e}")
@@ -466,13 +464,14 @@ def evaluate_pseudocode(client, prompt_template,num_samples,model):
 
     return accuracy, correct, total, empty_responses
 
+
 def main():
     parser = argparse.ArgumentParser(description="Evaluate prompts on GEPA benchmark datasets")
     parser.add_argument(
         "--dataset",
         type=str,
         required=True,
-        choices=["ifeval", "hover", "hotpotqa", "all","pseudocode"],
+        choices=["ifeval", "hover", "hotpotqa", "all", "pseudocode"],
         help="Dataset to evaluate on",
     )
     parser.add_argument(
@@ -488,12 +487,8 @@ def main():
         default=3,
         help="Number of samples to evaluate (default: full dataset)",
     )
-    parser.add_argument(
-        "--model", type=str, default="qwen-plus", help="Model to use for evaluation"
-    )
-    parser.add_argument(
-        "--output", type=str, default=None, help="Output file for results (default: auto-generated)"
-    )
+    parser.add_argument("--model", type=str, default="qwen-plus", help="Model to use for evaluation")
+    parser.add_argument("--output", type=str, default=None, help="Output file for results (default: auto-generated)")
 
     args = parser.parse_args()
 
@@ -507,12 +502,17 @@ def main():
         datasets = [args.dataset]
 
     # Evaluation functions
-    eval_funcs = {"ifeval": evaluate_ifeval, "hover": evaluate_hover, "hotpotqa": evaluate_hotpotqa,"pseudocode":evaluate_pseudocode}
+    eval_funcs = {
+        "ifeval": evaluate_ifeval,
+        "hover": evaluate_hover,
+        "hotpotqa": evaluate_hotpotqa,
+        "pseudocode": evaluate_pseudocode
+    }
 
     # Load baseline results for comparison
     baseline_results = {}
     if os.path.exists("baseline_results_50samples.json"):
-        with open("baseline_results_50samples.json", "r") as f:
+        with open("baseline_results_50samples.json") as f:
             baseline_data = json.load(f)
             for result in baseline_data.get("results", []):
                 baseline_results[result["dataset"]] = result["accuracy"]
@@ -539,9 +539,8 @@ def main():
 
             # Run evaluation
             start_time = time.time()
-            accuracy, correct, total, empty_responses = eval_funcs[dataset_name](
-                client, prompt_template, args.samples, args.model
-            )
+            accuracy, correct, total, empty_responses = eval_funcs[dataset_name](client, prompt_template, args.samples,
+                                                                                 args.model)
             elapsed_time = time.time() - start_time
 
             # Get baseline accuracy
@@ -578,14 +577,12 @@ def main():
 
         except Exception as e:
             print(f"Error evaluating {dataset_name}: {str(e)}")
-            all_results.append(
-                {
-                    "dataset": dataset_name,
-                    "prompt_type": args.prompt_type,
-                    "error": str(e),
-                    "timestamp": datetime.now().isoformat(),
-                }
-            )
+            all_results.append({
+                "dataset": dataset_name,
+                "prompt_type": args.prompt_type,
+                "error": str(e),
+                "timestamp": datetime.now().isoformat(),
+            })
 
     # Save results
     output_path = args.output

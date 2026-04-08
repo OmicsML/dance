@@ -1,22 +1,24 @@
 import hashlib
+import logging
 import time
+from abc import ABC, abstractmethod
+from typing import Any, Optional, Tuple
+
 import numpy as np
 import pandas as pd
 import scanpy as sc
 import torch
 from scipy import sparse
+from sklearn.model_selection import train_test_split
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
 from torch_geometric.data import Data as PyGData
-from typing import Optional, Tuple, Any
-from abc import ABC, abstractmethod
 
-import logging
 from dance import logger
 from dance.registry import register_preprocessor
-from dance.typing import LogLevel
 from dance.transforms.base import BaseTransform
+from dance.typing import LogLevel
+
 
 def scipysparse2torchsparse(x):
     """Convert scipy sparse matrix to torch sparse tensor."""
@@ -28,22 +30,19 @@ def scipysparse2torchsparse(x):
     t = torch.sparse.FloatTensor(indices, torch.from_numpy(values).float(), [samples, features])
     return indices, t
 
+
 @register_preprocessor("graph", "cell")
 class scGATGraphTransform(BaseTransform):
-    """
-    Constructs a PyTorch Geometric Graph from AnnData for GAT training.
+    """Constructs a PyTorch Geometric Graph from AnnData for GAT training.
+
     Supports labels in adata.obs (categorical) or adata.obsm (one-hot).
+
     """
 
     _DISPLAY_ATTRS: Tuple[str] = ("label_column", "n_neighbors")
 
-    def __init__(
-        self,
-        label_column: str = 'cell_type',
-        n_neighbors: int = 15,
-        out: Optional[str] = None,
-        log_level: LogLevel = "INFO"
-    ):
+    def __init__(self, label_column: str = 'cell_type', n_neighbors: int = 15, out: Optional[str] = None,
+                 log_level: LogLevel = "INFO"):
         super().__init__(out=out, log_level=log_level)
         self.label_column = label_column
         self.n_neighbors = n_neighbors
@@ -89,7 +88,7 @@ class scGATGraphTransform(BaseTransform):
             X_mat = adata.X.todense()
         else:
             X_mat = adata.X
-        
+
         # Calculate min/max
         x_min = X_mat.min()
         x_max = X_mat.max()
@@ -102,7 +101,7 @@ class scGATGraphTransform(BaseTransform):
         # 4. Handle Labels (Modified for One-Hot in obsm)
         # ---------------------------------------------------------
         self.logger.info(f"Processing label column: {self.label_column}")
-        
+
         le = LabelEncoder()
         labels = None
 
@@ -110,14 +109,14 @@ class scGATGraphTransform(BaseTransform):
         if self.label_column in adata.obsm:
             self.logger.info(f"Found '{self.label_column}' in adata.obsm (One-Hot format).")
             y_matrix = adata.obsm[self.label_column]
-            
+
             # Check if it's a DataFrame (has column names) or numpy array
             if hasattr(y_matrix, "columns") or isinstance(y_matrix, pd.DataFrame):
                 # Convert from One-Hot to Index (0, 1, 2...)
                 labels = y_matrix.values.argmax(axis=1)
                 # Store class names manually in encoder
                 le.classes_ = np.array(y_matrix.columns)
-                le.fit(le.classes_) # Dummy fit to ensure compatibility
+                le.fit(le.classes_)  # Dummy fit to ensure compatibility
             else:
                 # Numpy array without names
                 labels = np.array(y_matrix).argmax(axis=1)
@@ -128,7 +127,7 @@ class scGATGraphTransform(BaseTransform):
         elif self.label_column in adata.obs.columns:
             self.logger.info(f"Found '{self.label_column}' in adata.obs (Categorical format).")
             labels = le.fit_transform(adata.obs[self.label_column])
-        
+
         else:
             raise ValueError(f"Label '{self.label_column}' not found in adata.obsm or adata.obs")
 
@@ -168,12 +167,8 @@ class scGATGraphTransform(BaseTransform):
             if not val_indices.any():
                 self.logger.info("Splitting test set to create validation set...")
                 test_idx_loc = np.where(test_indices)[0]
-                val_idx_loc, test_idx_loc = train_test_split(
-                    test_idx_loc,
-                    test_size=0.5,
-                    random_state=42,
-                    stratify=labels[test_idx_loc]
-                )
+                val_idx_loc, test_idx_loc = train_test_split(test_idx_loc, test_size=0.5, random_state=42,
+                                                             stratify=labels[test_idx_loc])
                 val_indices = np.zeros(len(adata), dtype=bool)
                 val_indices[val_idx_loc] = True
                 test_indices = np.zeros(len(adata), dtype=bool)
@@ -181,22 +176,14 @@ class scGATGraphTransform(BaseTransform):
         else:
             # Random stratified split
             idx_all = np.arange(adata.shape[0])
-            idx_train, idx_test = train_test_split(
-                idx_all,
-                test_size=1 - self.train_ratio,
-                random_state=42,
-                stratify=labels
-            )
+            idx_train, idx_test = train_test_split(idx_all, test_size=1 - self.train_ratio, random_state=42,
+                                                   stratify=labels)
 
             remaining_ratio = 1 - self.train_ratio
             if remaining_ratio > 0:
                 val_relative_size = self.val_ratio / remaining_ratio
-                idx_test, idx_val = train_test_split(
-                    idx_test,
-                    test_size=val_relative_size,
-                    random_state=42,
-                    stratify=labels[idx_test]
-                )
+                idx_test, idx_val = train_test_split(idx_test, test_size=val_relative_size, random_state=42,
+                                                     stratify=labels[idx_test])
             else:
                 idx_val = []
 
@@ -212,27 +199,25 @@ class scGATGraphTransform(BaseTransform):
         self.logger.info("Converting to PyG Data object...")
         edge_index, _ = scipysparse2torchsparse(adj)
 
-        pyg_data = PyGData(
-            x=torch.from_numpy(features).float(),
-            edge_index=edge_index,
-            y=torch.LongTensor(labels),
-            train_mask=torch.tensor(train_indices, dtype=torch.bool),
-            val_mask=torch.tensor(val_indices, dtype=torch.bool),
-            test_mask=torch.tensor(test_indices, dtype=torch.bool)
-        )
+        pyg_data = PyGData(x=torch.from_numpy(features).float(), edge_index=edge_index, y=torch.LongTensor(labels),
+                           train_mask=torch.tensor(train_indices, dtype=torch.bool),
+                           val_mask=torch.tensor(val_indices, dtype=torch.bool),
+                           test_mask=torch.tensor(test_indices, dtype=torch.bool))
 
         self.logger.info(f"GAT Graph ready. Nodes: {pyg_data.num_nodes}, Edges: {pyg_data.num_edges}")
-        self.logger.info(f"Split - Train: {pyg_data.train_mask.sum()}, Val: {pyg_data.val_mask.sum()}, Test: {pyg_data.test_mask.sum()}")
+        self.logger.info(
+            f"Split - Train: {pyg_data.train_mask.sum()}, Val: {pyg_data.val_mask.sum()}, Test: {pyg_data.test_mask.sum()}"
+        )
 
         # Attach results to the dance Data object
         adata.uns['pyg_data'] = pyg_data
         adata.uns['label_encoder'] = le
-        
+
         # Store masks in obs for verification
         adata.obs['gat_train_mask'] = train_indices
         adata.obs['gat_val_mask'] = val_indices
         adata.obs['gat_test_mask'] = test_indices
-        
+
         self.logger.info(f"Transformation finished in {time.time() - start_time:.2f}s")
 
         return data

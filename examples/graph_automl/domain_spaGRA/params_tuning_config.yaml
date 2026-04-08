@@ -15,7 +15,7 @@ pipeline:
   - type: graph.spatial
     target: CalSpatialNet
     params_to_tune:
-      rad_cutoff: 
+      rad_cutoff:
         values: [100,150,200]
   - type: misc
     target: SetConfig

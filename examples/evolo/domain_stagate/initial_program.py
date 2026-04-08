@@ -1,25 +1,24 @@
 import argparse
 import time  # 新增：导入 time 模块
 
+import numpy as np
+import scanpy as sc
 from sklearn.neighbors import NearestNeighbors
 
+from dance.datasets.spatial import SpatialLIBDDataset
+from dance.modules.spatial.spatial_domain.stagate import Stagate
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.transforms.graph.spatial_graph import StagateGraph
 from dance.transforms.interface import AnnDataTransform
 from dance.transforms.misc import Compose, SetConfig
-from dance.typing import LogLevel
-from dance.utils.metrics import calculate_unified_scores, resolve_score_func
-import numpy as np
-import scanpy as sc
-from dance.datasets.spatial import SpatialLIBDDataset
-from dance.modules.spatial.spatial_domain.stagate import Stagate
+from dance.typing import LogLevel, Optional
 from dance.utils import set_seed, sub_data
-from dance.typing import Optional
+from dance.utils.metrics import calculate_unified_scores, resolve_score_func
 
 
 # EVOLVE-BLOCK-START
-@register_preprocessor("graph", "spatial",overwrite=True)
+@register_preprocessor("graph", "spatial", overwrite=True)
 class StagateGraph(BaseTransform):
     """STAGATE spatial graph.
 
@@ -59,23 +58,27 @@ class StagateGraph(BaseTransform):
             adj = NearestNeighbors(n_neighbors=self.n_neighbors).fit(xy_pixel).kneighbors_graph(xy_pixel)
 
         data.data.obsp[self.out] = adj
+
+
 # EVOLVE-BLOCK-END
+
 
 def get_preprocessing_pipeline(hvg_flavor: str = "seurat_v3", n_top_hvgs: int = 3000, model_name: str = "radius",
                                radius: float = 150, n_neighbors: int = 5, log_level: LogLevel = "INFO"):
-        return Compose(
-            AnnDataTransform(sc.pp.highly_variable_genes, flavor=hvg_flavor, n_top_genes=n_top_hvgs, subset=True),
-            AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
-            AnnDataTransform(sc.pp.log1p),
-            StagateGraph(model_name, radius=radius, n_neighbors=n_neighbors),
-            SetConfig({
-                "feature_channel": "StagateGraph",
-                "feature_channel_type": "obsp",
-                "label_channel": "label",
-                "label_channel_type": "obs"
-            }),
-            log_level=log_level,
-        )
+    return Compose(
+        AnnDataTransform(sc.pp.highly_variable_genes, flavor=hvg_flavor, n_top_genes=n_top_hvgs, subset=True),
+        AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
+        AnnDataTransform(sc.pp.log1p),
+        StagateGraph(model_name, radius=radius, n_neighbors=n_neighbors),
+        SetConfig({
+            "feature_channel": "StagateGraph",
+            "feature_channel_type": "obsp",
+            "label_channel": "label",
+            "label_channel_type": "obs"
+        }),
+        log_level=log_level,
+    )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -89,7 +92,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=3, help="")
     parser.add_argument("--num_runs", type=int, default=1)
     parser.add_argument("--device", type=str, default=None, help="Device to use (e.g., 'cuda', 'cpu', 'cuda:0').")
-    parser.add_argument("--obs_nums",type=int,default=10000)
+    parser.add_argument("--obs_nums", type=int, default=10000)
     args = parser.parse_args()
 
     scores = []
@@ -98,49 +101,48 @@ if __name__ == "__main__":
 
     for seed in range(args.seed, args.seed + args.num_runs):
         start_time = time.time()  # 新增：记录单次循环的开始时间
-        
+
         set_seed(seed)
 
         # Initialize model and get model specific preprocessing pipeline
-        preprocessing_pipeline = get_preprocessing_pipeline(n_top_hvgs=args.high_variable_genes,
-                                                            radius=args.rad_cutoff)
+        preprocessing_pipeline = get_preprocessing_pipeline(n_top_hvgs=args.high_variable_genes, radius=args.rad_cutoff)
 
         # Load data and perform necessary preprocessing
         dataloader = SpatialLIBDDataset(data_id=args.sample_number)
         data = dataloader.load_data(transform=None, cache=args.cache)
-        sub_data(data.data,args.obs_nums)
+        sub_data(data.data, args.obs_nums)
         preprocessing_pipeline(data)
         adj, y = data.get_data(return_type="default")
         x = data.data.X.A
         edge_list_array = np.vstack(np.nonzero(adj))
 
         # Train and evaluate model
-        model = Stagate([min(args.high_variable_genes,x.shape[1])] + args.hidden_dims,device=args.device)
+        model = Stagate([min(args.high_variable_genes, x.shape[1])] + args.hidden_dims, device=args.device)
         score = model.fit_score((x, edge_list_array), y, epochs=args.epochs, random_state=seed)
-        pred=model.predict()
+        pred = model.predict()
         silhouette_score = resolve_score_func("silhouette")
         calinski_harabasz_score = resolve_score_func("calinski_harabasz")
         davies_bouldin_score = resolve_score_func("davies_bouldin")
-        inner_scores.append(calculate_unified_scores({
-            "silhouette": silhouette_score(x, pred),
-            "calinski_harabasz": calinski_harabasz_score(x, pred),
-            "davies_bouldin": davies_bouldin_score(x, pred)
-        }))
+        inner_scores.append(
+            calculate_unified_scores({
+                "silhouette": silhouette_score(x, pred),
+                "calinski_harabasz": calinski_harabasz_score(x, pred),
+                "davies_bouldin": davies_bouldin_score(x, pred)
+            }))
         scores.append(score)
-        
+
         end_time = time.time()  # 新增：记录单次循环的结束时间
         run_time = end_time - start_time
         times.append(run_time)  # 新增：保存耗时
-        
+
         print(f"ARI: {score:.4f}, time: {run_time:.2f}s")  # 修改：同时输出得分与时间
-        
+
     print(f"STAGATE {args.sample_number}:")
     # 修改：加入 times 列表，以供 evaluator 捕获
     print(f"scores:{scores},inner_scores:{inner_scores},times:{times}")
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
     print(f"mean_time: {np.mean(times):.2f}s")  # 新增：输出平均运行时间
-
 """ To reproduce Stagate on other samples, please refer to command lines belows:
 NOTE: since the stagate method is unstable, you have to run at least 5 times to get
       best performance. (same with original Stagate paper)

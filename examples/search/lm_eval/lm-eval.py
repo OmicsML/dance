@@ -1,22 +1,29 @@
-"""
-OpenEvolve <-> lm-evaluation-harness adapter
+"""OpenEvolve <-> lm-evaluation-harness adapter.
 
 Implements generation only, no loglikelihood. Tasks such as GSM8K / BoolQ / MMLU-Math /
 AQUA-RAT and most code suites should work fine because they grade on the generated
 answer string.
+
 """
 
 from __future__ import annotations
-import subprocess, tempfile, json, os, argparse, math, pathlib
+
+import argparse
+import json
+import math
+import os
+import pathlib
+import subprocess
+import tempfile
+from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Tuple, Any, Iterable
+from typing import Any, Dict, Iterable, List, Tuple
 
 import lm_eval
-from lm_eval.tasks import TaskManager
-from lm_eval.evaluator import evaluate
 from lm_eval.api.model import LM
 from lm_eval.api.registry import register_model
-from datetime import datetime
+from lm_eval.evaluator import evaluate
+from lm_eval.tasks import TaskManager
 
 # cd to the parent parent directory of this file
 # os.chdir(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -25,13 +32,14 @@ PIPELINE_CMD = ["python3", "openevolve-run.py"]
 
 @register_model("openevolve")
 class OpenEvolve(LM):
+
     def __init__(
         self,
         init_file: str = "initial_content_stub.txt",
         evaluator_file: str = "evaluator_stub.py",
         config_file: str = "config.yml",
         iterations: int = 5,
-        extra_param: List[str] = [],
+        extra_param: list[str] = [],
         **kwargs,
     ):
         super().__init__()
@@ -47,7 +55,7 @@ class OpenEvolve(LM):
         self.best_path = "openevolve_output/best/best_program.txt"
         self.base_system_message = "You are an expert task solver, with a lot of commonsense, math, language and coding knowledge.\n\nConsider this task:\n```{prompt}´´´"
 
-    def generate(self, prompts: List[str], max_gen_toks: int = None, stop=None, **kwargs):
+    def generate(self, prompts: list[str], max_gen_toks: int = None, stop=None, **kwargs):
         outs = []
         for prompt in prompts:
             # Task prompt becomes the system message. User prompt is the evolutionary logic.
@@ -58,13 +66,8 @@ class OpenEvolve(LM):
             with Path(self.evaluator_prompt_path).open("w") as f:
                 f.write(self.base_system_message.format(prompt=prompt))
 
-            cmd = (
-                PIPELINE_CMD
-                + ["--config", self.config_file]
-                + ["--iterations", str(self.iterations)]
-                + self.extra_param
-                + [self.init_file, self.evaluator_file]
-            )
+            cmd = (PIPELINE_CMD + ["--config", self.config_file] +
+                   ["--iterations", str(self.iterations)] + self.extra_param + [self.init_file, self.evaluator_file])
             print(f"Running command: {' '.join(cmd)}")
             try:
                 res = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -91,7 +94,7 @@ class OpenEvolve(LM):
         return outs
 
     # for tasks that ask for log likelihood, indicate that it is unsupported
-    def loglikelihood(self, requests: Iterable[Tuple[str, str]], **kw):
+    def loglikelihood(self, requests: Iterable[tuple[str, str]], **kw):
         # return [(-math.inf, False) for _ in requests]
         raise NotImplementedError
 
@@ -99,7 +102,7 @@ class OpenEvolve(LM):
         # return [(-math.inf, False) for _ in requests]
         raise NotImplementedError
 
-    def generate_until(self, requests: Iterable[Any], **kw) -> List[str]:
+    def generate_until(self, requests: Iterable[Any], **kw) -> list[str]:
         ctxs, stops = [], []
 
         for req in requests:
@@ -136,18 +139,14 @@ class OpenEvolve(LM):
 
 if __name__ == "__main__":
     # cli arguments for primary model, secondary model, iterations, config and tasks
-    p = argparse.ArgumentParser(
-        description="OpenEvolve <-> lm-evaluation-harness adapter.",
-    )
+    p = argparse.ArgumentParser(description="OpenEvolve <-> lm-evaluation-harness adapter.", )
     p.add_argument("--config", default="config.yml", help="config file")
     p.add_argument(
         "--init_file",
         default="initial_content_stub.txt",
         help="initial content file",
     )
-    p.add_argument(
-        "--evaluator_file", default="evaluator_stub.py", help="evaluator file"
-    )
+    p.add_argument("--evaluator_file", default="evaluator_stub.py", help="evaluator file")
     p.add_argument("--iterations", default=5, type=int, help="number of iterations")
     p.add_argument(
         "--limit",
@@ -176,17 +175,13 @@ if __name__ == "__main__":
     )
 
     # write out the results
-    pathlib.Path(
-        args.output_path,
-    ).mkdir(exist_ok=True)
+    pathlib.Path(args.output_path, ).mkdir(exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    results_path = pathlib.Path(
-        os.path.join(
-            args.output_path,
-            f"{timestamp}_iter{args.iterations}.json",
-        )
-    )
+    results_path = pathlib.Path(os.path.join(
+        args.output_path,
+        f"{timestamp}_iter{args.iterations}.json",
+    ))
 
     with results_path.open("w") as f:
         json.dump(results, f, indent=2)

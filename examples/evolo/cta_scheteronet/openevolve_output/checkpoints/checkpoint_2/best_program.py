@@ -3,12 +3,13 @@ from typing import Optional
 
 import dgl
 import numpy as np
+import pandas as pd
 import scanpy as sc
-from sklearn.neighbors import NearestNeighbors
 import torch
 import torch.nn as nn
 from sklearn.model_selection import train_test_split
-import pandas as pd
+from sklearn.neighbors import NearestNeighbors
+
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scheteronet import (
     convert_dgl_to_original_format,
@@ -28,9 +29,8 @@ from dance.typing import LogLevel
 from dance.utils import set_seed
 
 
-
 # EVOLVE-BLOCK-START
-@register_preprocessor("graph", "cell",overwrite=True)
+@register_preprocessor("graph", "cell", overwrite=True)
 class HeteronetGraph(BaseTransform):
 
     def __init__(self, knn_num: int = 5, distance_metrics: str = 'l2', random_state: int = 0,
@@ -56,6 +56,7 @@ class HeteronetGraph(BaseTransform):
             dgl.DGLGraph: A DGL graph with node features ('feat'), labels ('label'),
                         and split masks ('train_mask', 'val_mask', 'test_mask',
                         'id_mask', 'ood_mask').
+
         """
         adata = data.data
         # 1. Extract Features
@@ -76,7 +77,7 @@ class HeteronetGraph(BaseTransform):
         # 3. Build Edges using efficient PyTorch-based KNN
         # Convert to torch tensor for faster computation
         features_torch = torch.from_numpy(features_np).float()
-        
+
         # Compute pairwise distances
         if self.distance_metrics == 'l2':
             # Use squared Euclidean distance for efficiency
@@ -87,10 +88,10 @@ class HeteronetGraph(BaseTransform):
             distances = 1 - torch.mm(features_norm, features_norm.t())
         else:  # l1 or other metrics
             distances = torch.cdist(features_torch, features_torch, p=1)
-            
+
         # Get k nearest neighbors for each node
         _, knn_indices = torch.topk(distances, k=self.knn_num + 1, largest=False, sorted=True)
-        
+
         # Handle mutual KNN
         if self.mutual:
             # For mutual KNN: only keep edges where u is in v's neighbors AND v is in u's neighbors
@@ -98,12 +99,12 @@ class HeteronetGraph(BaseTransform):
             for i in range(num_nodes):
                 # Get neighbors of node i
                 i_neighbors = set(knn_indices[i][1:].tolist())  # Exclude node i itself
-                
+
                 # Check if neighbors are mutual
                 for j in knn_indices[i][1:]:
                     if i in set(knn_indices[j][1:].tolist()):
                         mutual_edges.append([i, j])
-                        
+
             if mutual_edges:
                 edge_list = torch.tensor(mutual_edges, dtype=torch.long).t()
             else:
@@ -114,15 +115,14 @@ class HeteronetGraph(BaseTransform):
             for i in range(num_nodes):
                 neighbors = knn_indices[i][1:]  # Exclude node i itself
                 if len(neighbors) > 0:
-                    src = torch.full((len(neighbors),), i, dtype=torch.long)
+                    src = torch.full((len(neighbors), ), i, dtype=torch.long)
                     dst = neighbors
                     edge_list = torch.cat([edge_list, torch.stack([src, dst])], dim=1)
-        
+
         # 4. Create DGL Graph
         if edge_list.shape[1] == 0:
             # Create an empty graph if no edges
-            g = dgl.graph((torch.tensor([], dtype=torch.long), torch.tensor([], dtype=torch.long)), 
-                         num_nodes=num_nodes)
+            g = dgl.graph((torch.tensor([], dtype=torch.long), torch.tensor([], dtype=torch.long)), num_nodes=num_nodes)
         else:
             g = dgl.graph((edge_list[0], edge_list[1]), num_nodes=num_nodes)
 
@@ -136,21 +136,26 @@ class HeteronetGraph(BaseTransform):
         if batchs is not None:
             g.ndata['batch_id'] = torch.from_numpy(batchs.values.astype(int)).long()
         adata.uns[self.out] = g
+
+
 # EVOLVE-BLOCK-END
 
+
 def get_preprocessing_pipeline(log_level: LogLevel = "INFO"):
-        transforms = []
-        transforms.append(FilterCellsType())
-        transforms.append(AnnDataTransform(sc.pp.filter_genes, min_counts=3))
-        transforms.append(FilterCellsScanpy(min_counts=1))
-        transforms.append(HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=4000, flavor="cell_ranger"))
-        transforms.append(SaveRaw())
-        transforms.append(NormalizeTotal())
-        transforms.append(UpdateSizeFactors())
-        transforms.append(Log1P())
-        transforms.append(HeteronetGraph())
-        transforms.append(SetConfig({"label_channel": "cell_type"}))
-        return Compose(*transforms, log_level=log_level)
+    transforms = []
+    transforms.append(FilterCellsType())
+    transforms.append(AnnDataTransform(sc.pp.filter_genes, min_counts=3))
+    transforms.append(FilterCellsScanpy(min_counts=1))
+    transforms.append(HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=4000, flavor="cell_ranger"))
+    transforms.append(SaveRaw())
+    transforms.append(NormalizeTotal())
+    transforms.append(UpdateSizeFactors())
+    transforms.append(Log1P())
+    transforms.append(HeteronetGraph())
+    transforms.append(SetConfig({"label_channel": "cell_type"}))
+    return Compose(*transforms, log_level=log_level)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_dataset", nargs="+", type=int, default=[1759], help="Testing dataset IDs")

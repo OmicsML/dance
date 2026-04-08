@@ -1,18 +1,20 @@
 import argparse
-import pprint
-from typing import Optional, Union, get_args
 import json  # 新增：导入 json 模块用于保存结果
+import pprint
+import time
+from typing import Optional, Union, get_args
 
 import dgl
 import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
-import torch
 
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
-from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort, GNN
-import torch.nn as nn
+from dance.modules.single_modality.cell_type_annotation.scdeepsort import GNN, ScDeepSort
 from dance.registry import register_preprocessor
 from dance.transforms.base import BaseTransform
 from dance.transforms.misc import Compose, SetConfig
@@ -20,15 +22,12 @@ from dance.typing import LogLevel
 from dance.utils import set_seed, sub_data
 from dance.utils.matrix import normalize
 from dance.utils.wrappers import add_mod_and_transform
-import time
-import torch.nn.functional as F
 
 
 class ChunkedGraphLearner(nn.Module):
     """Memory-efficient graph learner using chunked cosine similarity + KNN."""
 
-    def __init__(self, n_feats: int, K: int = 20, lamb1: float = 0.5, lamb2: float = 0.5,
-                 chunk_size: int = 2000):
+    def __init__(self, n_feats: int, K: int = 20, lamb1: float = 0.5, lamb2: float = 0.5, chunk_size: int = 2000):
         super().__init__()
         # 【修复 2】增强 Graph Learner 的表达能力，从单一的对角权重升级为 Linear 层
         self.transform = nn.Linear(n_feats, n_feats)
@@ -40,9 +39,9 @@ class ChunkedGraphLearner(nn.Module):
     def forward(self, features: torch.Tensor, adj_init_sparse=None):
         # 使用 Linear 层进行特征变换，并用 ReLU 激活
         z = torch.relu(self.transform(features))
-        
+
         z_norm = F.normalize(z, p=2, dim=1, eps=1e-8)
-        
+
         N = z_norm.shape[0]
         K = min(self.K, N - 1)
 
@@ -51,14 +50,14 @@ class ChunkedGraphLearner(nn.Module):
             end = min(i + self.chunk_size, N)
             chunk_len = end - i
 
-            sim_chunk = z_norm[i:end] @ z_norm.T  
+            sim_chunk = z_norm[i:end] @ z_norm.T
 
             self_idx = torch.arange(chunk_len, device=features.device)
             diag_mask = torch.zeros_like(sim_chunk, dtype=torch.bool)
             diag_mask[self_idx, self_idx + i] = True
             sim_chunk = sim_chunk.masked_fill(diag_mask, -1.0)
 
-            topk_vals, topk_idx = sim_chunk.topk(K, dim=1)  
+            topk_vals, topk_idx = sim_chunk.topk(K, dim=1)
             topk_vals = torch.relu(topk_vals)
             rows = torch.arange(i, end, device=features.device).unsqueeze(1).expand(-1, K)
             all_src.append(rows.reshape(-1))
@@ -79,8 +78,9 @@ class ChunkedGraphLearner(nn.Module):
 
         return src, dst, val
 
+
 # EVOLVE-BLOCK-START
-@register_preprocessor("feature", "cell",overwrite=True)
+@register_preprocessor("feature", "cell", overwrite=True)
 @add_mod_and_transform
 class WeightedFeaturePCA(BaseTransform):
     _DISPLAY_ATTRS = ("n_components", "split_name", "feat_norm_mode", "feat_norm_axis")
@@ -95,23 +95,25 @@ class WeightedFeaturePCA(BaseTransform):
         self.save_info = save_info
 
     def __call__(self, data):
-        feat = data.get_x(self.split_name)  
+        feat = data.get_x(self.split_name)
         if self.feat_norm_mode is not None:
             feat = normalize(feat, mode=self.feat_norm_mode, axis=self.feat_norm_axis)
         if self.n_components > min(feat.shape):
             self.n_components = min(feat.shape)
-        gene_pca = PCA(n_components=self.n_components)  
+        gene_pca = PCA(n_components=self.n_components)
 
-        gene_feat = gene_pca.fit_transform(feat.T)  
+        gene_feat = gene_pca.fit_transform(feat.T)
 
         x = data.get_x()
-        cell_feat = normalize(x, mode="normalize", axis=1) @ gene_feat  
+        cell_feat = normalize(x, mode="normalize", axis=1) @ gene_feat
         data.data.obsm[self.out] = cell_feat.astype(np.float32)
         data.data.varm[self.out] = gene_feat.astype(np.float32)
         return data
 
-@register_preprocessor("graph", "cell",overwrite=True)
+
+@register_preprocessor("graph", "cell", overwrite=True)
 class CellFeatureGraph(BaseTransform):
+
     def __init__(self, cell_feature_channel: str, gene_feature_channel: Optional[str] = None, *,
                  mod: Optional[str] = None, normalize_edges: bool = True, **kwargs):
         super().__init__(**kwargs)
@@ -127,8 +129,8 @@ class CellFeatureGraph(BaseTransform):
         row, col = np.nonzero(feat)
         edata = np.array(feat[row, col]).ravel()[:, None]
 
-        row = row + num_feats  
-        col, row = np.hstack((col, row)), np.hstack((row, col))  
+        row = row + num_feats
+        col, row = np.hstack((col, row)), np.hstack((row, col))
         edata = np.vstack((edata, edata))
 
         col = torch.LongTensor(col)
@@ -137,10 +139,10 @@ class CellFeatureGraph(BaseTransform):
 
         g = dgl.graph((row, col))
         g.edata["weight"] = edata
-        g.ndata["cell_id"] = torch.concat((torch.arange(num_feats, dtype=torch.int32),
-                                           -torch.ones(num_cells, dtype=torch.int32)))  
-        g.ndata["feat_id"] = torch.concat((-torch.ones(num_feats, dtype=torch.int32),
-                                           torch.arange(num_cells, dtype=torch.int32)))  
+        g.ndata["cell_id"] = torch.concat((torch.arange(num_feats,
+                                                        dtype=torch.int32), -torch.ones(num_cells, dtype=torch.int32)))
+        g.ndata["feat_id"] = torch.concat(
+            (-torch.ones(num_feats, dtype=torch.int32), torch.arange(num_cells, dtype=torch.int32)))
 
         if self.normalize_edges:
             in_deg = g.in_degrees()
@@ -160,13 +162,14 @@ class CellFeatureGraph(BaseTransform):
         data.data.uns[self.out] = g
         return data
 
-@register_preprocessor("graph", "cell",overwrite=True)
+
+@register_preprocessor("graph", "cell", overwrite=True)
 class PCACellFeatureGraph(BaseTransform):
     _DISPLAY_ATTRS = ("n_components", "split_name")
 
-    def __init__(self, n_components: int = 400, split_name: Optional[str] = None, *,
-                 normalize_edges: bool = True, feat_norm_mode: Optional[str] = None,
-                 feat_norm_axis: int = 0, mod: Optional[str] = None, log_level: LogLevel = "WARNING"):
+    def __init__(self, n_components: int = 400, split_name: Optional[str] = None, *, normalize_edges: bool = True,
+                 feat_norm_mode: Optional[str] = None, feat_norm_axis: int = 0, mod: Optional[str] = None,
+                 log_level: LogLevel = "WARNING"):
         super().__init__(log_level=log_level)
         self.n_components = n_components
         self.split_name = split_name
@@ -181,6 +184,8 @@ class PCACellFeatureGraph(BaseTransform):
         CellFeatureGraph(cell_feature_channel="WeightedFeaturePCA", mod=self.mod, normalize_edges=self.normalize_edges,
                          log_level=self.log_level)(data)
         return data
+
+
 # EVOLVE-BLOCK-END
 
 
@@ -189,28 +194,26 @@ def smooth_cell_features(cell_feat, adj_sparse, gene_feat):
         return torch.cat([gene_feat, cell_feat], dim=0)
     knn_src, knn_dst, knn_val = adj_sparse
     N = cell_feat.shape[0]
-    row_sums = torch.zeros(N, device=cell_feat.device).scatter_add(
-        0, knn_src, knn_val).clamp(min=1e-8)
+    row_sums = torch.zeros(N, device=cell_feat.device).scatter_add(0, knn_src, knn_val).clamp(min=1e-8)
     row_sums_safe = row_sums.clone()
     row_sums_safe[row_sums_safe < 1e-8] = 1.0
     norm_val = knn_val / row_sums_safe[knn_src]
-    
-    h_agg = torch.zeros_like(cell_feat).scatter_add(
-        0, knn_src.unsqueeze(-1).expand(-1, cell_feat.shape[1]),
-        norm_val.unsqueeze(-1) * cell_feat[knn_dst])
-    
-    alpha = 0.5  
+
+    h_agg = torch.zeros_like(cell_feat).scatter_add(0,
+                                                    knn_src.unsqueeze(-1).expand(-1, cell_feat.shape[1]),
+                                                    norm_val.unsqueeze(-1) * cell_feat[knn_dst])
+
+    alpha = 0.5
     smoothed_cell_feat = alpha * cell_feat + (1 - alpha) * h_agg
-    
+
     return torch.cat([gene_feat, smoothed_cell_feat], dim=0)
 
 
-def compute_graph_reg(knn_src, knn_dst, knn_val, cell_embeds, N,
-                      lambda_smooth, lambda_conn, lambda_sparse):
+def compute_graph_reg(knn_src, knn_dst, knn_val, cell_embeds, N, lambda_smooth, lambda_conn, lambda_sparse):
     reg = torch.tensor(0.0, device=knn_val.device)
 
     if lambda_smooth > 0:
-        diff = cell_embeds[knn_src] - cell_embeds[knn_dst]  
+        diff = cell_embeds[knn_src] - cell_embeds[knn_dst]
         smooth_loss = (knn_val * (diff * diff).sum(dim=1)).mean()
         reg = reg + lambda_smooth * smooth_loss
 
@@ -218,7 +221,7 @@ def compute_graph_reg(knn_src, knn_dst, knn_val, cell_embeds, N,
         row_sums = torch.zeros(N, device=knn_val.device).scatter_add(0, knn_src, knn_val)
         # 【修复 1】不再强制逼近 1.0，而是逼近平均度数，惩罚度数的方差，鼓励均匀连通
         target_degree = row_sums.mean().detach()
-        conn_loss = ((row_sums - target_degree) ** 2).mean()
+        conn_loss = ((row_sums - target_degree)**2).mean()
         reg = reg + lambda_conn * conn_loss
 
     if lambda_sparse > 0:
@@ -276,7 +279,8 @@ if __name__ == "__main__":
         )
 
         dataloader = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
-                                               train_dataset=args.train_dataset, data_dir="../temp_data", val_size=args.val_size)
+                                               train_dataset=args.train_dataset, data_dir="../temp_data",
+                                               val_size=args.val_size)
         data = dataloader.load_data(transform=None, cache=args.cache)
 
         if args.obs_nums is not None:
@@ -305,7 +309,7 @@ if __name__ == "__main__":
         n_feats = features_train.shape[1]
         num_train_cells = g_train.num_nodes() - num_genes
 
-        cell_features_train = features_train[num_genes:]  
+        cell_features_train = features_train[num_genes:]
         gene_feat_base = features_train[:num_genes].detach()
 
         src_all, dst_all = g_train.edges()
@@ -313,9 +317,7 @@ if __name__ == "__main__":
         if cell_mask.any():
             weights_all = g_train.edata["weight"].squeeze(-1) if "weight" in g_train.edata \
                 else torch.ones(src_all.shape[0], device=args.device)
-            adj_init_sparse = (src_all[cell_mask] - num_genes,
-                               dst_all[cell_mask] - num_genes,
-                               weights_all[cell_mask])
+            adj_init_sparse = (src_all[cell_mask] - num_genes, dst_all[cell_mask] - num_genes, weights_all[cell_mask])
         else:
             adj_init_sparse = None
 
@@ -326,10 +328,12 @@ if __name__ == "__main__":
         model.model = GNN(model.dense_dim, model.num_labels, model.hidden_dim, model.n_layers, num_genes,
                           activation=nn.ReLU(), dropout=model.dropout).to(args.device)
 
-        optimizer = torch.optim.Adam([
-            {'params': model.model.parameters()},
-            {'params': graphlearner.parameters(), 'lr': args.lr * 10}
-        ], lr=args.lr, weight_decay=args.weight_decay)
+        optimizer = torch.optim.Adam([{
+            'params': model.model.parameters()
+        }, {
+            'params': graphlearner.parameters(),
+            'lr': args.lr * 10
+        }], lr=args.lr, weight_decay=args.weight_decay)
 
         g_train_cpu = g_train.to("cpu")
         g_test_cpu = g_test.to("cpu")
@@ -338,14 +342,20 @@ if __name__ == "__main__":
         train_loader = dgl.dataloading.DataLoader(
             g_train_cpu,
             torch.arange(num_genes, num_genes + num_train_cells),
-            sampler, batch_size=args.batch_size, shuffle=False,
-            drop_last=False, num_workers=0,
+            sampler,
+            batch_size=args.batch_size,
+            shuffle=False,
+            drop_last=False,
+            num_workers=0,
         )
         test_loader = dgl.dataloading.DataLoader(
             g_test_cpu,
             torch.arange(num_genes, num_genes + num_test_cells),
-            sampler, batch_size=args.batch_size, shuffle=False,
-            drop_last=False, num_workers=0,
+            sampler,
+            batch_size=args.batch_size,
+            shuffle=False,
+            drop_last=False,
+            num_workers=0,
         )
 
         model.model.train()
@@ -371,9 +381,14 @@ if __name__ == "__main__":
 
             knn_src, knn_dst, knn_val = adj_cells_sparse
             reg_loss = compute_graph_reg(
-                knn_src, knn_dst, knn_val, cell_embeds.detach(),
+                knn_src,
+                knn_dst,
+                knn_val,
+                cell_embeds.detach(),
                 num_train_cells,
-                args.lambda_smooth, args.lambda_conn, args.lambda_sparse,
+                args.lambda_smooth,
+                args.lambda_conn,
+                args.lambda_sparse,
             )
 
             total_loss_val = 0.0
@@ -382,7 +397,7 @@ if __name__ == "__main__":
             # --- 2. GNN Batch 训练 ---
             for batch_idx, (input_nodes, output_nodes, blocks) in enumerate(train_batches):
                 optimizer.zero_grad()
-                
+
                 blocks_gpu = [b.to(args.device) for b in blocks]
                 src_ids = blocks_gpu[0].srcdata[dgl.NID]
                 batch_feats = feat_smooth[src_ids]
@@ -398,27 +413,27 @@ if __name__ == "__main__":
 
                 # 【修复核心】只在最后一个 batch 反向传播 reg_loss，避免使用过时梯度重复更新
                 is_last_batch = (batch_idx == num_batches - 1)
-                
+
                 if is_last_batch:
-                    alpha = 1e-1 
+                    alpha = 1e-1
                     total_batch_loss = batch_loss + alpha * reg_loss
                     total_batch_loss.backward()
                 else:
                     # 前面的 batch 只反向传播 GNN 的 loss，需要 retain_graph 以便最后传播 reg_loss
                     batch_loss.backward(retain_graph=True)
-                
+
                 total_loss_val += batch_loss.item()
                 epoch_hidden[batch_cell_idx] = hidden.detach()
-                
+
                 all_params = list(model.model.parameters()) + list(graphlearner.parameters())
                 torch.nn.utils.clip_grad_norm_(all_params, max_norm=2.0)
-                
+
                 optimizer.step()
 
-            gamma = 0.5 
+            gamma = 0.5
             cell_embeds = gamma * feat_smooth[num_genes:].detach() + (1 - gamma) * cell_features_train
-            
-            if epoch==0 or (epoch + 1) % 50 == 0:
+
+            if epoch == 0 or (epoch + 1) % 50 == 0:
                 avg_loss = total_loss_val / num_batches
                 print(f"Epoch {epoch+1:03d} | Train Loss: {avg_loss:.4f} | Reg: {reg_loss.item():.4f}")
 
@@ -447,8 +462,7 @@ if __name__ == "__main__":
             if cell_mask_t.any():
                 weights_t = g_test.edata["weight"].squeeze(-1) if "weight" in g_test.edata \
                     else torch.ones(src_t.shape[0], device=args.device)
-                adj_init_sparse_test = (src_t[cell_mask_t] - num_genes,
-                                        dst_t[cell_mask_t] - num_genes,
+                adj_init_sparse_test = (src_t[cell_mask_t] - num_genes, dst_t[cell_mask_t] - num_genes,
                                         weights_t[cell_mask_t])
             else:
                 adj_init_sparse_test = None
@@ -521,5 +535,5 @@ if __name__ == "__main__":
 
     with open(json_filename, "w", encoding="utf-8") as f:
         json.dump(results_dict, f, indent=4, ensure_ascii=False)
-    
+
     print(f"Results successfully saved to {json_filename}")

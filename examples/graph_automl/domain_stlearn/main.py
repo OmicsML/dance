@@ -41,7 +41,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     file_root_path = Path(args.root_path, args.sample_number).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
-    pipeline_planer = PipelinePlaner.from_config_file(f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
+    pipeline_planer = PipelinePlaner.from_config_file(
+        f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
 
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
@@ -89,7 +90,7 @@ if __name__ == "__main__":
             silhouette_score = resolve_score_func("silhouette")
             calinski_harabasz_score = resolve_score_func("calinski_harabasz")
             davies_bouldin_score = resolve_score_func("davies_bouldin")
-            
+
             # 检查 x 是否为稀疏数组，如果是则转换为稠密
             if hasattr(x, 'toarray'):
                 x = x.toarray()
@@ -119,7 +120,9 @@ if __name__ == "__main__":
         speed_score = 1.0 / (1.0 + total_time_seconds / 300.0)
         combined_score = 0.8 * avg_inner_score + 0.2 * speed_score
 
-        print(f"Averaged over {args.num_runs} runs - ARI: {avg_score:.4f}, Inner Score: {avg_inner_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}")
+        print(
+            f"Averaged over {args.num_runs} runs - ARI: {avg_score:.4f}, Inner Score: {avg_inner_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}"
+        )
 
         wandb.log({
             "ARI": avg_score,

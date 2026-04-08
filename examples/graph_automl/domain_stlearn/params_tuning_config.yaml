@@ -4,7 +4,7 @@ tune_mode: params
 pipeline:
   - type: filter.gene
     target: FilterGenesScanpy
-    params: 
+    params:
       min_cells: 1
   - type: normalize
     target: NormalizeTotalLog1P
@@ -17,7 +17,7 @@ pipeline:
       device: cuda
       target_size: 230
     params_to_tune:
-      crop_size: 
+      crop_size:
         values: [5,10,15]
   - type: feature.cell
     target: CellPCA
@@ -40,7 +40,7 @@ pipeline:
     params:
       channel: SMEFeature
     params_to_tune:
-      n_neighbors: 
+      n_neighbors:
         values: [5,10,15]
       n_pcs:
         values: [5,10]

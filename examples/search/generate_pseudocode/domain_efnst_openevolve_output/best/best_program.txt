@@ -11,7 +11,7 @@ begin
     data_loader := DataLoader(dataset, batch_size = 64, shuffle = false, num_workers = 4);
     all_features := [];
     all_spot_names := [];
-    
+
     model.eval();
     with torch.no_grad() do
       for image_batch, spot_name_batch in data_loader do
@@ -21,7 +21,7 @@ begin
         all_features.append(result_batch.cpu().numpy());
         all_spot_names.extend(list(spot_name_batch));
       end;
-    
+
     final_features := Concatenate(all_features, axis = 0);
     feat_df := DataFrame(final_features, index = all_spot_names);
     return feat_df;
@@ -44,7 +44,7 @@ begin
       tree := BallTree(data, leaf_size = 2);
       _, indices := tree.query(data, k = spatial_k + 1);
     end;
-    
+
     indices := indices[:, 1:];
     spatial_weight := ZeroMatrix(data.shape[0], data.shape[0]);
     for i := 0 to indices.shape[0] - 1 do
@@ -79,9 +79,9 @@ begin
     end
     else
       physical_distance := ComputeSpatialWeight(adata.obsm['spatial'], spatial_k, spatial_type);
-    
+
     gene_correlation := ComputeGeneWeight(adata.X, n_components, gb_dist_type);
-    
+
     if platform = "Visium" then
     begin
       morphological_similarity := 1 - PairwiseDistances(adata.obsm["image_feat_pca"], metric = md_dist_type);
@@ -92,7 +92,7 @@ begin
     end
     else
       weights_matrix_nomd := gene_correlation * physical_distance;
-    
+
     if verbose then
     begin
       adata.obsm["gene_correlation"] := gene_correlation;
@@ -100,7 +100,7 @@ begin
       if platform = "Visium" then
         adata.obsm["morphological_similarity"] := morphological_similarity;
     end;
-    
+
     if platform = "Visium" then
       adata.obsm["weights_matrix_all"] := weights_matrix_all;
     adata.obsm["weights_matrix_nomd"] := weights_matrix_nomd;
@@ -113,21 +113,21 @@ begin
       gene_matrix := adata.X.toarray()
     else
       gene_matrix := adata.obsm[use_data];
-    
+
     weights_matrix := adata.obsm[weights];
     final_coordinates := [];
     weights_list := [];
-    
+
     for i := 0 to adata.shape[0] - 1 do
     begin
       if weights = "physical_distance" then
         current_spot := TopKIndices(weights_matrix[i], k = neighbour_k + 2, reverse = true)
       else
         current_spot := TopKIndices(weights_matrix[i], k = neighbour_k - 1, reverse = true);
-      
+
       spot_weight := weights_matrix[i][current_spot];
       spot_matrix := gene_matrix[current_spot];
-      
+
       if Sum(spot_weight) > 0 then
       begin
         spot_weight_scaled := spot_weight / Sum(spot_weight);
@@ -140,10 +140,10 @@ begin
         spot_matrix_final := ZeroVector(gene_matrix.shape[1]);
         weights_list.append(ZeroVector(length(current_spot)));
       end;
-      
+
       final_coordinates.append(spot_matrix_final);
     end;
-    
+
     adata.obsm['adjacent_data'] := Array(final_coordinates);
     if verbose then
       adata.obsm['adjacent_weight'] := Array(weights_list);
@@ -179,7 +179,7 @@ begin
       image := (image * 255).astype(uint8);
     img_pillow := Image.fromarray(image);
     tile_names := [];
-    
+
     for (imagerow, imagecol) in zip(adata.obsm["spatial_pixel"]['x_pixel'], adata.obsm["spatial_pixel"]['y_pixel']) do
     begin
       imagerow_down := imagerow - crop_size / 2;
@@ -194,7 +194,7 @@ begin
       tile_names.append(str(out_tile));
       tile.save(out_tile, "PNG");
     end;
-    
+
     adata.obs["slices_path"] := tile_names;
     return adata;
   end;
@@ -204,20 +204,20 @@ begin
     model := EfficientNet.from_pretrained(cnnType);
     model.to(device);
     model.eval();
-    
+
     feat_df := ExtractImageFeatures(adata, device, model);
     adata.obsm["image_feat"] := feat_df.transpose().to_numpy();
-    
+
     if verbose then
       Print("The image feature is added to adata.obsm['image_feat'] !");
-    
+
     pca := PCA(n_components = pca_components, random_state = 88);
     pca_result := pca.fit_transform(feat_df.transpose().to_numpy());
     adata.obsm["image_feat_pca"] := pca_result;
-    
+
     if verbose then
       Print("The pca result of image feature is added to adata.obsm['image_feat_pca'] !");
-    
+
     return adata;
   end;
 
@@ -242,7 +242,7 @@ begin
       distances, indices := nbrs.radius_neighbors(data);
       graphList := [(i, indices[i][j]) for i in range(indices.shape[0]) for j in range(indices[i].shape[0]) if distances[i][j] > 0];
     end;
-    
+
     graph_dict := ListToDict(graphList, num_cell = data.shape[0]);
     adj_org := adjacency_matrix(from_dict_of_lists(graph_dict));
     adj_pre := adj_org - diagonal_matrix(adj_org.diagonal());
@@ -250,7 +250,7 @@ begin
     adj_norm := preprocess_graph(adj_pre);
     adj_label := adj_pre + identity_matrix(adj_pre.shape[0]);
     norm := compute_norm(adj_pre);
-    
+
     return {
       "adj_norm": adj_norm,
       "adj_label": adj_label,
@@ -273,7 +273,7 @@ begin
       Domain_WT = Domain_WT,
       use_gpu = use_gpu
     );
-    
+
     training_config.pretrain();
     embedding, _ := training_config.process();
     adata.obsm["EfNST_embedding"] := embedding;
@@ -284,12 +284,12 @@ begin
   begin
     pred_df := DataFrame({"pred": pred}, index = sample_id);
     dis_df := DataFrame(dis, index = sample_id, columns = sample_id);
-    
+
     if shape = "hexagon" then
       num_nbs := 6
     else if shape = "square" then
       num_nbs := 4;
-    
+
     refined_pred := [];
     for i := 0 to length(sample_id) - 1 do
     begin
@@ -299,13 +299,13 @@ begin
       nbs_pred := pred_df.loc[nbs, "pred"];
       self_pred := pred_df.loc[index, "pred"];
       v_c := nbs_pred.value_counts();
-      
+
       if (v_c[self_pred] < num_nbs / 2) and (max(v_c) > num_nbs / 2) then
         refined_pred.append(v_c.idxmax())
       else
         refined_pred.append(self_pred);
     end;
-    
+
     return refined_pred;
   end;
 

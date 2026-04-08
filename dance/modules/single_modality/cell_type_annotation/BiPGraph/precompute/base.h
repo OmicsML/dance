@@ -75,9 +75,9 @@ class Base:public Graph{
     }
 
     void ppr_push(){
-        struct timeval t_start,t_end; 
+        struct timeval t_start,t_end;
         double timeCost;
-        gettimeofday(&t_start, NULL); 
+        gettimeofday(&t_start, NULL);
         vector<thread> threads;
         int ti;
         int start;
@@ -97,7 +97,7 @@ class Base:public Graph{
         }
         vector<vector<double>>().swap(negativeFeature);
         vector<thread>().swap(threads);
-        gettimeofday(&t_end, NULL); 
+        gettimeofday(&t_end, NULL);
         timeCost = t_end.tv_sec - t_start.tv_sec + (t_end.tv_usec - t_start.tv_usec)/1000000.0;
         cout<<dataset<<" pre-computation cost: "<<timeCost<<" s"<<endl;
     }
@@ -243,10 +243,10 @@ class Base:public Graph{
     }
 
     void rw_push(){
-        
-        struct timeval t_start,t_end; 
+
+        struct timeval t_start,t_end;
         double timeCost;
-        gettimeofday(&t_start, NULL); 
+        gettimeofday(&t_start, NULL);
         //MC
         int root_num = rwIndex.size();
         vector<thread> threads;
@@ -285,7 +285,7 @@ class Base:public Graph{
         }
         vector<vector<double>>().swap(negativeFeature);
         vector<thread>().swap(threads);
-        gettimeofday(&t_end, NULL); 
+        gettimeofday(&t_end, NULL);
         timeCost = t_end.tv_sec - t_start.tv_sec + (t_end.tv_usec - t_start.tv_usec)/1000000.0;
         cout<<dataset<<" pre-computation cost: "<<timeCost<<" s"<<endl;
 

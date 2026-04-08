@@ -3,12 +3,13 @@ from typing import Optional
 
 import dgl
 import numpy as np
+import pandas as pd
 import scanpy as sc
-from sklearn.neighbors import NearestNeighbors
 import torch
 import torch.nn as nn
 from sklearn.model_selection import train_test_split
-import pandas as pd
+from sklearn.neighbors import NearestNeighbors
+
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scheteronet import (
     convert_dgl_to_original_format,
@@ -28,15 +29,13 @@ from dance.typing import LogLevel
 from dance.utils import set_seed
 
 
-
 # EVOLVE-BLOCK-START
-@register_preprocessor("graph", "cell",overwrite=True)
+@register_preprocessor("graph", "cell", overwrite=True)
 class HeteronetGraph(BaseTransform):
 
-    def __init__(self, knn_num: int = 5, distance_metrics: str = 'l2', random_state: int = 0,
-                 mutual: bool = True, add_self_loop: bool = True,
-                 channel: Optional[str] = None, channel_type: Optional[str] = "X", ignore_first: bool = False,
-                 **kwargs):
+    def __init__(self, knn_num: int = 5, distance_metrics: str = 'l2', random_state: int = 0, mutual: bool = True,
+                 add_self_loop: bool = True, channel: Optional[str] = None, channel_type: Optional[str] = "X",
+                 ignore_first: bool = False, **kwargs):
         super().__init__(**kwargs)
         self.knn_num = knn_num
         self.distance_metrics = distance_metrics
@@ -48,23 +47,21 @@ class HeteronetGraph(BaseTransform):
         self.channel_type = channel_type
 
     def build_graph_mutual_knn(self, features):
-        """
-        Build graph using DGL's knn functionality with mutual nearest neighbors
-        """
+        """Build graph using DGL's knn functionality with mutual nearest neighbors."""
         # Use DGL's native knn_graph function which is more efficient
         g_knn = dgl.knn_graph(features, self.knn_num, algorithm='bruteforce-blas')
-        
+
         # Get edges from the knn graph
         u_knn, v_knn = g_knn.edges()
-        
+
         # For mutual KNN: check if both u->v and v->u exist
         if self.mutual:
             # Create bidirectional edges for the initial knn graph
             g_bidir = dgl.add_reverse_edges(g_knn)
-            
+
             # Get unique edges (avoid duplicates after adding reverse edges)
             u_all, v_all = g_bidir.edges()
-            
+
             # Find mutual neighbors by checking intersection
             edge_set = set(zip(u_all.tolist(), v_all.tolist()))
             mutual_edges = []
@@ -72,7 +69,7 @@ class HeteronetGraph(BaseTransform):
                 # Check if this edge represents a mutual neighbor relationship
                 if (v_val, u_val) in edge_set:
                     mutual_edges.append([u_val, v_val])
-            
+
             if mutual_edges:
                 u_final = torch.tensor([edge[0] for edge in mutual_edges], dtype=torch.long)
                 v_final = torch.tensor([edge[1] for edge in mutual_edges], dtype=torch.long)
@@ -83,7 +80,7 @@ class HeteronetGraph(BaseTransform):
             # Just return original knn edges if not using mutual
             u_final = u_knn
             v_final = v_knn
-        
+
         return u_final, v_final
 
     def __call__(self, data):
@@ -123,7 +120,7 @@ class HeteronetGraph(BaseTransform):
 
         # 4. Create DGL Graph
         g = dgl.graph((src, dst), num_nodes=num_nodes)
-        
+
         # 5. Add self loops if specified
         if self.add_self_loop:
             g = dgl.add_self_loop(g)
@@ -134,21 +131,26 @@ class HeteronetGraph(BaseTransform):
         if batchs is not None:
             g.ndata['batch_id'] = torch.from_numpy(batchs.values.astype(int)).long()
         adata.uns[self.out] = g
+
+
 # EVOLVE-BLOCK-END
 
+
 def get_preprocessing_pipeline(log_level: LogLevel = "INFO"):
-        transforms = []
-        transforms.append(FilterCellsType())
-        transforms.append(AnnDataTransform(sc.pp.filter_genes, min_counts=3))
-        transforms.append(FilterCellsScanpy(min_counts=1))
-        transforms.append(HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=4000, flavor="cell_ranger"))
-        transforms.append(SaveRaw())
-        transforms.append(NormalizeTotal())
-        transforms.append(UpdateSizeFactors())
-        transforms.append(Log1P())
-        transforms.append(HeteronetGraph())
-        transforms.append(SetConfig({"label_channel": "cell_type"}))
-        return Compose(*transforms, log_level=log_level)
+    transforms = []
+    transforms.append(FilterCellsType())
+    transforms.append(AnnDataTransform(sc.pp.filter_genes, min_counts=3))
+    transforms.append(FilterCellsScanpy(min_counts=1))
+    transforms.append(HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=4000, flavor="cell_ranger"))
+    transforms.append(SaveRaw())
+    transforms.append(NormalizeTotal())
+    transforms.append(UpdateSizeFactors())
+    transforms.append(Log1P())
+    transforms.append(HeteronetGraph())
+    transforms.append(SetConfig({"label_channel": "cell_type"}))
+    return Compose(*transforms, log_level=log_level)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_dataset", nargs="+", type=int, default=[1759], help="Testing dataset IDs")

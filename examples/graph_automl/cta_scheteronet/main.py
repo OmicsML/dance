@@ -78,11 +78,11 @@ if __name__ == "__main__":
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
     parser.add_argument("--filetype", default="csv")
     args = parser.parse_args()
-    
+
     logger.setLevel(args.log_level)
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
     logger.info(f"Running ScDeepSort with the following parameters:\n{pprint.pformat(vars(args))}")
-    
+
     file_root_path = Path(
         args.root_path, "_".join([
             "-".join([str(num) for num in dataset])
@@ -90,9 +90,10 @@ if __name__ == "__main__":
             if (dataset is not None and dataset != [])
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
-    
-    pipeline_planer = PipelinePlaner.from_config_file(f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
-    
+
+    pipeline_planer = PipelinePlaner.from_config_file(
+        f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
+
     if args.gpu == -1:
         device = torch.device("cpu")
     else:
@@ -103,7 +104,7 @@ if __name__ == "__main__":
     # ================= MODIFIED FUNCTION STARTS HERE =================
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
-        
+
         train_scores = []
         valid_scores = []
         test_scores = []
@@ -113,10 +114,10 @@ if __name__ == "__main__":
 
         for run_idx in range(args.num_runs):
             logger.info(f"Starting Run {run_idx + 1}/{args.num_runs}")
-            
+
             current_seed = args.seed + run_idx
             set_seed(current_seed)
-            
+
             data = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
                                              train_dataset=args.train_dataset, data_dir=args.data_dir,
                                              val_size=args.val_size).load_data()
@@ -125,14 +126,15 @@ if __name__ == "__main__":
             preprocessing_pipeline = pipeline_planer.generate(**kwargs)
             if run_idx == 0:
                 print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
-            
+
             preprocessing_pipeline(data)
 
             set_split(data, data.train_idx, data.val_idx, data.test_idx)
             g = data.data.uns['HeteronetGraph']
             ref_data_name = f"{args.species}_{args.tissue}_{args.train_dataset}"
-            dataset_ind, dataset_ood_tr, dataset_ood_te, adata = convert_dgl_to_original_format(g, data.data, ref_data_name)
-            
+            dataset_ind, dataset_ood_tr, dataset_ood_te, adata = convert_dgl_to_original_format(
+                g, data.data, ref_data_name)
+
             if len(dataset_ind.y.shape) == 1:
                 dataset_ind.y = dataset_ind.y.unsqueeze(1)
             if len(dataset_ood_tr.y.shape) == 1:
@@ -147,7 +149,7 @@ if __name__ == "__main__":
 
             c = max(dataset_ind.y.max().item() + 1, dataset_ind.y.shape[1])
             d = dataset_ind.graph['node_feat'].shape[1]
-            
+
             model = scHeteroNet(d, c, dataset_ind.edge_index.to(device), dataset_ind.num_nodes,
                                 hidden_channels=args.hidden_channels, num_layers=args.num_layers, dropout=args.dropout,
                                 use_bn=args.use_bn, device=device, min_loss=100000)
@@ -157,24 +159,24 @@ if __name__ == "__main__":
             model.to(device)
 
             optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-            
+
             for epoch in range(args.epochs):
                 loss = model.fit(dataset_ind, dataset_ood_tr, args.use_zinb, adata, args.zinb_weight, args.cl_weight,
                                  args.mask_ratio, criterion, optimizer)
-            
+
             run_train_score = model.score(dataset_ind, dataset_ind.y, data.train_idx)
             run_valid_score = model.score(dataset_ind, dataset_ood_te.y, data.val_idx)
             run_test_score = model.score(dataset_ind, dataset_ind.y, data.test_idx)
-            
+
             train_scores.append(run_train_score)
             valid_scores.append(run_valid_score)
             test_scores.append(run_test_score)
-            
+
             logger.info(f"Run {run_idx + 1} finished. Valid Acc: {run_valid_score:.4f}, Test Acc: {run_test_score:.4f}")
 
             del model, data, dataset_ind, dataset_ood_tr, dataset_ood_te, g, adata
             gc.collect()
-            if args.gpu != -1: 
+            if args.gpu != -1:
                 torch.cuda.empty_cache()
 
         # Stop Timer
@@ -188,23 +190,26 @@ if __name__ == "__main__":
         speed_score = 1.0 / (1.0 + total_time_seconds / 300.0)
         combined_score = 0.8 * avg_valid_score + 0.2 * speed_score
 
-        logger.info(f"Averaged over {args.num_runs} runs - Valid Acc: {avg_valid_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}")
+        logger.info(
+            f"Averaged over {args.num_runs} runs - Valid Acc: {avg_valid_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}"
+        )
 
         wandb.log({
-            "train_acc": avg_train_score, 
-            "acc": avg_valid_score, 
+            "train_acc": avg_train_score,
+            "acc": avg_valid_score,
             "test_acc": avg_test_score,
             "time": total_time_seconds,
             "speed_score": speed_score,
             "combined_score": combined_score
         })
         wandb.finish()
+
     # ================= MODIFIED FUNCTION ENDS HERE =================
 
-    entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
-        evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)
+    entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(evaluate_pipeline, sweep_id=args.sweep_id,
+                                                                  count=args.count)
     save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
-    
+
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
         get_step3_yaml(
             result_load_path=f"{args.summary_file_path}",

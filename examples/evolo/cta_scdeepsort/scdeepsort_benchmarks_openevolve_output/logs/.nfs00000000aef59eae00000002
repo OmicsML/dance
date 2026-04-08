@@ -9,7 +9,7 @@
 2026-03-17 23:23:42,962 - openevolve.database - INFO - Initialized program database with 0 programs
 2026-03-17 23:23:47,274 - numexpr.utils - INFO - Note: NumExpr detected 48 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 16.
 2026-03-17 23:23:47,277 - numexpr.utils - INFO - NumExpr defaulting to 16 threads.
-2026-03-17 23:25:18,804 - evaluation_module - INFO - Stdout: 
+2026-03-17 23:25:18,804 - evaluation_module - INFO - Stdout:
 2026-03-17 23:25:18,806 - evaluation_module - INFO - Stderr: /home/common/zyxing/anaconda3/envs/dance-evolo/lib/python3.11/site-packages/louvain/__init__.py:54: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
   from pkg_resources import get_distribution, DistributionNotFound
 /mnt/nfs/zyxing/msu/dance_temp/dance/dance/utils/matrix.py:178: NumbaExperimentalFeatureWarning: First-class function type feature is experimental
@@ -40,4 +40,3 @@ Traceback (most recent call last):
     start_time = time.time()  # 新增：记录单次循环的开始时间
                  ^^^^
 NameError: name 'time' is not defined. Did you mean: 'times'?
-

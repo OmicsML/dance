@@ -613,11 +613,9 @@ class NormalizeTotal(AnnDataTransform):
     """
 
     def __init__(self, target_sum: Optional[float] = None, max_fraction: float = 0.05, key_added: Optional[str] = None,
-                 layer: Optional[str] = None, 
-                 inplace: bool = True, copy: bool = False, **kwargs):
-        super().__init__(sc.pp.normalize_total, target_sum=target_sum, key_added=key_added, layer=layer, 
-                         inplace=inplace, copy=copy, exclude_highly_expressed=True,
-                         max_fraction=max_fraction, **kwargs)
+                 layer: Optional[str] = None, inplace: bool = True, copy: bool = False, **kwargs):
+        super().__init__(sc.pp.normalize_total, target_sum=target_sum, key_added=key_added, layer=layer,
+                         inplace=inplace, copy=copy, exclude_highly_expressed=True, max_fraction=max_fraction, **kwargs)
 
         if max_fraction == 1.0:
             self.logger.info("max_fraction set to 1.0, this is equivalent to setting exclude_highly_expressed=False.")

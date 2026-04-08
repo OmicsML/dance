@@ -5,6 +5,9 @@ import os
 import pickle as pkl
 import random
 import sys
+
+# Local/third-party specific imports
+import warnings
 from collections import Counter
 from copy import deepcopy
 
@@ -21,14 +24,12 @@ from sklearn.metrics import f1_score, precision_score
 from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
 from torch import Tensor, nn
 from torch.nn import Parameter
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, ReduceLROnPlateau, _LRScheduler
 from torch.utils import data as tdata
 from torch_geometric.data import Batch, Data
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.utils import remove_self_loops
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, ReduceLROnPlateau, _LRScheduler
 
-# Local/third-party specific imports
-import warnings
 from dance.modules.base import BaseClassificationMethod
 from dance.transforms import BaseTransform, Compose, NormalizeTotalLog1P, SetConfig
 from dance.transforms.graph import StringDBGraph
@@ -39,6 +40,7 @@ warnings.filterwarnings("ignore")
 # ==========================================
 # 1. Data Handling (Dataset & DataLoader)
 # ==========================================
+
 
 def collate_func(batch):
     data0 = batch[0]
@@ -59,19 +61,21 @@ def collate_func(batch):
 
 
 class DataLoader(torch.utils.data.DataLoader):
+
     def __init__(self, dataset, batch_size=1, shuffle=False, follow_batch=[], **kwargs):
         if 'collate_fn' not in kwargs.keys():
             kwargs['collate_fn'] = collate_func
-        super(DataLoader, self).__init__(dataset, batch_size, shuffle, **kwargs)
+        super().__init__(dataset, batch_size, shuffle, **kwargs)
 
 
 class ExprDataset(tdata.Dataset):
-    def __init__(self, Expr, edge, y, device='cpu'): 
-        super(ExprDataset, self).__init__()
+
+    def __init__(self, Expr, edge, y, device='cpu'):
+        super().__init__()
 
         print('processing dataset (on CPU)...')
         self.gene_num = Expr.shape[1]
-        
+
         # ==================== 修复部分开始 ====================
         # 处理 Edge (保持在 CPU)
         if isinstance(edge, list):
@@ -91,12 +95,14 @@ class ExprDataset(tdata.Dataset):
         elif isinstance(edge, (np.ndarray, t.Tensor)):
             # 转换为 Tensor
             edge_tensor = t.tensor(edge).long().cpu() if not isinstance(edge, t.Tensor) else edge.long().cpu()
-            
+
             # 【关键修复】: 如果形状是 [N, 2] (比如 [899420, 2])，强制转置为 [2, N]
             if edge_tensor.shape[0] != 2 and edge_tensor.shape[1] == 2:
-                print(f"Warning: Transposing edge_index from {edge_tensor.shape} to ({edge_tensor.shape[1]}, {edge_tensor.shape[0]}) for PyG compat.")
+                print(
+                    f"Warning: Transposing edge_index from {edge_tensor.shape} to ({edge_tensor.shape[1]}, {edge_tensor.shape[0]}) for PyG compat."
+                )
                 edge_tensor = edge_tensor.t()
-            
+
             self.common_edge = edge_tensor
             # 现在可以安全地获取边数 (第1维)
             self.edge_num = self.common_edge.shape[1]
@@ -109,7 +115,7 @@ class ExprDataset(tdata.Dataset):
             self.Expr = Expr.float().cpu()
         else:
             self.Expr = t.tensor(Expr).float()
-            
+
         # 2. 处理 Label
         self.y = t.tensor(y).long().cpu()
 
@@ -129,14 +135,14 @@ class ExprDataset(tdata.Dataset):
         impute_indexs = np.arange(self.num_sam).tolist()
 
         np.random.seed(random_seed)
-        
+
         for lab in np.unique(y_np):
             current_count = np.sum(y_np == lab)
-            
+
             if max_num_types / current_count > dup_odds:
                 impute_size = int(max_num_types / dup_odds) - current_count
                 print('duplicate #celltype %d with %d cells' % (lab, impute_size))
-                
+
                 impute_idx = np.random.choice(np.where(y_np == lab)[0], size=impute_size, replace=True).tolist()
                 impute_indexs += impute_idx
 
@@ -157,7 +163,7 @@ class ExprDataset(tdata.Dataset):
         if not isinstance(idx, t.Tensor):
             idx = t.tensor(idx).long()
         return ExprDataset(self.Expr[idx, :], self.common_edge, self.y[idx])
-    
+
     def __len__(self):
         return self.num_sam
 
@@ -169,18 +175,23 @@ class ExprDataset(tdata.Dataset):
         data['edge_index'] = self.common_edge
         return data
 
+
 # ==========================================
 # 2. Model Definition (Layers & GNN)
 # ==========================================
+
 
 def uniform(size, tensor):
     bound = 1.0 / math.sqrt(size)
     if tensor is not None:
         tensor.data.uniform_(-bound, bound)
 
+
 class SAGEConv(MessagePassing):
-    def __init__(self, in_channels, out_channels, normalize=False, bias=True, activate=False, alphas=[0.65, 0.35], shared_weight=False, aggr='mean', **kwargs):
-        super(SAGEConv, self).__init__(aggr=aggr, **kwargs)
+
+    def __init__(self, in_channels, out_channels, normalize=False, bias=True, activate=False, alphas=[0.65, 0.35],
+                 shared_weight=False, aggr='mean', **kwargs):
+        super().__init__(aggr=aggr, **kwargs)
         self.shared_weight = shared_weight
         self.activate = activate
         self.in_channels = in_channels
@@ -228,10 +239,12 @@ class SAGEConv(MessagePassing):
             aggr_out = F.normalize(aggr_out, p=2, dim=-1)
         return aggr_out
 
+
 def init_weights(m):
     if type(m) == nn.Linear:
         nn.init.xavier_uniform_(m.weight)
         m.bias.data.fill_(0.01)
+
 
 def help_bn(bn1, x):
     x = x.permute(1, 0, 2)  # #samples x #nodes x #features
@@ -239,15 +252,17 @@ def help_bn(bn1, x):
     x = x.permute(1, 0, 2)  # #nodes x #samples x #features
     return x
 
+
 def sup_constrive(representations, label, T, device):
     n = label.shape[0]
     similarity_matrix = F.cosine_similarity(representations.unsqueeze(1), representations.unsqueeze(0), dim=2)
-    
+
     # Create mask
-    mask = torch.ones_like(similarity_matrix) * (label.expand(n, n).eq(label.expand(n, n).t())) - torch.eye(n, n).to(device)
+    mask = torch.ones_like(similarity_matrix) * (label.expand(n, n).eq(label.expand(n, n).t())) - torch.eye(
+        n, n).to(device)
     mask_no_sim = torch.ones_like(mask) - mask
     mask_dui_jiao_0 = torch.ones(n, n) - torch.eye(n, n)
-    
+
     similarity_matrix = torch.exp(similarity_matrix / T)
     similarity_matrix = similarity_matrix * mask_dui_jiao_0.to(device)
     sim = mask * similarity_matrix
@@ -265,9 +280,11 @@ def sup_constrive(representations, label, T, device):
         loss = torch.tensor(0.0).to(device)
     return loss
 
+
 class WeightFreezing(nn.Module):
+
     def __init__(self, input_dim, output_dim, shared_ratio=0.3, multiple=0):
-        super(WeightFreezing, self).__init__()
+        super().__init__()
         self.weight = nn.Parameter(torch.Tensor(output_dim, input_dim))
         self.bias = nn.Parameter(torch.Tensor(output_dim))
         nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
@@ -281,13 +298,15 @@ class WeightFreezing(nn.Module):
         self.multiple = multiple
 
     def forward(self, x, shared_weight):
-        combined_weight = torch.where(self.shared_mask, shared_weight*self.multiple, self.weight.t())
+        combined_weight = torch.where(self.shared_mask, shared_weight * self.multiple, self.weight.t())
         output = F.linear(x, combined_weight.t(), self.bias)
         return output
 
+
 class scRGCL(nn.Module):
+
     def __init__(self, in_channel=1, mid_channel=8, out_channel=2, num_nodes=2207, edge_num=151215, **args):
-        super(scRGCL, self).__init__()
+        super().__init__()
         self.mid_channel = mid_channel
         self.dropout_ratio = args.get('dropout_ratio', 0.3)
         print('model dropout ratio:', self.dropout_ratio)
@@ -339,8 +358,8 @@ class scRGCL(nn.Module):
 
         self.nn = []
         for idx, num in enumerate(channel_list[:-1]):
-            self.nn.append(nn.Linear(channel_list[idx], channel_list[idx+1]))
-            self.nn.append(nn.BatchNorm1d(channel_list[idx+1]))
+            self.nn.append(nn.Linear(channel_list[idx], channel_list[idx + 1]))
+            self.nn.append(nn.BatchNorm1d(channel_list[idx + 1]))
             if self.dropout_ratio > 0:
                 self.nn.append(nn.Dropout(0.3))
             self.nn.append(nn.ReLU())
@@ -360,18 +379,18 @@ class scRGCL(nn.Module):
         self.fixed_weight = self.shared_weights.t() * self.classifier.shared_mask
 
         self.edge_num = edge_num
-        self.weight_edge_flag = True  
+        self.weight_edge_flag = True
         if self.weight_edge_flag:
-            self.edge_weight = nn.Parameter(t.ones(edge_num).float()*0.01)
+            self.edge_weight = nn.Parameter(t.ones(edge_num).float() * 0.01)
         else:
             self.edge_weight = None
-    
+
         self.reset_parameters()
 
     @property
     def device(self):
         return self.c_layer.weight.device
-    
+
     def reset_parameters(self):
         self.conv1.apply(init_weights)
         self.conv2.apply(init_weights)
@@ -390,17 +409,17 @@ class scRGCL(nn.Module):
         self.global_fc_nn.apply(init_weights)
         self.fc1.apply(init_weights)
 
-    def forward(self,data,get_latent_varaible=False,ui=None):
+    def forward(self, data, get_latent_varaible=False, ui=None):
         x, edge_index, batch = data.x, data.edge_index, data.batch
-        
+
         if self.weight_edge_flag:
             one_graph_edge_weight = torch.sigmoid(self.edge_weight)
             edge_weight = one_graph_edge_weight
         else:
-            edge_weight = None 
-            
+            edge_weight = None
+
         # 维度交换
-        x = x.permute(1, 0, 2) 
+        x = x.permute(1, 0, 2)
         x = self.conv1(x, edge_index, edge_weight=edge_weight)
         x = self.act1(x)
         x = x.permute(1, 0, 2)
@@ -409,10 +428,10 @@ class scRGCL(nn.Module):
 
         if ui == True:
             c_x = x.permute(1, 0, 2)
-            avg_pool = F.avg_pool1d(c_x,kernel_size=8)
+            avg_pool = F.avg_pool1d(c_x, kernel_size=8)
             max_pool = avg_pool.squeeze(dim=-1)
             c_layer = self.c_layer(max_pool)
-            
+
             contrast_label = np.squeeze(data.y.cpu().numpy(), -1)
             contrast_label = torch.tensor(contrast_label).to(self.device)
             loss_hard = sup_constrive(c_layer, contrast_label, 0.07, self.device)
@@ -449,24 +468,24 @@ class scRGCL(nn.Module):
         x = self.conv2(x, edge_index, edge_weight=edge_weight)
         x = self.act2(x)
         x = x.permute(1, 0, 2)
-        
+
         x = help_bn(self.bn2, x)
         x = F.dropout(x, p=0.3, training=self.training)
 
-        x = x.permute(1,2,0)
+        x = x.permute(1, 2, 0)
         x = x.unsqueeze(dim=-1)
         x = self.global_conv1(x)
         x = self.global_act1(x)
         x = self.global_bn1(x)
-        if self.dropout_ratio >0: x = F.dropout(x, p=0.3, training=self.training)
+        if self.dropout_ratio > 0: x = F.dropout(x, p=0.3, training=self.training)
         x = self.global_conv2(x)
         x = self.global_act1(x)
         x = self.global_bn2(x)
-        if self.dropout_ratio >0: x = F.dropout(x, p=0.3, training=self.training)
+        if self.dropout_ratio > 0: x = F.dropout(x, p=0.3, training=self.training)
         x = x.squeeze(dim=-1)
         num_samples = x.shape[0]
 
-        x = x .view(num_samples, -1)
+        x = x.view(num_samples, -1)
         x = self.global_fc_nn(x)
         if get_latent_varaible:
             return x
@@ -474,9 +493,11 @@ class scRGCL(nn.Module):
             x = self.classifier(x, self.fixed_weight.to(x.device))
             return F.softmax(x, dim=-1), loss_hard
 
+
 # ==========================================
 # 3. Training & Utility Functions
 # ==========================================
+
 
 def edge_transform_func(org_edge):
     edge = org_edge
@@ -484,6 +505,7 @@ def edge_transform_func(org_edge):
     edge = remove_self_loops(edge)[0]
     edge = edge.numpy()
     return edge
+
 
 def compute_kl_loss(p, q, pad_mask=None):
     p_loss = F.kl_div(F.log_softmax(p, dim=-1), F.softmax(q, dim=-1), reduction='none')
@@ -496,14 +518,17 @@ def compute_kl_loss(p, q, pad_mask=None):
     loss = (p_loss + q_loss) / 2
     return loss
 
+
 def train2(model, optimizer, train_loader, epoch, device, loss_fn=None, scheduler=None, verbose=False):
     model.train()
     loss_all = 0
     iters = len(train_loader)
-    
+
     # 【修复】防止 Loader 为空导致的除零错误
     if iters == 0:
-        print(f"Warning: Epoch {epoch} skipped because DataLoader is empty (Batch size > Dataset size with drop_last=True).")
+        print(
+            f"Warning: Epoch {epoch} skipped because DataLoader is empty (Batch size > Dataset size with drop_last=True)."
+        )
         return 0
 
     for idx, data in enumerate(train_loader):
@@ -511,17 +536,17 @@ def train2(model, optimizer, train_loader, epoch, device, loss_fn=None, schedule
 
         if verbose:
             print(data.y.shape, data.edge_index.shape)
-            
+
         optimizer.zero_grad()
         label = data.y.reshape(-1)
-        
+
         all_output = model(data, ui=True)
         all_output1 = model(data, ui=True)
-        
+
         output = all_output[0]
         output1 = all_output1[0]
         c_loss = all_output[1]
-        
+
         if loss_fn is None:
             ce_loss = 0.5 * (F.cross_entropy(output1, label) + F.cross_entropy(output, label))
             kl_loss = compute_kl_loss(output1, output)
@@ -532,7 +557,7 @@ def train2(model, optimizer, train_loader, epoch, device, loss_fn=None, schedule
             loss = ce_loss + 0.75 * kl_loss
 
         if model.edge_weight is not None:
-            l2_loss = 0 
+            l2_loss = 0
             if isinstance(model.edge_weight, nn.Module):
                 for edge_weight in model.edge_weight:
                     l2_loss += 0.1 * t.mean((edge_weight)**2)
@@ -542,7 +567,7 @@ def train2(model, optimizer, train_loader, epoch, device, loss_fn=None, schedule
 
         loss = loss + c_loss.item() * 0.1
         loss.backward()
-        
+
         loss_all += loss.item() * data.num_graphs
         optimizer.step()
 
@@ -551,12 +576,13 @@ def train2(model, optimizer, train_loader, epoch, device, loss_fn=None, schedule
 
     return (loss_all / iters)
 
+
 @torch.no_grad()
 def test2(model, loader, predicts=False, device=None):
     model.eval()
     y_pred_list = []
     y_true_list = []
-    y_output_list = [] 
+    y_output_list = []
     cell_list = []
 
     for data in loader:
@@ -591,24 +617,18 @@ def test2(model, loader, predicts=False, device=None):
     else:
         return acc, f1
 
+
 # ==========================================
 # 4. Main Wrapper Class
 # ==========================================
 
+
 class scRGCLWrapper(BaseClassificationMethod):
-    """
-    Wrapper class for scRGCL model.
-    """
-    def __init__(self, 
-                 dropout_ratio: float = 0.1,
-                 weight_decay: float = 1e-4,
-                 init_lr: float = 0.001,
-                 min_lr: float = 1e-6,
-                 max_epoch_stage1: int = 14,
-                 max_epoch_stage2: int = 50,
-                 seed: int = 42,
-                 out_dir: str = './output',
-                 device: torch.device = torch.device("cuda:0")):
+    """Wrapper class for scRGCL model."""
+
+    def __init__(self, dropout_ratio: float = 0.1, weight_decay: float = 1e-4, init_lr: float = 0.001,
+                 min_lr: float = 1e-6, max_epoch_stage1: int = 14, max_epoch_stage2: int = 50, seed: int = 42,
+                 out_dir: str = './output', device: torch.device = torch.device("cuda:0")):
         super().__init__()
         self.dropout_ratio = dropout_ratio
         self.weight_decay = weight_decay
@@ -620,7 +640,7 @@ class scRGCLWrapper(BaseClassificationMethod):
         self.out_dir = out_dir
         self.device = device
         self.model = None
-        self.dataset_attr = {} 
+        self.dataset_attr = {}
         self.str_labels = []
 
         os.makedirs(os.path.join(self.out_dir, 'models'), exist_ok=True)
@@ -630,21 +650,18 @@ class scRGCLWrapper(BaseClassificationMethod):
         return Compose(
             NormalizeTotalLog1P(),
             StringDBGraph(thres=thres, species=species),
-            SetConfig({
-                "label_channel": "cell_type"
-            }),
+            SetConfig({"label_channel": "cell_type"}),
             log_level=log_level,
         )
-
 
     def fit(self, adata, batch_size=64):
         logExpr = adata.X
         if scipy.sparse.issparse(logExpr):
             print("Converting sparse matrix to dense array for speed...")
             logExpr = logExpr.toarray()
-        
+
         logExpr = logExpr.astype(np.float32)
-        
+
         if 'str_labels' in adata.uns:
             self.str_labels = adata.uns['str_labels']
             label = np.array([self.str_labels.index(ct) for ct in adata.obs['cell_type']])
@@ -656,7 +673,7 @@ class scRGCLWrapper(BaseClassificationMethod):
 
         if 'edge_index' not in adata.uns:
             raise ValueError("adata.uns['edge_index'] is missing.")
-        
+
         used_edge = edge_transform_func(adata.uns['edge_index'])
         print('Data preparation complete.')
 
@@ -665,12 +682,12 @@ class scRGCLWrapper(BaseClassificationMethod):
         alpha = np.max(alpha) / alpha
         alpha = np.clip(alpha, 1, 50)
         alpha = alpha / np.sum(alpha)
-        
+
         loss_fn = t.nn.CrossEntropyLoss(weight=t.tensor(alpha).float())
         loss_fn = loss_fn.to(self.device)
 
         full_dataset = ExprDataset(Expr=logExpr, edge=used_edge, y=label, device='cpu')
-        
+
         self.dataset_attr = {
             'gene_num': full_dataset.gene_num,
             'class_num': len(np.unique(label)),
@@ -679,12 +696,10 @@ class scRGCLWrapper(BaseClassificationMethod):
             'used_edge': used_edge
         }
 
-        self.model = scRGCL(in_channel=self.dataset_attr['num_expr_feature'], 
-                            num_nodes=self.dataset_attr['gene_num'],
-                            out_channel=self.dataset_attr['class_num'], 
-                            edge_num=self.dataset_attr['edge_num'],
+        self.model = scRGCL(in_channel=self.dataset_attr['num_expr_feature'], num_nodes=self.dataset_attr['gene_num'],
+                            out_channel=self.dataset_attr['class_num'], edge_num=self.dataset_attr['edge_num'],
                             dropout_ratio=self.dropout_ratio).to(self.device)
-        
+
         print(f"Model initialized on {next(self.model.parameters()).device}")
 
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.init_lr, weight_decay=self.weight_decay)
@@ -692,50 +707,56 @@ class scRGCLWrapper(BaseClassificationMethod):
         # Stage 1 Training
         train_dataset = full_dataset
         train_dataset.duplicate_minor_types(dup_odds=50)
-        
+
         # 【修复】如果 Stage 1 数据集太小，关闭 drop_last
         s1_drop_last = True
         if len(train_dataset) < batch_size:
-            print(f"Notice: Stage 1 dataset size ({len(train_dataset)}) < batch_size ({batch_size}). Disabling drop_last.")
+            print(
+                f"Notice: Stage 1 dataset size ({len(train_dataset)}) < batch_size ({batch_size}). Disabling drop_last."
+            )
             s1_drop_last = False
 
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=0, 
-                                  shuffle=True, collate_fn=collate_func, drop_last=s1_drop_last, pin_memory=True)
-        
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=0, shuffle=True,
+                                  collate_fn=collate_func, drop_last=s1_drop_last, pin_memory=True)
+
         scheduler = CosineAnnealingWarmRestarts(optimizer, 2, 2, eta_min=int(self.min_lr), last_epoch=-1)
-        
+
         print('Stage 1 training (Warmup)...')
         for epoch in range(1, self.max_epoch_stage1):
             train_loss = train2(self.model, optimizer, train_loader, epoch, self.device, loss_fn, scheduler=scheduler)
             train_acc, train_f1 = test2(self.model, train_loader, predicts=False, device=self.device)
             lr = optimizer.param_groups[0]['lr']
-            print(f'epoch {epoch:03d}, lr: {lr:.06f}, loss: {train_loss:.06f}, T-acc: {train_acc:.04f}, T-f1: {train_f1:.04f}')
+            print(
+                f'epoch {epoch:03d}, lr: {lr:.06f}, loss: {train_loss:.06f}, T-acc: {train_acc:.04f}, T-f1: {train_f1:.04f}'
+            )
 
         # Stage 2 Training
         print('Stage 2 training (Fine-tuning)...')
-        
+
         raw_dataset = ExprDataset(Expr=logExpr, edge=used_edge, y=label, device='cpu')
-        
+
         sss = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=self.seed)
         y_cpu = raw_dataset.y.numpy()
         train_idx, valid_idx = next(sss.split(y_cpu, y_cpu))
-        
+
         st2_train_dataset = raw_dataset.split(t.tensor(train_idx).long())
         st2_valid_dataset = raw_dataset.split(t.tensor(valid_idx).long())
-        
+
         st2_train_dataset.duplicate_minor_types(dup_odds=50)
-        
+
         # 【修复】Stage 2 关键修复：动态检查 drop_last
         # 因为切分后数据变少了，更容易触发这个问题
         s2_drop_last = True
         if len(st2_train_dataset) < batch_size:
-            print(f"Notice: Stage 2 train size ({len(st2_train_dataset)}) < batch_size ({batch_size}). Disabling drop_last.")
+            print(
+                f"Notice: Stage 2 train size ({len(st2_train_dataset)}) < batch_size ({batch_size}). Disabling drop_last."
+            )
             s2_drop_last = False
 
-        st2_train_loader = DataLoader(st2_train_dataset, batch_size=batch_size, num_workers=0, 
-                                      shuffle=True, collate_fn=collate_func, drop_last=s2_drop_last, pin_memory=True)
-        st2_valid_loader = DataLoader(st2_valid_dataset, batch_size=batch_size, num_workers=0, 
-                                      shuffle=True, collate_fn=collate_func, pin_memory=True)
+        st2_train_loader = DataLoader(st2_train_dataset, batch_size=batch_size, num_workers=0, shuffle=True,
+                                      collate_fn=collate_func, drop_last=s2_drop_last, pin_memory=True)
+        st2_valid_loader = DataLoader(st2_valid_dataset, batch_size=batch_size, num_workers=0, shuffle=True,
+                                      collate_fn=collate_func, pin_memory=True)
 
         current_lr = optimizer.param_groups[0]['lr']
         print(f'Stage 2 initialize lr: {current_lr}')
@@ -744,17 +765,19 @@ class scRGCLWrapper(BaseClassificationMethod):
 
         max_metric = 0.0
         max_metric_count = 0
-        
+
         for epoch in range(self.max_epoch_stage1, self.max_epoch_stage1 + self.max_epoch_stage2):
             train_loss = train2(self.model, optimizer, st2_train_loader, epoch, self.device, loss_fn, verbose=False)
             train_acc, train_f1 = test2(self.model, st2_train_loader, predicts=False, device=self.device)
             valid_acc, valid_f1 = test2(self.model, st2_valid_loader, predicts=False, device=self.device)
-            
+
             lr = optimizer.param_groups[0]['lr']
-            print(f'epoch {epoch:03d}, lr: {lr:.06f}, loss: {train_loss:.06f}, T-acc: {train_acc:.04f}, T-f1: {train_f1:.04f}, V-acc: {valid_acc:.04f}, V-f1: {valid_f1:.04f}')
-            
+            print(
+                f'epoch {epoch:03d}, lr: {lr:.06f}, loss: {train_loss:.06f}, T-acc: {train_acc:.04f}, T-f1: {train_f1:.04f}, V-acc: {valid_acc:.04f}, V-f1: {valid_f1:.04f}'
+            )
+
             scheduler.step(valid_f1)
-            
+
             if valid_f1 > max_metric:
                 max_metric = valid_f1
                 max_metric_count = 0
@@ -764,11 +787,11 @@ class scRGCLWrapper(BaseClassificationMethod):
                 if max_metric_count > 3:
                     print(f'Early stopping triggered at epoch {epoch}')
                     break
-            
+
             if optimizer.param_groups[0]['lr'] <= 0.00001:
                 print('Minimum learning rate reached.')
                 break
-        
+
         best_model_path = os.path.join(self.out_dir, 'models', 'best_model.pth')
         if os.path.exists(best_model_path):
             self.model.load_state_dict(t.load(best_model_path))
@@ -776,15 +799,12 @@ class scRGCLWrapper(BaseClassificationMethod):
 
         t.save(self.model, os.path.join(self.out_dir, 'models', 'final_model.pth'))
 
-
-
-
     def _prepare_test_loader(self, dataset):
         if self.model is None:
-             raise RuntimeError("Model is not fitted yet.")
+            raise RuntimeError("Model is not fitted yet.")
         if isinstance(dataset, DataLoader):
             return dataset
-        
+
         if hasattr(dataset, 'X'):
             expr = dataset.X
             y = np.zeros(expr.shape[0])

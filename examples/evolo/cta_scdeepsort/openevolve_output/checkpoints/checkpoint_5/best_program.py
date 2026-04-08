@@ -4,8 +4,8 @@ from typing import Optional, Union, get_args
 
 import dgl
 import numpy as np
-from sklearn.decomposition import TruncatedSVD
 import torch
+from sklearn.decomposition import TruncatedSVD
 
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
@@ -18,8 +18,9 @@ from dance.utils import set_seed
 from dance.utils.matrix import normalize
 from dance.utils.wrappers import add_mod_and_transform
 
+
 # EVOLVE-BLOCK-START
-@register_preprocessor("feature", "cell",overwrite=True)
+@register_preprocessor("feature", "cell", overwrite=True)
 @add_mod_and_transform
 class WeightedFeaturePCA(BaseTransform):
     """Compute the weighted gene PCA as cell features.
@@ -59,15 +60,14 @@ class WeightedFeaturePCA(BaseTransform):
             feat = normalize(feat, mode=self.feat_norm_mode, axis=self.feat_norm_axis)
         if self.n_components > min(feat.shape):
             self.logger.warning(
-                f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)}"
-            )
+                f"n_components={self.n_components} must be between 0 and min(n_samples, n_features)={min(feat.shape)}")
             self.n_components = min(feat.shape)
-        
+
         # Use TruncatedSVD instead of PCA for sparse matrices
         gene_decomposer = TruncatedSVD(n_components=self.n_components)  # genes x components
 
         gene_feat = gene_decomposer.fit_transform(feat.T)  # decompose into gene features
-        
+
         # Compute cell features independently using TruncatedSVD on the original matrix
         cell_decomposer = TruncatedSVD(n_components=self.n_components)
         cell_feat = cell_decomposer.fit_transform(feat)  # cells x components
@@ -81,7 +81,8 @@ class WeightedFeaturePCA(BaseTransform):
         #     data.data.uns["pca_explained_variance_ratio"] = gene_pca.explained_variance_ratio_
         return data
 
-@register_preprocessor("graph", "cell",overwrite=True)
+
+@register_preprocessor("graph", "cell", overwrite=True)
 class CellFeatureGraph(BaseTransform):
 
     def __init__(self, cell_feature_channel: str, gene_feature_channel: Optional[str] = None, *,
@@ -110,7 +111,7 @@ class CellFeatureGraph(BaseTransform):
 
         # Apply log transformation to dampen outlier effects
         feat_log = np.log1p(feat)
-        
+
         row, col = np.nonzero(feat_log)
         edata = np.array(feat_log[row, col]).ravel()[:, None]
         self.logger.info(f"Number of nonzero entries: {edata.size:,}")
@@ -137,7 +138,7 @@ class CellFeatureGraph(BaseTransform):
         # Normalize edges efficiently using DGL's built-in function
         if self.normalize_edges:
             g.edata['weight'] = dgl.nn.EdgeWeightNorm('both')(g, g.edata['weight'])
-        
+
         # Remove explicit self-loops since AdaptiveSAGE handles them internally
         # g.add_edges(g.nodes(), g.nodes(), {"weight": torch.ones(g.number_of_nodes())[:, None]})
 
@@ -152,7 +153,7 @@ class CellFeatureGraph(BaseTransform):
         return data
 
 
-@register_preprocessor("graph", "cell",overwrite=True)
+@register_preprocessor("graph", "cell", overwrite=True)
 class PCACellFeatureGraph(BaseTransform):
 
     _DISPLAY_ATTRS = ("n_components", "split_name")
@@ -183,8 +184,10 @@ class PCACellFeatureGraph(BaseTransform):
         CellFeatureGraph(cell_feature_channel="WeightedFeaturePCA", mod=self.mod, normalize_edges=self.normalize_edges,
                          log_level=self.log_level)(data)
         return data
+
+
 # EVOLVE-BLOCK-END
-    
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=500)
@@ -226,7 +229,8 @@ if __name__ == "__main__":
 
         # Load data and perform necessary preprocessing
         dataloader = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
-                                               train_dataset=args.train_dataset, data_dir="../temp_data", val_size=args.val_size)
+                                               train_dataset=args.train_dataset, data_dir="../temp_data",
+                                               val_size=args.val_size)
         data = dataloader.load_data(transform=preprocessing_pipeline, cache=args.cache)
 
         # Obtain training and testing data

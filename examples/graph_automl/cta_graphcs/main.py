@@ -23,10 +23,9 @@ from dance.transforms.normalize import NormalizeTotalLog1P
 from dance.typing import LogLevel
 from dance.utils import set_seed
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    
+
     # Base Dance arguments
     parser.add_argument("--cache", action="store_true", help="Cache processed data.")
     parser.add_argument("--dense_dim", type=int, default=400, help="dim of PCA")
@@ -39,20 +38,20 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=10)
     parser.add_argument("--num_runs", type=int, default=2)
     parser.add_argument("--val_size", type=float, default=0.2, help="val size")
-    
+
     # Training parameters (passed to GraphCSClassifier.__init__)
     parser.add_argument("--batch_size", type=int, default=128, help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
     parser.add_argument("--vat_lr", type=float, default=0.1, help="VAT learning rate")
     parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
     parser.add_argument("--patience", type=int, default=20, help="early stopping patience")
-    
+
     # Model architecture parameters
     parser.add_argument("--layer", type=int, default=2, help="number of layers")
     parser.add_argument("--hidden", type=int, default=256, help="hidden dimensions")
     parser.add_argument("--dropout", type=float, default=0, help="dropout rate")
     parser.add_argument("--bias", default='none', help="bias usage")
-    
+
     # GraphCS specific parameters (if used in preprocessing or internal logic)
     parser.add_argument("--alpha", type=float, default=0.05, help="decay factor (GraphCS)")
     parser.add_argument("--rmax", type=float, default=1e-5, help="threshold (GraphCS)")
@@ -66,11 +65,11 @@ if __name__ == "__main__":
     parser.add_argument("--filetype", default="csv")
     parser.add_argument('--additional_sweep_ids', action='append', type=str, help='get prior runs')
     args = parser.parse_args()
-    
+
     # Update GPU argument for the model wrapper expectations
     # The class expects args.gpus to be a list
     args.gpus = [args.gpu] if args.gpu != -1 else []
-    
+
     logger.setLevel(args.log_level)
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
     logger.info(f"Running GraphCS with the following parameters:\n{pprint.pformat(vars(args))}")
@@ -78,13 +77,13 @@ if __name__ == "__main__":
     # Construct file root path similar to scdeepsort
     file_root_path = Path(
         args.root_path, "_".join([
-            "-".join([str(num) for num in dataset])
-            for dataset in [args.train_dataset, args.test_dataset]
+            "-".join([str(num) for num in dataset]) for dataset in [args.train_dataset, args.test_dataset]
             if (dataset is not None and dataset != [])
         ])).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
 
-    pipeline_planer = PipelinePlaner.from_config_file(f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
+    pipeline_planer = PipelinePlaner.from_config_file(
+        f"{Path(args.root_path).resolve()}/{args.tune_mode}_tuning_config.yaml")
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
 
     # ================= MODIFIED FUNCTION STARTS HERE =================
@@ -106,7 +105,8 @@ if __name__ == "__main__":
 
             # Load data and perform necessary preprocessing
             data = CellTypeAnnotationDataset(train_dataset=args.train_dataset, test_dataset=args.test_dataset,
-                                           species=args.species, tissue=args.tissue, val_size=args.val_size).load_data()
+                                             species=args.species, tissue=args.tissue,
+                                             val_size=args.val_size).load_data()
 
             # Prepare preprocessing pipeline and apply it to data
             kwargs = {tune_mode: dict(wandb.config)}
@@ -148,8 +148,8 @@ if __name__ == "__main__":
             nclass = max(int(y_train_converted.max()), int(y_val_converted.max())) + 1
 
             # Train: fit() uses self.batch_size initialized earlier
-            model.fit(torch.FloatTensor(x_train), torch.LongTensor(y_train_converted),
-                     torch.FloatTensor(x_val), torch.LongTensor(y_val_converted), nfeat, nclass)
+            model.fit(torch.FloatTensor(x_train), torch.LongTensor(y_train_converted), torch.FloatTensor(x_val),
+                      torch.LongTensor(y_val_converted), nfeat, nclass)
 
             # Predict/Score: uses self.batch_size
             run_train_score = model.score(x_train, y_train)
@@ -178,7 +178,9 @@ if __name__ == "__main__":
         speed_score = 1.0 / (1.0 + total_time_seconds / 300.0)
         combined_score = 0.8 * avg_valid_score + 0.2 * speed_score
 
-        logger.info(f"Averaged over {args.num_runs} runs - Valid Acc: {avg_valid_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}")
+        logger.info(
+            f"Averaged over {args.num_runs} runs - Valid Acc: {avg_valid_score:.4f}, Time: {total_time_seconds:.2f}s, Combined Score: {combined_score:.4f}"
+        )
 
         wandb.log({
             "train_acc": avg_train_score,
@@ -189,10 +191,11 @@ if __name__ == "__main__":
             "combined_score": combined_score
         })
         wandb.finish()
+
     # ================= MODIFIED FUNCTION ENDS HERE =================
 
-    entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
-        evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)
+    entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(evaluate_pipeline, sweep_id=args.sweep_id,
+                                                                  count=args.count)
     save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path,
                       additional_sweep_ids=args.additional_sweep_ids)
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
@@ -206,7 +209,6 @@ if __name__ == "__main__":
         )
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
-
 """To reproduce GraphCS benchmarks, please refer to command lines below:
 
 Mouse Brain

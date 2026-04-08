@@ -6,21 +6,20 @@ from typing import Literal
 
 import cv2
 import numpy as np
+import scanpy as sc
+import torch
+import wandb
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import pairwise_distances
-import torch
 from tqdm import tqdm, trange
-import wandb
 
 from dance.datasets.spatial import SpatialLIBDDataset
 from dance.modules.spatial.spatial_domain.stlearn import StLouvain
 from dance.registry import register_preprocessor
-from dance.utils import set_seed, sub_data
-import scanpy as sc
-
 from dance.transforms import AnnDataTransform, BaseTransform, Compose, SetConfig
 from dance.typing import LogLevel, Optional, Sequence, Union
+from dance.utils import set_seed, sub_data
 from dance.utils.matrix import normalize
 from dance.utils.metrics import calculate_unified_scores, resolve_score_func
 from dance.utils.wrappers import add_mod_and_transform
@@ -28,7 +27,8 @@ from dance.utils.wrappers import add_mod_and_transform
 MODES = ["louvain", "kmeans"]
 # EVOLVE-BLOCK-START
 
-@register_preprocessor("feature", "spatial",overwrite=True)
+
+@register_preprocessor("feature", "spatial", overwrite=True)
 class MorphologyFeatureCNN(BaseTransform):
     """Cell morphological features extracted from CNN.
 
@@ -96,22 +96,23 @@ class MorphologyFeatureCNN(BaseTransform):
         # Vectorized batch processing for improved efficiency
         batch_size = 64
         num_samples = len(xy_pixel)
-        
+
         # Pre-process all images first to avoid repeated operations
         all_cropped_images = []
         for x, y in xy_pixel:
             img = self._crop_and_process(image, x, y)
             all_cropped_images.append(img)
-        
+
         # Process in batches using GPU
         all_features = []
-        for i in trange(0, num_samples, batch_size, desc="Extracting feature", bar_format="{l_bar}{bar} [ time left: {remaining} ]"):
+        for i in trange(0, num_samples, batch_size, desc="Extracting feature",
+                        bar_format="{l_bar}{bar} [ time left: {remaining} ]"):
             batch_end = min(i + batch_size, num_samples)
             batch_tensor = torch.cat(all_cropped_images[i:batch_end], dim=0).to(self.device)
             with torch.no_grad():
                 batch_features = self.model(batch_tensor).view(batch_end - i, -1)
                 all_features.extend(batch_features.detach().cpu().numpy())
-        
+
         morth_feat = np.array(all_features)
         if self.n_components > 0:
             pca = PCA(n_components=self.n_components, random_state=self.random_state)
@@ -120,7 +121,7 @@ class MorphologyFeatureCNN(BaseTransform):
         data.data.obsm[self.out] = morth_feat
 
 
-@register_preprocessor("feature", "spatial",overwrite=True)
+@register_preprocessor("feature", "spatial", overwrite=True)
 class SMEFeature(BaseTransform):
     """Spatial Morphological gene Expression normalization feature from stLearn.
 
@@ -153,24 +154,24 @@ class SMEFeature(BaseTransform):
         adj = data.get_feature(return_type="numpy", channel=self.channels[1], channel_type=self.channel_types[1])
 
         # Vectorized implementation using sparse matrix operations
-        from scipy import sparse
         import numpy as np
-        
+        from scipy import sparse
+
         # Convert adjacency to sparse matrix for efficient computation if needed
         if not sparse.issparse(adj):
             adj_sparse = sparse.csr_matrix(adj)
         else:
             adj_sparse = adj
-        
+
         # For each row, keep only top-k neighbors and normalize weights
         num_samples = adj_sparse.shape[0]
-        
+
         # Convert to dense temporarily for top-k selection (more efficient than sparse operations for top-k)
         adj_dense = adj_sparse.toarray()
-        
+
         # Create array to hold only top-k values for each row
         adj_topk = np.zeros_like(adj_dense)
-        
+
         for i in range(num_samples):
             row = adj_dense[i]
             # Get indices of top-k non-zero elements
@@ -179,15 +180,15 @@ class SMEFeature(BaseTransform):
             mask = np.zeros_like(row, dtype=bool)
             mask[top_k_indices] = True
             adj_topk[i, mask] = row[mask]
-        
+
         # Normalize weights for each row so they sum to 1
         row_sums = adj_topk.sum(axis=1)
         row_sums[row_sums == 0] = 1  # Avoid division by zero
         adj_normalized = adj_topk / row_sums[:, None]
-        
+
         # Efficient matrix multiplication for imputation
         imputed = adj_normalized @ x
-        
+
         sme_feat = (x + imputed) / 2
         if self.n_components > 0:
             sme_feat = normalize(sme_feat, mode="standardize", axis=0)
@@ -195,9 +196,9 @@ class SMEFeature(BaseTransform):
             sme_feat = pca.fit_transform(sme_feat)
 
         data.data.obsm[self.out] = sme_feat
-        
 
-@register_preprocessor("feature", "cell",overwrite=True)
+
+@register_preprocessor("feature", "cell", overwrite=True)
 @add_mod_and_transform
 class CellPCA(BaseTransform):
     """Reduce cell feature matrix with PCA.
@@ -247,9 +248,10 @@ class CellPCA(BaseTransform):
             data.data.uns["pca_explained_variance_ratio"] = pca.explained_variance_ratio_
             # data.data.uns["pca"] = pca
 
-        return data    
+        return data
 
-@register_preprocessor("graph", "spatial",overwrite=True)
+
+@register_preprocessor("graph", "spatial", overwrite=True)
 class SMEGraph(BaseTransform):
     """Spatial Morphological gene Expression graph."""
 
@@ -277,18 +279,19 @@ class SMEGraph(BaseTransform):
         adj_p = np.where(pdist >= self.radius * unit, 0, 1)
         adj_m = (1 - pairwise_distances(morph_feat, metric="cosine")).clip(0)
         adj_g = 1 - pairwise_distances(gene_feat, metric="correlation")
-        
+
         # Use weighted averaging instead of strict multiplication to avoid sparsity
         # This prevents one modality from completely nullifying connections
         alpha, beta, gamma = 0.33, 0.33, 0.34  # Weights for spatial, morphological, and gene expression
         adj = alpha * adj_p + beta * adj_m + gamma * adj_g
-        
+
         # Normalize to maintain consistent scale
         adj = adj / adj.max() if adj.max() > 0 else adj
 
         data.data.obsp[self.out] = adj
-        
-@register_preprocessor("graph", "cell",overwrite=True)
+
+
+@register_preprocessor("graph", "cell", overwrite=True)
 class NeighborGraph(BaseTransform):
     """Construct neighborhood graph of observations.
 
@@ -338,20 +341,19 @@ class NeighborGraph(BaseTransform):
         data.data.obsp[self.out] = adj
 
         return data
-     
-          
+
+
 def get_preprocessing_pipeline(morph_feat_dim: int = 50, sme_feat_dim: int = 50, pca_feat_dim: int = 10,
-                            nbrs_pcs: int = 10, n_neighbors: int = 10, device: str = "cpu",
-                            log_level: LogLevel = "INFO", crop_size=20, target_size=224):
+                               nbrs_pcs: int = 10, n_neighbors: int = 10, device: str = "cpu",
+                               log_level: LogLevel = "INFO", crop_size=20, target_size=224):
     return Compose(
         AnnDataTransform(sc.pp.filter_genes, min_cells=1),
         AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
         AnnDataTransform(sc.pp.log1p),
-        MorphologyFeatureCNN(n_components=morph_feat_dim, device=device, crop_size=crop_size,
-                                target_size=target_size),
+        MorphologyFeatureCNN(n_components=morph_feat_dim, device=device, crop_size=crop_size, target_size=target_size),
         CellPCA(n_components=pca_feat_dim),
         SMEGraph(radius=2.5),
-        SMEFeature(n_components=sme_feat_dim, n_neighbors=max(5, n_neighbors//2)),
+        SMEFeature(n_components=sme_feat_dim, n_neighbors=max(5, n_neighbors // 2)),
         NeighborGraph(n_neighbors=n_neighbors, n_pcs=nbrs_pcs, channel="SMEFeature"),
         SetConfig({
             "feature_channel": "NeighborGraph",
@@ -361,6 +363,8 @@ def get_preprocessing_pipeline(morph_feat_dim: int = 50, sme_feat_dim: int = 50,
         }),
         log_level=log_level,
     )
+
+
 # EVOLVE-BLOCK-END
 
 if __name__ == "__main__":
@@ -387,7 +391,7 @@ if __name__ == "__main__":
         if args.mode == "kmeans":
             raise NotImplementedError("--------")
         elif args.mode == "louvain":
-            model = StLouvain(resolution=0.6,random_state=seed)
+            model = StLouvain(resolution=0.6, random_state=seed)
         else:
             raise ValueError(f"Unknown mode {args.mode!r}, available options are {MODES}")
         # preprocessing_pipeline = model.preprocessing_pipeline(device=args.device)
@@ -396,28 +400,27 @@ if __name__ == "__main__":
         dataloader = SpatialLIBDDataset(data_id=args.sample_number, data_dir=args.data_dir,
                                         sample_file=args.sample_file)
         preprocessing_pipeline = get_preprocessing_pipeline(device=args.device)
-        data = dataloader.load_data(transform=None,cache=args.cache)
+        data = dataloader.load_data(transform=None, cache=args.cache)
         sub_data(data.data)
         preprocessing_pipeline(data)
         # Prepare preprocessing pipeline and apply it to data
         x, y = data.get_data(return_type="default")
         score = model.fit_score(x, y.values.ravel())
-        pred=model.predict()
+        pred = model.predict()
         silhouette_score = resolve_score_func("silhouette")
         calinski_harabasz_score = resolve_score_func("calinski_harabasz")
         davies_bouldin_score = resolve_score_func("davies_bouldin")
-        inner_scores.append(calculate_unified_scores({
-            "silhouette": silhouette_score(x.toarray(), pred),
-            "calinski_harabasz": calinski_harabasz_score(x.toarray(), pred),
-            "davies_bouldin": davies_bouldin_score(x.toarray(), pred)
-        }))
+        inner_scores.append(
+            calculate_unified_scores({
+                "silhouette": silhouette_score(x.toarray(), pred),
+                "calinski_harabasz": calinski_harabasz_score(x.toarray(), pred),
+                "davies_bouldin": davies_bouldin_score(x.toarray(), pred)
+            }))
         scores.append(score)
         print(f"ARI: {score:.4f}")
     print(f"STAGATE {args.sample_number}:")
     print(f"mean_score: {np.mean(scores):.5f} +/- {np.std(scores):.5f}")
     print(f"mean_inner_score: {np.mean(inner_scores):.5f} +/- {np.std(inner_scores):.5f}")
-        
-
 """ To reproduce stlearn on other samples, please refer to command lines belows:
 NOTE: since the stlearn method is unstable, you have to run multiple times to get
       best performance.

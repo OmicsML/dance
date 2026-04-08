@@ -6,14 +6,15 @@ This example demonstrates how to use OpenEvolve to automatically optimize prompt
 
 OpenEvolve successfully improved prompt performance across three challenging GEPA benchmarks:
 
-| Dataset | Baseline Accuracy | Evolved Accuracy | Improvement | Samples |
-|---------|------------------|------------------|-------------|---------|
-| **IFEval** | 95.01% | 97.41% | **+2.40%** ✅ | 541 |
-| **HoVer** | 43.83% | 42.90% | -0.93% | 4,000 |
-| **HotpotQA** | 77.93% | 88.62% | **+10.69%** ✅ | 7,405 |
-| **Overall** | 67.29% | 73.71% | **+6.42%** ✅ | 11,946 |
+| Dataset      | Baseline Accuracy | Evolved Accuracy | Improvement    | Samples |
+| ------------ | ----------------- | ---------------- | -------------- | ------- |
+| **IFEval**   | 95.01%            | 97.41%           | **+2.40%** ✅  | 541     |
+| **HoVer**    | 43.83%            | 42.90%           | -0.93%         | 4,000   |
+| **HotpotQA** | 77.93%            | 88.62%           | **+10.69%** ✅ | 7,405   |
+| **Overall**  | 67.29%            | 73.71%           | **+6.42%** ✅  | 11,946  |
 
 ### Key Achievements:
+
 - **767 more correct answers** across all datasets
 - **38% fewer empty responses** with evolved prompts
 - **Near-perfect performance** on instruction following (IFEval: 97.41%)
@@ -22,6 +23,7 @@ OpenEvolve successfully improved prompt performance across three challenging GEP
 ## 🎯 Overview
 
 OpenEvolve automatically:
+
 - Evolves prompts through multiple generations using LLMs
 - Uses cascading evaluation for efficient testing
 - Employs MAP-Elites algorithm to maintain diversity
@@ -33,6 +35,7 @@ OpenEvolve automatically:
 ### GEPA Benchmarks (Latest Focus)
 
 #### IFEval (Instruction Following Eval)
+
 - **Task**: Follow complex, multi-constraint instructions
 - **Size**: 541 samples (train split)
 - **Metric**: Binary success on instruction adherence
@@ -40,6 +43,7 @@ OpenEvolve automatically:
 - **Config**: `ifeval_prompt_dataset.yaml`
 
 #### HoVer (Claim Verification)
+
 - **Task**: Verify claims as SUPPORTED or NOT_SUPPORTED
 - **Size**: 4,000 samples (validation split)
 - **Metric**: Binary classification accuracy
@@ -48,6 +52,7 @@ OpenEvolve automatically:
 - **Note**: Uses integer labels (0=SUPPORTED, 1=NOT_SUPPORTED)
 
 #### HotpotQA (Multi-hop Question Answering)
+
 - **Task**: Answer questions requiring reasoning over multiple paragraphs
 - **Size**: 7,405 samples (validation split)
 - **Metric**: Exact match with answer
@@ -57,18 +62,21 @@ OpenEvolve automatically:
 ### Additional Datasets (Earlier Experiments)
 
 #### Emotion Classification
+
 - **Task**: Classify emotions in text (6 classes)
 - **Dataset**: `dair-ai/emotion`
 - **Config**: `emotion_prompt_dataset.yaml`
 - **Benchmark**: Compared against DSPy results
 
 #### GSM8K (Grade School Math)
+
 - **Task**: Solve grade school math word problems
 - **Dataset**: `gsm8k`
 - **Config**: `gsm8k_prompt_dataset.yaml`
 - **Benchmark**: DSPy achieves 97.1%
 
 #### IMDB Sentiment Analysis
+
 - **Task**: Binary sentiment classification
 - **Dataset**: `stanfordnlp/imdb`
 - **Config**: `initial_prompt_dataset.yaml`
@@ -129,6 +137,7 @@ python ../../openevolve-run.py ifeval_prompt.txt evaluator.py \
 ### Evolution Configurations
 
 #### GEPA Benchmarks (`config_qwen3_evolution.yaml`)
+
 ```yaml
 llm:
   models:
@@ -150,6 +159,7 @@ database:
 ```
 
 #### General Configuration (`config.yaml`)
+
 ```yaml
 llm:
   api_base: "https://openrouter.ai/api/v1"
@@ -176,11 +186,11 @@ is_ifeval: true  # Special handling flag
 ### How It Works
 
 1. **Initial Population**: Start with baseline prompt
-2. **Variation**: LLM generates prompt mutations
-3. **Evaluation**: Test on dataset samples (10 for Stage 1, 40 for Stage 2)
-4. **Selection**: Keep best performers based on combined score
-5. **Island Evolution**: 4 isolated populations with periodic migration
-6. **Iteration**: Repeat for specified generations (typically 50-100)
+1. **Variation**: LLM generates prompt mutations
+1. **Evaluation**: Test on dataset samples (10 for Stage 1, 40 for Stage 2)
+1. **Selection**: Keep best performers based on combined score
+1. **Island Evolution**: 4 isolated populations with periodic migration
+1. **Iteration**: Repeat for specified generations (typically 50-100)
 
 ### Cascade Evaluation
 
@@ -191,6 +201,7 @@ is_ifeval: true  # Special handling flag
 ### LLM Feedback Metrics
 
 Evolved prompts are evaluated on:
+
 - **Clarity**: Unambiguous instructions
 - **Specificity**: Appropriate detail level
 - **Robustness**: Edge case handling
@@ -236,16 +247,18 @@ llm_prompt_optimization/
 ## 🔍 Example Evolved Prompts
 
 ### IFEval (97.41% accuracy)
+
 ```
-Follow the instruction below precisely. Structure your response into two 
-distinct parts: 1) a step-by-step reasoning process that explicitly 
-identifies the task, constraints, and required output format, and 2) the 
+Follow the instruction below precisely. Structure your response into two
+distinct parts: 1) a step-by-step reasoning process that explicitly
+identifies the task, constraints, and required output format, and 2) the
 final answer in the exact format specified...
 ```
 
 ### HotpotQA (88.62% accuracy)
+
 ```
-Answer the following question using the provided context. The answer must 
+Answer the following question using the provided context. The answer must
 integrate information from multiple paragraphs and follow these steps:
 1. Paragraph Analysis: Extract key details from each relevant paragraph...
 2. Synthesis: Combine these details into a single, coherent response...
@@ -253,41 +266,49 @@ integrate information from multiple paragraphs and follow these steps:
 ```
 
 ### IMDB Sentiment (Example Evolution)
+
 Starting prompt:
+
 ```
 Analyze the sentiment: "{input_text}"
 ```
 
 Evolved prompt after 100 iterations:
+
 ```
-Analyze the sentiment of the following text. Determine if the overall 
+Analyze the sentiment of the following text. Determine if the overall
 emotional tone is positive or negative.
 
 Text: "{input_text}"
 
-Response: Provide only a single digit - either 1 for positive sentiment 
+Response: Provide only a single digit - either 1 for positive sentiment
 or 0 for negative sentiment. Do not include any explanation or additional text.
 ```
+
 Accuracy improvement: 72% → 94%
 
 ## 🐛 Troubleshooting
 
 ### HoVer Dataset Issues
+
 - **Problem**: Test split has no labels (all -1)
 - **Solution**: Use validation split (configured automatically)
 - **Labels**: Integer format (0=SUPPORTED, 1=NOT_SUPPORTED)
 
 ### Empty Responses
+
 - **Cause**: Complex evolved prompts exceeding token limits
 - **Solution**: Increase max_tokens in evaluation or simplify prompts
 
 ### Slow Evaluation
+
 - **IFEval**: ~1 minute per 100 samples
 - **HoVer**: ~30 minutes for full dataset
 - **HotpotQA**: ~45 minutes for full dataset
 - **Tip**: Use --samples flag for faster testing
 
 ### Dataset Not Found
+
 - Check the exact dataset name and source
 - Some datasets require acceptance of terms
 - Use `trust_remote_code=True` for certain datasets
@@ -299,8 +320,8 @@ Accuracy improvement: 72% → 94%
 To add a new dataset:
 
 1. Create initial prompt: `mydataset_prompt.txt`
-2. Create configuration: `mydataset_prompt_dataset.yaml`
-3. Run evolution: 
+1. Create configuration: `mydataset_prompt_dataset.yaml`
+1. Run evolution:
    ```bash
    ./run_evolution.sh mydataset_prompt.txt --iterations 50
    # or directly:
@@ -332,6 +353,7 @@ python ../../openevolve-run.py prompt.txt evaluator.py \
 ### Custom Templates
 
 The `templates/` directory contains customizable templates for prompt evolution:
+
 - `full_rewrite_user.txt`: Instructions for prompt rewriting
 - `evaluation.txt`: LLM feedback template
 - `evaluator_system_message.txt`: System message for evaluation
@@ -339,11 +361,11 @@ The `templates/` directory contains customizable templates for prompt evolution:
 ## 📈 Tips for Best Results
 
 1. **Start Simple**: Begin with clear, working baseline prompts
-2. **Sufficient Samples**: Use at least 40 samples for Stage 2 evaluation
-3. **Monitor Progress**: Check `openevolve_output_*/logs/` for progress
-4. **Multiple Runs**: Evolution has randomness; try multiple runs
-5. **Token Limits**: Ensure max_tokens accommodates prompt + response
-6. **Dataset Variety**: Test on multiple datasets to ensure generalization
+1. **Sufficient Samples**: Use at least 40 samples for Stage 2 evaluation
+1. **Monitor Progress**: Check `openevolve_output_*/logs/` for progress
+1. **Multiple Runs**: Evolution has randomness; try multiple runs
+1. **Token Limits**: Ensure max_tokens accommodates prompt + response
+1. **Dataset Variety**: Test on multiple datasets to ensure generalization
 
 ## 📚 References
 
