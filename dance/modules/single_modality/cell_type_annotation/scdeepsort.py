@@ -12,13 +12,14 @@ from copy import deepcopy
 from pathlib import Path
 
 import dgl
+import scanpy as sc
 import torch
 import torch.nn as nn
 from dgl.dataloading import DataLoader, NeighborSampler
 
 from dance.models.nn import AdaptiveSAGE
 from dance.modules.base import BaseClassificationMethod
-from dance.transforms import Compose, SetConfig
+from dance.transforms import AnnDataTransform, Compose, SetConfig
 from dance.transforms.graph import PCACellFeatureGraph
 from dance.typing import LogLevel, Optional
 
@@ -132,12 +133,31 @@ class ScDeepSort(BaseClassificationMethod):
             self.save_path.mkdir(parents=True)
 
     @staticmethod
-    def preprocessing_pipeline(n_components: int = 400, log_level: LogLevel = "INFO"):
-        return Compose(
+    def preprocessing_pipeline(n_components: int = 400, normalize: bool = False, log_level: LogLevel = "INFO"):
+        """Create the preprocessing pipeline for scDeepSort.
+
+        Parameters
+        ----------
+        n_components
+            Number of PCA components used to initialize cell and gene features.
+        normalize
+            Whether to apply the Scanpy equivalent of Seurat ``NormalizeData`` before graph construction.
+        log_level
+            Logging level for the composed preprocessing pipeline.
+
+        """
+        transforms = []
+
+        if normalize:
+            transforms.append(AnnDataTransform(sc.pp.normalize_total, target_sum=1e4))
+            transforms.append(AnnDataTransform(sc.pp.log1p))
+
+        transforms.extend([
             PCACellFeatureGraph(n_components=n_components, split_name="train"),
             SetConfig({"label_channel": "cell_type"}),
-            log_level=log_level,
-        )
+        ])
+
+        return Compose(*transforms, log_level=log_level)
 
     def fit(self, graph: dgl.DGLGraph, labels: torch.Tensor, epochs: int = 300, lr: float = 1e-3,
             weight_decay: float = 0, val_ratio: float = 0.2):
