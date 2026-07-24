@@ -10,9 +10,9 @@ from typing import get_args
 
 import numpy as np
 import torch
-import wandb
 from sympy import elliptic_k
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
@@ -22,6 +22,7 @@ from dance.transforms.cell_feature import WeightedFeaturePCA
 from dance.transforms.filter import (
     FilterGenesNumberPlaceHolder,
     FilterGenesPlaceHolder,
+    FilterGenesScanpyOrder,
     HighlyVariableGenesLogarithmizedByTopGenes,
     HighlyVariableGenesRawCount,
 )
@@ -41,6 +42,28 @@ from dance.utils import set_seed
 
 def build_transform_pipeline(pipeline_name, num_genes=2208):
     transforms = []
+    if pipeline_name == "atlas_scdeepsort_pancreas_53d208b0_scale_rawcount_svd":
+        transforms.append(
+            FilterGenesScanpyOrder(
+                order=["min_counts", "max_counts", "max_cells", "min_cells"],
+                min_counts=191,
+                min_cells=0.03798547080750556,
+                max_counts=0.9377398883656286,
+                max_cells=0.964294533892298,
+            ))
+        transforms.append(ColumnSumNormalize(mode="l2", eps=0.7))
+        transforms.append(HighlyVariableGenesRawCount(n_top_genes=5718, span=0.39461811670516034))
+        transforms.append(
+            WeightedFeatureSVD(
+                n_components=591,
+                out="feature.cell",
+                log_level="INFO",
+                feat_norm_mode="l2",
+            ))
+        transforms.append(CellFeatureGraph(cell_feature_channel="feature.cell"))
+        transforms.append(SetConfig({"label_channel": "cell_type"}))
+        return transforms
+
     pipeline_parts = pipeline_name.split("_")
     for i, pipline_part in enumerate(pipeline_parts):
         if pipline_part in {"FGPH", "FPGH"}:
@@ -103,6 +126,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--exp_num", type=int, default=1000)
     parser.add_argument("--root_path", default="/home/common/zyxing/dance/result/cta_scdeepsort", type=str)
+    parser.add_argument("--data_dir", default="../temp_data", type=str)
     parser.add_argument("--filetype", default="csv")
     parser.add_argument("--pipeline_name", type=str, default="")
     parser.add_argument("--num_genes", type=int, default=2208)
@@ -123,7 +147,7 @@ if __name__ == "__main__":
     # Load data and perform necessary preprocessing
     data = CellTypeAnnotationDataset(species=args.species, tissue=args.tissue, test_dataset=args.test_dataset,
                                      train_dataset=args.train_dataset, valid_dataset=args.valid_dataset,
-                                     data_dir="../temp_data", val_size=args.val_size,
+                                     data_dir=args.data_dir, val_size=args.val_size,
                                      filetype=args.filetype).load_data()
     if args.pipeline_name == "origin":
         preprocessing_pipeline = ScDeepSort.preprocessing_pipeline(normalize=True)
