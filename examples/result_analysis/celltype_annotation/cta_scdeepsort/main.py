@@ -10,9 +10,9 @@ from typing import get_args
 
 import numpy as np
 import torch
-import wandb
 from sympy import elliptic_k
 
+import wandb
 from dance import logger
 from dance.datasets.singlemodality import CellTypeAnnotationDataset
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
@@ -22,6 +22,7 @@ from dance.transforms.cell_feature import WeightedFeaturePCA
 from dance.transforms.filter import (
     FilterGenesNumberPlaceHolder,
     FilterGenesPlaceHolder,
+    HighlyVariableGenesLogarithmizedByMeanAndDisp,
     HighlyVariableGenesLogarithmizedByTopGenes,
     HighlyVariableGenesRawCount,
 )
@@ -65,6 +66,8 @@ def build_transform_pipeline(pipeline_name, num_genes=2208):
             transforms.append(HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=num_genes))
         elif pipline_part == "NTLP":
             transforms.append(NormalizeTotalLog1P())
+        elif pipline_part == "HVGmD":
+            transforms.append(HighlyVariableGenesLogarithmizedByMeanAndDisp())
         elif pipline_part == "WPCA":
             transforms.append(
                 WeightedFeaturePCA(out="feature.cell", log_level="INFO", save_info=True, split_name="train"))
