@@ -152,12 +152,16 @@ examples/multi_modality/joint_embedding/models/*.pth
 !examples/result_analysis/get_important_pattern.py
 !examples/result_analysis/get_num.py
 
+
 # =============================================================================
 # Model files
 # =============================================================================
 models/model_joint_embedding_1.pth
 examples/tuning/joint_embedding_scmogcn/models/model_joint_embedding_1.pth
 examples/multi_modality/joint_embedding/models/*.pth
+
+
+!examples/result_analysis/celltype_annotation/cta_scdeepsort/main.py
 
 # =============================================================================
 # Others
