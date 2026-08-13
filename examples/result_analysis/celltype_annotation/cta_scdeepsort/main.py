@@ -23,6 +23,7 @@ from dance.transforms.filter import (
     FilterGenesNumberPlaceHolder,
     FilterGenesPlaceHolder,
     FilterGenesScanpyOrder,
+    HighlyVariableGenesLogarithmizedByMeanAndDisp,
     HighlyVariableGenesLogarithmizedByTopGenes,
     HighlyVariableGenesRawCount,
 )
@@ -88,6 +89,8 @@ def build_transform_pipeline(pipeline_name, num_genes=2208):
             transforms.append(HighlyVariableGenesLogarithmizedByTopGenes(n_top_genes=num_genes))
         elif pipline_part == "NTLP":
             transforms.append(NormalizeTotalLog1P())
+        elif pipline_part == "HVGmD":
+            transforms.append(HighlyVariableGenesLogarithmizedByMeanAndDisp())
         elif pipline_part == "WPCA":
             transforms.append(
                 WeightedFeaturePCA(out="feature.cell", log_level="INFO", save_info=True, split_name="train"))
