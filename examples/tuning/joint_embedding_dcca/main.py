@@ -66,6 +66,8 @@ def parameter_setting():
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
+    parser.add_argument("--data_root", default="/mnt/nfs/zyxing/data", type=str,
+                        help="Directory containing the joint-embedding dataset subdirectories.")
     return parser
 
 
@@ -104,7 +106,7 @@ if __name__ == "__main__":
                 wandb.finish()
                 return
         try:
-            dataset = JointEmbeddingNIPSDataset(args.subtask, root="./data/joint_embedding")
+            dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_root)
             data = dataset.load_data()
             # Prepare preprocessing pipeline and apply it to data
             kwargs = {tune_mode: dict(wandb_config)}
