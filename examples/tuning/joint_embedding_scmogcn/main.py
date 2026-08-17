@@ -2,13 +2,28 @@ import argparse
 import gc
 import os
 import pprint
+import re
 import sys
+from collections import Counter
 from pathlib import Path
+
+# Keep preprocessing caches out of the repository and enable PyTorch's
+# fragmentation-resistant CUDA allocator for every newly isolated run.
+_cache_root = Path(os.environ.get("NO_CELL_QC_CACHE_DIR", "/tmp/dance_scmogcn_no_cell_qc"))
+for _env_name, _subdir in (
+    ("NUMBA_CACHE_DIR", "numba"),
+    ("MPLCONFIGDIR", "matplotlib"),
+    ("XDG_CACHE_HOME", "xdg"),
+):
+    os.environ.setdefault(_env_name, str(_cache_root / _subdir))
+    Path(os.environ[_env_name]).mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 import numpy as np
 import pandas as pd
 import torch
 import wandb
+from prefix_cache import PipelinePrefixCache, canonical_prefix
 
 from dance import logger
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
@@ -41,8 +56,16 @@ if __name__ == "__main__":
     parser.add_argument("--tune_mode", default="pipeline_params", choices=["pipeline", "params", "pipeline_params"])
     parser.add_argument("--count", type=int, default=2)
     parser.add_argument("--sweep_id", type=str, default=None)
+    parser.add_argument("--run_step3", action="store_true",
+                        help="Explicitly run step-3 parameter sweeps after the pipeline sweep.")
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
+    parser.add_argument(
+        "--prefix_cache_root", default=None, type=str,
+        help="NFS directory for exact deterministic preprocessing-prefix caches. Defaults below --data_folder.")
+    parser.add_argument("--prefix_cache_depth", default=5, type=int,
+                        help="Number of leading pipeline actions to cache (5 means indexes 0 through 4).")
+    parser.add_argument("--disable_prefix_cache", action="store_true")
 
     args = parser.parse_args()
 
@@ -57,6 +80,23 @@ if __name__ == "__main__":
     file_root_path = Path(args.root_path, args.subtask).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
     pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
+    prefix_cache_root = Path(args.prefix_cache_root or Path(args.data_folder, ".dance_prefix_cache", "scmogcn"))
+    prefix_counts = Counter()
+    if not args.disable_prefix_cache and "run_kwargs" in pipeline_planer.config:
+        grouped_candidates = {}
+        for candidate in pipeline_planer.config.run_kwargs:
+            candidate_dict = dict(candidate)
+            prefix_token = tuple(
+                sorted((key, str(value)) for key, value in candidate_dict.items() if (
+                    match := re.match(r"pipeline\.(\d+)\.", key)) and int(match.group(1)) < args.prefix_cache_depth))
+            if prefix_token not in grouped_candidates:
+                grouped_candidates[prefix_token] = [candidate_dict, 0]
+            grouped_candidates[prefix_token][1] += 1
+        for candidate, count in grouped_candidates.values():
+            candidate_pipeline = pipeline_planer.generate(**{args.tune_mode: candidate})
+            prefix_counts[canonical_prefix(candidate_pipeline, args.prefix_cache_depth)] += count
+        logger.info(f"Prefix cache enabled: root={prefix_cache_root}, depth={args.prefix_cache_depth}, "
+                    f"reused_prefixes={sum(count > 1 for count in prefix_counts.values())}")
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
     os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
     os.environ["WANDB_AGENT_DISABLE_FLAPPING"] = "True"
@@ -74,12 +114,33 @@ if __name__ == "__main__":
                 return
         try:
             dataset = JointEmbeddingNIPSDataset(args.subtask, root=args.data_folder, preprocess=args.preprocess)
-            data = dataset.load_data()
             # Prepare preprocessing pipeline and apply it to data
             kwargs = {tune_mode: dict(wandb_config)}
             preprocessing_pipeline = pipeline_planer.generate(**kwargs)
             print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
-            preprocessing_pipeline(data)
+            prefix = canonical_prefix(preprocessing_pipeline, args.prefix_cache_depth)
+
+            def load_and_apply_prefix():
+                prefix_data = dataset.load_data()
+                for action_index in range(min(args.prefix_cache_depth, len(preprocessing_pipeline))):
+                    preprocessing_pipeline[action_index](prefix_data)
+                return prefix_data
+
+            use_prefix_cache = (not args.disable_prefix_cache and args.prefix_cache_depth > 0
+                                and prefix_counts.get(prefix, 0) > 1)
+            if use_prefix_cache:
+                prefix_cache = PipelinePrefixCache(prefix_cache_root, dataset, preprocessing_pipeline,
+                                                   args.prefix_cache_depth, args.seed)
+                data, prefix_cache_hit = prefix_cache.load_or_build(load_and_apply_prefix)
+                logger.info(f"PREFIX_CACHE_RESULT hit={prefix_cache_hit} reuse_count={prefix_counts[prefix]}")
+                pipeline_start = args.prefix_cache_depth
+            else:
+                data = dataset.load_data()
+                pipeline_start = 0
+                logger.info(f"PREFIX_CACHE_BYPASS reuse_count={prefix_counts.get(prefix, 0)}")
+
+            for action_index in range(pipeline_start, len(preprocessing_pipeline)):
+                preprocessing_pipeline[action_index](data)
             # train_idx=list(set(data.mod["meta1"].obs_names) & set(data.mod["mod1"].obs_names))
             train_name = [item for item in data.mod["mod1"].obs_names if item in data.mod["meta1"].obs_names]
             train_idx = [data.mod["mod1"].obs_names.get_loc(name) for name in train_name]
@@ -157,7 +218,7 @@ if __name__ == "__main__":
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
-    if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
+    if args.run_step3 and (args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params"):
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
                        root_path=file_root_path,
