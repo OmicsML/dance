@@ -22,9 +22,9 @@ os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 import numpy as np
 import pandas as pd
 import torch
+import wandb
 from prefix_cache import PipelinePrefixCache, canonical_prefix
 
-import wandb
 from dance import logger
 from dance.datasets.multimodality import JointEmbeddingNIPSDataset
 from dance.modules.multi_modality.joint_embedding.scmogcn import ScMoGCNWrapper
