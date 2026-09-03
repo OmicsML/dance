@@ -1,6 +1,7 @@
 import itertools
 
 import numpy as np
+import scipy.sparse as sp
 import scipy.stats
 
 from dance.utils import matrix
@@ -27,6 +28,18 @@ def test_normalize(subtests):
 
         mat_norm1 = (mat / np.sqrt((mat**2).sum(1, keepdims=True))).tolist()
         assert matrix.normalize(mat, mode="l2", axis=1).tolist() == mat_norm1
+
+
+def test_normalize_sparse():
+    dense = np.array([[0, 1, 2], [3, 0, 4], [0, 5, 0]], dtype=np.float64)
+
+    for sparse_type in (sp.csr_matrix, sp.csc_matrix):
+        for mode in ("normalize", "l2"):
+            for axis in (0, 1):
+                expected = matrix.normalize(dense, mode=mode, axis=axis)
+                actual = matrix.normalize(sparse_type(dense), mode=mode, axis=axis)
+                assert isinstance(actual, sparse_type)
+                np.testing.assert_allclose(actual.toarray(), expected)
 
 
 def test_pairwise_distance(subtests):
