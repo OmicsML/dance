@@ -6,6 +6,7 @@ Shao, Xin, et al. "scDeepSort: a pre-trained cell-type annotation method for sin
 learning with a weighted graph neural network." Nucleic acids research 49.21 (2021): e122-e122.
 
 """
+import os
 import time
 from contextlib import nullcontext
 from copy import deepcopy
@@ -249,10 +250,11 @@ class ScDeepSort(BaseClassificationMethod):
         self.model.train()
         total_loss = total_size = 0
 
-        num_workers = 4 if self.device == "cpu" else 0
+        default_workers = 0 if self.device == "cpu" else 0
+        num_workers = int(os.environ.get("DANCE_SCDEEPSORT_NUM_WORKERS", default_workers))
         dataloader = DataLoader(graph=graph, indices=idx, graph_sampler=self.sampler, batch_size=self.batch_size,
                                 num_workers=num_workers, shuffle=True)
-        with dataloader.enable_cpu_affinity() if self.device == "cpu" else nullcontext():
+        with dataloader.enable_cpu_affinity() if self.device == "cpu" and num_workers > 0 else nullcontext():
             for _, _, blocks in dataloader:
                 blocks = [b.to(self.device) for b in blocks]
                 input_features = blocks[0].srcdata["features"]
