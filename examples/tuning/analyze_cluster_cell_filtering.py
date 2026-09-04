@@ -191,7 +191,9 @@ def download_h5(tuning_dir: Path, method_dir: str, dataset: str) -> Path | None:
     url = clustering_urls(tuning_dir.parent.parent / "dance" / "metadata" / "clustering.csv").get(dataset)
     if not url:
         return None
-    target = tuning_dir / method_dir / "data" / f"{dataset}.h5"
+    # Clustering tuning entry points use ``--data_dir ../temp_data`` by
+    # default, so downloaded data must go to the same shared directory.
+    target = tuning_dir / "temp_data" / f"{dataset}.h5"
     target.parent.mkdir(parents=True, exist_ok=True)
     print(f"Downloading {dataset} -> {target}", file=__import__("sys").stderr)
     urllib.request.urlretrieve(url, target)
@@ -199,10 +201,13 @@ def download_h5(tuning_dir: Path, method_dir: str, dataset: str) -> Path | None:
 
 
 def find_h5(tuning_dir: Path, method_dir: str, dataset: str, download: bool) -> Path | None:
+    # Keep this order aligned with the clustering ``main.py`` defaults.  A
+    # method-local data file can be stale or represent a different dataset
+    # version even when it has the same filename.
     candidates = [
-        tuning_dir / method_dir / "data" / f"{dataset}.h5",
-        tuning_dir / method_dir / "temp_data" / f"{dataset}.h5",
         tuning_dir / "temp_data" / f"{dataset}.h5",
+        tuning_dir / method_dir / "temp_data" / f"{dataset}.h5",
+        tuning_dir / method_dir / "data" / f"{dataset}.h5",
         tuning_dir.parent / "single_modality" / "clustering" / "data" / f"{dataset}.h5",
     ]
     for path in candidates:
