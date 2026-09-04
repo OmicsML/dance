@@ -64,6 +64,13 @@ def parameter_setting():
     parser.add_argument("--tune_mode", default="pipeline_params", choices=["pipeline", "params", "pipeline_params"])
     parser.add_argument("--count", type=int, default=2)
     parser.add_argument("--sweep_id", type=str, default=None)
+    parser.add_argument("--skip_step3", action="store_true", help="Stop after the step-2 sweep summary is saved.")
+    parser.add_argument("--skip_summary", action="store_true",
+                        help="Do not download and write the W&B sweep summary after the agent exits.")
+    parser.add_argument("--summary_only", action="store_true",
+                        help="Only download the specified W&B sweep summary, without running an agent.")
+    parser.add_argument("--config_path", type=str, default=None,
+                        help="Optional tuning config path, used for fixed retry sweeps.")
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
     parser.add_argument("--data_root", default="/mnt/nfs/zyxing/data", type=str,
@@ -87,8 +94,18 @@ if __name__ == "__main__":
     logger.info(f"\n{pprint.pformat(vars(args))}")
     file_root_path = Path(args.root_path, args.subtask).resolve()
     logger.info(f"\n files is saved in {file_root_path}")
-    pipeline_planer = PipelinePlaner.from_config_file(f"{file_root_path}/{args.tune_mode}_tuning_config.yaml")
+    config_path = Path(args.config_path).resolve() if args.config_path else \
+        file_root_path / f"{args.tune_mode}_tuning_config.yaml"
+    pipeline_planer = PipelinePlaner.from_config_file(config_path)
     os.environ["WANDB_AGENT_MAX_INITIAL_FAILURES"] = "2000"
+
+    if args.summary_only:
+        if not args.sweep_id:
+            parser.error("--summary_only requires --sweep_id")
+        wandb_config = pipeline_planer.config.wandb
+        save_summary_data(wandb_config.entity, wandb_config.project, args.sweep_id,
+                          summary_file_path=args.summary_file_path, root_path=file_root_path)
+        raise SystemExit(0)
 
     def evaluate_pipeline(tune_mode=args.tune_mode, pipeline_planer=pipeline_planer):
         wandb.init(settings=wandb.Settings(start_method='thread'))
@@ -208,8 +225,9 @@ if __name__ == "__main__":
 
     entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
         evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
-    save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
-    if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
+    if not args.skip_summary:
+        save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path)
+    if (args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params") and not args.skip_step3:
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
                        root_path=file_root_path, required_funs=["AlignMod","FilterCellsCommonMod","FilterCellsCommonMod","SetConfig"],

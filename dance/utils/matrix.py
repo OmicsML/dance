@@ -1,5 +1,6 @@
 import numba
 import numpy as np
+import scipy.sparse as sp
 import torch
 
 from dance.typing import NormMode
@@ -22,6 +23,29 @@ def normalize(mat, *, mode: NormMode = "normalize", axis: int = 0, eps: float = 
         ones.
 
     """
+    if sp.issparse(mat):
+        if axis not in (0, 1):
+            raise ValueError(f"Sparse normalization only supports axis 0 or 1, got {axis!r}.")
+        if mode not in ("normalize", "l2"):
+            raise TypeError(f"Sparse matrices do not support zero-preserving mode {mode!r}.")
+
+        if mode == "normalize":
+            denom = np.asarray(mat.sum(axis=axis)).reshape(-1)
+        else:
+            denom = np.sqrt(np.asarray(mat.power(2).sum(axis=axis)).reshape(-1))
+
+        if eps == -1:
+            denom[denom == 0] = 1
+        elif eps > 0:
+            denom = denom + eps
+        else:
+            raise ValueError(f"Invalid {eps=!r}. Must be positive or -1, the later set zero entries to one.")
+
+        scale = 1 / denom
+        if axis == 1:
+            scale = scale[:, None]
+        return mat.multiply(scale).asformat(mat.format)
+
     if isinstance(mat, torch.Tensor):
         is_torch = True
     elif not isinstance(mat, np.ndarray):

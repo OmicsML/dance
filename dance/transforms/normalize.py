@@ -60,6 +60,7 @@ class ColumnSumNormalize(BaseTransform):
         batch_key: Optional[str] = None,
         mode: NormMode = "normalize",
         eps: float = -1,
+        preserve_sparse: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -68,6 +69,7 @@ class ColumnSumNormalize(BaseTransform):
         self.batch_key = batch_key
         self.mode = mode
         self.eps = eps
+        self.preserve_sparse = preserve_sparse
 
     def _get_idx_dict(self, data) -> List[Dict[str, List[int]]]:
         batch_key = self.batch_key
@@ -96,14 +98,24 @@ class ColumnSumNormalize(BaseTransform):
 
     def __call__(self, data):
         if isinstance(data.data.X, sp.spmatrix):
-            self.logger.warning("Native support for sparse matrix is not implemented yet, "
-                                "converting to dense array explicitly.")
-            data.data.X = data.data.X.A
+            if not self.preserve_sparse:
+                self.logger.warning(
+                    "Native support for sparse matrix is disabled, converting to dense array explicitly.")
+                data.data.X = data.data.X.toarray()
+            elif self.mode not in ("normalize", "l2"):
+                self.logger.warning(
+                    f"Sparse matrices cannot preserve zeros with mode={self.mode!r}; converting to dense array.")
+                data.data.X = data.data.X.toarray()
 
         idx_dict = self._get_idx_dict(data)
         for name, idx in idx_dict.items():
             self.logger.info(f"Scaling {name} (n={len(idx):,})")
-            data.data.X[idx] = normalize(data.data.X[idx], mode=self.mode, axis=self.axis, eps=self.eps)
+            normalized = normalize(data.data.X[idx], mode=self.mode, axis=self.axis, eps=self.eps)
+            if len(idx) == data.shape[0] and np.array_equal(idx, np.arange(data.shape[0])):
+                data.data.X = normalized
+            else:
+                data.data.X[idx] = normalized
+        return data
 
 
 class ScTransformR(BaseTransform):
@@ -254,6 +266,7 @@ class ScTransform(BaseTransform):
         bw_adjust: float = 3,
         processes_num: int = os.cpu_count(),
         sparse_output: bool = False,
+        preserve_sparse: bool = False,
         **kwargs,
     ):  # yapf: disable
         super().__init__(**kwargs)
@@ -266,7 +279,7 @@ class ScTransform(BaseTransform):
         self.bin_size = bin_size
         self.bw_adjust = bw_adjust
         self.processes_num = processes_num
-        self.sparse_output = sparse_output
+        self.preserve_sparse = preserve_sparse
 
     def _get_idx_dict(self, data) -> List[Dict[str, List[int]]]:
         # TODO: refactor out this function; reduce ropied code.
@@ -295,10 +308,10 @@ class ScTransform(BaseTransform):
         return idx_dict
 
     def __call__(self, data: Data):
-        if isinstance(data.data.X, sp.spmatrix) and not self.sparse_output:
-            self.logger.warning("Native support for sparse matrix is not implemented yet, "
-                                "converting to dense array explicitly.")
-            data.data.X = data.data.X.A
+        input_is_sparse = self.preserve_sparse and isinstance(data.data.X, sp.spmatrix)
+        if isinstance(data.data.X, sp.spmatrix) and not input_is_sparse:
+            self.logger.warning("Native support for sparse matrix is disabled, converting to dense array explicitly.")
+            data.data.X = data.data.X.toarray()
         # idx_dict = self._get_idx_dict(data)
         # for name, idx in idx_dict.items():
         selected_data = data.data
@@ -422,9 +435,8 @@ class ScTransform(BaseTransform):
         x, y = X.nonzero()
         y = np.array([d[i] for i in y])
         data = X.data
-        Xnew = sp.coo_matrix((data, (x, y)), shape=selected_data.shape).tocsr()
-        if not self.sparse_output:
-            Xnew = Xnew.toarray()
+        Xnew = sp.coo_matrix((data, (x, y)), shape=selected_data.shape)
+        Xnew = Xnew.tocsr() if input_is_sparse else Xnew.toarray()
         selected_data.X = Xnew
         for c in full_model_pars.columns:
             selected_data.var[c + '_sct'] = full_model_pars[c]
@@ -619,18 +631,20 @@ class NormalizeTotal(AnnDataTransform):
     """
 
     def __init__(self, target_sum: Optional[float] = None, max_fraction: float = 0.05, key_added: Optional[str] = None,
-                 layer: Optional[str] = None, layers: Union[Literal['all'], Iterable[str]] = None,
-                 layer_norm: Optional[str] = None, inplace: bool = True, copy: bool = False, **kwargs):
+                 layer: Optional[str] = None, layers: Union[Literal['all'],
+                                                            Iterable[str]] = None, layer_norm: Optional[str] = None,
+                 inplace: bool = True, copy: bool = False, preserve_sparse: bool = False, **kwargs):
         super().__init__(sc.pp.normalize_total, target_sum=target_sum, key_added=key_added, layer=layer, layers=layers,
                          layer_norm=layer_norm, inplace=inplace, copy=copy, exclude_highly_expressed=True,
                          max_fraction=max_fraction, **kwargs)
+        self.preserve_sparse = preserve_sparse
 
         if max_fraction == 1.0:
             self.logger.info("max_fraction set to 1.0, this is equivalent to setting exclude_highly_expressed=False.")
 
     def __call__(self, data):
-        if scipy.sparse.issparse(data.data.X):
-            data.data.X = np.array(data.data.X.todense())
+        if scipy.sparse.issparse(data.data.X) and not self.preserve_sparse:
+            data.data.X = np.asarray(data.data.X.toarray())
         return super().__call__(data)
 
 
@@ -674,9 +688,10 @@ class NormalizeTotalLog1P(BaseTransform):
 
     """
 
-    def __init__(self, base=None, target_sum=None, max_fraction=0.05, **kwargs):
+    def __init__(self, base=None, target_sum=None, max_fraction=0.05, preserve_sparse: bool = False, **kwargs):
         super().__init__(**kwargs)
-        self.normalize_total = NormalizeTotal(target_sum=target_sum, max_fraction=max_fraction)
+        self.normalize_total = NormalizeTotal(target_sum=target_sum, max_fraction=max_fraction,
+                                              preserve_sparse=preserve_sparse)
         self.log1p = Log1P(base=base)
 
     def __call__(self, data: Data) -> Data:
