@@ -231,6 +231,9 @@ class ScTransform(BaseTransform):
         Bandwidth adjusting parameter.
     processes_num
         Number of processes. Default to the total number of available processors.
+    sparse_output
+        Preserve the residual matrix as CSR instead of materializing a dense
+        array. The numerical values are unchanged; this only changes storage.
 
     References
     ---------
@@ -250,6 +253,7 @@ class ScTransform(BaseTransform):
         bin_size: int = 500,
         bw_adjust: float = 3,
         processes_num: int = os.cpu_count(),
+        sparse_output: bool = False,
         **kwargs,
     ):  # yapf: disable
         super().__init__(**kwargs)
@@ -262,6 +266,7 @@ class ScTransform(BaseTransform):
         self.bin_size = bin_size
         self.bw_adjust = bw_adjust
         self.processes_num = processes_num
+        self.sparse_output = sparse_output
 
     def _get_idx_dict(self, data) -> List[Dict[str, List[int]]]:
         # TODO: refactor out this function; reduce ropied code.
@@ -290,15 +295,14 @@ class ScTransform(BaseTransform):
         return idx_dict
 
     def __call__(self, data: Data):
-        if isinstance(data.data.X, sp.spmatrix):
+        if isinstance(data.data.X, sp.spmatrix) and not self.sparse_output:
             self.logger.warning("Native support for sparse matrix is not implemented yet, "
                                 "converting to dense array explicitly.")
             data.data.X = data.data.X.A
         # idx_dict = self._get_idx_dict(data)
         # for name, idx in idx_dict.items():
         selected_data = data.data
-        X = selected_data.X.copy()
-        X = sp.csr_matrix(X)
+        X = sp.csr_matrix(selected_data.X, copy=True)
         X.eliminate_zeros()
         gn = np.array(list(selected_data.var_names))
         cn = np.array(list(selected_data.obs_names))
@@ -418,7 +422,9 @@ class ScTransform(BaseTransform):
         x, y = X.nonzero()
         y = np.array([d[i] for i in y])
         data = X.data
-        Xnew = sp.coo_matrix((data, (x, y)), shape=selected_data.shape).toarray()
+        Xnew = sp.coo_matrix((data, (x, y)), shape=selected_data.shape).tocsr()
+        if not self.sparse_output:
+            Xnew = Xnew.toarray()
         selected_data.X = Xnew
         for c in full_model_pars.columns:
             selected_data.var[c + '_sct'] = full_model_pars[c]
