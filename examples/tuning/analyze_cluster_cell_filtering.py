@@ -213,9 +213,6 @@ def find_h5(tuning_dir: Path, method_dir: str, dataset: str, download: bool) -> 
     for path in candidates:
         if path.exists():
             return path
-    for path in tuning_dir.glob(f"cluster_*/data/{dataset}.h5"):
-        if path.exists():
-            return path
     if download:
         return download_h5(tuning_dir, method_dir, dataset)
     return None
