@@ -92,6 +92,8 @@ def parse_args() -> argparse.Namespace:
                         help="Pipeline tuning YAML path relative to each task directory.")
     parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT,
                         help="JointEmbeddingNIPSDataset root containing task directories.")
+    parser.add_argument("--seed", type=int, default=1,
+                        help="Random seed reset before each preprocessing replay (matches the tuning scripts).")
     parser.add_argument("--min-cell-retention", type=float, default=0.8,
                         help="Minimum min-modality cell-retention fraction for filtered outputs.")
     parser.add_argument("--min-cell-count", type=int, default=None,
@@ -106,6 +108,16 @@ def parse_args() -> argparse.Namespace:
                         help="Only replay the first N unique pipelines, for smoke testing.")
     parser.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True,
                         help="Reuse existing retention detail CSV rows with no recorded error.")
+    parser.add_argument(
+        "--retry-errors",
+        nargs="+",
+        default=None,
+        help="When resuming, retry only existing rows whose preprocess.error exactly matches one of these values. "
+        "Existing rows with other errors are retained without replaying; unseen pipelines still run.",
+    )
+    parser.add_argument(
+        "--retry-all-errors", action="store_true",
+        help="When resuming, retry every existing preprocessing error while preserving successful rows.")
     parser.add_argument("--continue-on-error", action=argparse.BooleanOptionalAction, default=True,
                         help="Record failed preprocessing pipelines and continue.")
     parser.add_argument("--backup", action=argparse.BooleanOptionalAction, default=True,
@@ -280,7 +292,12 @@ def clone_raw_data(raw_data):
 
 
 def run_preprocessing_once(dataset, raw_data, planer: PipelinePlaner, pipeline_spec: dict[str, str],
-                           guard_mods: Sequence[str]) -> dict[str, object]:
+                           guard_mods: Sequence[str], seed: int) -> dict[str, object]:
+    # The original tuning entry points reset this seed before each pipeline
+    # evaluation.  This matters for ScTransform's gene sampling.
+    from dance.utils import set_seed
+
+    set_seed(seed)
     data = dataset._raw_to_dance(clone_raw_data(raw_data))
     raw_shapes = mod_shape_table(data)
 
@@ -289,6 +306,12 @@ def run_preprocessing_once(dataset, raw_data, planer: PipelinePlaner, pipeline_s
                                if elem.get("type") == "filter.cell")
     for idx in range(last_cell_filter_idx + 1):
         preprocessing_pipeline[idx](data)
+        kept_shapes = mod_shape_table(data)
+        # A pipeline that removes every cell from a guarded modality has a
+        # well-defined retention of zero. Do not invoke later transforms that
+        # expect a non-empty AnnData object merely to obtain that result.
+        if any(kept_shapes.get(mod, {}).get("n_cells", 0) == 0 for mod in guard_mods):
+            return retention_record(raw_shapes, kept_shapes, guard_mods)
 
     kept_shapes = mod_shape_table(data)
     return retention_record(raw_shapes, kept_shapes, guard_mods)
@@ -480,7 +503,16 @@ def process_task(task: str, args: argparse.Namespace, timestamp_backup_root: Pat
     if args.resume and retention_path.exists():
         existing = pd.read_csv(retention_path)
         if "preprocess.pipeline_key" in existing and "preprocess.error" in existing:
-            done = existing[existing["preprocess.error"].fillna("") == ""]
+            errors = existing["preprocess.error"].fillna("").astype(str)
+            if args.retry_all_errors:
+                done = existing[errors == ""]
+                logger.info(f"{task}: retrying all {int((errors != '').sum())} existing preprocessing errors")
+            elif args.retry_errors:
+                retry_errors = set(args.retry_errors)
+                done = existing[(errors == "") | ~errors.isin(retry_errors)]
+                logger.info(f"{task}: retrying existing errors only when they match {sorted(retry_errors)!r}")
+            else:
+                done = existing[errors == ""]
             done_keys = set(done["preprocess.pipeline_key"].astype(str))
 
     records: list[dict[str, object]] = []
@@ -495,7 +527,7 @@ def process_task(task: str, args: argparse.Namespace, timestamp_backup_root: Pat
         record: dict[str, object] = row.to_dict()
         logger.info(f"{task}: replay {idx + 1}/{len(unique)} pipeline_key={key}")
         try:
-            record.update(run_preprocessing_once(dataset, raw_data, planer, pipeline_spec, args.guard_mods))
+            record.update(run_preprocessing_once(dataset, raw_data, planer, pipeline_spec, args.guard_mods, args.seed))
             record["preprocess.error"] = ""
         except Exception as exc:
             record["preprocess.error"] = repr(exc)
