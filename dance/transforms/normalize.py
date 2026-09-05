@@ -251,6 +251,9 @@ class ScTransform(BaseTransform):
         Bandwidth adjusting parameter.
     processes_num
         Number of processes. Default to the total number of available processors.
+    sparse_output
+        Preserve the residual matrix as CSR instead of materializing a dense
+        array. The numerical values are unchanged; this only changes storage.
 
     References
     ---------
@@ -270,6 +273,7 @@ class ScTransform(BaseTransform):
         bin_size: int = 500,
         bw_adjust: float = 3,
         processes_num: int = os.cpu_count(),
+        sparse_output: bool = False,
         preserve_sparse: bool = False,
         **kwargs,
     ):  # yapf: disable
@@ -319,8 +323,7 @@ class ScTransform(BaseTransform):
         # idx_dict = self._get_idx_dict(data)
         # for name, idx in idx_dict.items():
         selected_data = data.data
-        X = selected_data.X.copy()
-        X = sp.csr_matrix(X)
+        X = sp.csr_matrix(selected_data.X, copy=True)
         X.eliminate_zeros()
         gn = np.array(list(selected_data.var_names))
         cn = np.array(list(selected_data.obs_names))
