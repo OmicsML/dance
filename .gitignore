@@ -169,3 +169,5 @@ examples/multi_modality/joint_embedding/models/*.pth
 trash
 out.log
 temp_data
+!examples/tuning/cluster_cell_filtering_*_audit.md
+!examples/tuning/cluster_cell_filtering_*_summary.csv
