@@ -1,93 +1,91 @@
-# Cluster cell-filtering audit: server 159
+# Server 159 corrected-count and historical Top3 audit
 
-## Scope and conclusion
+Completed: 7 tasks, 3 H5 datasets, 42 filter combinations; 12 combinations below 0.8. All 21 historical Top3 candidates retain at least 0.8. All 7 tasks are NO_STEP3_NEEDED. No candidates are excluded from historical Top3; no replacements enter.
 
-This audit covers the 42 preprocessing rows in `examples/tuning/cluster_cell_filtering_159.csv`: 4 methods, 3 datasets, and 7 method/dataset pairs. There are 12 combinations with `cell_retention < 0.8`.
+Step1 launches: 0. Step2 launches: 0. Step3 launches: 0. Pilot and trial monitoring are not applicable because no Top3 changed. No new joint best exists and no final result values may be updated from this audit. Historical Step3 results are not newly certified for runtime retention or trial completeness.
 
-The historical step3 runs cannot be claimed to have used `min_cell_retention=0.8`. All five current `cluster_*` entry points define the parameter, but its default is `None`; no checked `cluster_*` launch command passes it, and no checked log contains a filtering or cell-count-guard marker. The guard-supporting code was added in commit `78ba0f4` on 2026-09-03, after the inspected 2024-2025 runs.
+## Data and corrected counts
 
-## Data-source validation
+The requested analyzer ran with downloads enabled. Downloads: none; all three H5 files already existed in the highest-priority shared temp_data directory. find_h5 priority and download destination were verified. No MISSING_DATA; every task has six combinations. All X shapes match raw_cells/raw_genes; no dataset dimension conflicts. Ratios are computed as kept_cells/raw_cells; exactly 0.8 is retained.
 
-All H5 and YAML paths referenced by the input CSV exist. Each H5 has an `X` dataset whose shape agrees with `raw_cells` and `raw_genes` in every corresponding CSV row.
+| Dataset          | X shape         | H5 path                                                          | SHA256                                                           |
+| ---------------- | --------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 10X_PBMC         | \[4271, 16653\] | /home/zyxing/dance/examples/tuning/temp_data/10X_PBMC.h5         | 34382b572c7d88aa19a7e0faf3a4be09393d3c2de2ccc617d781edea5f97d106 |
+| human_ILCS_cell  | \[648, 64535\]  | /home/zyxing/dance/examples/tuning/temp_data/human_ILCS_cell.h5  | fa2d49b6120ed83d4baefa8bb8f71ab50c8f8cb1090bb73066759228a5e1e438 |
+| worm_neuron_cell | \[4186, 13488\] | /home/zyxing/dance/examples/tuning/temp_data/worm_neuron_cell.h5 | 4f2a3c4b8492bcd11d957a8a74098ba258c271d714718c175854a7c44b1e31e6 |
 
-| Dataset            | CSV H5                                          | raw_cells | raw_genes | Validation |
-| ------------------ | ----------------------------------------------- | --------: | --------: | ---------- |
-| `10X_PBMC`         | `examples/tuning/temp_data/10X_PBMC.h5`         |      4271 |     16653 | Reliable   |
-| `human_ILCS_cell`  | `examples/tuning/temp_data/human_ILCS_cell.h5`  |       648 |     64535 | Reliable   |
-| `worm_neuron_cell` | `examples/tuning/temp_data/worm_neuron_cell.h5` |      4186 |     13488 | Reliable   |
+Original CSV SHA256: `c6d572e0d1dd57802d9ac3cd090efdf03e223ff7b3891c60e3ab327694da9a1d`
+Corrected CSV SHA256: `07a3c7a967df7ab973f22390efe8165a869f17baee87dbb8d39924f9a9a9f105`
 
-The current `main.py` default is `--data_dir ../temp_data` for Graphsc, SCDCC, SCDEEPCLUSTER, SCDSC, and SCTAG. With the launch convention shown by each method's `run.sh` (run from the method directory), this resolves to `examples/tuning/temp_data`, matching the CSV.
-
-The inspected 2025 logs for the seven server-159 pairs use `../temp_data`, except that older SCDEEPCLUSTER/human_ILCS_cell and SCDSC/human_ILCS_cell log sections from 2024 used `./data`. The local and shared copies are byte-identical:
-
-- `human_ILCS_cell.h5`: SHA-256 `fa2d49b6120ed83d4baefa8bb8f71ab50c8f8cb1090bb73066759228a5e1e438`
-- `10X_PBMC.h5`: SHA-256 `34382b572c7d88aa19a7e0faf3a4be09393d3c2de2ccc617d781edea5f97d106`
-- `worm_neuron_cell.h5`: SHA-256 `4f2a3c4b8492bcd11d957a8a74098ba258c271d714718c175854a7c44b1e31e6`
-
-No dataset has conflicting original dimensions, and no data-source row is marked suspicious. The historical location change is documented but does not alter this audit because the compared files are identical.
+All original/current count fields, H5 paths, filter-function keys and filter-operation details are identical after matching by method/dataset/gene_filter/cell_filter. The corrected CSV additionally stores the explicit retention ratio. The original CSV is preserved with its original bytes. No prior out_step3_cell_guard\*.log exists for these seven tasks, and no previous guarded run was reused.
 
 ## Combinations below 0.8
 
-`cell_retention` is calculated as `kept_cells / raw_cells`. If a 0.8 guard is enabled, all 12 rows below must be excluded.
+| Method        | Dataset         | Gene filter            | Cell filter            | Kept/raw  | Retention   |
+| ------------- | --------------- | ---------------------- | ---------------------- | --------- | ----------- |
+| SCDCC         | 10X_PBMC        | FilterGenesPercentile  | FilterCellsScanpyOrder | 1783/4271 | 0.417466635 |
+| SCDCC         | 10X_PBMC        | FilterGenesScanpyOrder | FilterCellsScanpyOrder | 1746/4271 | 0.408803559 |
+| SCDCC         | human_ILCS_cell | FilterGenesPercentile  | FilterCellsScanpyOrder | 480/648   | 0.740740741 |
+| SCDCC         | human_ILCS_cell | FilterGenesScanpyOrder | FilterCellsScanpyOrder | 482/648   | 0.743827160 |
+| SCDEEPCLUSTER | human_ILCS_cell | FilterGenesPercentile  | FilterCellsScanpyOrder | 480/648   | 0.740740741 |
+| SCDEEPCLUSTER | human_ILCS_cell | FilterGenesScanpyOrder | FilterCellsScanpyOrder | 482/648   | 0.743827160 |
+| SCDSC         | 10X_PBMC        | FilterGenesPercentile  | FilterCellsScanpyOrder | 1783/4271 | 0.417466635 |
+| SCDSC         | 10X_PBMC        | FilterGenesScanpyOrder | FilterCellsScanpyOrder | 1746/4271 | 0.408803559 |
+| SCDSC         | human_ILCS_cell | FilterGenesPercentile  | FilterCellsScanpyOrder | 480/648   | 0.740740741 |
+| SCDSC         | human_ILCS_cell | FilterGenesScanpyOrder | FilterCellsScanpyOrder | 482/648   | 0.743827160 |
+| SCTAG         | human_ILCS_cell | FilterGenesPercentile  | FilterCellsScanpyOrder | 480/648   | 0.740740741 |
+| SCTAG         | human_ILCS_cell | FilterGenesScanpyOrder | FilterCellsScanpyOrder | 482/648   | 0.743827160 |
 
-| method        | dataset         | scenario                                      | gene_filter            | cell_filter            | raw_cells | kept_cells | removed_cells | cell_retention | h5                                             | yaml                                                                                       |
-| ------------- | --------------- | --------------------------------------------- | ---------------------- | ---------------------- | --------: | ---------: | ------------: | -------------: | ---------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| SCDCC         | 10X_PBMC        | FilterGenesScanpyOrder+FilterCellsScanpyOrder | FilterGenesScanpyOrder | FilterCellsScanpyOrder |      4271 |       1746 |          2525 |       0.408804 | `examples/tuning/temp_data/10X_PBMC.h5`        | `examples/tuning/cluster_scdcc/10X_PBMC/pipeline_params_tuning_config.yaml`                |
-| SCDCC         | 10X_PBMC        | FilterGenesPercentile+FilterCellsScanpyOrder  | FilterGenesPercentile  | FilterCellsScanpyOrder |      4271 |       1783 |          2488 |       0.417467 | `examples/tuning/temp_data/10X_PBMC.h5`        | `examples/tuning/cluster_scdcc/10X_PBMC/pipeline_params_tuning_config.yaml`                |
-| SCDCC         | human_ILCS_cell | FilterGenesPercentile+FilterCellsScanpyOrder  | FilterGenesPercentile  | FilterCellsScanpyOrder |       648 |        480 |           168 |       0.740741 | `examples/tuning/temp_data/human_ILCS_cell.h5` | `examples/tuning/cluster_scdcc/human_ILCS_cell/pipeline_params_tuning_config.yaml`         |
-| SCDCC         | human_ILCS_cell | FilterGenesScanpyOrder+FilterCellsScanpyOrder | FilterGenesScanpyOrder | FilterCellsScanpyOrder |       648 |        482 |           166 |       0.743827 | `examples/tuning/temp_data/human_ILCS_cell.h5` | `examples/tuning/cluster_scdcc/human_ILCS_cell/pipeline_params_tuning_config.yaml`         |
-| SCDEEPCLUSTER | human_ILCS_cell | FilterGenesPercentile+FilterCellsScanpyOrder  | FilterGenesPercentile  | FilterCellsScanpyOrder |       648 |        480 |           168 |       0.740741 | `examples/tuning/temp_data/human_ILCS_cell.h5` | `examples/tuning/cluster_scdeepcluster/human_ILCS_cell/pipeline_params_tuning_config.yaml` |
-| SCDEEPCLUSTER | human_ILCS_cell | FilterGenesScanpyOrder+FilterCellsScanpyOrder | FilterGenesScanpyOrder | FilterCellsScanpyOrder |       648 |        482 |           166 |       0.743827 | `examples/tuning/temp_data/human_ILCS_cell.h5` | `examples/tuning/cluster_scdeepcluster/human_ILCS_cell/pipeline_params_tuning_config.yaml` |
-| SCDSC         | 10X_PBMC        | FilterGenesScanpyOrder+FilterCellsScanpyOrder | FilterGenesScanpyOrder | FilterCellsScanpyOrder |      4271 |       1746 |          2525 |       0.408804 | `examples/tuning/temp_data/10X_PBMC.h5`        | `examples/tuning/cluster_scdsc/10X_PBMC/pipeline_params_tuning_config.yaml`                |
-| SCDSC         | 10X_PBMC        | FilterGenesPercentile+FilterCellsScanpyOrder  | FilterGenesPercentile  | FilterCellsScanpyOrder |      4271 |       1783 |          2488 |       0.417467 | `examples/tuning/temp_data/10X_PBMC.h5`        | `examples/tuning/cluster_scdsc/10X_PBMC/pipeline_params_tuning_config.yaml`                |
-| SCDSC         | human_ILCS_cell | FilterGenesPercentile+FilterCellsScanpyOrder  | FilterGenesPercentile  | FilterCellsScanpyOrder |       648 |        480 |           168 |       0.740741 | `examples/tuning/temp_data/human_ILCS_cell.h5` | `examples/tuning/cluster_scdsc/human_ILCS_cell/pipeline_params_tuning_config.yaml`         |
-| SCDSC         | human_ILCS_cell | FilterGenesScanpyOrder+FilterCellsScanpyOrder | FilterGenesScanpyOrder | FilterCellsScanpyOrder |       648 |        482 |           166 |       0.743827 | `examples/tuning/temp_data/human_ILCS_cell.h5` | `examples/tuning/cluster_scdsc/human_ILCS_cell/pipeline_params_tuning_config.yaml`         |
-| SCTAG         | human_ILCS_cell | FilterGenesPercentile+FilterCellsScanpyOrder  | FilterGenesPercentile  | FilterCellsScanpyOrder |       648 |        480 |           168 |       0.740741 | `examples/tuning/temp_data/human_ILCS_cell.h5` | `examples/tuning/cluster_sctag/human_ILCS_cell/pipeline_params_tuning_config.yaml`         |
-| SCTAG         | human_ILCS_cell | FilterGenesScanpyOrder+FilterCellsScanpyOrder | FilterGenesScanpyOrder | FilterCellsScanpyOrder |       648 |        482 |           166 |       0.743827 | `examples/tuning/temp_data/human_ILCS_cell.h5` | `examples/tuning/cluster_sctag/human_ILCS_cell/pipeline_params_tuning_config.yaml`         |
+## Historical sweep provenance
 
-Thus, low-retention candidates occur for SCDCC/10X_PBMC, SCDCC/human_ILCS_cell, SCDEEPCLUSTER/human_ILCS_cell, SCDSC/10X_PBMC, SCDSC/human_ILCS_cell, and SCTAG/human_ILCS_cell. SCDSC/worm_neuron_cell has none; its minimum is 0.834209.
+Primary Step2 sweep IDs come exclusively from results - cluster.csv. Associated sweep IDs were resolved from historical wandb-metadata.json arguments using get_additional_sweep(). W&B run configs and summaries were downloaded without agents. All 4104 IDs, acc values (numeric tolerance 1e-12), and pipeline fields match local summaries; local originals were not rewritten. Raw W&B exports and full run configs/summaries are in step2_provenance/.
 
-## Method/dataset summary
+| Method        | Dataset          | Sweeps (primary first) | Verified runs |
+| ------------- | ---------------- | ---------------------- | ------------- |
+| SCDCC         | 10X_PBMC         | bl236xc7, 4qdza524     | 216           |
+| SCDCC         | human_ILCS_cell  | gx9i91pb, cuqx61va     | 216           |
+| SCDEEPCLUSTER | human_ILCS_cell  | m6yn75go, 0d0h4cnj     | 216           |
+| SCDSC         | worm_neuron_cell | vqmhygcx, 2z7apgyl     | 864           |
+| SCDSC         | 10X_PBMC         | n4j6jo73, 0wsjafv8     | 864           |
+| SCDSC         | human_ILCS_cell  | 9o2yvv6q, g56cb2ac     | 864           |
+| SCTAG         | human_ILCS_cell  | 81fqd0nb, msqj6fao     | 864           |
 
-The machine-readable aggregate is in `examples/tuning/cluster_cell_filtering_159_summary.csv`.
+## Historical Top3 → guarded Top3
 
-| method/dataset                | combinations | below 0.8 | minimum retention | minimum kept cells | worst combination                             |
-| ----------------------------- | -----------: | --------: | ----------------: | -----------------: | --------------------------------------------- |
-| SCDCC/10X_PBMC                |            6 |         2 |          0.408804 |               1746 | FilterGenesScanpyOrder+FilterCellsScanpyOrder |
-| SCDCC/human_ILCS_cell         |            6 |         2 |          0.740741 |                480 | FilterGenesPercentile+FilterCellsScanpyOrder  |
-| SCDEEPCLUSTER/human_ILCS_cell |            6 |         2 |          0.740741 |                480 | FilterGenesPercentile+FilterCellsScanpyOrder  |
-| SCDSC/10X_PBMC                |            6 |         2 |          0.408804 |               1746 | FilterGenesScanpyOrder+FilterCellsScanpyOrder |
-| SCDSC/human_ILCS_cell         |            6 |         2 |          0.740741 |                480 | FilterGenesPercentile+FilterCellsScanpyOrder  |
-| SCDSC/worm_neuron_cell        |            6 |         0 |          0.834209 |               3492 | FilterGenesScanpyOrder+FilterCellsScanpyOrder |
-| SCTAG/human_ILCS_cell         |            6 |         2 |          0.740741 |                480 | FilterGenesPercentile+FilterCellsScanpyOrder  |
+Historical ranking uses the repository’s original acc descending sort on the full CSV, once. Guarded ranking removes below-threshold rows from that same order. This preserves original tie order. Sorting again after filtering can spuriously swap tied candidates even when no historical Top3 candidate is excluded; dance/pipeline.py was corrected to rank before filtering. Two regression cases passed, including exactly 0.8 and replacement of an excluded winner. The preliminary audit directory from before this correction is retained but superseded by this audit.
 
-## Historical step3 threshold evidence
+| Method        | Dataset          | Rank | Historical ID → guarded ID | acc            | Retention   | Decision |
+| ------------- | ---------------- | ---- | -------------------------- | -------------- | ----------- | -------- |
+| SCDCC         | 10X_PBMC         | 1    | vt5nay0m → vt5nay0m        | 0.844467179538 | 0.984312807 | KEEP     |
+| SCDCC         | 10X_PBMC         | 2    | 70qplttf → 70qplttf        | 0.837021077306 | 1.000000000 | KEEP     |
+| SCDCC         | 10X_PBMC         | 3    | rgqn3vvo → rgqn3vvo        | 0.826216923571 | 1.000000000 | KEEP     |
+| SCDCC         | human_ILCS_cell  | 1    | 8t78un2u → 8t78un2u        | 0.172261458621 | 1.000000000 | KEEP     |
+| SCDCC         | human_ILCS_cell  | 2    | jb62ui8h → jb62ui8h        | 0.17106015438  | 1.000000000 | KEEP     |
+| SCDCC         | human_ILCS_cell  | 3    | eemulfzs → eemulfzs        | 0.17106015438  | 1.000000000 | KEEP     |
+| SCDEEPCLUSTER | human_ILCS_cell  | 1    | 8jie17h3 → 8jie17h3        | 0.541898384693 | 1.000000000 | KEEP     |
+| SCDEEPCLUSTER | human_ILCS_cell  | 2    | wl59y7b6 → wl59y7b6        | 0.541898384693 | 1.000000000 | KEEP     |
+| SCDEEPCLUSTER | human_ILCS_cell  | 3    | hbne3ukv → hbne3ukv        | 0.44259801067  | 1.000000000 | KEEP     |
+| SCDSC         | worm_neuron_cell | 1    | to55sqp6 → to55sqp6        | 0.655493335464 | 0.983038700 | KEEP     |
+| SCDSC         | worm_neuron_cell | 2    | h58u5oms → h58u5oms        | 0.655493335464 | 0.983038700 | KEEP     |
+| SCDSC         | worm_neuron_cell | 3    | uetzgf3a → uetzgf3a        | 0.655493335464 | 0.983038700 | KEEP     |
+| SCDSC         | 10X_PBMC         | 1    | 15m7hot1 → 15m7hot1        | 0.720369111377 | 1.000000000 | KEEP     |
+| SCDSC         | 10X_PBMC         | 2    | rg8irg7b → rg8irg7b        | 0.720369111377 | 1.000000000 | KEEP     |
+| SCDSC         | 10X_PBMC         | 3    | 3sbvxzv4 → 3sbvxzv4        | 0.720369111377 | 1.000000000 | KEEP     |
+| SCDSC         | human_ILCS_cell  | 1    | mnccuzxb → mnccuzxb        | 0.6763138849   | 0.986111111 | KEEP     |
+| SCDSC         | human_ILCS_cell  | 2    | i4t5qxul → i4t5qxul        | 0.6763138849   | 0.986111111 | KEEP     |
+| SCDSC         | human_ILCS_cell  | 3    | vz7l1o7v → vz7l1o7v        | 0.6763138849   | 0.986111111 | KEEP     |
+| SCTAG         | human_ILCS_cell  | 1    | hszjezax → hszjezax        | 0.668502600814 | 1.000000000 | KEEP     |
+| SCTAG         | human_ILCS_cell  | 2    | 0nd39u6v → 0nd39u6v        | 0.668425492986 | 1.000000000 | KEEP     |
+| SCTAG         | human_ILCS_cell  | 3    | 1ofbvzv6 → 1ofbvzv6        | 0.425030417605 | 0.986111111 | KEEP     |
 
-Classification is based on checked launch commands and logs, not merely on current argparse definitions.
+## Execution, completeness and preservation
 
-| Method        | Classification                                               | Evidence                                                                                                                          |
-| ------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| Graphsc       | Parameter exists, but no evidence it was passed historically | Current default is `None`; `run.sh` does not pass it; no guard/filter log marker. Graphsc has no server-159 row in the input CSV. |
-| SCDCC         | Parameter exists, but no evidence it was passed historically | Current default is `None`; historical parameter dumps do not contain it; `run.sh` does not pass it; no guard/filter log marker.   |
-| SCDEEPCLUSTER | Parameter exists, but no evidence it was passed historically | Same evidence; no historical command or log establishes 0.8.                                                                      |
-| SCDSC         | Parameter exists, but no evidence it was passed historically | Same evidence; no historical command or log establishes 0.8.                                                                      |
-| SCTAG         | Parameter exists, but no evidence it was passed historically | Same evidence; no historical command or log establishes 0.8.                                                                      |
+No NEEDS_STEP3 or BLOCKED tasks remain. No main.py was invoked, no new sweep was created, and no GPU was allocated. Consequently there is no pilot execution, no new incomplete task, and all newly planned/started/completed/valid/failed/guard-skipped trial counts are zero. CUDA OOM, NaN/Inf, Singular matrix, Killed and Traceback counts for new trials are not applicable. The initial sandboxed W&B probe encountered ProxyError; authorized network access succeeded for every sweep.
 
-No method qualifies for “explicitly passed 0.8 and log proves filtering.” No method lacks support completely in the current code. `generate_cluster_112_step3_commands.py` has a default of 0.8 and renders guarded commands, but it targets server 112; there is no generated server-159 guarded command or corresponding `out_step3_cell_guard.log`, so it is not evidence for these historical runs.
+The mandatory “Skip step-2 sweep agent because count=0” marker applies to cluster executions; none were necessary. It is not fabricated as an observed training-log line. execution_audit.log records zero main.py/Step2 invocations, and the API-only verification script contains no agent launch.
 
-## Results requiring action
+old_joint_best contains only the observed maximum of existing local Step3 CSVs; historical_step3_observations.json records file hashes, row counts and numeric acc counts. These maxima are not completeness or runtime-guard certifications. new_joint_best is empty for every task. No result table is updated.
 
-To make a defensible claim that historical server-159 step3 results obey `cell_retention >= 0.8`, step3 candidate selection must be regenerated for all seven method/dataset pairs with the guard explicitly enabled and logged. This does not automatically mean every model must be retrained: retraining is required where guarded selection differs from the historical selection.
-
-The six method/dataset pairs containing low-retention candidates are the priority for re-selection and possible recomputation:
-
-- SCDCC/10X_PBMC
-- SCDCC/human_ILCS_cell
-- SCDEEPCLUSTER/human_ILCS_cell
-- SCDSC/10X_PBMC
-- SCDSC/human_ILCS_cell
-- SCTAG/human_ILCS_cell
-
-SCDSC/worm_neuron_cell has no below-0.8 combination under the audited defaults, so the CSV alone does not indicate a filtering-driven need to retrain it. However, the historical run still lacks proof that the guard was enabled.
-
-Historical step3 parameter sweeps tune filtering thresholds, whereas this input CSV evaluates the six pipeline combinations at the parent YAML defaults. Therefore the CSV is sufficient to exclude the 12 listed default combinations, but it is not sufficient to certify every individual historical step3 run. Existing parameter-level results must not be declared valid or invalid without reconstructing their realized retention. Missing guard logs are the limiting evidence; H5 data are not missing.
+Archive: /home/zyxing/dance/examples/tuning/cluster_159_step3_archive/corrected_counts_20260906_020637
+Initial original-artifact backup: /home/zyxing/dance/examples/tuning/cluster_159_step3_archive/corrected_counts_20260906_020609
+No task results/config directories required execution archives because there are no NEEDS_STEP3 tasks. All original task results/configs/logs remain in place. New annotated Step2 files are separate from best_test_acc.csv. The archive manifest covers audit/provenance artifacts; each copied artifact is hash-compared to its source. No reset, checkout, deletion, commit or push was performed.

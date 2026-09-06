@@ -1204,6 +1204,9 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
     result = pd.read_csv(result_load_path)
     result = _attach_cell_count_stats(result, cell_count_summary_path, cell_count_method, cell_count_dataset,
                                       cell_count_prefix)
+    # Establish the historical ranking before filtering. Sorting the smaller
+    # frame again can reorder tied scores and needlessly replace Top3 runs.
+    result = result.sort_values(by=metric, ascending=ascending)
     n_cells_col = f"{cell_count_prefix}.n_cells"
     retention_col = f"{cell_count_prefix}.cell_retention"
     if min_cell_count is not None:
@@ -1223,7 +1226,7 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
                 f"Skip min_cell_retention filtering because {retention_col!r} is missing in {result_load_path}")
     if result.empty:
         raise ValueError("No step-2 pipelines remain after cell-count filtering.")
-    result = result.sort_values(by=metric, ascending=ascending).head(pipeline_top_k)
+    result = result.head(pipeline_top_k)
     columns = sorted(
         [col for col in result.columns if (col.startswith("pipeline") or col.startswith("run_kwargs_pipeline"))],
         key=lambda x: float(x.split('.')[1]))
