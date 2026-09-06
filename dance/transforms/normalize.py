@@ -118,6 +118,12 @@ class ColumnSumNormalize(BaseTransform):
         return data
 
 
+@register_preprocessor("normalize")
+@add_mod_and_transform
+class ScaleFeature(ColumnSumNormalize):
+    """Historical name retained for clustering sweep configs predating 98bf305."""
+
+
 class ScTransformR(BaseTransform):
     """ScTransform normalization and variance stabiliation.
 
