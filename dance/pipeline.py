@@ -1198,7 +1198,8 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
     result = pd.read_csv(result_load_path)
     result = _attach_cell_count_stats(result, cell_count_summary_path, cell_count_method, cell_count_dataset,
                                       cell_count_prefix)
-    # Rank before filtering so tied scores retain their historical candidate order.
+    # Establish the historical ranking before filtering. Sorting the smaller
+    # frame again can reorder tied scores and needlessly replace Top3 runs.
     result = result.sort_values(by=metric, ascending=ascending)
     n_cells_col = f"{cell_count_prefix}.n_cells"
     retention_col = f"{cell_count_prefix}.cell_retention"

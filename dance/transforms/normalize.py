@@ -1,5 +1,5 @@
 import os
-from multiprocessing import Manager, Pool
+from multiprocessing import Pool
 
 import anndata as ad
 import numpy as np
@@ -200,17 +200,25 @@ class tfidfTransform(BaseTransform):
         self.fitted = False
 
     def fit(self, X):
-        self.idf = X.shape[0] / X.sum(axis=0)
+        feature_sums = np.asarray(X.sum(axis=0)).ravel()
+        # A feature absent from every cell has an undefined inverse document
+        # frequency. Keeping its weight at zero preserves the all-zero column
+        # without introducing infinities into subsequent normalizers.
+        self.idf = np.divide(X.shape[0], feature_sums, out=np.zeros_like(feature_sums, dtype=float), where=feature_sums
+                             != 0)
         self.fitted = True
 
     def transform(self, X):
         if not self.fitted:
             raise RuntimeError('Transformer was not fitted on any data')
         if scipy.sparse.issparse(X):
-            tf = X.multiply(1 / X.sum(axis=1))
+            row_sums = np.asarray(X.sum(axis=1)).ravel()
+            inv_row_sums = np.divide(1, row_sums, out=np.zeros_like(row_sums, dtype=float), where=row_sums != 0)
+            tf = X.multiply(inv_row_sums[:, None])
             return tf.multiply(self.idf).tocsr()
         else:
-            tf = X / X.sum(axis=1, keepdims=True)
+            row_sums = np.asarray(X.sum(axis=1), dtype=float)
+            tf = np.divide(X, row_sums[:, None], out=np.zeros_like(X, dtype=float), where=row_sums[:, None] != 0)
             return tf * self.idf
 
     def __call__(self, data):
@@ -372,7 +380,11 @@ class ScTransform(BaseTransform):
         bin_ind = np.ceil(np.arange(1, genes_step1.size + 1) / self.bin_size)
         max_bin = max(bin_ind)
 
-        ps = Manager().dict()
+        # ``multiprocessing.Manager`` launches a local socket server. Besides
+        # adding unnecessary IPC overhead, that socket is unavailable in some
+        # sandboxed execution environments. Have workers return their fitted
+        # parameters instead and aggregate them in the parent process.
+        ps = {}
 
         for i in range(1, int(max_bin) + 1):
             genes_bin_regress = genes_step1[bin_ind == i]
@@ -382,14 +394,12 @@ class ScTransform(BaseTransform):
 
             pc_chunksize = umi_bin.shape[1] // os.cpu_count() + 1
 
-            pool = Pool(self.processes_num, _parallel_init, [genes_bin_regress, umi_bin, gn, mm, ps])
+            pool = Pool(self.processes_num, _parallel_init, [genes_bin_regress, umi_bin, gn, mm])
             try:
-                pool.map(_parallel_wrapper, range(umi_bin.shape[1]), chunksize=pc_chunksize)
+                ps.update(pool.map(_parallel_wrapper, range(umi_bin.shape[1]), chunksize=pc_chunksize))
             finally:
                 pool.close()
                 pool.join()
-
-        ps = ps._getvalue()
 
         model_pars = pd.DataFrame(data=np.vstack([ps[x] for x in gn[genes_step1]]),
                                   columns=['Intercept', 'log_umi', 'theta'], index=gn[genes_step1])
@@ -496,17 +506,15 @@ def is_outlier(y, x, th=10):
     return np.abs(np.vstack((score1, score2))).min(0) > th
 
 
-def _parallel_init(igenes_bin_regress, iumi_bin, ign, imm, ips):
+def _parallel_init(igenes_bin_regress, iumi_bin, ign, imm):
     global genes_bin_regress
     global umi_bin
     global gn
     global mm
-    global ps
     genes_bin_regress = igenes_bin_regress
     umi_bin = iumi_bin
     gn = ign
     mm = imm
-    ps = ips
 
 
 def _parallel_wrapper(j):
@@ -518,7 +526,7 @@ def _parallel_wrapper(j):
     res = pr.fit(disp=False)
     mu = res.predict()
     theta = theta_ml(y, mu)
-    ps[name] = np.append(res.params, theta)
+    return name, np.append(res.params, theta)
 
 
 def theta_ml(y, mu):
