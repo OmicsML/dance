@@ -26,6 +26,12 @@ DEFAULT_PARAMETER_TUNING_FREQ_N = 10
 
 DEFAULT_CELL_COUNT_PREFIX = "preprocess"
 
+# Transform names stored in older sweep summaries.  Resolve them to their
+# current registry names when rebuilding step-3 configurations.
+LEGACY_TRANSFORM_TARGETS = {
+    "ScaleFeature": "ColumnSumNormalize",
+}
+
 
 def get_cell_count_stats(data, raw_n_cells: Optional[int] = None, raw_n_features: Optional[int] = None,
                          prefix: str = DEFAULT_CELL_COUNT_PREFIX) -> Dict[str, Union[int, float]]:
@@ -1227,9 +1233,16 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
         pipeline = []
         row = [i for i in row]
         for x in row:
+            target = LEGACY_TRANSFORM_TARGETS.get(x, x)
+            matched = False
             for k in conf.pipeline:
-                if k["target"] == x:
+                if k["target"] == target:
                     pipeline.append(deepcopy(k))
+                    matched = True
+                    break
+            if not matched:
+                raise ValueError(f"Step-3 parameter template has no transform for selected pipeline target {x!r} "
+                                 f"(resolved target {target!r}).")
         for i, f in zip(required_indexes, required_funs):
             if i == sys.maxsize:
                 i = len(step2_pipeline_planer.config.pipeline) - 1
@@ -1255,8 +1268,15 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
                                 if target == p2["target"]:
                                     p2["params"] = d_p
         step2_pipeline = step2_pipeline_planer.config.pipeline
+        if len(step2_pipeline) != len(pipeline):
+            raise ValueError(
+                f"Generated step-3 pipeline length mismatch: step2={len(step2_pipeline)}, generated={len(pipeline)}.")
         # step2_pipeline=sorted(step2_pipeline_planer.config.pipeline,key=lambda x: float(x.split('.')[1]))
         for p1, p2 in zip(step2_pipeline, pipeline):  #need order
+            if p1["type"] != p2["type"]:
+                raise ValueError(
+                    f"Generated step-3 pipeline type mismatch: expected {p1['type']!r}, got {p2['type']!r} "
+                    f"for target {p2['target']!r}.")
             if "params" in p1:
                 p2.params = p1.params
                 # for key, value in p1.params.items():
