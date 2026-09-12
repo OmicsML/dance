@@ -152,6 +152,7 @@ examples/multi_modality/joint_embedding/models/*.pth
 !examples/result_analysis/get_important_pattern.py
 !examples/result_analysis/get_num.py
 
+
 # =============================================================================
 # Model files
 # =============================================================================
@@ -159,9 +160,15 @@ models/model_joint_embedding_1.pth
 examples/tuning/joint_embedding_scmogcn/models/model_joint_embedding_1.pth
 examples/multi_modality/joint_embedding/models/*.pth
 
+
+!examples/result_analysis/celltype_annotation/cta_scdeepsort/main.py
+
 # =============================================================================
 # Others
 # =============================================================================
 trash
 out.log
 temp_data
+!examples/tuning/cluster_cell_filtering_*_audit.md
+!examples/tuning/cluster_cell_filtering_*_summary.csv
+!examples/tuning/cluster_cell_filtering_*_top3_changes.csv

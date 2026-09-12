@@ -16,6 +16,27 @@ from dance import logger
 from dance.data import Data
 from dance.datasets.base import BaseDataset
 from dance.registry import register_dataset
+from dance.transforms import (
+    AlignMod,
+    ColumnSumNormalize,
+    Compose,
+    FeatureCellPlaceHolder,
+    FilterCellsCommonMod,
+    FilterCellsPlaceHolder,
+    FilterCellsScanpyOrder,
+    FilterGenesPercentile,
+    FilterGenesPlaceHolder,
+    FilterGenesRegression,
+    FilterGenesScanpyOrder,
+    FilterGenesTopK,
+    GaussRandProjFeature,
+    HighlyVariableGenesRawCount,
+    NormalizePlaceHolder,
+    NormalizeTotal,
+    NormalizeTotalLog1P,
+    SetConfig,
+    tfidfTransform,
+)
 from dance.transforms.preprocess import lsiTransformer
 from dance.typing import List
 from dance.utils import is_numeric
@@ -776,6 +797,221 @@ class JointEmbeddingNIPSDataset(MultiModalityDataset):
             meta_common_cells = list(set(meta1.obs.index) & set(meta2.obs.index))
             meta1 = meta1[meta_common_cells, :]
             meta2 = meta2[meta_common_cells, :]
+        elif self.preprocess == "dcca_optim":
+            data = Data(md.MuData({
+                "mod1": mod1,
+                "mod2": mod2,
+                "meta1": meta1,
+                "meta2": meta2,
+                "test_sol": test_sol,
+            }), train_size=train_size)
+
+            preprocessing_pipeline = Compose(
+                # pipeline.0.filter.gene: mod1
+                FilterGenesPlaceHolder(mod="mod1"),
+
+                # pipeline.1.filter.gene: mod2
+                FilterGenesPercentile(mod="mod2"),
+
+                # pipeline.2.misc
+                AlignMod(),
+
+                # pipeline.3.normalize: mod1, candidate group [NormalizePlaceHolder, tfidfTransform]
+                NormalizePlaceHolder(mod="mod1"),
+
+                # pipeline.4.normalize: mod2, candidate group [NormalizePlaceHolder, tfidfTransform]
+                NormalizePlaceHolder(mod="mod2"),
+
+                # pipeline.5.normalize: mod1
+                NormalizePlaceHolder(mod="mod1"),
+
+                # pipeline.6.normalize: mod2
+                NormalizeTotalLog1P(mod="mod2"),
+
+                # pipeline.7.filter.gene: mod1, channel=counts/layers
+                FilterGenesRegression(
+                    mod="mod1",
+                    channel="counts",
+                    channel_type="layers",
+                    num_genes=self.selection_threshold,
+                ),
+
+                # pipeline.8.filter.gene: mod2, channel=counts/layers
+                FilterGenesRegression(
+                    mod="mod2",
+                    channel="counts",
+                    channel_type="layers",
+                    num_genes=self.selection_threshold,
+                ),
+
+                # pipeline.9.filter.cell: mod1
+                FilterCellsPlaceHolder(mod="mod1"),
+
+                # # pipeline.10.filter.cell: mod2
+                FilterCellsPlaceHolder(mod="mod2"),
+                # FilterCellsScanpyOrder(
+                #     mod="mod2",
+                #     order=["min_counts", "min_genes", "max_counts", "max_genes"],
+                #     min_counts=0.01,
+                #     max_counts=0.99,
+                #     min_genes=0.01,
+                #     max_genes=0.99,
+                # ),
+
+                # pipeline.11.filter.cell
+                FilterCellsCommonMod(mod1="mod1", mod2="mod2", sol="test_sol"),
+
+                # pipeline.12.filter.cell: meta1
+                FilterCellsPlaceHolder(mod="meta1"),
+
+                # pipeline.13.filter.cell: meta2
+                FilterCellsPlaceHolder(mod="meta2"),
+
+                # pipeline.14.filter.cell
+                FilterCellsCommonMod(mod1="meta1", mod2="meta2"),
+
+                # pipeline.15.feature.cell: mod1
+                FeatureCellPlaceHolder(out="feature.cell", log_level="INFO", mod="mod1"),
+
+                # pipeline.16.feature.cell: mod2
+                FeatureCellPlaceHolder(out="feature.cell", log_level="INFO", mod="mod2"),
+
+                # pipeline.17.misc
+                SetConfig({
+                    "feature_mod": ["mod1", "mod2", "mod1", "mod2", "mod1", "mod2"],
+                    "label_mod":
+                    "mod1",
+                    "feature_channel_type": ["obsm", "obsm", "layers", "layers", "obsm", "obsm"],
+                    "feature_channel":
+                    ["feature.cell", "feature.cell", "counts", "counts", "size_factors", "size_factors"],
+                    "label_channel":
+                    "labels",
+                }),
+            )
+            preprocessing_pipeline(data)
+
+            mod1 = data.data.mod["mod1"]
+            mod2 = data.data.mod["mod2"]
+            meta1 = data.data.mod["meta1"]
+            meta2 = data.data.mod["meta2"]
+            test_sol = data.data.mod["test_sol"]
+        elif self.preprocess == "dcca_optim_v2":
+            data = Data(md.MuData({
+                "mod1": mod1,
+                "mod2": mod2,
+                "meta1": meta1,
+                "meta2": meta2,
+                "test_sol": test_sol,
+            }), train_size=train_size)
+
+            preprocessing_pipeline = Compose(
+                # pipeline.0.filter.gene: mod1
+                FilterGenesScanpyOrder(
+                    mod="mod1",
+                    order=["min_counts", "max_counts", "min_cells", "max_cells"],
+                    min_counts=0.01,
+                    max_counts=0.99,
+                    min_cells=0.01,
+                    max_cells=0.99,
+                ),
+
+                # pipeline.1.filter.gene: mod2
+                FilterGenesScanpyOrder(
+                    mod="mod2",
+                    order=["min_counts", "max_counts", "min_cells", "max_cells"],
+                    min_counts=0.01,
+                    max_counts=0.99,
+                    min_cells=0.01,
+                    max_cells=0.99,
+                ),
+
+                # pipeline.2.misc
+                AlignMod(),
+
+                # pipeline.3.normalize: mod1
+                tfidfTransform(mod="mod1"),
+
+                # pipeline.4.normalize: mod2
+                NormalizePlaceHolder(mod="mod2"),
+
+                # pipeline.5.normalize: mod1
+                ColumnSumNormalize(mod="mod1"),  # pyright: ignore[reportUndefinedVariable]
+
+                # pipeline.6.normalize: mod2
+                NormalizeTotal(mod="mod2"),
+
+                # pipeline.7.filter.gene: mod1
+                FilterGenesTopK(
+                    mod="mod1",
+                    channel="counts",
+                    channel_type="layers",
+                    num_genes=self.selection_threshold,
+                ),
+
+                # pipeline.8.filter.gene: mod2
+                HighlyVariableGenesRawCount(
+                    mod="mod2",
+                    channel="counts",
+                    channel_type="layers",
+                    n_top_genes=self.selection_threshold,
+                ),
+
+                # pipeline.9.filter.cell: mod1
+                FilterCellsPlaceHolder(mod="mod1"),
+
+                # pipeline.10.filter.cell: mod2
+                FilterCellsPlaceHolder(mod="mod2"),
+
+                # pipeline.11.filter.cell
+                FilterCellsCommonMod(mod1="mod1", mod2="mod2", sol="test_sol"),
+
+                # pipeline.12.filter.cell: meta1
+                FilterCellsPlaceHolder(mod="meta1"),
+
+                # pipeline.13.filter.cell: meta2
+                FilterCellsScanpyOrder(
+                    mod="meta2",
+                    order=["min_counts", "min_genes", "max_counts", "max_genes"],
+                    min_counts=0.01,
+                    max_counts=0.99,
+                    min_genes=0.01,
+                    max_genes=0.99,
+                ),
+
+                # pipeline.14.filter.cell
+                FilterCellsCommonMod(mod1="meta1", mod2="meta2"),
+
+                # pipeline.15.feature.cell: mod1
+                GaussRandProjFeature(
+                    mod="mod1",
+                    out="feature.cell",
+                    log_level="INFO",
+                    n_components=400,
+                ),
+
+                # pipeline.16.feature.cell: mod2
+                FeatureCellPlaceHolder(out="feature.cell", log_level="INFO", mod="mod2"),
+
+                # pipeline.17.misc
+                SetConfig({
+                    "feature_mod": ["mod1", "mod2", "mod1", "mod2", "mod1", "mod2"],
+                    "label_mod":
+                    "mod1",
+                    "feature_channel_type": ["obsm", "obsm", "layers", "layers", "obsm", "obsm"],
+                    "feature_channel":
+                    ["feature.cell", "feature.cell", "counts", "counts", "size_factors", "size_factors"],
+                    "label_channel":
+                    "labels",
+                }),
+            )
+            preprocessing_pipeline(data)
+
+            mod1 = data.data.mod["mod1"]
+            mod2 = data.data.mod["mod2"]
+            meta1 = data.data.mod["meta1"]
+            meta2 = data.data.mod["meta2"]
+            test_sol = data.data.mod["test_sol"]
+
         else:
             logger.info(f"Preprocessing method {self.preprocess!r} not supported.")
 

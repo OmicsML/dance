@@ -1,5 +1,5 @@
 import os
-from multiprocessing import Manager, Pool
+from multiprocessing import Pool
 
 import anndata as ad
 import numpy as np
@@ -60,6 +60,7 @@ class ColumnSumNormalize(BaseTransform):
         batch_key: Optional[str] = None,
         mode: NormMode = "normalize",
         eps: float = -1,
+        preserve_sparse: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -68,6 +69,7 @@ class ColumnSumNormalize(BaseTransform):
         self.batch_key = batch_key
         self.mode = mode
         self.eps = eps
+        self.preserve_sparse = preserve_sparse
 
     def _get_idx_dict(self, data) -> List[Dict[str, List[int]]]:
         batch_key = self.batch_key
@@ -96,14 +98,30 @@ class ColumnSumNormalize(BaseTransform):
 
     def __call__(self, data):
         if isinstance(data.data.X, sp.spmatrix):
-            self.logger.warning("Native support for sparse matrix is not implemented yet, "
-                                "converting to dense array explicitly.")
-            data.data.X = data.data.X.A
+            if not self.preserve_sparse:
+                self.logger.warning(
+                    "Native support for sparse matrix is disabled, converting to dense array explicitly.")
+                data.data.X = data.data.X.toarray()
+            elif self.mode not in ("normalize", "l2"):
+                self.logger.warning(
+                    f"Sparse matrices cannot preserve zeros with mode={self.mode!r}; converting to dense array.")
+                data.data.X = data.data.X.toarray()
 
         idx_dict = self._get_idx_dict(data)
         for name, idx in idx_dict.items():
             self.logger.info(f"Scaling {name} (n={len(idx):,})")
-            data.data.X[idx] = normalize(data.data.X[idx], mode=self.mode, axis=self.axis, eps=self.eps)
+            normalized = normalize(data.data.X[idx], mode=self.mode, axis=self.axis, eps=self.eps)
+            if len(idx) == data.shape[0] and np.array_equal(idx, np.arange(data.shape[0])):
+                data.data.X = normalized
+            else:
+                data.data.X[idx] = normalized
+        return data
+
+
+@register_preprocessor("normalize")
+@add_mod_and_transform
+class ScaleFeature(ColumnSumNormalize):
+    """Historical name retained for clustering sweep configs predating 98bf305."""
 
 
 class ScTransformR(BaseTransform):
@@ -182,17 +200,25 @@ class tfidfTransform(BaseTransform):
         self.fitted = False
 
     def fit(self, X):
-        self.idf = X.shape[0] / X.sum(axis=0)
+        feature_sums = np.asarray(X.sum(axis=0)).ravel()
+        # A feature absent from every cell has an undefined inverse document
+        # frequency. Keeping its weight at zero preserves the all-zero column
+        # without introducing infinities into subsequent normalizers.
+        self.idf = np.divide(X.shape[0], feature_sums, out=np.zeros_like(feature_sums, dtype=float), where=feature_sums
+                             != 0)
         self.fitted = True
 
     def transform(self, X):
         if not self.fitted:
             raise RuntimeError('Transformer was not fitted on any data')
         if scipy.sparse.issparse(X):
-            tf = X.multiply(1 / X.sum(axis=1))
+            row_sums = np.asarray(X.sum(axis=1)).ravel()
+            inv_row_sums = np.divide(1, row_sums, out=np.zeros_like(row_sums, dtype=float), where=row_sums != 0)
+            tf = X.multiply(inv_row_sums[:, None])
             return tf.multiply(self.idf).tocsr()
         else:
-            tf = X / X.sum(axis=1, keepdims=True)
+            row_sums = np.asarray(X.sum(axis=1), dtype=float)
+            tf = np.divide(X, row_sums[:, None], out=np.zeros_like(X, dtype=float), where=row_sums[:, None] != 0)
             return tf * self.idf
 
     def __call__(self, data):
@@ -231,6 +257,9 @@ class ScTransform(BaseTransform):
         Bandwidth adjusting parameter.
     processes_num
         Number of processes. Default to the total number of available processors.
+    sparse_output
+        Preserve the residual matrix as CSR instead of materializing a dense
+        array. The numerical values are unchanged; this only changes storage.
 
     References
     ---------
@@ -250,6 +279,8 @@ class ScTransform(BaseTransform):
         bin_size: int = 500,
         bw_adjust: float = 3,
         processes_num: int = os.cpu_count(),
+        sparse_output: bool = False,
+        preserve_sparse: bool = False,
         **kwargs,
     ):  # yapf: disable
         super().__init__(**kwargs)
@@ -262,6 +293,7 @@ class ScTransform(BaseTransform):
         self.bin_size = bin_size
         self.bw_adjust = bw_adjust
         self.processes_num = processes_num
+        self.preserve_sparse = preserve_sparse
 
     def _get_idx_dict(self, data) -> List[Dict[str, List[int]]]:
         # TODO: refactor out this function; reduce ropied code.
@@ -290,15 +322,14 @@ class ScTransform(BaseTransform):
         return idx_dict
 
     def __call__(self, data: Data):
-        if isinstance(data.data.X, sp.spmatrix):
-            self.logger.warning("Native support for sparse matrix is not implemented yet, "
-                                "converting to dense array explicitly.")
-            data.data.X = data.data.X.A
+        input_is_sparse = self.preserve_sparse and isinstance(data.data.X, sp.spmatrix)
+        if isinstance(data.data.X, sp.spmatrix) and not input_is_sparse:
+            self.logger.warning("Native support for sparse matrix is disabled, converting to dense array explicitly.")
+            data.data.X = data.data.X.toarray()
         # idx_dict = self._get_idx_dict(data)
         # for name, idx in idx_dict.items():
         selected_data = data.data
-        X = selected_data.X.copy()
-        X = sp.csr_matrix(X)
+        X = sp.csr_matrix(selected_data.X, copy=True)
         X.eliminate_zeros()
         gn = np.array(list(selected_data.var_names))
         cn = np.array(list(selected_data.obs_names))
@@ -349,7 +380,11 @@ class ScTransform(BaseTransform):
         bin_ind = np.ceil(np.arange(1, genes_step1.size + 1) / self.bin_size)
         max_bin = max(bin_ind)
 
-        ps = Manager().dict()
+        # ``multiprocessing.Manager`` launches a local socket server. Besides
+        # adding unnecessary IPC overhead, that socket is unavailable in some
+        # sandboxed execution environments. Have workers return their fitted
+        # parameters instead and aggregate them in the parent process.
+        ps = {}
 
         for i in range(1, int(max_bin) + 1):
             genes_bin_regress = genes_step1[bin_ind == i]
@@ -359,14 +394,12 @@ class ScTransform(BaseTransform):
 
             pc_chunksize = umi_bin.shape[1] // os.cpu_count() + 1
 
-            pool = Pool(self.processes_num, _parallel_init, [genes_bin_regress, umi_bin, gn, mm, ps])
+            pool = Pool(self.processes_num, _parallel_init, [genes_bin_regress, umi_bin, gn, mm])
             try:
-                pool.map(_parallel_wrapper, range(umi_bin.shape[1]), chunksize=pc_chunksize)
+                ps.update(pool.map(_parallel_wrapper, range(umi_bin.shape[1]), chunksize=pc_chunksize))
             finally:
                 pool.close()
                 pool.join()
-
-        ps = ps._getvalue()
 
         model_pars = pd.DataFrame(data=np.vstack([ps[x] for x in gn[genes_step1]]),
                                   columns=['Intercept', 'log_umi', 'theta'], index=gn[genes_step1])
@@ -418,7 +451,8 @@ class ScTransform(BaseTransform):
         x, y = X.nonzero()
         y = np.array([d[i] for i in y])
         data = X.data
-        Xnew = sp.coo_matrix((data, (x, y)), shape=selected_data.shape).toarray()
+        Xnew = sp.coo_matrix((data, (x, y)), shape=selected_data.shape)
+        Xnew = Xnew.tocsr() if input_is_sparse else Xnew.toarray()
         selected_data.X = Xnew
         for c in full_model_pars.columns:
             selected_data.var[c + '_sct'] = full_model_pars[c]
@@ -472,17 +506,15 @@ def is_outlier(y, x, th=10):
     return np.abs(np.vstack((score1, score2))).min(0) > th
 
 
-def _parallel_init(igenes_bin_regress, iumi_bin, ign, imm, ips):
+def _parallel_init(igenes_bin_regress, iumi_bin, ign, imm):
     global genes_bin_regress
     global umi_bin
     global gn
     global mm
-    global ps
     genes_bin_regress = igenes_bin_regress
     umi_bin = iumi_bin
     gn = ign
     mm = imm
-    ps = ips
 
 
 def _parallel_wrapper(j):
@@ -494,7 +526,7 @@ def _parallel_wrapper(j):
     res = pr.fit(disp=False)
     mu = res.predict()
     theta = theta_ml(y, mu)
-    ps[name] = np.append(res.params, theta)
+    return name, np.append(res.params, theta)
 
 
 def theta_ml(y, mu):
@@ -613,18 +645,20 @@ class NormalizeTotal(AnnDataTransform):
     """
 
     def __init__(self, target_sum: Optional[float] = None, max_fraction: float = 0.05, key_added: Optional[str] = None,
-                 layer: Optional[str] = None, layers: Union[Literal['all'], Iterable[str]] = None,
-                 layer_norm: Optional[str] = None, inplace: bool = True, copy: bool = False, **kwargs):
+                 layer: Optional[str] = None, layers: Union[Literal['all'],
+                                                            Iterable[str]] = None, layer_norm: Optional[str] = None,
+                 inplace: bool = True, copy: bool = False, preserve_sparse: bool = False, **kwargs):
         super().__init__(sc.pp.normalize_total, target_sum=target_sum, key_added=key_added, layer=layer, layers=layers,
                          layer_norm=layer_norm, inplace=inplace, copy=copy, exclude_highly_expressed=True,
                          max_fraction=max_fraction, **kwargs)
+        self.preserve_sparse = preserve_sparse
 
         if max_fraction == 1.0:
             self.logger.info("max_fraction set to 1.0, this is equivalent to setting exclude_highly_expressed=False.")
 
     def __call__(self, data):
-        if scipy.sparse.issparse(data.data.X):
-            data.data.X = np.array(data.data.X.todense())
+        if scipy.sparse.issparse(data.data.X) and not self.preserve_sparse:
+            data.data.X = np.asarray(data.data.X.toarray())
         return super().__call__(data)
 
 
@@ -668,9 +702,10 @@ class NormalizeTotalLog1P(BaseTransform):
 
     """
 
-    def __init__(self, base=None, target_sum=None, max_fraction=0.05, **kwargs):
+    def __init__(self, base=None, target_sum=None, max_fraction=0.05, preserve_sparse: bool = False, **kwargs):
         super().__init__(**kwargs)
-        self.normalize_total = NormalizeTotal(target_sum=target_sum, max_fraction=max_fraction)
+        self.normalize_total = NormalizeTotal(target_sum=target_sum, max_fraction=max_fraction,
+                                              preserve_sparse=preserve_sparse)
         self.log1p = Log1P(base=base)
 
     def __call__(self, data: Data) -> Data:
