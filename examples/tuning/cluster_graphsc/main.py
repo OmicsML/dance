@@ -14,7 +14,16 @@ from sklearn.model_selection import train_test_split
 from dance import logger
 from dance.datasets.singlemodality import ClusteringDataset
 from dance.modules.single_modality.clustering.graphsc import GraphSC
-from dance.pipeline import PipelinePlaner, get_step3_yaml, run_step3, save_summary_data
+from dance.pipeline import (
+    PipelinePlaner,
+    fails_cell_count_guard,
+    get_step3_yaml,
+    log_cell_count_stats,
+    maybe_run_wandb_sweep_agent,
+    resolve_sweep_inputs,
+    run_step3,
+    save_summary_data,
+)
 from dance.utils import set_seed
 
 if __name__ == "__main__":
@@ -58,6 +67,14 @@ if __name__ == "__main__":
     parser.add_argument("--sweep_id", type=str, default=None)
     parser.add_argument("--summary_file_path", default="results/pipeline/best_test_acc.csv", type=str)
     parser.add_argument("--root_path", default=str(Path(__file__).resolve().parent), type=str)
+    parser.add_argument("--min_cell_retention", default=None, type=float,
+                        help="Minimum preprocessing cell retention for step3 generation, e.g. 0.8")
+    parser.add_argument("--min_cell_count", default=None, type=int,
+                        help="Minimum cells after preprocessing for step3 generation")
+    parser.add_argument("--cell_count_summary_path", default=None, type=str,
+                        help="External cell-count CSV used to filter step3 candidates")
+    parser.add_argument("--auto_additional_sweep_ids", action="store_true",
+                        help="Resolve prior additional sweep ids from wandb metadata")
     parser.add_argument('--additional_sweep_ids', action='append', type=str, help='get prior runs')
     args = parser.parse_args()
     aris = []
@@ -74,11 +91,18 @@ if __name__ == "__main__":
         # Load data and perform necessary preprocessing
         dataloader = ClusteringDataset(args.data_dir, args.dataset)
         data = dataloader.load_data(cache=args.cache)
+        raw_n_cells, raw_n_features = data.shape
         # Prepare preprocessing pipeline and apply it to data
         kwargs = {tune_mode: dict(wandb.config)}
         preprocessing_pipeline = pipeline_planer.generate(**kwargs)
         print(f"Pipeline config:\n{preprocessing_pipeline.to_yaml()}")
         preprocessing_pipeline(data)
+        cell_stats = log_cell_count_stats(data, raw_n_cells=raw_n_cells, raw_n_features=raw_n_features)
+        if fails_cell_count_guard(cell_stats, min_cell_retention=args.min_cell_retention,
+                                  min_cell_count=args.min_cell_count):
+            wandb.log({"acc": -1.0, "preprocess.cell_count_guard_failed": 1})
+            wandb.finish()
+            return
         graph, y = data.get_train_data()
         n_clusters = len(np.unique(y))
 
@@ -102,15 +126,21 @@ if __name__ == "__main__":
         torch.cuda.empty_cache()
         time.sleep(20)
 
-    entity, project, sweep_id = pipeline_planer.wandb_sweep_agent(
-        evaluate_pipeline, sweep_id=args.sweep_id, count=args.count)  #Score can be recorded for each epoch
+    entity, project, sweep_id, args.additional_sweep_ids = resolve_sweep_inputs(
+        pipeline_planer, args.sweep_id, additional_sweep_ids=args.additional_sweep_ids,
+        auto_additional_sweep_ids=args.auto_additional_sweep_ids)
+    entity, project, sweep_id = maybe_run_wandb_sweep_agent(pipeline_planer, evaluate_pipeline, sweep_id=sweep_id,
+                                                            count=args.count)  #Score can be recorded for each epoch
     save_summary_data(entity, project, sweep_id, summary_file_path=args.summary_file_path, root_path=file_root_path,
                       additional_sweep_ids=args.additional_sweep_ids)
     if args.tune_mode == "pipeline" or args.tune_mode == "pipeline_params":
         get_step3_yaml(result_load_path=f"{args.summary_file_path}", step2_pipeline_planer=pipeline_planer,
                        conf_load_path=f"{Path(args.root_path).resolve().parent}/step3_default_params.yaml",
                        root_path=file_root_path, required_funs=["CellFeatureGraph", "SetConfig"],
-                       required_indexes=[sys.maxsize - 1, sys.maxsize], metric="acc")
+                       required_indexes=[sys.maxsize - 1,
+                                         sys.maxsize], metric="acc", min_cell_retention=args.min_cell_retention,
+                       min_cell_count=args.min_cell_count, cell_count_summary_path=args.cell_count_summary_path,
+                       cell_count_method="Graphsc", cell_count_dataset=args.dataset)
         if args.tune_mode == "pipeline_params":
             run_step3(file_root_path, evaluate_pipeline, tune_mode="params", step2_pipeline_planer=pipeline_planer)
 """ Reproduction information

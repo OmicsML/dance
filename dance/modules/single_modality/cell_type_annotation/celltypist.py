@@ -11,7 +11,7 @@ from sklearn.preprocessing import StandardScaler
 
 from dance import logger
 from dance.modules.base import BaseClassificationMethod
-from dance.transforms import SetConfig
+from dance.transforms import AnnDataTransform, Compose, SetConfig
 from dance.typing import LogLevel, Optional, Union
 
 
@@ -549,8 +549,26 @@ class Celltypist(BaseClassificationMethod):
         self.description = description
 
     @staticmethod
-    def preprocessing_pipeline(log_level: LogLevel = "INFO"):
-        return SetConfig({"label_channel": "cell_type"}, log_level=log_level)
+    def preprocessing_pipeline(normalize: bool = False, log_level: LogLevel = "INFO"):
+        """Create the preprocessing pipeline for CellTypist.
+
+        Parameters
+        ----------
+        normalize
+            Whether to transform ``.X`` to log1p-normalized expression at 10,000 counts per cell.
+        log_level
+            Logging level for the composed preprocessing pipeline.
+
+        """
+        transforms = []
+
+        if normalize:
+            transforms.append(AnnDataTransform(sc.pp.normalize_total, target_sum=1e4))
+            transforms.append(AnnDataTransform(sc.pp.log1p))
+
+        transforms.append(SetConfig({"label_channel": "cell_type"}))
+
+        return Compose(*transforms, log_level=log_level)
 
     def fit(self, indata: np.array, labels: Optional[Union[str, list, tuple, np.ndarray, pd.Series, pd.Index]] = None,
             C: float = 1.0, solver: Optional[str] = None, max_iter: int = 1000, n_jobs: Optional[int] = None,

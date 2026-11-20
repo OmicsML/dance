@@ -50,7 +50,7 @@ class CellFeatureGraph(BaseTransform):
         edata = torch.FloatTensor(edata)
 
         # Initialize cell-gene graph
-        g = dgl.graph((row, col))
+        g = dgl.graph((row, col), num_nodes=num_feats + num_cells)
         g.edata["weight"] = edata
         # FIX: change to feat_id
         g.ndata["cell_id"] = torch.concat((torch.arange(num_feats, dtype=torch.int32),

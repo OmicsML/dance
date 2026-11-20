@@ -23,11 +23,13 @@ repos:
     rev: v3.16.0
     hooks:
       - id: pyupgrade
+        language_version: python3.10
         args: [--py3-plus]
   - repo: https://github.com/google/yapf
     rev: v0.40.2
     hooks:
       - id: yapf
+        language_version: python3.10
         name: Format code
         additional_dependencies: [toml]
   - repo: https://github.com/pycqa/isort
@@ -41,6 +43,7 @@ repos:
     hooks:
       - id: docformatter
         name: Format docstring
+        language_version: python3.10
         additional_dependencies: [tomli]
         args: [--config, pyproject.toml]
   - repo: https://github.com/executablebooks/mdformat

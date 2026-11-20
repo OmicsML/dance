@@ -64,6 +64,11 @@ mertic_names = [d["metric"] for d in metrics_dict]
 ascendings = [d["ascending"] for d in metrics_dict]
 
 
+def is_pipeline_search_step(step_name):
+    normalized = str(step_name).strip().lower().replace(" ", "")
+    return normalized in {"step2", "step1&2", "step1and2"}
+
+
 def summary_pattern(step2_origin_data: pd.DataFrame, metric_name, ascending, task, positive, only_apr, alpha=0.05,
                     vis=False):
     """Analyze patterns in pipeline configurations and their impact on performance
@@ -171,6 +176,7 @@ if __name__ == "__main__":
         data['Methods'] = data['Methods'].fillna(method='ffill')
         data['step name'] = data['step name'].fillna(method='ffill')
         data = data.set_index(['Methods'])
+        processed_combinations = set()
 
         # Iterate through each method and dataset combination
         for row_idx in range(data.shape[0]):
@@ -190,8 +196,11 @@ if __name__ == "__main__":
                 #     continue
                 # if method != "Scgnn2":
                 #     continue
-                if isinstance(value, str) and value.startswith(prefix) and (
-                        str(step_name).lower() == "step2" or str(step_name).lower() == "step 2"):  #TODO add step3
+                if isinstance(value, str) and value.startswith(prefix) and is_pipeline_search_step(step_name):
+                    combination = (method, str(dataset))
+                    if combination in processed_combinations:
+                        continue
+                    processed_combinations.add(combination)
                     sweep_url = value
                 else:
                     continue

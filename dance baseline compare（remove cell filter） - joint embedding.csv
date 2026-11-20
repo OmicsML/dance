@@ -1,0 +1,5 @@
+,BRAIN atac2gex,SKIN atac2gex,op 2022 multi atac2gex,ARI,"  Stage 1, 2 and 3 (test dataset as metric for selection)"
+dcca,0.326/0.317/0.112/NA,0.409/0.399/0.335/NA,0.530/0.511/0.438/NA,,
+jae,0.685/0.713/0.475/NA,0.750/0.740/0.34/NA,0.825/0.790/0.428/NA,,
+scmogcn,0.679/0.679/0.478/NA,0.622/0.603/0.32/NA,0.824/0.761/0.433/NA,,
+scmvae,0.470/0.429/0.218/NA,0.362/0.363/0.341/NA,0.404/0.397/0.362/NA,,

@@ -24,6 +24,151 @@ from dance.utils import Color, default, try_import
 DEFAULT_PIPELINE_TUNING_TOP_K = 3
 DEFAULT_PARAMETER_TUNING_FREQ_N = 10
 
+DEFAULT_CELL_COUNT_PREFIX = "preprocess"
+
+# Transform names stored in older sweep summaries.  Resolve them to their
+# current registry names when rebuilding step-3 configurations.
+LEGACY_TRANSFORM_TARGETS = {
+    "ScaleFeature": "ColumnSumNormalize",
+}
+
+
+def get_cell_count_stats(data, raw_n_cells: Optional[int] = None, raw_n_features: Optional[int] = None,
+                         prefix: str = DEFAULT_CELL_COUNT_PREFIX) -> Dict[str, Union[int, float]]:
+    """Return cell/feature retention statistics for a processed data object.
+
+    This is intentionally small and task-agnostic so tuning scripts can log the
+    same summary fields to wandb after preprocessing. The columns are later used
+    by :func:`get_step3_yaml` to filter out step-2 pipelines that retained too
+    few cells before generating step-3 parameter sweeps.
+
+    """
+    n_cells, n_features = data.shape
+    stats: Dict[str, Union[int, float]] = {
+        f"{prefix}.n_cells": int(n_cells),
+        f"{prefix}.n_features": int(n_features),
+    }
+    if raw_n_cells is not None:
+        stats[f"{prefix}.raw_n_cells"] = int(raw_n_cells)
+        stats[f"{prefix}.removed_n_cells"] = int(raw_n_cells - n_cells)
+        stats[f"{prefix}.cell_retention"] = float(n_cells / raw_n_cells) if raw_n_cells else 0.0
+    if raw_n_features is not None:
+        stats[f"{prefix}.raw_n_features"] = int(raw_n_features)
+        stats[f"{prefix}.removed_n_features"] = int(raw_n_features - n_features)
+        stats[f"{prefix}.feature_retention"] = float(n_features / raw_n_features) if raw_n_features else 0.0
+    return stats
+
+
+def log_cell_count_stats(data, raw_n_cells: Optional[int] = None, raw_n_features: Optional[int] = None,
+                         prefix: str = DEFAULT_CELL_COUNT_PREFIX):
+    """Log preprocessing cell/feature retention statistics to the active wandb run."""
+    stats = get_cell_count_stats(data, raw_n_cells=raw_n_cells, raw_n_features=raw_n_features, prefix=prefix)
+    try_import("wandb").log(stats)
+    return stats
+
+
+def resolve_sweep_inputs(pipeline_planer, sweep_id: Optional[str], additional_sweep_ids=None,
+                         auto_additional_sweep_ids: bool = False):
+    """Return wandb entity/project/sweep inputs, optionally expanding additional sweep
+    IDs."""
+    entity = pipeline_planer.config.wandb.get("entity")
+    project = pipeline_planer.config.wandb.get("project")
+    additional_sweep_ids = list(additional_sweep_ids or [])
+    if auto_additional_sweep_ids and sweep_id is not None:
+        try:
+            resolved = get_additional_sweep(entity=entity, project=project, sweep_id=sweep_id)
+            for resolved_sweep_id in resolved[1:]:
+                if resolved_sweep_id not in additional_sweep_ids:
+                    additional_sweep_ids.append(resolved_sweep_id)
+        except Exception as exc:
+            logger.warning(f"Failed to resolve additional sweep ids for {sweep_id}: {exc}")
+    return entity, project, sweep_id, additional_sweep_ids
+
+
+def maybe_run_wandb_sweep_agent(pipeline_planer, function, sweep_id: Optional[str], count: int):
+    """Run a wandb sweep agent unless count=0 is used to only reuse an existing
+    sweep."""
+    if count == 0 and sweep_id is not None:
+        entity = pipeline_planer.config.wandb.get("entity")
+        project = pipeline_planer.config.wandb.get("project")
+        logger.info(f"Skip step-2 sweep agent because count=0: {sweep_id=}, {entity=}, {project=}")
+        return entity, project, sweep_id
+    return pipeline_planer.wandb_sweep_agent(function, sweep_id=sweep_id, count=count)
+
+
+def fails_cell_count_guard(stats: Dict[str, Union[int, float]], min_cell_retention: Optional[float] = None,
+                           min_cell_count: Optional[int] = None, prefix: str = DEFAULT_CELL_COUNT_PREFIX) -> bool:
+    """Return whether a preprocessed run should be skipped because too few cells
+    remain."""
+    n_cells = stats.get(f"{prefix}.n_cells")
+    cell_retention = stats.get(f"{prefix}.cell_retention")
+    if min_cell_count is not None and n_cells is not None and n_cells < min_cell_count:
+        logger.warning(f"Skip run because {prefix}.n_cells={n_cells} < {min_cell_count}")
+        return True
+    if min_cell_retention is not None and cell_retention is not None and cell_retention < min_cell_retention:
+        logger.warning(f"Skip run because {prefix}.cell_retention={cell_retention:.6f} < {min_cell_retention}")
+        return True
+    return False
+
+
+def _first_pipeline_column(result: pd.DataFrame, suffix: str) -> Optional[str]:
+    cols = [col for col in result.columns if col.startswith("pipeline.") and col.endswith(suffix)]
+    if not cols:
+        return None
+    return sorted(cols, key=lambda col: float(col.split(".")[1]))[0]
+
+
+def _attach_cell_count_stats(
+    result: pd.DataFrame,
+    cell_count_summary_path: Optional[PathLike],
+    cell_count_method: Optional[str],
+    cell_count_dataset: Optional[str],
+    cell_count_prefix: str,
+) -> pd.DataFrame:
+    if cell_count_summary_path is None:
+        return result
+
+    cell_counts = pd.read_csv(cell_count_summary_path)
+    if cell_count_method is not None and "method" in cell_counts:
+        cell_counts = cell_counts[cell_counts["method"] == cell_count_method]
+    if cell_count_dataset is not None and "dataset" in cell_counts:
+        cell_counts = cell_counts[cell_counts["dataset"] == cell_count_dataset]
+
+    gene_col = _first_pipeline_column(result, ".filter.gene")
+    cell_col = _first_pipeline_column(result, ".filter.cell")
+    required = {"gene_filter", "cell_filter", "raw_cells", "kept_cells", "removed_cells"}
+    if gene_col is None or cell_col is None or not required.issubset(cell_counts.columns):
+        logger.warning(f"Skip external cell-count annotation because required columns are missing: "
+                       f"{gene_col=}, {cell_col=}, {cell_count_summary_path=}")
+        return result
+
+    keep = ["gene_filter", "cell_filter", "raw_cells", "kept_cells", "removed_cells"]
+    if "raw_genes" in cell_counts:
+        keep.append("raw_genes")
+    if "genes_before_filter_cell" in cell_counts:
+        keep.append("genes_before_filter_cell")
+    cell_counts = cell_counts[keep].drop_duplicates(["gene_filter", "cell_filter"])
+    rename = {
+        "raw_cells": f"{cell_count_prefix}.raw_n_cells",
+        "kept_cells": f"{cell_count_prefix}.n_cells",
+        "removed_cells": f"{cell_count_prefix}.removed_n_cells",
+        "raw_genes": f"{cell_count_prefix}.raw_n_features",
+        "genes_before_filter_cell": f"{cell_count_prefix}.n_features_before_cell_filter",
+    }
+    cell_counts = cell_counts.rename(columns=rename)
+    result = result.drop(columns=[col for col in rename.values() if col in result.columns], errors="ignore")
+    result = result.drop(columns=[f"{cell_count_prefix}.cell_retention"], errors="ignore")
+
+    annotated = result.merge(cell_counts, left_on=[gene_col, cell_col], right_on=["gene_filter", "cell_filter"],
+                             how="left")
+    annotated = annotated.drop(columns=["gene_filter", "cell_filter"])
+    raw_col = f"{cell_count_prefix}.raw_n_cells"
+    n_col = f"{cell_count_prefix}.n_cells"
+    if raw_col in annotated and n_col in annotated:
+        annotated[f"{cell_count_prefix}.cell_retention"] = (pd.to_numeric(annotated[n_col], errors="coerce") /
+                                                            pd.to_numeric(annotated[raw_col], errors="coerce"))
+    return annotated
+
 
 class Action:
     # XXX: Raise error if other keys found, unless disabled check,
@@ -1012,7 +1157,10 @@ def generate_subsets(path, tune_mode, save_directory, file_path, log_dir, requir
 def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_default_params.yaml",
                    result_load_path="results/pipeline/best.csv", metric="acc", ascending=False,
                    step2_pipeline_planer=None, required_funs=["SetConfig"], required_indexes=[sys.maxsize],
-                   root_path=None):
+                   root_path=None, min_cell_retention: Optional[float] = None, min_cell_count: Optional[int] = None,
+                   cell_count_prefix: str = DEFAULT_CELL_COUNT_PREFIX,
+                   cell_count_summary_path: Optional[PathLike] = None, cell_count_method: Optional[str] = None,
+                   cell_count_dataset: Optional[str] = None):
     """Generate the configuration file of step 3 based on the results of step 2.
 
     Parameters
@@ -1035,6 +1183,16 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
         Location of required functions in step 3.
     root_path
         root path of all paths, defaults to the directory where the script is called.
+    min_cell_retention
+        Optional minimum fraction of raw cells that must remain after preprocessing. Requires summary columns generated
+        by :func:`log_cell_count_stats`. If the columns are missing, no filtering is applied.
+    min_cell_count
+        Optional minimum absolute number of cells that must remain after preprocessing. Requires summary columns
+        generated by :func:`log_cell_count_stats`. If the columns are missing, no filtering is applied.
+    cell_count_summary_path
+        Optional external CSV with columns ``method``, ``dataset``, ``gene_filter``, ``cell_filter``, ``raw_cells``,
+        ``kept_cells`` and ``removed_cells``. This allows reusing one cell-count table across algorithms and existing
+        step-2 sweep summaries.
 
     """
     root_path = default(root_path, CURDIR)
@@ -1043,7 +1201,32 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
     result_load_path = os.path.join(root_path, result_load_path)
     conf = OmegaConf.load(conf_load_path)
     pipeline_top_k = default(step2_pipeline_planer.config.pipeline_tuning_top_k, DEFAULT_PIPELINE_TUNING_TOP_K)
-    result = pd.read_csv(result_load_path).sort_values(by=metric, ascending=ascending).head(pipeline_top_k)
+    result = pd.read_csv(result_load_path)
+    result = _attach_cell_count_stats(result, cell_count_summary_path, cell_count_method, cell_count_dataset,
+                                      cell_count_prefix)
+    # Establish the historical ranking before filtering. Sorting the smaller
+    # frame again can reorder tied scores and needlessly replace Top3 runs.
+    result = result.sort_values(by=metric, ascending=ascending)
+    n_cells_col = f"{cell_count_prefix}.n_cells"
+    retention_col = f"{cell_count_prefix}.cell_retention"
+    if min_cell_count is not None:
+        if n_cells_col in result:
+            before = len(result)
+            result = result[pd.to_numeric(result[n_cells_col], errors="coerce") >= min_cell_count]
+            logger.info(f"Filtered step-2 pipelines by {n_cells_col}>={min_cell_count}: {before}->{len(result)}")
+        else:
+            logger.warning(f"Skip min_cell_count filtering because {n_cells_col!r} is missing in {result_load_path}")
+    if min_cell_retention is not None:
+        if retention_col in result:
+            before = len(result)
+            result = result[pd.to_numeric(result[retention_col], errors="coerce") >= min_cell_retention]
+            logger.info(f"Filtered step-2 pipelines by {retention_col}>={min_cell_retention}: {before}->{len(result)}")
+        else:
+            logger.warning(
+                f"Skip min_cell_retention filtering because {retention_col!r} is missing in {result_load_path}")
+    if result.empty:
+        raise ValueError("No step-2 pipelines remain after cell-count filtering.")
+    result = result.head(pipeline_top_k)
     columns = sorted(
         [col for col in result.columns if (col.startswith("pipeline") or col.startswith("run_kwargs_pipeline"))],
         key=lambda x: float(x.split('.')[1]))
@@ -1053,9 +1236,16 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
         pipeline = []
         row = [i for i in row]
         for x in row:
+            target = LEGACY_TRANSFORM_TARGETS.get(x, x)
+            matched = False
             for k in conf.pipeline:
-                if k["target"] == x:
+                if k["target"] == target:
                     pipeline.append(deepcopy(k))
+                    matched = True
+                    break
+            if not matched:
+                raise ValueError(f"Step-3 parameter template has no transform for selected pipeline target {x!r} "
+                                 f"(resolved target {target!r}).")
         for i, f in zip(required_indexes, required_funs):
             if i == sys.maxsize:
                 i = len(step2_pipeline_planer.config.pipeline) - 1
@@ -1081,8 +1271,15 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
                                 if target == p2["target"]:
                                     p2["params"] = d_p
         step2_pipeline = step2_pipeline_planer.config.pipeline
+        if len(step2_pipeline) != len(pipeline):
+            raise ValueError(
+                f"Generated step-3 pipeline length mismatch: step2={len(step2_pipeline)}, generated={len(pipeline)}.")
         # step2_pipeline=sorted(step2_pipeline_planer.config.pipeline,key=lambda x: float(x.split('.')[1]))
         for p1, p2 in zip(step2_pipeline, pipeline):  #need order
+            if p1["type"] != p2["type"]:
+                raise ValueError(
+                    f"Generated step-3 pipeline type mismatch: expected {p1['type']!r}, got {p2['type']!r} "
+                    f"for target {p2['target']!r}.")
             if "params" in p1:
                 p2.params = p1.params
                 # for key, value in p1.params.items():
@@ -1093,7 +1290,7 @@ def get_step3_yaml(conf_save_path="config_yamls/params/", conf_load_path="step3_
         temp_conf.pipeline = pipeline
         temp_conf.wandb = step2_pipeline_planer.config.wandb
         temp_conf.wandb.method = "bayes"
-        os.makedirs(os.path.dirname(conf_save_path), exist_ok=True)
+        os.makedirs(conf_save_path, exist_ok=True)
         OmegaConf.save(temp_conf, f"{conf_save_path}/{count}_params_tuning_config.yaml")
         count += 1
 
@@ -1128,9 +1325,12 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
     for i in range(pipeline_top_k):
         if i < step3_start_k:
             continue
+        config_path = f"{root_path}/config_yamls/{tune_mode}/{i}_{tune_mode}_tuning_config.yaml"
+        if not os.path.exists(config_path):
+            logger.warning(f"Skip missing step3 config: {config_path}")
+            continue
         try:
-            pipeline_planer = PipelinePlaner.from_config_file(
-                f"{root_path}/config_yamls/{tune_mode}/{i}_{tune_mode}_tuning_config.yaml")
+            pipeline_planer = PipelinePlaner.from_config_file(config_path)
             entity, project, step3_sweep_id = pipeline_planer.wandb_sweep_agent(
                 partial(evaluate_pipeline, tune_mode, pipeline_planer), sweep_id=step3_sweep_ids[i - step3_start_k],
                 count=step3_k)  # score can be recorded for each epoch
@@ -1140,7 +1340,7 @@ def run_step3(root_path, evaluate_pipeline, step2_pipeline_planer: PipelinePlane
             continue
 
 
-def get_additional_sweep(entity, project, sweep_id):
+def get_additional_sweep(entity, project, sweep_id, _seen=None):
     """Recursively retrieve all related sweep IDs from a given sweep.
 
     Given a sweep ID, this function recursively finds all related sweep IDs by examining
@@ -1148,6 +1348,10 @@ def get_additional_sweep(entity, project, sweep_id):
     may have prior runs or additional sweep references.
 
     """
+    _seen = set() if _seen is None else _seen
+    if sweep_id in _seen:
+        return []
+    _seen.add(sweep_id)
     wandb = try_import("wandb")
     sweep = wandb.Api().sweep(f"{entity}/{project}/{sweep_id}")
     additional_sweep_ids = [sweep_id]
@@ -1161,5 +1365,6 @@ def get_additional_sweep(entity, project, sweep_id):
     for i in range(len(args)):
         if args[i] == '--additional_sweep_ids':
             if i + 1 < len(args):
-                additional_sweep_ids += get_additional_sweep(entity=entity, project=project, sweep_id=args[i + 1])
+                additional_sweep_ids += get_additional_sweep(entity=entity, project=project, sweep_id=args[i + 1],
+                                                             _seen=_seen)
     return additional_sweep_ids

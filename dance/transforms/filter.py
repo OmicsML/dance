@@ -103,6 +103,14 @@ class FilterScanpy(BaseTransform):
                              channel_type=self.channel_type)
         total_cells, total_features = x.shape
 
+        # ``FilterCellsScanpyOrder`` applies several filters in sequence. If
+        # one of them removes every cell, the next one must be a no-op rather
+        # than attempting percentile calculations on an empty array. The
+        # caller can then record a zero cell-retention rate.
+        if self._FILTER_TARGET == "cells" and total_cells == 0:
+            self.logger.warning("Skip cell filtering because no cells remain")
+            return
+
         min_counts, max_counts = self.prepCounts(x)
 
         # Determine whether we are dealing with cells or genes
