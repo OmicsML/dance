@@ -284,8 +284,13 @@ class CellTypeAnnotationDataset(BaseDataset):
         data_path = osp.join(train_dir, species, f"{species}_{tissue}{self.train_dataset[0]}_data.h5ad")
         adata = sc.read_h5ad(data_path)
         map_path = osp.join(data_dir, self.map_path, self.species)
-        X_train_temp, X_test = train_test_split(adata, test_size=0.2)
-        X_train, X_val = train_test_split(X_train_temp, test_size=0.25)
+        # Data's default splits are contiguous train/validation/test slices.
+        # Split positions (not names, which need not be unique), and return the
+        # expression and all cell metadata in the same order as the labels.
+        train_valid_idx, test_idx = train_test_split(np.arange(adata.n_obs), test_size=0.2)
+        train_idx, valid_idx = train_test_split(train_valid_idx, test_size=0.25)
+        X_train, X_val, X_test = adata[train_idx], adata[valid_idx], adata[test_idx]
+        adata = adata[np.concatenate([train_idx, valid_idx, test_idx])].copy()
         train_feat, valid_feat, test_feat = X_train.X, X_val.X, X_test.X
         train_label, valid_label, test_label = X_train.obs, X_val.obs, X_test.obs
         if valid_feat is not None:
